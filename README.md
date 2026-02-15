@@ -31,4 +31,4 @@ Sistema completo para gestão de escalas de trabalho, colaboradores e horários.
 
 ## Autor
 
-[Fernando Maffei]
+Fernando Maffei
