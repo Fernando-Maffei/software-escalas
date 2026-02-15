@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Software de Escalas</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+
+<div class="container">
+
+    <aside class="sidebar" id="mainSidebar">
+
+      <div class="sidebar-header">
+        <div class="logo-container">
+          <i class="fas fa-calendar-check"></i>
+        </div>
+        <span class="sidebar-title">Escalas</span></span>
+      </div>
+       <button class="sidebar-btn" data-page="calendario">
+        <div class="btn-content">
+          <div class="icon-wrapper">
+            <i class="fas fa-calendar-alt"></i>
+          </div>
+          <span class="btn-text">Calendário</span>
+        </div>
+      </button>
+
+      <button class="sidebar-btn active" data-page="colaboradores">
+        <div class="btn-content">
+          <div class="icon-wrapper">
+            <i class="fas fa-users"></i>
+
+          </div>
+          <span class="btn-text">Colaboradores</span>
+        </div>
+      </button>
+      
+      <button class="sidebar-btn" data-page="escala">
+        <div class="btn-content">
+          <div class="icon-wrapper">
+            <i class="fas fa-calendar-day"></i>
+          </div>
+          <span class="btn-text">Escala do Dia</span>
+        </div>
+      </button>
+
+      <button class="sidebar-btn" data-page="lancamentoPlantao">
+        <div class="btn-content">
+            <div class="icon-wrapper">
+                <i class="fas fa-calendar-plus"></i>
+            </div>
+            <span class="btn-text">Lançar Plantão</span>
+        </div>
+      </button>
+      
+      <div class="sidebar-divider"></div>
+      
+      <!-- BOTÕES SECUNDÁRIOS -->
+      <button class="sidebar-btn secondary" data-page="relatorios">
+        <div class="btn-content">
+          <div class="icon-wrapper">
+            <i class="fas fa-chart-pie"></i>
+          </div>
+          <span class="btn-text">Relatórios</span>
+        </div>
+      </button>
+      
+      <button class="sidebar-btn secondary" data-page="configuracoes">
+        <div class="btn-content">
+          <div class="icon-wrapper">
+            <i class="fas fa-cog"></i>
+          </div>
+          <span class="btn-text">Configurações</span>
+        </div>
+      </button>
+      
+      <div class="sidebar-spacer"></div>
+      
+      <!-- FOOTER DA SIDEBAR -->
+      <div class="sidebar-footer">
+        <div class="user-profile">
+          <div class="user-avatar">
+            <i class="fas fa-user-astronaut"></i>
+          </div>
+          <div class="user-info">
+            <span class="user-name">Fernando</span>
+            <span class="user-role">Administrador</span>
+          </div>
+        </div>
+        <div class="user-actions">
+          <button class="icon-btn" title="Configurações">
+            <i class="fas fa-sliders-h"></i>
+          </button>
+          <button class="icon-btn" title="Sair">
+            <i class="fas fa-sign-out-alt"></i>
+          </button>
+        </div>
+      </div>
+      
+      <div class="version-badge">
+        <i class="fas fa-code-branch"></i>
+        <span>v1.0.0</span>
+      </div>
+    </aside>
+
+  <!-- CONTEÚDO PRINCIPAL -->
+  <main id="appContent">
+    <div class="loading-indicator">
+      <i class="fas fa-spinner fa-spin"></i> Carregando...
+    </div>
+  </main>
+</div>
+
+<!-- MODAL DE LANÇAMENTO -->
+<div id="modal" class="modal hidden">
+  <div class="modal-content modal-lg">
+    <div class="modal-header">
+      <h3><i class="fas fa-calendar-alt"></i> Gerenciar Lançamentos</h3>
+      <button class="modal-close" id="fecharModalBtn">&times;</button>
+    </div>
+    
+    <div class="modal-body modal-columns">
+      <div class="modal-column list-column">
+        <div class="list-section">
+          <h4><i class="fas fa-list"></i> Lançamentos</h4>
+          
+
+          <div id="loadingAusencias" class="loading-state">
+            <i class="fas fa-spinner fa-spin"></i>
+            <p>Carregando lançamentos...</p>
+          </div>
+
+          <div id="emptyAusencias" class="empty-state hidden">
+            <i class="fas fa-calendar-times"></i>
+            <p>Nenhum lançamento encontrado</p>
+            <small>Clique em "Novo Lançamento" para adicionar</small>
+          </div>
+          <div id="listaAusencias" class="ausencias-list hidden"></div>
+        </div>
+      </div>
+
+
+      <div class="modal-column form-column">
+        <div class="form-section">
+          <h4><i class="fas fa-pen"></i> Novo Lançamento</h4>
+          
+          <div class="form-group">
+            <label><i class="fas fa-user"></i> Colaborador</label>
+            <select id="colaboradorSelect" class="form-control">
+              <option value="">Selecione um colaborador</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label><i class="fas fa-tag"></i> Tipo</label>
+            <select id="tipoSelect" class="form-control">
+              <option value="folga">🌸 Folga</option>
+              <option value="ausencia">⚠️ Ausência</option>
+              <option value="ferias">🏖️ Férias</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label><i class="fas fa-calendar-day"></i> Data Início</label>
+            <input type="date" id="dataInicio" class="form-control">
+          </div>
+
+          <div class="form-group">
+            <label><i class="fas fa-calendar-check"></i> Data Fim</label>
+            <input type="date" id="dataFim" class="form-control">
+          </div>
+
+          <div class="form-actions column">
+            <button id="salvarAusenciaBtn" class="btn-primary full-width">
+              <i class="fas fa-save"></i> Salvar
+            </button>
+            <button id="cancelarEdicaoLancamentoBtn" class="btn-secondary full-width hidden">
+              <i class="fas fa-times"></i> Cancelar Edição
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="modalConfirmacao" class="modal hidden">
+  <div class="modal-content modal-small">
+    <div class="modal-header">
+      <h3><i class="fas fa-exclamation-triangle" style="color: var(--warning);"></i> Confirmar Exclusão</h3>
+      <button class="modal-close" id="fecharModalConfirmacaoBtn">&times;</button>
+    </div>
+    
+    <div class="modal-body" style="text-align: center; padding: 24px;">
+      <i class="fas fa-trash-alt" style="font-size: 48px; color: var(--danger); margin-bottom: 16px;"></i>
+      <p style="font-size: 16px; margin-bottom: 8px;">Tem certeza que deseja excluir este lançamento?</p>
+      <p style="font-size: 14px; color: var(--text-light);" id="confirmacaoInfo"></p>
+    </div>
+
+    <div class="modal-actions" style="justify-content: center; gap: 12px;">
+      <button id="confirmarExclusaoBtn" class="btn-danger">
+        <i class="fas fa-check"></i> Sim, excluir
+      </button>
+      <button id="cancelarExclusaoBtn" class="btn-secondary">
+        <i class="fas fa-times"></i> Cancelar
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL DE HORÁRIOS -->
+<div id="modalHorario" class="modal hidden">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h3><i class="fas fa-clock"></i> Editar Horários</h3>
+      <button class="modal-close" id="fecharModalHorarioBtn">&times;</button>
+    </div>
+    
+    <div class="modal-body">
+      <h4 id="modalNome" style="margin-bottom: 20px; color: var(--primary);"></h4>
+      
+      <div class="form-group">
+        <label>Início do Trabalho</label>
+        <input type="time" id="modalTrabInicio" class="form-control">
+      </div>
+      
+      <div class="form-group">
+        <label>Fim do Trabalho</label>
+        <input type="time" id="modalTrabFim" class="form-control">
+      </div>
+      
+      <div class="form-group">
+        <label>Início do Almoço</label>
+        <input type="time" id="modalAlmInicio" class="form-control">
+      </div>
+      
+      <div class="form-group">
+        <label>Fim do Almoço</label>
+        <input type="time" id="modalAlmFim" class="form-control">
+      </div>
+    </div>
+
+    <div class="modal-actions">
+      <button onclick="salvarHorarioModal()" class="btn-primary">
+        <i class="fas fa-save"></i> Salvar
+      </button>
+      <button id="fecharModalHorarioBtn2" class="btn-secondary">
+        <i class="fas fa-times"></i> Cancelar
+      </button>
+    </div>
+  </div>
+</div>
+
+<div id="toastContainer" style="position: fixed; bottom: 20px; right: 20px; z-index: 9999;"></div>
+<script src="js/calendar.js"></script>
+<script src="js/app.js"></script>
+<script src="https://unpkg.com/lucide@latest"></script>
+<script>
+  lucide.createIcons();
+  
+  document.addEventListener('DOMContentLoaded', function() {
+    setTimeout(() => {
+      const loading = document.querySelector('.loading-indicator');
+      if (loading) loading.style.display = 'none';
+    }, 500);
+  });
+</script>
+
+
+<script>
+  (function() {
+    console.log('Inicializando sidebar...');
+    
+    document.addEventListener('DOMContentLoaded', function() {
+      
+      // ===== NAVEGAÇÃO DOS BOTÕES =====
+      const sidebarBtns = document.querySelectorAll('.sidebar-btn');
+      
+      sidebarBtns.forEach(btn => {
+        btn.addEventListener('click', function(e) {
+          e.preventDefault();
+          e.stopPropagation();
+          
+          const page = this.dataset.page;
+          console.log('Botão clicado:', page);
+          
+          // Remove active de todos
+          sidebarBtns.forEach(b => b.classList.remove('active'));
+          
+          // Adiciona active no clicado
+          this.classList.add('active');
+          
+          // Chama a função carregarPagina
+          if (typeof window.carregarPagina === 'function') {
+            window.carregarPagina(page);
+          } else if (typeof carregarPagina === 'function') {
+            carregarPagina(page);
+          } else {
+            console.error('Função carregarPagina não encontrada!');
+          }
+        });
+      });
+      
+      // Função para ativar botão por página
+      window.setActiveButton = function(page) {
+        sidebarBtns.forEach(btn => {
+          if (btn.dataset.page === page) {
+            btn.classList.add('active');
+          } else {
+            btn.classList.remove('active');
+          }
+        });
+      };
+      
+    });
+  })();
+</script>
