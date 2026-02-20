@@ -6,7 +6,7 @@ const { sql, conectar } = require('../db');
 router.get('/', async (req, res) => {
     try {
         const pool = await conectar();
-        const result = await pool.request().query('SELECT * FROM Ausencias');
+        const result = await pool.request().query('SELECT * FROM Ausencias ORDER BY DataInicio DESC');
         res.json(result.recordset);
     } catch (err) {
         console.error("Erro ao listar:", err);
@@ -16,20 +16,45 @@ router.get('/', async (req, res) => {
 
 // Adicionar ausencia
 router.post('/', async (req, res) => {
-    const { colaboradorId, tipo, dataInicio, dataFim } = req.body;
+    const { colaboradorId, tipo, dataInicio, dataFim, periodoTipo, horaInicio, horaFim } = req.body;
 
     if (!colaboradorId || !tipo || !dataInicio || !dataFim) {
         return res.status(400).json({ error: "Todos os campos são obrigatórios" });
     }
 
+    // Validação para período com horas
+    if (periodoTipo === 'horas' && (!horaInicio || !horaFim)) {
+        return res.status(400).json({ error: "Horas são obrigatórias para período de horas" });
+    }
+
     try {
         const pool = await conectar();
-        await pool.request()
+        
+        const request = pool.request()
             .input('colaboradorId', sql.Int, colaboradorId)
             .input('tipo', sql.NVarChar, tipo)
             .input('dataInicio', sql.Date, dataInicio)
             .input('dataFim', sql.Date, dataFim)
-            .query('INSERT INTO Ausencias (ColaboradorId, Tipo, DataInicio, DataFim) VALUES (@colaboradorId, @tipo, @dataInicio, @dataFim)');
+            .input('periodoTipo', sql.NVarChar(20), periodoTipo || 'dia_inteiro');
+
+        // Adiciona horas apenas se for período de horas
+        if (periodoTipo === 'horas' && horaInicio && horaFim) {
+            request.input('horaInicio', sql.Time, horaInicio)
+                   .input('horaFim', sql.Time, horaFim);
+        } else {
+            request.input('horaInicio', sql.Time, null)
+                   .input('horaFim', sql.Time, null);
+        }
+
+        await request.query(`
+            INSERT INTO Ausencias (
+                ColaboradorId, Tipo, DataInicio, DataFim, 
+                PeriodoTipo, HoraInicio, HoraFim, DataCadastro
+            ) VALUES (
+                @colaboradorId, @tipo, @dataInicio, @dataFim,
+                @periodoTipo, @horaInicio, @horaFim, GETDATE()
+            )
+        `);
 
         res.json({ message: 'Ausência adicionada!', success: true });
     } catch (err) {
@@ -38,10 +63,10 @@ router.post('/', async (req, res) => {
     }
 });
 
-// 🔥 ROTA PUT (editar) - ADICIONAR
+// ROTA PUT (editar)
 router.put('/:id', async (req, res) => {
     const { id } = req.params;
-    const { colaboradorId, tipo, dataInicio, dataFim } = req.body;
+    const { colaboradorId, tipo, dataInicio, dataFim, periodoTipo, horaInicio, horaFim } = req.body;
 
     if (!colaboradorId || !tipo || !dataInicio || !dataFim) {
         return res.status(400).json({ error: "Todos os campos são obrigatórios" });
@@ -59,20 +84,33 @@ router.put('/:id', async (req, res) => {
             return res.status(404).json({ error: "Lançamento não encontrado" });
         }
 
-        await pool.request()
+        const request = pool.request()
             .input('id', sql.Int, id)
             .input('colaboradorId', sql.Int, colaboradorId)
             .input('tipo', sql.NVarChar, tipo)
             .input('dataInicio', sql.Date, dataInicio)
             .input('dataFim', sql.Date, dataFim)
-            .query(`
-                UPDATE Ausencias 
-                SET ColaboradorId = @colaboradorId, 
-                    Tipo = @tipo, 
-                    DataInicio = @dataInicio, 
-                    DataFim = @dataFim 
-                WHERE Id = @id
-            `);
+            .input('periodoTipo', sql.NVarChar(20), periodoTipo || 'dia_inteiro');
+
+        if (periodoTipo === 'horas' && horaInicio && horaFim) {
+            request.input('horaInicio', sql.Time, horaInicio)
+                   .input('horaFim', sql.Time, horaFim);
+        } else {
+            request.input('horaInicio', sql.Time, null)
+                   .input('horaFim', sql.Time, null);
+        }
+
+        await request.query(`
+            UPDATE Ausencias 
+            SET ColaboradorId = @colaboradorId, 
+                Tipo = @tipo, 
+                DataInicio = @dataInicio, 
+                DataFim = @dataFim,
+                PeriodoTipo = @periodoTipo,
+                HoraInicio = @horaInicio,
+                HoraFim = @horaFim
+            WHERE Id = @id
+        `);
 
         res.json({ message: 'Ausência atualizada!', success: true });
     } catch (err) {
@@ -81,14 +119,13 @@ router.put('/:id', async (req, res) => {
     }
 });
 
-// 🔥 ROTA DELETE (excluir) - ADICIONAR
+// ROTA DELETE
 router.delete('/:id', async (req, res) => {
     const { id } = req.params;
 
     try {
         const pool = await conectar();
         
-        // Verifica se o registro existe
         const checkResult = await pool.request()
             .input('id', sql.Int, id)
             .query('SELECT * FROM Ausencias WHERE Id = @id');
@@ -97,22 +134,18 @@ router.delete('/:id', async (req, res) => {
             return res.status(404).json({ error: "Lançamento não encontrado" });
         }
 
-        const result = await pool.request()
+        await pool.request()
             .input('id', sql.Int, id)
             .query('DELETE FROM Ausencias WHERE Id = @id');
 
-        res.json({ 
-            message: 'Ausência excluída!', 
-            success: true,
-            rowsAffected: result.rowsAffected[0]
-        });
+        res.json({ message: 'Ausência excluída!', success: true });
     } catch (err) {
         console.error("Erro ao excluir:", err);
         res.status(500).json({ error: err.message });
     }
 });
 
-// Rota para buscar ausências por colaborador (opcional)
+// Rota para buscar ausências por colaborador
 router.get('/colaborador/:colaboradorId', async (req, res) => {
     const { colaboradorId } = req.params;
 
@@ -125,31 +158,6 @@ router.get('/colaborador/:colaboradorId', async (req, res) => {
         res.json(result.recordset);
     } catch (err) {
         console.error("Erro ao buscar por colaborador:", err);
-        res.status(500).json({ error: err.message });
-    }
-});
-
-// Rota para buscar ausências por período (opcional)
-router.get('/periodo', async (req, res) => {
-    const { dataInicio, dataFim } = req.query;
-
-    try {
-        const pool = await conectar();
-        let query = 'SELECT * FROM Ausencias WHERE 1=1';
-        
-        if (dataInicio) {
-            query += ` AND DataInicio >= '${dataInicio}'`;
-        }
-        if (dataFim) {
-            query += ` AND DataFim <= '${dataFim}'`;
-        }
-        
-        query += ' ORDER BY DataInicio DESC';
-        
-        const result = await pool.request().query(query);
-        res.json(result.recordset);
-    } catch (err) {
-        console.error("Erro ao buscar por período:", err);
         res.status(500).json({ error: err.message });
     }
 });

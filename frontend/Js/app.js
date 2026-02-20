@@ -3,11 +3,20 @@ let colaboradores = [];
 let editandoId = null;
 let editandoAusenciaId = null;
 let plantoesLancados = [];
+let feriadosLocais = []
+let editandoFeriadoId = null;
 
 // EXPOR FUNÇÕES GLOBAIS (já está correto)
 window.carregarPagina = carregarPagina;
 window.abrirModalAusencia = abrirModalAusencia;
 window.abrirModalHorario = abrirModalHorario;
+window.debugTiposAusencias = debugTiposAusencias;
+window.debugDados = debugDados;
+window.atualizarTudo = atualizarTudo;
+window.testarAtualizacao = testarAtualizacao;
+window.ausencias = ausencias;
+window.colaboradores = colaboradores;
+window.feriadosLocais = feriadosLocais;
 
 // Elemento principal onde o conteúdo será renderizado
 const appContent = document.getElementById("appContent");
@@ -26,6 +35,33 @@ document.addEventListener("DOMContentLoaded", async () => {
     renderCalendario();
 });
 
+
+
+async function testarConexaoBackend() {
+    console.log("Testando conexão com backend...");
+    
+    const testes = [
+        { url: 'http://localhost:3000/api/feriados', nome: 'Feriados' },
+        { url: 'http://localhost:3000/api/ausencias', nome: 'Ausências' },
+        { url: 'http://localhost:3000/api/colaboradores', nome: 'Colaboradores' }
+    ];
+    
+    for (const teste of testes) {
+        try {
+            const response = await fetch(teste.url);
+            if (response.ok) {
+                const data = await response.json();
+                console.log(`✅ ${teste.nome}: OK (${data.length} registros)`);
+            } else {
+                console.error(`❌ ${teste.nome}: Erro ${response.status}`);
+            }
+        } catch (error) {
+            console.error(`❌ ${teste.nome}: Falha na conexão`, error.message);
+        }
+    }
+}
+
+window.testarConexaoBackend = testarConexaoBackend;
 
 
 /* ===========================
@@ -702,40 +738,47 @@ async function confirmarExclusao() {
     }
     
     try {
-        console.log("Excluindo ausência ID:", exclusaoPendenteId);
+        console.log("Excluindo ID:", exclusaoPendenteId);
         
-        const response = await fetch(`http://localhost:3000/api/ausencias/${exclusaoPendenteId}`, {
-            method: 'DELETE'
-        });
+        let response;
+        
+        if (exclusaoTipo === 'feriado') {
+            response = await fetch(`http://localhost:3000/api/feriados/${exclusaoPendenteId}`, {
+                method: 'DELETE'
+            });
+        } else {
+            response = await fetch(`http://localhost:3000/api/ausencias/${exclusaoPendenteId}`, {
+                method: 'DELETE'
+            });
+        }
         
         if (!response.ok) {
             const errorText = await response.text();
             throw new Error(`Erro ${response.status}: ${errorText}`);
         }
         
-        await carregarAusencias();
+        // 🔥 ATUALIZAR TUDO
+        await atualizarTudo();
         
-        // Recarrega apenas os lançamentos do dia selecionado
-        await carregarAusenciasDoDia(dataSelecionada);
-        
-        if (editandoAusenciaId === exclusaoPendenteId) {
+        // Se estava editando, cancelar edição
+        if (exclusaoTipo === 'feriado' && editandoFeriadoId === exclusaoPendenteId) {
+            cancelarEdicaoFeriado();
+        } else if (editandoAusenciaId === exclusaoPendenteId) {
             cancelarEdicaoAusencia();
         }
         
-        mostrarToast("Lançamento excluído com sucesso!", "success");
-        
-        // Atualiza o calendário se estiver visível
-        if (document.getElementById("calendar")) {
-            if (typeof inicializarCalendario === 'function') {
-                inicializarCalendario();
-            }
+        // Se o modal de ausência estiver aberto, recarregar a listagem do dia
+        const modalAusencia = document.getElementById("modal");
+        if (modalAusencia && !modalAusencia.classList.contains('hidden') && dataSelecionada) {
+            await carregarAusenciasDoDia(dataSelecionada);
         }
+        
+        mostrarToast("Excluído com sucesso!", "success");
         
     } catch (error) {
         console.error("Erro ao excluir:", error);
         mostrarToast(`Erro ao excluir: ${error.message}`, "error");
     } finally {
-        // Fecha o modal e limpa o ID pendente
         fecharModal('modalConfirmacao');
         exclusaoPendenteId = null;
     }
@@ -1272,26 +1315,67 @@ async function excluirColaborador(id) {
 async function carregarColaboradores() {
     try {
         const res = await fetch('http://localhost:3000/api/colaboradores');
-        if (!res.ok) throw new Error("Erro na requisição");
+        if (!res.ok) throw new Error(`Erro ${res.status}: ${res.statusText}`);
         const data = await res.json();
         colaboradores = Array.isArray(data) ? data : [];
+        
+        // 🔥 ATUALIZAR WINDOW
+        window.colaboradores = colaboradores;
+        
+        console.log(`Colaboradores carregados: ${colaboradores.length}`);
+        return colaboradores;
     } catch (error) {
         console.error("Erro ao carregar colaboradores:", error);
         colaboradores = [];
+        window.colaboradores = [];
+        return [];
     }
 }
 
 async function carregarAusencias() {
     try {
         const res = await fetch('http://localhost:3000/api/ausencias');
-        if (!res.ok) throw new Error("Erro na requisição");
-        ausencias = await res.json();
+        if (!res.ok) throw new Error(`Erro ${res.status}: ${res.statusText}`);
+        const data = await res.json();
+        ausencias = Array.isArray(data) ? data : [];
+        
+        // 🔥 ATUALIZAR WINDOW
+        window.ausencias = ausencias;
+        
+        console.log(`Ausências carregadas: ${ausencias.length}`);
+        return ausencias;
     } catch (error) {
         console.error("Erro ao carregar ausências:", error);
         ausencias = [];
+        window.ausencias = [];
+        return [];
     }
 }
-
+async function carregarFeriadosLocais() {
+    try {
+        console.log("Carregando feriados do backend...");
+        const response = await fetch('http://localhost:3000/api/feriados');
+        
+        if (!response.ok) {
+            throw new Error(`Erro ${response.status}: ${response.statusText}`);
+        }
+        
+        const data = await response.json();
+        feriadosLocais = Array.isArray(data) ? data : [];
+        
+        // 🔥 ATUALIZAR A VARIÁVEL GLOBAL
+        window.feriadosLocais = feriadosLocais;
+        
+        console.log(`Feriados locais carregados: ${feriadosLocais.length}`);
+        return feriadosLocais;
+        
+    } catch (error) {
+        console.error("Erro ao carregar feriados locais:", error);
+        feriadosLocais = [];
+        window.feriadosLocais = [];
+        return [];
+    }
+}
 /* ===========================
    TELA ESCALA DO DIA
 =========================== */
@@ -4756,3 +4840,1032 @@ function gerarHTMLCalendarioPDF(dados) {
     
     return html;
 }
+
+// ================= FERIADOS MUNICIPAIS/ESTADUAIS =================
+
+// Carregar feriados locais do backend
+async function carregarFeriadosLocais() {
+    try {
+        console.log("Carregando feriados do backend...");
+        const response = await fetch('http://localhost:3000/api/feriados');
+        
+        if (!response.ok) {
+            throw new Error(`Erro ${response.status}: ${response.statusText}`);
+        }
+        
+        const data = await response.json();
+        feriadosLocais = Array.isArray(data) ? data : [];
+        
+        // 🔥 ATUALIZAR A VARIÁVEL GLOBAL
+        window.feriadosLocais = feriadosLocais;
+        
+        console.log(`Feriados locais carregados: ${feriadosLocais.length}`);
+        return feriadosLocais;
+        
+    } catch (error) {
+        console.error("Erro ao carregar feriados locais:", error);
+        feriadosLocais = [];
+        window.feriadosLocais = [];
+        mostrarToast("Erro ao carregar feriados do banco", "error");
+        return [];
+    }
+}
+
+// Abrir modal de feriado
+function abrirModalFeriado() {
+    console.log("Abrindo modal de feriado...");
+
+    const modal = document.getElementById('modalFeriado');
+    if (!modal) {
+        console.error("Modal de feriado não encontrado!");
+        return;
+    }
+
+    document.getElementById("loadingFeriados").classList.remove("hidden");
+    document.getElementById("emptyFeriados").classList.add("hidden");
+    document.getElementById("listaFeriados").classList.add("hidden");
+
+    document.getElementById("feriadoNome").value = "";
+    document.getElementById("feriadoData").value = "";
+    document.getElementById("feriadoTipo").value = "municipal";
+
+    editandoFeriadoId = null;
+    document.getElementById("salvarFeriadoBtn").innerHTML = '<i class="fas fa-save"></i> Salvar Feriado';
+    document.getElementById("cancelarEdicaoFeriadoBtn").classList.add("hidden");
+
+    carregarListaFeriados();
+
+    modal.classList.remove("hidden");
+    modal.classList.add("active");
+}
+
+// Carregar listagem de feriados
+async function carregarListaFeriados() {
+    const loadingEl = document.getElementById("loadingFeriados");
+    const emptyEl = document.getElementById("emptyFeriados");
+    const listaEl = document.getElementById("listaFeriados");
+
+    if (!loadingEl || !emptyEl || !listaEl) return;
+
+    try {
+        await carregarFeriadosLocais();
+        
+        loadingEl.classList.add("hidden");
+
+        if (!feriadosLocais || feriadosLocais.length === 0) {
+            emptyEl.classList.remove("hidden");
+            listaEl.classList.add("hidden");
+            return;
+        }
+
+        emptyEl.classList.add("hidden");
+        listaEl.classList.remove("hidden");
+
+        const feriadosOrdenados = [...feriadosLocais].sort((a, b) => 
+            new Date(a.Data) - new Date(b.Data)
+        );
+
+        listaEl.innerHTML = "";
+
+        feriadosOrdenados.forEach(f => {
+            const card = document.createElement("div");
+            card.className = "feriado-card";
+            card.setAttribute("data-id", f.Id);
+
+            const dataFormatada = new Date(f.Data).toLocaleDateString("pt-BR");
+            
+            const tipoIcon = f.Tipo === 'estadual' ? '🏛️' : '🏛️';
+            const tipoClass = f.Tipo || 'municipal';
+            
+            card.innerHTML = `
+                <div class="feriado-header">
+                    <div class="feriado-nome">
+                        <i class="fas fa-city"></i>
+                        ${f.Nome}
+                    </div>
+                    <span class="feriado-tipo-badge ${tipoClass}">${tipoIcon} ${f.Tipo || 'municipal'}</span>
+                </div>
+                <div class="feriado-data">
+                    <i class="fas fa-calendar-alt"></i>
+                    <span>${dataFormatada}</span>
+                </div>
+                <div class="feriado-actions">
+                    <button onclick="editarFeriado(${f.Id})" class="btn-icon-sm edit" title="Editar">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    <button onclick="excluirFeriado(${f.Id})" class="btn-icon-sm delete" title="Excluir">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            `;
+
+            listaEl.appendChild(card);
+        });
+
+    } catch (error) {
+        console.error("Erro ao carregar lista:", error);
+        loadingEl.classList.add("hidden");
+        emptyEl.classList.remove("hidden");
+        emptyEl.innerHTML = `
+            <i class="fas fa-exclamation-triangle" style="color: var(--danger);"></i>
+            <p style="color: var(--danger);">Erro ao carregar feriados</p>
+            <button onclick="carregarListaFeriados()" class="btn-primary" style="margin-top: 10px;">
+                <i class="fas fa-sync"></i> Tentar novamente
+            </button>
+        `;
+    }
+}
+
+// Salvar feriado
+async function salvarFeriado() {
+    const nome = document.getElementById("feriadoNome")?.value;
+    const data = document.getElementById("feriadoData")?.value;
+    const tipo = document.getElementById("feriadoTipo")?.value;
+    
+    if (!nome || !data) {
+        mostrarToast("Preencha todos os campos", "error");
+        return;
+    }
+    
+    try {
+        let response;
+        const url = editandoFeriadoId 
+            ? `http://localhost:3000/api/feriados/${editandoFeriadoId}`
+            : 'http://localhost:3000/api/feriados';
+        
+        const metodo = editandoFeriadoId ? 'PUT' : 'POST';
+        
+        const payload = {
+            nome: nome,
+            data: data,
+            tipo: tipo
+        };
+        
+        console.log("Enviando feriado:", payload);
+        
+        response = await fetch(url, {
+            method: metodo,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`Erro ${response.status}: ${errorText}`);
+        }
+        
+        // 🔥 ATUALIZAR TUDO
+        await atualizarTudo();
+        
+        cancelarEdicaoFeriado();
+        
+        mostrarToast(
+            editandoFeriadoId ? "Feriado atualizado!" : "Feriado salvo com sucesso!", 
+            "success"
+        );
+        
+    } catch (error) {
+        console.error("Erro ao salvar feriado:", error);
+        mostrarToast(`Erro ao salvar: ${error.message}`, "error");
+    }
+}
+
+// Editar feriado
+function editarFeriado(id) {
+    const feriado = feriadosLocais.find(f => f.Id === id);
+    if (!feriado) {
+        mostrarToast("Feriado não encontrado", "error");
+        return;
+    }
+
+    editandoFeriadoId = id;
+    
+    document.getElementById("feriadoNome").value = feriado.Nome;
+    const data = new Date(feriado.Data);
+    const dataFormatada = data.toISOString().split('T')[0];
+    document.getElementById("feriadoData").value = dataFormatada;
+    document.getElementById("feriadoTipo").value = feriado.Tipo || 'municipal';
+    
+    document.getElementById("salvarFeriadoBtn").innerHTML = '<i class="fas fa-check"></i> Atualizar';
+    document.getElementById("cancelarEdicaoFeriadoBtn").classList.remove("hidden");
+    
+    document.querySelector('.form-section')?.scrollIntoView({ behavior: 'smooth' });
+}
+
+// Cancelar edição de feriado
+function cancelarEdicaoFeriado() {
+    editandoFeriadoId = null;
+    document.getElementById("feriadoNome").value = "";
+    document.getElementById("feriadoData").value = "";
+    document.getElementById("feriadoTipo").value = "municipal";
+    document.getElementById("salvarFeriadoBtn").innerHTML = '<i class="fas fa-save"></i> Salvar Feriado';
+    document.getElementById("cancelarEdicaoFeriadoBtn").classList.add("hidden");
+}
+
+// Excluir feriado
+async function excluirFeriado(id) {
+    const feriado = feriadosLocais.find(f => f.Id === id);
+    
+    document.getElementById("confirmacaoInfo").innerText = feriado?.Nome || "Feriado";
+    
+    exclusaoPendenteId = id;
+    exclusaoTipo = 'feriado';
+    
+    const modal = document.getElementById("modalConfirmacao");
+    modal.classList.remove("hidden");
+    modal.classList.add("active");
+}
+
+// Confirmar exclusão de feriado
+async function confirmarExclusaoFeriado(id) {
+    try {
+        const response = await fetch(`http://localhost:3000/api/feriados/${id}`, {
+            method: 'DELETE'
+        });
+        
+        if (!response.ok) throw new Error("Erro ao excluir");
+        
+        await carregarFeriadosLocais();
+        await carregarListaFeriados();
+        
+        if (editandoFeriadoId === id) {
+            cancelarEdicaoFeriado();
+        }
+        
+        mostrarToast("Feriado excluído com sucesso!", "success");
+        
+        if (document.getElementById("calendar")) {
+            gerarCalendario(mesAtual, anoAtual);
+            gerarLegendaMensal();
+        }
+        
+    } catch (error) {
+        console.error("Erro ao excluir:", error);
+        mostrarToast(`Erro ao excluir: ${error.message}`, "error");
+    }
+}
+
+// ================= LEGENDA MENSAL =================
+function gerarLegendaMensal() {
+    const container = document.getElementById("legendaMensalContent");
+    if (!container) return;
+
+    // Verificar se os dados existem
+    if (!colaboradores) colaboradores = [];
+    if (!ausencias) ausencias = [];
+    if (!feriados) feriados = [];
+    if (!feriadosLocais) feriadosLocais = [];
+
+    const mes = mesAtual;
+    const ano = anoAtual;
+    const diasNoMes = new Date(ano, mes + 1, 0).getDate();
+
+    // Contadores
+    let totalFeriados = 0;
+    let totalAusencias = 0;
+    let totalFolgas = 0;
+    let totalFerias = 0;
+    let eventosPorDia = {};
+
+    // Inicializar eventos por dia
+    for (let dia = 1; dia <= diasNoMes; dia++) {
+        eventosPorDia[dia] = {
+            feriados: [],
+            ausencias: [],
+            folgas: [],
+            ferias: []
+        };
+    }
+
+    // Processar feriados da API
+    if (feriados && feriados.length > 0) {
+        feriados.forEach(f => {
+            if (f.date) {
+                const [anoF, mesF, diaF] = f.date.split('-').map(Number);
+                if (mesF === mes + 1 && anoF === ano) {
+                    eventosPorDia[diaF].feriados.push(f.name);
+                    totalFeriados++;
+                }
+            }
+        });
+    }
+
+    // Processar feriados locais
+    if (feriadosLocais && feriadosLocais.length > 0) {
+        feriadosLocais.forEach(f => {
+            if (f.Data) {
+                const data = new Date(f.Data);
+                if (data.getMonth() === mes && data.getFullYear() === ano) {
+                    const dia = data.getDate();
+                    eventosPorDia[dia].feriados.push(`${f.Nome} (${f.Tipo || 'municipal'})`);
+                    totalFeriados++;
+                }
+            }
+        });
+    }
+
+    // 🔥 CORREÇÃO: Processar ausências com os tipos corretos
+    if (ausencias && ausencias.length > 0 && colaboradores.length > 0) {
+        ausencias.forEach(a => {
+            if (a.DataInicio && a.DataFim) {
+                const dataInicio = new Date(a.DataInicio);
+                const dataFim = new Date(a.DataFim);
+                const colaborador = colaboradores.find(c => c.Id === (a.colaboradorId || a.ColaboradorId));
+                
+                if (!colaborador) return;
+
+                // Verificar se o período cruza com o mês atual
+                const primeiroDiaMes = new Date(ano, mes, 1);
+                const ultimoDiaMes = new Date(ano, mes + 1, 0);
+                
+                if (dataFim >= primeiroDiaMes && dataInicio <= ultimoDiaMes) {
+                    
+                    // 🔥 CORREÇÃO: Identificar o tipo corretamente
+                    const tipo = (a.tipo || a.Tipo || '').toLowerCase();
+                    
+                    // Incrementar contadores por tipo
+                    if (tipo === 'folga') {
+                        totalFolgas++;
+                    } else if (tipo === 'ferias') {
+                        totalFerias++;
+                    } else if (tipo === 'ausencia') {
+                        totalAusencias++;
+                    }
+                    
+                    // Adicionar aos dias específicos do mês
+                    const diaInicio = Math.max(1, dataInicio.getDate());
+                    const diaFim = Math.min(diasNoMes, dataFim.getDate());
+                    
+                    for (let dia = diaInicio; dia <= diaFim; dia++) {
+                        const dataDia = new Date(ano, mes, dia);
+                        
+                        // Verificar se o dia está dentro do período
+                        if (dataDia >= dataInicio && dataDia <= dataFim) {
+                            if (tipo === 'folga') {
+                                eventosPorDia[dia].folgas.push(colaborador.Nome);
+                            } else if (tipo === 'ferias') {
+                                eventosPorDia[dia].ferias.push(colaborador.Nome);
+                            } else if (tipo === 'ausencia') {
+                                eventosPorDia[dia].ausencias.push(colaborador.Nome);
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    // Gerar HTML da legenda
+    let html = `
+        <div class="legenda-resumo">
+            <div class="legenda-cards">
+                <div class="legenda-card feriado">
+                    <i class="fas fa-calendar-day"></i>
+                    <div>
+                        <strong>${totalFeriados}</strong>
+                        <span>Feriados</span>
+                    </div>
+                </div>
+                <div class="legenda-card ferias">
+                    <i class="fas fa-umbrella-beach"></i>
+                    <div>
+                        <strong>${totalFerias}</strong>
+                        <span>Férias</span>
+                    </div>
+                </div>
+                <div class="legenda-card folga">
+                    <i class="fas fa-leaf"></i>
+                    <div>
+                        <strong>${totalFolgas}</strong>
+                        <span>Folgas</span>
+                    </div>
+                </div>
+                <div class="legenda-card ausencia">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <div>
+                        <strong>${totalAusencias}</strong>
+                        <span>Ausências</span>
+                    </div>
+                </div>
+            </div>
+    `;
+
+    // Dias com eventos
+    const diasComEventos = [];
+    for (let dia = 1; dia <= diasNoMes; dia++) {
+        const eventos = eventosPorDia[dia];
+        if (eventos.feriados.length > 0 || eventos.ausencias.length > 0 || 
+            eventos.folgas.length > 0 || eventos.ferias.length > 0) {
+            diasComEventos.push({ dia, eventos });
+        }
+    }
+
+    if (diasComEventos.length > 0) {
+        html += `
+            <div class="legenda-dias">
+                <h5>Detalhamento por dia</h5>
+                <div class="legenda-dias-grid">
+        `;
+
+        diasComEventos.forEach(({ dia, eventos }) => {
+            html += `<div class="legenda-dia-card">`;
+            html += `<div class="legenda-dia-numero">${dia}</div>`;
+            html += `<div class="legenda-dia-eventos">`;
+            
+            eventos.feriados.forEach(f => {
+                html += `<span class="legenda-evento feriado-tag">📅 ${f}</span>`;
+            });
+            
+            eventos.ferias.forEach(f => {
+                html += `<span class="legenda-evento ferias-tag">🏖️ ${f}</span>`;
+            });
+            
+            eventos.folgas.forEach(f => {
+                html += `<span class="legenda-evento folga-tag">🌸 ${f}</span>`;
+            });
+            
+            eventos.ausencias.forEach(a => {
+                html += `<span class="legenda-evento ausencia-tag">⚠️ ${a}</span>`;
+            });
+            
+            html += `</div></div>`;
+        });
+
+        html += `
+                </div>
+            </div>
+        `;
+    } else {
+        html += `
+            <div class="legenda-sem-eventos">
+                <i class="fas fa-check-circle"></i>
+                <p>Nenhum evento no mês atual</p>
+            </div>
+        `;
+    }
+
+    html += `</div>`;
+
+    container.innerHTML = html;
+
+}
+
+
+function debugTiposAusencias() {
+    console.log("=== DEBUG TIPOS DE AUSÊNCIAS ===");
+    if (ausencias && ausencias.length > 0) {
+        ausencias.forEach((a, index) => {
+            console.log(`Ausência ${index + 1}:`, {
+                id: a.id || a.Id,
+                tipo: a.tipo || a.Tipo,
+                tipoLower: (a.tipo || a.Tipo || '').toLowerCase(),
+                colaboradorId: a.colaboradorId || a.ColaboradorId,
+                dataInicio: a.DataInicio,
+                dataFim: a.DataFim
+            });
+        });
+    } else {
+        console.log("Nenhuma ausência encontrada");
+    }
+}
+
+
+
+// ================= CONFIGURAÇÃO DO MODAL DE AUSÊNCIA COM HORAS =================
+function configurarCamposHora() {
+    const periodoTipo = document.getElementById('periodoTipo');
+    const camposHora = document.getElementById('camposHora');
+    
+    if (periodoTipo && camposHora) {
+        periodoTipo.addEventListener('change', function() {
+            if (this.value === 'horas') {
+                camposHora.classList.remove('hidden');
+            } else {
+                camposHora.classList.add('hidden');
+            }
+        });
+    }
+}
+
+// Modificar a função salvarAusencia para incluir horas
+async function salvarAusencia() {
+    const colaboradorId = document.getElementById("colaboradorSelect")?.value;
+    const tipo = document.getElementById("tipoSelect")?.value;
+    const dataInicio = document.getElementById("dataInicio")?.value;
+    const dataFim = document.getElementById("dataFim")?.value;
+    const periodoTipo = document.getElementById("periodoTipo")?.value;
+    const horaInicio = document.getElementById("horaInicio")?.value;
+    const horaFim = document.getElementById("horaFim")?.value;
+    
+    console.log("Dados do formulário:", { colaboradorId, tipo, dataInicio, dataFim, periodoTipo, horaInicio, horaFim });
+    
+    if (!colaboradorId || !dataInicio || !dataFim) {
+        mostrarToast("Preencha todos os campos", "error");
+        return;
+    }
+    
+    if (dataFim < dataInicio) {
+        mostrarToast("Data fim deve ser maior ou igual à data início", "error");
+        return;
+    }
+    
+    if (periodoTipo === 'horas' && (!horaInicio || !horaFim)) {
+        mostrarToast("Preencha as horas de início e fim", "error");
+        return;
+    }
+    
+    if (periodoTipo === 'horas' && horaFim <= horaInicio && dataInicio === dataFim) {
+        mostrarToast("Hora fim deve ser maior que hora início no mesmo dia", "error");
+        return;
+    }
+    
+    try {
+        let response;
+        const url = editandoAusenciaId 
+            ? `http://localhost:3000/api/ausencias/${editandoAusenciaId}`
+            : 'http://localhost:3000/api/ausencias';
+        
+        const metodo = editandoAusenciaId ? 'PUT' : 'POST';
+        
+        const payload = {
+            colaboradorId: parseInt(colaboradorId),
+            tipo: tipo,
+            dataInicio: dataInicio,
+            dataFim: dataFim,
+            periodoTipo: periodoTipo,
+            horaInicio: periodoTipo === 'horas' ? horaInicio : null,
+            horaFim: periodoTipo === 'horas' ? horaFim : null
+        };
+        
+        console.log("Enviando payload:", payload);
+        
+        response = await fetch(url, {
+            method: metodo,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`Erro ${response.status}: ${errorText}`);
+        }
+        
+        // 🔥 ATUALIZAR TUDO
+        await atualizarTudo();
+        
+        // Se for edição, recarregar a listagem do dia
+        if (editandoAusenciaId && dataSelecionada) {
+            await carregarAusenciasDoDia(dataSelecionada);
+        }
+        
+        cancelarEdicaoAusencia();
+        
+        mostrarToast(
+            editandoAusenciaId ? "Lançamento atualizado!" : "Lançamento salvo com sucesso!", 
+            "success"
+        );
+        
+    } catch (error) {
+        console.error("Erro ao salvar ausência:", error);
+        mostrarToast(`Erro ao salvar: ${error.message}`, "error");
+    }
+}
+
+// Modificar a função renderCalendario para incluir a legenda
+function renderCalendario() {
+    appContent.innerHTML = `
+        <div class="page-header">
+            <h1>Calendário Mensal</h1>
+            <div class="header-actions">
+                <button id="btnFeriadoMunicipal" class="btn-primary">
+                    <i class="fas fa-city"></i> Feriados
+                </button>
+                <button id="btnLancamentoAjuste" class="btn-primary">
+                    <i class="fas fa-plus"></i> Lançamento
+                </button>
+            </div>
+        </div>
+
+        <div class="calendar-wrapper">
+            <div class="calendar-header">
+                <div class="month-nav">
+                    <button id="prevMonth" class="nav-btn">
+                        <i class="fas fa-chevron-left"></i>
+                    </button>
+                    <h2 id="monthTitle">Carregando...</h2>
+                    <button id="nextMonth" class="nav-btn">
+                        <i class="fas fa-chevron-right"></i>
+                    </button>
+                </div>
+            </div>
+
+            <div class="weekdays"></div>
+            <div id="calendar" class="calendar-grid"></div>
+        </div>
+
+        <!-- LEGENDA MENSAL -->
+        <div class="calendario-legenda-mensal">
+            <div class="legenda-mensal-header">
+                <i class="fas fa-info-circle"></i>
+                <h4>Resumo do Mês</h4>
+            </div>
+            <div class="legenda-mensal-content" id="legendaMensalContent">
+                Carregando...
+            </div>
+        </div>
+    `;
+
+    setTimeout(() => {
+        if (typeof inicializarCalendario === 'function') {
+            inicializarCalendario();
+        }
+        // Garantir que os dados estão carregados antes de gerar a legenda
+        setTimeout(() => {
+            gerarLegendaMensal();
+        }, 500);
+    }, 100);
+}
+
+// Modificar a função abrirModalAusencia para resetar os campos de hora
+function abrirModalAusencia(dataISO = null) {
+    console.log("Abrindo modal de ausência...", dataISO);
+    
+    const modal = document.getElementById("modal");
+    if (!modal) {
+        console.error("Modal não encontrado!");
+        return;
+    }
+    
+    dataSelecionada = dataISO;
+    
+    document.getElementById("loadingAusencias").classList.remove("hidden");
+    document.getElementById("emptyAusencias").classList.add("hidden");
+    document.getElementById("listaAusencias").classList.add("hidden");
+    
+    document.getElementById("colaboradorSelect").value = "";
+    document.getElementById("tipoSelect").value = "folga";
+    document.getElementById("periodoTipo").value = "dia_inteiro";
+    document.getElementById("camposHora").classList.add("hidden");
+    document.getElementById("horaInicio").value = "";
+    document.getElementById("horaFim").value = "";
+    
+    if (dataISO) {
+        let dataFormatada = dataISO;
+        if (dataISO.includes('T')) {
+            dataFormatada = dataISO.split('T')[0];
+        }
+        document.getElementById("dataInicio").value = dataFormatada;
+        document.getElementById("dataFim").value = dataFormatada;
+    } else {
+        document.getElementById("dataInicio").value = "";
+        document.getElementById("dataFim").value = "";
+    }
+    
+    editandoAusenciaId = null;
+    document.getElementById("salvarAusenciaBtn").innerHTML = '<i class="fas fa-save"></i> Salvar';
+    document.getElementById("cancelarEdicaoLancamentoBtn").classList.add("hidden");
+    
+    carregarColaboradoresNoSelect();
+    carregarAusenciasDoDia(dataISO);
+    
+    // 🔥 CHAMAR A CONFIGURAÇÃO DOS CAMPOS DE HORA
+    configurarCamposHora();
+    
+    modal.classList.remove("hidden");
+    modal.classList.add("active");
+}
+// Atualizar configurarModais para incluir o botão de feriado
+function configurarModais() {
+    console.log("Configurando modais...");
+    
+    document.addEventListener('click', function(e) {
+        if (e.target.id === 'btnLancamentoAjuste' || e.target.closest('#btnLancamentoAjuste')) {
+            e.preventDefault();
+            abrirModalAusencia();
+        }
+    });
+
+    document.addEventListener('click', function(e) {
+        if (e.target.id === 'btnFeriadoMunicipal' || e.target.closest('#btnFeriadoMunicipal')) {
+            e.preventDefault();
+            console.log("Botão feriado clicado!");
+            abrirModalFeriado();
+        }
+    });
+    
+    const fecharModalBtn = document.getElementById('fecharModalBtn');
+    if (fecharModalBtn) {
+        fecharModalBtn.addEventListener('click', function() {
+            fecharModal('modal');
+        });
+    }
+    
+    const fecharModalConfirmacaoBtn = document.getElementById('fecharModalConfirmacaoBtn');
+    if (fecharModalConfirmacaoBtn) {
+        fecharModalConfirmacaoBtn.addEventListener('click', function() {
+            fecharModal('modalConfirmacao');
+            exclusaoPendenteId = null;
+        });
+    }
+    
+    const cancelarExclusaoBtn = document.getElementById('cancelarExclusaoBtn');
+    if (cancelarExclusaoBtn) {
+        cancelarExclusaoBtn.addEventListener('click', function() {
+            fecharModal('modalConfirmacao');
+            exclusaoPendenteId = null;
+        });
+    }
+    
+    const confirmarExclusaoBtn = document.getElementById('confirmarExclusaoBtn');
+    if (confirmarExclusaoBtn) {
+        confirmarExclusaoBtn.addEventListener('click', confirmarExclusao);
+    }
+    
+    const fecharModalHorarioBtn = document.getElementById('fecharModalHorarioBtn');
+    if (fecharModalHorarioBtn) {
+        fecharModalHorarioBtn.addEventListener('click', function() {
+            fecharModal('modalHorario');
+        });
+    }
+    
+    const fecharModalHorarioBtn2 = document.getElementById('fecharModalHorarioBtn2');
+    if (fecharModalHorarioBtn2) {
+        fecharModalHorarioBtn2.addEventListener('click', function() {
+            fecharModal('modalHorario');
+        });
+    }
+    
+    window.addEventListener('click', function(e) {
+        if (e.target.classList.contains('modal')) {
+            e.target.classList.add('hidden');
+            e.target.classList.remove('active');
+            if (e.target.id === 'modalConfirmacao') {
+                exclusaoPendenteId = null;
+            }
+        }
+    });
+    
+    const salvarAusenciaBtn = document.getElementById('salvarAusenciaBtn');
+    if (salvarAusenciaBtn) {
+        salvarAusenciaBtn.addEventListener('click', salvarAusencia);
+    }
+    
+    const cancelarEdicaoBtn = document.getElementById('cancelarEdicaoLancamentoBtn');
+    if (cancelarEdicaoBtn) {
+        cancelarEdicaoBtn.addEventListener('click', cancelarEdicaoAusencia);
+    }
+
+    // Botões do modal de feriado
+    const salvarFeriadoBtn = document.getElementById('salvarFeriadoBtn');
+    if (salvarFeriadoBtn) {
+        salvarFeriadoBtn.addEventListener('click', salvarFeriado);
+    }
+
+    const cancelarEdicaoFeriadoBtn = document.getElementById('cancelarEdicaoFeriadoBtn');
+    if (cancelarEdicaoFeriadoBtn) {
+        cancelarEdicaoFeriadoBtn.addEventListener('click', cancelarEdicaoFeriado);
+    }
+
+    const fecharModalFeriadoBtn = document.getElementById('fecharModalFeriadoBtn');
+    if (fecharModalFeriadoBtn) {
+        fecharModalFeriadoBtn.addEventListener('click', function() {
+            fecharModal('modalFeriado');
+            cancelarEdicaoFeriado();
+        });
+    }
+}
+
+// EXPOR FUNÇÕES GLOBAIS
+window.carregarPagina = carregarPagina;
+window.abrirModalAusencia = abrirModalAusencia;
+window.abrirModalHorario = abrirModalHorario;
+window.abrirModalFeriado = abrirModalFeriado;
+window.editarFeriado = editarFeriado;
+window.excluirFeriado = excluirFeriado;
+
+// Atualizar carregamento inicial
+document.addEventListener("DOMContentLoaded", async () => {
+    console.log("Inicializando aplicação...");
+    
+    const temaSalvo = localStorage.getItem('tema') || 'light';
+    document.documentElement.setAttribute('data-theme', temaSalvo);
+
+    try {
+        await carregarColaboradores();
+        console.log("Colaboradores carregados:", colaboradores.length);
+        
+        await carregarAusencias();
+        console.log("Ausências carregadas:", ausencias.length);
+        
+        await carregarFeriadosLocais();
+        console.log("Feriados locais carregados:", feriadosLocais.length);
+        
+    } catch (error) {
+        console.error("Erro ao carregar dados:", error);
+        mostrarToast("Erro ao carregar dados do servidor", "error");
+    }
+    
+    configurarNavegacao();
+    configurarModais();
+    
+    renderCalendario();
+});
+
+// ================= FUNÇÕES DE DEBUG =================
+function debugDados() {
+    console.log("=== DEBUG DO SISTEMA ===");
+    console.log("Colaboradores:", colaboradores.length);
+    console.log("Ausências:", ausencias.length);
+    console.log("Feriados API:", feriados?.length || 0);
+    console.log("Feriados Locais:", feriadosLocais?.length || 0);
+    
+    if (ausencias.length > 0) {
+        console.log("Primeira ausência:", ausencias[0]);
+    }
+}
+
+// ================= FUNÇÃO PARA ATUALIZAR TUDO =================
+async function atualizarTudo() {
+    console.log("Atualizando todos os dados...");
+    
+    try {
+        // Recarregar todos os dados do backend com tratamento de erro individual
+        const resultados = await Promise.allSettled([
+            carregarColaboradores(),
+            carregarAusencias(),
+            carregarFeriadosLocais()
+        ]);
+        
+        resultados.forEach((resultado, index) => {
+            const nomes = ['Colaboradores', 'Ausências', 'Feriados'];
+            if (resultado.status === 'fulfilled') {
+                console.log(`✅ ${nomes[index]} atualizados`);
+            } else {
+                console.error(`❌ Erro ao atualizar ${nomes[index]}:`, resultado.reason);
+            }
+        });
+        
+        // Se o calendário estiver visível, atualizar
+        if (document.getElementById("calendar")) {
+            gerarCalendario(mesAtual, anoAtual);
+        }
+        
+        // Atualizar a legenda mensal
+        gerarLegendaMensal();
+        
+        // Se o modal de ausência estiver aberto, atualizar a listagem
+        const modalAusencia = document.getElementById("modal");
+        if (modalAusencia && !modalAusencia.classList.contains('hidden')) {
+            if (dataSelecionada) {
+                await carregarAusenciasDoDia(dataSelecionada);
+            }
+        }
+        
+        console.log("Atualização completa!");
+        mostrarToast("Dados atualizados!", "success");
+        
+    } catch (error) {
+        console.error("Erro ao atualizar dados:", error);
+        mostrarToast("Erro ao atualizar dados", "error");
+    }
+}
+
+// ================= OBSERVER PARA ATUALIZAÇÃO AUTOMÁTICA =================
+function configurarObservers() {
+    // Observer para detectar quando o calendário é atualizado
+    const calendarObserver = new MutationObserver(() => {
+        // Quando o calendário mudar, atualizar a legenda
+        setTimeout(() => {
+            gerarLegendaMensal();
+        }, 100);
+    });
+    
+    const calendar = document.getElementById("calendar");
+    if (calendar) {
+        calendarObserver.observe(calendar, { 
+            childList: true, 
+            subtree: true,
+            characterData: true 
+        });
+    }
+    
+    // Observer para detectar quando modais são fechados
+    const modalObserver = new MutationObserver((mutations) => {
+        mutations.forEach((mutation) => {
+            if (mutation.attributeName === 'class') {
+                const modal = mutation.target;
+                // Se o modal foi fechado (adicionou hidden)
+                if (modal.classList.contains('hidden')) {
+                    // Atualizar dados
+                    setTimeout(() => {
+                        atualizarTudo();
+                    }, 300);
+                }
+            }
+        });
+    });
+    
+    // Observar modais
+    const modals = ['modal', 'modalFeriado', 'modalConfirmacao'];
+    modals.forEach(modalId => {
+        const modal = document.getElementById(modalId);
+        if (modal) {
+            modalObserver.observe(modal, { attributes: true });
+        }
+    });
+}
+
+// Chamar no DOMContentLoaded
+document.addEventListener("DOMContentLoaded", async () => {
+    console.log("Inicializando aplicação...");
+    
+    const temaSalvo = localStorage.getItem('tema') || 'light';
+    document.documentElement.setAttribute('data-theme', temaSalvo);
+
+    try {
+        await carregarColaboradores();
+        console.log("Colaboradores carregados:", colaboradores.length);
+        
+        await carregarAusencias();
+        console.log("Ausências carregadas:", ausencias.length);
+        
+        await carregarFeriadosLocais();
+        console.log("Feriados locais carregados:", feriadosLocais.length);
+        
+    } catch (error) {
+        console.error("Erro ao carregar dados:", error);
+        mostrarToast("Erro ao carregar dados do servidor", "error");
+    }
+    
+    configurarNavegacao();
+    configurarModais();
+    configurarObservers(); // 🔥 NOVO
+    
+    renderCalendario();
+});
+
+function testarAtualizacao() {
+    console.log("Testando atualização...");
+    atualizarTudo();
+}
+
+// No app.js, adicione esta função
+function atualizarCalendario() {
+    if (document.getElementById("calendar")) {
+        // Atualizar a variável global no calendar.js
+        if (typeof window.feriadosLocais !== 'undefined') {
+            window.feriadosLocais = feriadosLocais;
+        }
+        
+        // Chamar a função de gerar calendário
+        if (typeof gerarCalendario === 'function') {
+            gerarCalendario(mesAtual, anoAtual);
+        }
+    }
+}
+
+// E modifique a função atualizarTudo para chamar atualizarCalendario
+async function atualizarTudo() {
+    console.log("Atualizando todos os dados...");
+    
+    try {
+        const resultados = await Promise.allSettled([
+            carregarColaboradores(),
+            carregarAusencias(),
+            carregarFeriadosLocais()
+        ]);
+        
+        resultados.forEach((resultado, index) => {
+            const nomes = ['Colaboradores', 'Ausências', 'Feriados'];
+            if (resultado.status === 'fulfilled') {
+                console.log(`✅ ${nomes[index]} atualizados`);
+            } else {
+                console.error(`❌ Erro ao atualizar ${nomes[index]}:`, resultado.reason);
+            }
+        });
+        
+        // 🔥 ATUALIZAR O CALENDÁRIO
+        atualizarCalendario();
+        
+        // Atualizar a legenda mensal
+        gerarLegendaMensal();
+        
+        console.log("Atualização completa!");
+        
+    } catch (error) {
+        console.error("Erro ao atualizar dados:", error);
+        mostrarToast("Erro ao atualizar dados", "error");
+    }
+} 
+
+function toggleCamposHora(select) {
+    const camposHora = document.getElementById('camposHora');
+    if (select.value === 'horas') {
+        camposHora.classList.remove('hidden');
+    } else {
+        camposHora.classList.add('hidden');
+    }
+}
+
+// EXPOR GLOBALMENTE
+window.toggleCamposHora = toggleCamposHora;

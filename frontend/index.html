@@ -116,8 +116,7 @@
     </div>
   </main>
 </div>
-
-<!-- MODAL DE LANÇAMENTO -->
+<!-- MODAL DE LANÇAMENTO (ATUALIZADO) -->
 <div id="modal" class="modal hidden">
   <div class="modal-content modal-lg">
     <div class="modal-header">
@@ -128,14 +127,11 @@
     <div class="modal-body modal-columns">
       <div class="modal-column list-column">
         <div class="list-section">
-          <h4><i class="fas fa-list"></i> Lançamentos</h4>
-          
-
+          <h4><i class="fas fa-list"></i> Lançamentos do Dia</h4>
           <div id="loadingAusencias" class="loading-state">
             <i class="fas fa-spinner fa-spin"></i>
             <p>Carregando lançamentos...</p>
           </div>
-
           <div id="emptyAusencias" class="empty-state hidden">
             <i class="fas fa-calendar-times"></i>
             <p>Nenhum lançamento encontrado</p>
@@ -144,7 +140,6 @@
           <div id="listaAusencias" class="ausencias-list hidden"></div>
         </div>
       </div>
-
 
       <div class="modal-column form-column">
         <div class="form-section">
@@ -166,6 +161,16 @@
             </select>
           </div>
 
+          <!-- NOVO: Opção de período inteiro ou horas -->
+          <div class="form-group">
+            <label><i class="fas fa-clock"></i> Tipo de Período</label>
+            <select id="periodoTipo" class="form-control" onchange="toggleCamposHora(this)">
+              <option value="dia_inteiro">📅 Dia inteiro</option>
+              <option value="horas">⏰ Horas específicas</option>
+            </select>
+          </div>
+
+          <!-- Campos de data (sempre visíveis) -->
           <div class="form-group">
             <label><i class="fas fa-calendar-day"></i> Data Início</label>
             <input type="date" id="dataInicio" class="form-control">
@@ -174,6 +179,20 @@
           <div class="form-group">
             <label><i class="fas fa-calendar-check"></i> Data Fim</label>
             <input type="date" id="dataFim" class="form-control">
+          </div>
+
+       
+          <div id="camposHora" class="hidden">
+            <div class="form-row">
+              <div class="form-group">
+                <label><i class="fas fa-hourglass-start"></i> Hora Início</label>
+                <input type="time" id="horaInicio" class="form-control">
+              </div>
+              <div class="form-group">
+                <label><i class="fas fa-hourglass-end"></i> Hora Fim</label>
+                <input type="time" id="horaFim" class="form-control">
+              </div>
+            </div>
           </div>
 
           <div class="form-actions column">
@@ -189,6 +208,73 @@
     </div>
   </div>
 </div>
+
+<!-- MODAL DE FERIADOS MUNICIPAIS/ESTADUAIS -->
+<div id="modalFeriado" class="modal hidden">
+  <div class="modal-content modal-lg">
+    <div class="modal-header">
+      <h3><i class="fas fa-city"></i> Gerenciar Feriados</h3>
+      <button class="modal-close" id="fecharModalFeriadoBtn">&times;</button>
+    </div>
+    
+    <div class="modal-body modal-columns">
+      <!-- COLUNA ESQUERDA: Formulário -->
+      <div class="modal-column form-column">
+        <div class="form-section">
+          <h4><i class="fas fa-pen"></i> Novo Feriado</h4>
+          
+          <div class="form-group">
+            <label><i class="fas fa-calendar-day"></i> Data</label>
+            <input type="date" id="feriadoData" class="form-control">
+          </div>
+          
+          <div class="form-group">
+            <label><i class="fas fa-tag"></i> Nome do Feriado</label>
+            <input type="text" id="feriadoNome" class="form-control" placeholder="Ex: Aniversário da Cidade">
+          </div>
+
+          <div class="form-group">
+            <label><i class="fas fa-map-marker-alt"></i> Tipo</label>
+            <select id="feriadoTipo" class="form-control">
+              <option value="municipal">🏛️ Municipal</option>
+              <option value="estadual">🏛️ Estadual</option>
+            </select>
+          </div>
+
+          <div class="form-actions column">
+            <button id="salvarFeriadoBtn" class="btn-primary full-width">
+              <i class="fas fa-save"></i> Salvar Feriado
+            </button>
+            <button id="cancelarEdicaoFeriadoBtn" class="btn-secondary full-width hidden">
+              <i class="fas fa-times"></i> Cancelar Edição
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- COLUNA DIREITA: Listagem -->
+      <div class="modal-column list-column">
+        <div class="list-section">
+          <h4><i class="fas fa-list"></i> Feriados</h4>
+          
+          <div id="loadingFeriados" class="loading-state">
+            <i class="fas fa-spinner fa-spin"></i>
+            <p>Carregando feriados...</p>
+          </div>
+
+          <div id="emptyFeriados" class="empty-state hidden">
+            <i class="fas fa-calendar-times"></i>
+            <p>Nenhum feriado encontrado</p>
+            <small>Adicione feriados municipais ou estaduais</small>
+          </div>
+          
+          <div id="listaFeriados" class="feriados-list hidden"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 
 <div id="modalConfirmacao" class="modal hidden">
   <div class="modal-content modal-small">
@@ -321,3 +407,4 @@
     });
   })();
 </script>
+

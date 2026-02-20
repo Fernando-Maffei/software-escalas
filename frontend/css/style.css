@@ -62,7 +62,6 @@
   --shadow-xl: 0 20px 25px -5px rgba(0,0,0,0.5);
 }
 
-/* Transição suave entre temas */
 * {
   transition: background-color 0.3s ease, border-color 0.3s ease, color 0.2s ease;
 }
@@ -80,6 +79,223 @@ body {
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+[data-theme="dark"] body {
+    background: var(--bg);
+    color: var(--text);
+}
+
+[data-theme="dark"] main {
+    background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+}
+
+[data-theme="dark"] .calendar-wrapper {
+    background: var(--card);
+    border: 1px solid var(--border);
+}
+
+[data-theme="dark"] .day {
+    background: var(--card-dark);
+    color: var(--text);
+}
+
+[data-theme="dark"] .day:hover {
+    background: var(--card);
+}
+
+[data-theme="dark"] .today {
+    background: linear-gradient(135deg, var(--primary-soft) 0%, var(--card) 100%);
+}
+
+[data-theme="dark"] .weekday {
+    color: var(--text-light);
+}
+
+[data-theme="dark"] .modal-content {
+    background: var(--card);
+    color: var(--text);
+    border: 1px solid var(--border);
+}
+
+[data-theme="dark"] .modal-header {
+    border-bottom-color: var(--border);
+}
+
+[data-theme="dark"] .form-control {
+    background: var(--card-dark);
+    border-color: var(--border);
+    color: var(--text);
+}
+
+[data-theme="dark"] .form-control:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.2);
+}
+
+[data-theme="dark"] .loading-state,
+[data-theme="dark"] .empty-state {
+    background: var(--card-dark);
+    color: var(--text-light);
+    border-color: var(--border);
+}
+
+[data-theme="dark"] .ausencia-card {
+    background: var(--card-dark);
+    border-color: var(--border);
+    color: var(--text);
+}
+
+[data-theme="dark"] .ausencia-card:hover {
+    background: var(--card);
+    border-color: var(--primary);
+}
+
+[data-theme="dark"] .ausencia-datas {
+    background: var(--card);
+}
+
+[data-theme="dark"] .btn-secondary {
+    background: var(--card-dark);
+    color: var(--text);
+    border-color: var(--border);
+}
+
+[data-theme="dark"] .btn-secondary:hover {
+    background: var(--primary);
+    color: white;
+    border-color: var(--primary);
+}
+
+[data-theme="dark"] .calendario-legenda-mensal {
+    background: var(--card);
+    border: 1px solid var(--border);
+}
+
+[data-theme="dark"] .legenda-card {
+    background: var(--card-dark);
+    border-color: var(--border);
+}
+
+[data-theme="dark"] .legenda-dia-card {
+    background: var(--card-dark);
+    border-color: var(--border);
+}
+
+[data-theme="dark"] .legenda-evento {
+    background: var(--card);
+    border-color: var(--border);
+    color: var(--text);
+}
+/* ================= BOTÕES NO TEMA ESCURO ================= */
+[data-theme="dark"] .btn-primary {
+    background: linear-gradient(135deg, var(--primary) 0%, #4f52e0 100%);
+    color: white;
+    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+}
+
+[data-theme="dark"] .btn-primary:hover {
+    box-shadow: 0 8px 20px rgba(99, 102, 241, 0.5);
+    transform: translateY(-2px);
+}
+
+[data-theme="dark"] .btn-secondary {
+    background: var(--card-dark);
+    color: var(--text);
+    border: 2px solid var(--border);
+}
+
+[data-theme="dark"] .btn-secondary:hover {
+    background: var(--primary);
+    color: white;
+    border-color: var(--primary);
+}
+
+[data-theme="dark"] .btn-danger {
+    background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+    color: white;
+}
+
+[data-theme="dark"] .header-actions button {
+    background: var(--card-dark);
+    color: var(--text);
+    border: 1px solid var(--border);
+}
+
+[data-theme="dark"] .header-actions button:hover {
+    background: var(--primary);
+    color: white;
+    border-color: var(--primary);
+}
+
+[data-theme="dark"] .month-nav button {
+    background: var(--card-dark);
+    color: var(--text);
+    border: 1px solid var(--border);
+}
+
+[data-theme="dark"] .month-nav button:hover {
+    background: var(--primary);
+    color: white;
+    border-color: var(--primary);
+}
+
+/* ================= TAGS DE FERIADO NO CALENDÁRIO ================= */
+.holiday-tag {
+    font-size: 10px;
+    margin-top: 2px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    background: white;
+    border-left: 3px solid;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+    box-shadow: var(--shadow-sm);
+    font-weight: 500;
+}
+
+.holiday-tag.federal {
+    border-left-color: #2563eb;
+    color: #1e40af;
+    background: #dbeafe;
+}
+
+.holiday-tag.estadual {
+    border-left-color: #7c3aed;
+    color: #5b21b6;
+    background: #ede9fe;
+}
+
+.holiday-tag.municipal {
+    border-left-color: #bd3333;
+    color: #500606;
+    background: #f1a7a7;
+}
+
+/* Tema escuro */
+[data-theme="dark"] .holiday-tag {
+    background: var(--card-dark);
+    color: var(--text);
+}
+
+[data-theme="dark"] .holiday-tag.federal {
+    background: #1e3a8a;
+    color: #bfdbfe;
+    border-left-color: #3b82f6;
+}
+
+[data-theme="dark"] .holiday-tag.estadual {
+    background: #4c1d95;
+    color: #ddd6fe;
+    border-left-color: #8b5cf6;
+}
+
+[data-theme="dark"] .holiday-tag.municipal {
+    background: #064e3b;
+    color: #a7f3d0;
+    border-left-color: #10b981;
 }
 
 /* ================= LAYOUT MODERNO ================= */
@@ -5751,3 +5967,222 @@ input:checked + .slider:before {
     justify-content: flex-end;
 }
 
+/* ================= FERIADOS ================= */
+.feriado-tipo-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 500;
+    white-space: nowrap;
+    background: white;
+    border: 1px solid;
+}
+
+.feriado-tipo-badge.municipal {
+    color: #da1919;
+    border-color: #e41f1f;
+    background: #f0fdf4;
+}
+
+.feriado-tipo-badge.estadual {
+    color: #7c3aed;
+    border-color: #ede9fe;
+    background: #f5f3ff;
+}
+
+/* ================= LEGENDA MENSAL ================= */
+.calendario-legenda-mensal {
+    background: white;
+    border-radius: 24px;
+    padding: 24px;
+    box-shadow: var(--shadow-xl);
+    margin-top: 24px;
+}
+
+.legenda-mensal-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 20px;
+    padding-bottom: 16px;
+    border-bottom: 2px solid var(--border);
+}
+
+.legenda-mensal-header i {
+    font-size: 24px;
+    color: var(--primary);
+}
+
+.legenda-mensal-header h4 {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text);
+    margin: 0;
+}
+
+.legenda-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
+}
+
+.legenda-card {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 20px;
+    border-radius: 16px;
+    background: var(--card-dark);
+    border: 1px solid var(--border);
+    transition: var(--transition);
+}
+
+.legenda-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+}
+
+.legenda-card i {
+    font-size: 28px;
+    color: var(--primary);
+}
+
+.legenda-card.feriado i { color: #ef4444; }
+.legenda-card.ferias i { color: #4f52e0; }
+.legenda-card.folga i { color: #10b981; }
+.legenda-card.ausencia i { color: #f59e0b; }
+
+.legenda-card div {
+    display: flex;
+    flex-direction: column;
+}
+
+.legenda-card strong {
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--text);
+    line-height: 1.2;
+}
+
+.legenda-card span {
+    font-size: 14px;
+    color: var(--text-light);
+}
+
+.legenda-dias h5 {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 16px;
+}
+
+.legenda-dias-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    max-height: 400px;
+    overflow-y: auto;
+    padding-right: 8px;
+}
+
+.legenda-dia-card {
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+    padding: 12px;
+    background: var(--card-dark);
+    border-radius: 12px;
+    border: 1px solid var(--border);
+}
+
+.legenda-dia-numero {
+    min-width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--primary-soft);
+    color: var(--primary);
+    font-weight: 700;
+    font-size: 16px;
+    border-radius: 10px;
+}
+
+.legenda-dia-eventos {
+    flex: 1;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.legenda-evento {
+    font-size: 12px;
+    padding: 4px 10px;
+    border-radius: 20px;
+    background: white;
+    border: 1px solid var(--border);
+    color: var(--text);
+}
+
+.legenda-evento.feriado-tag {
+    background: #fee2e2;
+    border-color: #ef4444;
+    color: #991b1b;
+}
+
+.legenda-evento.ferias-tag {
+    background: #e0e7ff;
+    border-color: #4f52e0;
+    color: #1e40af;
+}
+
+.legenda-evento.folga-tag {
+    background: #d1fae5;
+    border-color: #10b981;
+    color: #065f46;
+}
+
+.legenda-evento.ausencia-tag {
+    background: #fed7aa;
+    border-color: #f59e0b;
+    color: #92400e;
+}
+
+/* ================= CAMPOS DE HORA ================= */
+#camposHora {
+    margin-top: 16px;
+    padding: 16px;
+    background: var(--card-dark);
+    border-radius: 12px;
+    border: 1px dashed var(--border);
+}
+
+#camposHora.hidden {
+    display: none;
+}
+
+.form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+}
+
+#camposHora {
+    margin-top: 16px;
+    padding: 16px;
+    background: var(--card-dark);
+    border-radius: 12px;
+    border: 1px dashed var(--border);
+}
+
+#camposHora.hidden {
+    display: none;
+}
+
+#camposHora:not(.hidden) {
+    display: block;
+}

@@ -1,0 +1,22 @@
+# Node
+node_modules/
+npm-debug.log
+package-lock.json
+
+# Ambiente
+.env
+.vscode/
+.DS_Store
+
+# Backend
+backend/config.js
+*.log
+
+# Banco de dados
+*.db
+*.sqlite
+*.sqlite3
+
+# Temporários
+*.tmp
+*.temp

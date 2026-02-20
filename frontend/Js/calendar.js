@@ -2,12 +2,17 @@ let mesAtual;
 let anoAtual;
 let feriados = [];
 
+
+window.gerarCalendario = gerarCalendario;
+window.inicializarCalendario = inicializarCalendario;
+
 async function carregarFeriados(ano) {
   try {
     const response = await fetch(`https://brasilapi.com.br/api/feriados/v1/${ano}`);
     feriados = await response.json();
+    console.log(`Feriados da API carregados para ${ano}:`, feriados.length);
   } catch (erro) {
-    console.error("Erro ao carregar feriados:", erro);
+    console.error("Erro ao carregar feriados da API:", erro);
     feriados = [];
   }
 }
@@ -17,7 +22,10 @@ async function carregarFeriados(ano) {
 ================================ */
 function gerarCalendario(mes, ano) {
   const calendar = document.getElementById("calendar");
-  if (!calendar) return;
+  if (!calendar) {
+    console.error("Elemento calendar não encontrado!");
+    return;
+  }
   
   calendar.innerHTML = "";
 
@@ -25,7 +33,7 @@ function gerarCalendario(mes, ano) {
   const ultimoDia = new Date(ano, mes + 1, 0);
 
   const diasNoMes = ultimoDia.getDate();
-  const diaSemanaInicio = primeiroDia.getDay(); // 0 = Domingo, 1 = Segunda, etc.
+  const diaSemanaInicio = primeiroDia.getDay(); // 0 = Domingo
 
   const monthTitle = document.getElementById("monthTitle");
   if (monthTitle) {
@@ -34,7 +42,6 @@ function gerarCalendario(mes, ano) {
       year: "numeric" 
     }).replace(/^\w/, c => c.toUpperCase());
     
-    // 🔥 Adiciona evento de clique no título
     monthTitle.style.cursor = 'pointer';
     monthTitle.title = 'Clique para navegar entre meses';
     
@@ -44,7 +51,11 @@ function gerarCalendario(mes, ano) {
     
     newMonthTitle.addEventListener('click', (e) => {
       e.stopPropagation();
-      abrirSeletorMes();
+      if (typeof abrirSeletorMes === 'function') {
+        abrirSeletorMes();
+      } else {
+        console.warn("Função abrirSeletorMes não encontrada");
+      }
     });
   }
 
@@ -69,34 +80,58 @@ function gerarCalendario(mes, ano) {
       cell.classList.add("today");
     }
 
-    // Criar data no formato ISO sem problemas de fuso
+    // Criar data no formato ISO
     const dataISO = `${ano}-${String(mes + 1).padStart(2, '0')}-${String(dia).padStart(2, '0')}`;
 
     cell.innerHTML = `<strong>${dia}</strong>`;
 
-    // Verifica feriados
-    const feriadoDoDia = feriados?.find(f => f.date === dataISO);
-    if (feriadoDoDia) {
-      cell.classList.add("holiday");
-      const tagFeriado = document.createElement("div");
-      tagFeriado.className = "holiday-tag";
-      tagFeriado.innerText = feriadoDoDia.name;
-      cell.appendChild(tagFeriado);
+    // ===== FERIADOS =====
+    // Verifica feriados da API (nacionais)
+    if (feriados && feriados.length > 0) {
+      const feriadoDoDia = feriados.find(f => f.date === dataISO);
+      if (feriadoDoDia) {
+        cell.classList.add("holiday");
+        const tagFeriado = document.createElement("div");
+        tagFeriado.className = "holiday-tag federal";
+        tagFeriado.innerHTML = `🇧🇷 ${feriadoDoDia.name}`;
+        cell.appendChild(tagFeriado);
+      }
     }
 
-    // Verifica ausências do dia
-    if (typeof ausencias !== 'undefined' && ausencias.length > 0 && colaboradores.length > 0) {
-      // Criar data alvo para comparação
+    // 🔥 CORREÇÃO: Usar window.feriadosLocais em vez de feriadosLocais
+    if (window.feriadosLocais && window.feriadosLocais.length > 0) {
+      const feriadoLocal = window.feriadosLocais.find(f => {
+        if (!f.Data) return false;
+        // Converte a data do banco para string ISO
+        const dataFeriado = new Date(f.Data);
+        const dataFeriadoStr = `${dataFeriado.getFullYear()}-${String(dataFeriado.getMonth() + 1).padStart(2, '0')}-${String(dataFeriado.getDate()).padStart(2, '0')}`;
+        return dataFeriadoStr === dataISO;
+      });
+      
+      if (feriadoLocal) {
+        cell.classList.add("holiday");
+        const tagFeriado = document.createElement("div");
+        tagFeriado.className = `holiday-tag ${feriadoLocal.Tipo || 'municipal'}`;
+        
+        const icone = feriadoLocal.Tipo === 'estadual' ? '🏛️' : '🏛️';
+        tagFeriado.innerHTML = `${icone} ${feriadoLocal.Nome}`;
+        cell.appendChild(tagFeriado);
+      }
+    }
+
+    // ===== AUSÊNCIAS =====
+    if (window.ausencias && window.ausencias.length > 0 && 
+        window.colaboradores && window.colaboradores.length > 0) {
+      
       const dataAlvo = new Date(ano, mes, dia);
       dataAlvo.setHours(0, 0, 0, 0);
       
-      const ausenciasDoDia = ausencias.filter(a => {
+      const ausenciasDoDia = window.ausencias.filter(a => {
           const dataInicioStr = a.DataInicio || a.dataInicio;
           const dataFimStr = a.DataFim || a.dataFim;
           
           if (!dataInicioStr || !dataFimStr) return false;
           
-          // Extrair apenas a data
           const dataInicio = new Date(dataInicioStr.split('T')[0] + 'T00:00:00');
           const dataFim = new Date(dataFimStr.split('T')[0] + 'T00:00:00');
           
@@ -111,18 +146,25 @@ function gerarCalendario(mes, ano) {
       
       ausenciasDoDia.forEach(a => {
           const colaboradorId = a.colaboradorId || a.ColaboradorId;
-          const colaborador = colaboradores?.find(c => c.Id === colaboradorId);
+          const colaborador = window.colaboradores?.find(c => c.Id === colaboradorId);
           const nome = colaborador?.Nome || "Desconhecido";
+          const tipo = (a.tipo || a.Tipo || '').toLowerCase();
           
           if (!colaboradoresUnicos.has(nome)) {
-              colaboradoresUnicos.set(nome, a);
+              colaboradoresUnicos.set(nome, { nome, tipo });
           }
       });
 
-      colaboradoresUnicos.forEach((a, nome) => {
+      colaboradoresUnicos.forEach((info, nome) => {
           const tag = document.createElement("div");
-          tag.className = `ausencia-tag ${a.tipo || 'ausencia'}`;
-          tag.innerText = nome;
+          tag.className = `ausencia-tag ${info.tipo}`;
+          
+          let icone = '📅';
+          if (info.tipo === 'folga') icone = '🌸';
+          else if (info.tipo === 'ferias') icone = '🏖️';
+          else if (info.tipo === 'ausencia') icone = '⚠️';
+          
+          tag.innerHTML = `${icone} ${nome}`;
           cell.appendChild(tag);
       });
     }
@@ -130,19 +172,22 @@ function gerarCalendario(mes, ano) {
     // Adiciona evento de clique para abrir o modal
     cell.addEventListener("click", (e) => {
       e.stopPropagation();
-      if (typeof abrirModalAusencia === 'function') {
-        abrirModalAusencia(dataISO);
+      if (typeof window.abrirModalAusencia === 'function') {
+        window.abrirModalAusencia(dataISO);
+      } else {
+        console.warn("Função abrirModalAusencia não encontrada");
       }
     });
 
     calendar.appendChild(cell);
   }
+  
+  console.log(`Calendário gerado para ${mes+1}/${ano}`);
 }
 
 /* ================================
    DIAS DA SEMANA
 ================================ */
-
 function gerarDiasSemana() {
   const container = document.querySelector(".weekdays");
   if (!container) return;
@@ -161,23 +206,23 @@ function gerarDiasSemana() {
 /* ================================
    INICIALIZAÇÃO
 ================================ */
-
 async function inicializarCalendario() {
   console.log("Inicializando calendário...");
   
   const dataAtual = new Date();
   
-  // Se já existe um mês/ano definido, mantém, senão usa o atual
   if (mesAtual === undefined || anoAtual === undefined) {
     mesAtual = dataAtual.getMonth();
     anoAtual = dataAtual.getFullYear();
   }
 
-  gerarDiasSemana();
+  // Carregar feriados da API
   await carregarFeriados(anoAtual);
-  gerarCalendario(mesAtual, anoAtual);
+  
+  console.log("Feriados locais disponíveis:", window.feriadosLocais?.length || 0);
 
-  // Configurar botões de navegação
+  gerarDiasSemana();
+  gerarCalendario(mesAtual, anoAtual);
   configurarNavegacaoCalendario();
 }
 
@@ -185,7 +230,6 @@ function configurarNavegacaoCalendario() {
   const prevBtn = document.getElementById("prevMonth");
   const nextBtn = document.getElementById("nextMonth");
   
-  // Remove eventos antigos para não duplicar
   if (prevBtn) {
     const newPrevBtn = prevBtn.cloneNode(true);
     prevBtn.parentNode.replaceChild(newPrevBtn, prevBtn);
