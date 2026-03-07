@@ -1,0 +1,406 @@
+/* ================= TELA DE COLABORADORES ================= */
+.colaboradores-layout {
+    display: flex;
+    gap: 20px;
+    min-height: 600px;
+}
+
+.colaboradores-container {
+    flex: 1;
+    background: white;
+    border-radius: 24px;
+    padding: 20px;
+    box-shadow: var(--shadow-lg);
+}
+
+.colaboradores-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    padding-bottom: 16px;
+    border-bottom: 2px solid var(--border);
+}
+
+.search-box {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--card-dark);
+    padding: 4px 12px;
+    border-radius: 12px;
+    flex: 1;
+    max-width: 300px;
+}
+
+.search-box i {
+    color: var(--text-light);
+    font-size: 14px;
+}
+
+.search-box input {
+    border: none;
+    background: transparent;
+    padding: 8px 0;
+    font-size: 14px;
+}
+
+.search-box input:focus {
+    outline: none;
+}
+
+.total-colaboradores {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--primary-soft);
+    color: var(--primary);
+    padding: 8px 16px;
+    border-radius: 30px;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.colaboradores-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+/* Cards de colaborador */
+.colaborador-card {
+    background: var(--card-dark);
+    border-radius: 16px;
+    padding: 16px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    border: 2px solid transparent;
+    transition: var(--transition);
+    cursor: pointer;
+    position: relative;
+}
+
+.colaborador-card:hover {
+    background: white;
+    border-color: var(--primary);
+    transform: translateX(5px);
+    box-shadow: var(--shadow-md);
+}
+
+.colaborador-avatar {
+    width: 48px;
+    height: 48px;
+    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+    border-radius: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-weight: 700;
+    font-size: 18px;
+    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+    flex-shrink: 0;
+}
+
+.colaborador-info {
+    flex: 1;
+}
+
+.colaborador-nome {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 4px;
+}
+
+.colaborador-horarios {
+    display: flex;
+    gap: 12px;
+}
+
+.horario-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: white;
+    padding: 4px 10px;
+    border-radius: 30px;
+    font-size: 12px;
+    color: var(--text-light);
+    border: 1px solid var(--border);
+}
+
+.horario-tag i {
+    color: var(--primary);
+    font-size: 11px;
+}
+
+.colaborador-edit-indicator {
+    color: var(--text-lighter);
+    transition: var(--transition);
+}
+
+.colaborador-card:hover .colaborador-edit-indicator {
+    color: var(--primary);
+    transform: translateX(5px);
+}
+
+/* ================= PAINEL EDITOR DE COLABORADORES ================= */
+#colaboradorEditor {
+    width: 400px;
+    background: white;
+    border-radius: 24px;
+    box-shadow: var(--shadow-xl);
+    overflow: hidden;
+    animation: slideIn 0.3s ease;
+    position: relative;
+    z-index: 10;
+    display: none;
+}
+
+#colaboradorEditor .editor-content {
+    padding: 24px;
+    opacity: 1 !important;
+    visibility: visible !important;
+    height: auto;
+    max-height: 600px;
+    overflow-y: auto;
+}
+
+#colaboradorEditor .editor-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+    background: linear-gradient(135deg, var(--primary-soft) 0%, transparent 100%);
+    padding: 16px 20px;
+    border-radius: 16px;
+    margin-top: -8px;
+}
+
+#colaboradorEditor .editor-header h3 {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--primary-dark);
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+#colaboradorEditor .editor-header h3 i {
+    color: var(--primary);
+}
+
+#colaboradorEditor .btn-close-editor {
+    width: 32px;
+    height: 32px;
+    border: none;
+    border-radius: 10px;
+    background: var(--danger-soft);
+    color: var(--danger);
+    cursor: pointer;
+    transition: var(--transition);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+#colaboradorEditor .btn-close-editor:hover {
+    background: var(--danger);
+    color: white;
+    transform: rotate(90deg);
+}
+
+#colaboradorEditor .editor-form-group {
+    margin-bottom: 24px;
+}
+
+#colaboradorEditor .editor-form-group label {
+    display: block;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-light);
+    margin-bottom: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+#colaboradorEditor .editor-form-group label i {
+    margin-right: 6px;
+    color: var(--primary);
+}
+
+#colaboradorEditor .time-inputs {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--card-dark);
+    padding: 8px;
+    border-radius: 12px;
+}
+
+#colaboradorEditor .time-inputs input {
+    flex: 1;
+    border: 2px solid var(--border);
+    border-radius: 8px;
+    padding: 10px;
+    font-size: 14px;
+    transition: var(--transition);
+    background: white;
+}
+
+#colaboradorEditor .time-inputs input:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px var(--primary-soft);
+}
+
+#colaboradorEditor .time-inputs span {
+    color: var(--text-light);
+    font-size: 14px;
+    font-weight: 500;
+}
+
+#colaboradorEditor .editor-actions {
+    display: flex;
+    gap: 12px;
+    margin-top: 30px;
+    padding-top: 20px;
+    border-top: 2px solid var(--border);
+}
+
+#colaboradorEditor .editor-actions .btn-primary,
+#colaboradorEditor .editor-actions .btn-secondary {
+    flex: 1;
+    justify-content: center;
+}
+
+#colaboradorEditor .editor-footer {
+    margin-top: 20px;
+    padding-top: 20px;
+    border-top: 2px dashed var(--danger-soft);
+}
+
+#colaboradorEditor .editor-footer .btn-danger {
+    width: 100%;
+    justify-content: center;
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateX(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+@media (max-width: 1200px) {
+    #colaboradorEditor {
+        width: 100%;
+    }
+}
+
+/* ================= TEMA ESCURO - COLABORADORES ================= */
+[data-theme="dark"] .colaboradores-container {
+    background: var(--card);
+    border-color: var(--border);
+}
+
+[data-theme="dark"] .colaborador-card {
+    background: var(--card-dark);
+    border-color: var(--border);
+}
+
+[data-theme="dark"] .colaborador-card:hover {
+    background: var(--card);
+    border-color: var(--primary);
+}
+
+[data-theme="dark"] .colaborador-nome {
+    color: var(--text);
+}
+
+[data-theme="dark"] .horario-tag {
+    background: var(--card);
+    color: var(--text-light);
+    border-color: var(--border);
+}
+
+[data-theme="dark"] .horario-tag i {
+    color: var(--primary);
+}
+
+[data-theme="dark"] .total-colaboradores {
+    background: var(--primary-soft);
+    color: var(--primary);
+}
+
+[data-theme="dark"] .search-box {
+    background: var(--card-dark);
+}
+
+[data-theme="dark"] .search-box i {
+    color: var(--text-light);
+}
+
+[data-theme="dark"] .search-box input {
+    color: var(--text);
+}
+
+[data-theme="dark"] .search-box input::placeholder {
+    color: var(--text-lighter);
+}
+
+/* Editor de colaboradores no tema escuro */
+[data-theme="dark"] #colaboradorEditor {
+    background: var(--card);
+    border-color: var(--border);
+}
+
+[data-theme="dark"] #colaboradorEditor .editor-header {
+    background: linear-gradient(135deg, var(--primary-soft) 0%, transparent 100%);
+}
+
+[data-theme="dark"] #colaboradorEditor .editor-header h3 {
+    color: var(--primary);
+}
+
+[data-theme="dark"] #colaboradorEditor .editor-form-group label {
+    color: var(--text-light);
+}
+
+[data-theme="dark"] #colaboradorEditor .time-inputs {
+    background: var(--card-dark);
+}
+
+[data-theme="dark"] #colaboradorEditor .time-inputs input {
+    background: var(--card);
+    color: var(--text);
+    border-color: var(--border);
+}
+
+[data-theme="dark"] #colaboradorEditor .time-inputs input:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px var(--primary-soft);
+}
+
+[data-theme="dark"] #colaboradorEditor .time-inputs span {
+    color: var(--text-light);
+}
+
+[data-theme="dark"] #colaboradorEditor .btn-secondary {
+    background: var(--card-dark);
+    color: var(--text);
+    border-color: var(--border);
+}
+
+[data-theme="dark"] #colaboradorEditor .btn-secondary:hover {
+    background: var(--primary);
+    color: white;
+    border-color: var(--primary);
+}

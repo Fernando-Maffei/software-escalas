@@ -1,7 +1,7 @@
+// calendar.js
 let mesAtual;
 let anoAtual;
 let feriados = [];
-
 
 window.gerarCalendario = gerarCalendario;
 window.inicializarCalendario = inicializarCalendario;
@@ -33,7 +33,7 @@ function gerarCalendario(mes, ano) {
   const ultimoDia = new Date(ano, mes + 1, 0);
 
   const diasNoMes = ultimoDia.getDate();
-  const diaSemanaInicio = primeiroDia.getDay(); // 0 = Domingo
+  const diaSemanaInicio = primeiroDia.getDay();
 
   const monthTitle = document.getElementById("monthTitle");
   if (monthTitle) {
@@ -45,7 +45,6 @@ function gerarCalendario(mes, ano) {
     monthTitle.style.cursor = 'pointer';
     monthTitle.title = 'Clique para navegar entre meses';
     
-    // Remove evento antigo para não duplicar
     const newMonthTitle = monthTitle.cloneNode(true);
     monthTitle.parentNode.replaceChild(newMonthTitle, monthTitle);
     
@@ -53,8 +52,6 @@ function gerarCalendario(mes, ano) {
       e.stopPropagation();
       if (typeof abrirSeletorMes === 'function') {
         abrirSeletorMes();
-      } else {
-        console.warn("Função abrirSeletorMes não encontrada");
       }
     });
   }
@@ -80,13 +77,10 @@ function gerarCalendario(mes, ano) {
       cell.classList.add("today");
     }
 
-    // Criar data no formato ISO
     const dataISO = `${ano}-${String(mes + 1).padStart(2, '0')}-${String(dia).padStart(2, '0')}`;
-
     cell.innerHTML = `<strong>${dia}</strong>`;
 
-    // ===== FERIADOS =====
-    // Verifica feriados da API (nacionais)
+    // ===== FERIADOS DA API =====
     if (feriados && feriados.length > 0) {
       const feriadoDoDia = feriados.find(f => f.date === dataISO);
       if (feriadoDoDia) {
@@ -98,11 +92,10 @@ function gerarCalendario(mes, ano) {
       }
     }
 
-    // 🔥 CORREÇÃO: Usar window.feriadosLocais em vez de feriadosLocais
+    // ===== FERIADOS LOCAIS =====
     if (window.feriadosLocais && window.feriadosLocais.length > 0) {
       const feriadoLocal = window.feriadosLocais.find(f => {
         if (!f.Data) return false;
-        // Converte a data do banco para string ISO
         const dataFeriado = new Date(f.Data);
         const dataFeriadoStr = `${dataFeriado.getFullYear()}-${String(dataFeriado.getMonth() + 1).padStart(2, '0')}-${String(dataFeriado.getDate()).padStart(2, '0')}`;
         return dataFeriadoStr === dataISO;
@@ -141,7 +134,6 @@ function gerarCalendario(mes, ano) {
           return dataAlvo >= dataInicio && dataAlvo <= dataFim;
       });
 
-      // Agrupa por colaborador para não repetir nomes
       const colaboradoresUnicos = new Map();
       
       ausenciasDoDia.forEach(a => {
@@ -169,15 +161,25 @@ function gerarCalendario(mes, ano) {
       });
     }
 
-    // Adiciona evento de clique para abrir o modal
-    cell.addEventListener("click", (e) => {
-      e.stopPropagation();
-      if (typeof window.abrirModalAusencia === 'function') {
-        window.abrirModalAusencia(dataISO);
-      } else {
-        console.warn("Função abrirModalAusencia não encontrada");
-      }
-    });
+    // Evento de clique
+    // Evento de clique - AGORA UNIFORME PARA TODOS OS DIAS
+cell.addEventListener("click", (e) => {
+  e.stopPropagation();
+  
+  // Verifica se é um feriado
+  const temFeriado = cell.classList.contains('holiday');
+  
+  if (temFeriado && typeof window.abrirModalLancamento === 'function') {
+    // Abre diretamente o modal na aba de feriados com a data selecionada
+    window.abrirModalLancamento('feriados', dataISO);
+  } else if (typeof window.abrirModalLancamento === 'function') {
+    // Abre na aba pessoal para os outros dias
+    window.abrirModalLancamento('pessoal', dataISO);
+  } else if (typeof window.abrirModalAusencia === 'function') {
+    // Fallback para funções antigas
+    window.abrirModalAusencia(dataISO);
+  }
+});
 
     calendar.appendChild(cell);
   }
@@ -216,7 +218,6 @@ async function inicializarCalendario() {
     anoAtual = dataAtual.getFullYear();
   }
 
-  // Carregar feriados da API
   await carregarFeriados(anoAtual);
   
   console.log("Feriados locais disponíveis:", window.feriadosLocais?.length || 0);
@@ -257,6 +258,56 @@ function configurarNavegacaoCalendario() {
         mesAtual = 0;
         anoAtual++;
       }
+      await carregarFeriados(anoAtual);
+      gerarCalendario(mesAtual, anoAtual);
+    });
+  }
+}
+
+// No final do arquivo calendar.js, adicione:
+window.mesAtual = mesAtual;
+window.anoAtual = anoAtual;
+
+// E atualize a função configurarNavegacaoCalendario para atualizar as variáveis globais
+function configurarNavegacaoCalendario() {
+  const prevBtn = document.getElementById("prevMonth");
+  const nextBtn = document.getElementById("nextMonth");
+  
+  if (prevBtn) {
+    const newPrevBtn = prevBtn.cloneNode(true);
+    prevBtn.parentNode.replaceChild(newPrevBtn, prevBtn);
+    
+    newPrevBtn.addEventListener("click", async () => {
+      console.log("Mês anterior");
+      mesAtual--;
+      if (mesAtual < 0) {
+        mesAtual = 11;
+        anoAtual--;
+      }
+      // 🔥 ATUALIZAR VARIÁVEIS GLOBAIS
+      window.mesAtual = mesAtual;
+      window.anoAtual = anoAtual;
+      
+      await carregarFeriados(anoAtual);
+      gerarCalendario(mesAtual, anoAtual);
+    });
+  }
+
+  if (nextBtn) {
+    const newNextBtn = nextBtn.cloneNode(true);
+    nextBtn.parentNode.replaceChild(newNextBtn, nextBtn);
+    
+    newNextBtn.addEventListener("click", async () => {
+      console.log("Próximo mês");
+      mesAtual++;
+      if (mesAtual > 11) {
+        mesAtual = 0;
+        anoAtual++;
+      }
+      // 🔥 ATUALIZAR VARIÁVEIS GLOBAIS
+      window.mesAtual = mesAtual;
+      window.anoAtual = anoAtual;
+      
       await carregarFeriados(anoAtual);
       gerarCalendario(mesAtual, anoAtual);
     });

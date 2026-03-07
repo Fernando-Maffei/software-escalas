@@ -1,0 +1,375 @@
+/* ================= CONFIGURAÇÕES ================= */
+.configuracoes-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+    gap: 24px;
+    margin-top: 24px;
+}
+
+.config-card {
+    background: var(--card);
+    border-radius: 24px;
+    box-shadow: var(--shadow-lg);
+    overflow: hidden;
+    border: 1px solid var(--border);
+    transition: var(--transition);
+}
+
+.config-card:hover {
+    box-shadow: var(--shadow-xl);
+    transform: translateY(-2px);
+}
+
+.config-card-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 20px 24px;
+    background: linear-gradient(135deg, var(--primary-soft) 0%, transparent 100%);
+    border-bottom: 2px solid var(--border);
+}
+
+.config-card-header i {
+    font-size: 24px;
+    color: var(--primary);
+}
+
+.config-card-header h2 {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text);
+    margin: 0;
+}
+
+.config-card-body {
+    padding: 24px;
+}
+
+.config-description {
+    color: var(--text-light);
+    font-size: 14px;
+    margin-bottom: 20px;
+    line-height: 1.5;
+}
+
+/* ================= OPÇÕES DE TEMA ================= */
+.tema-opcoes {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-top: 16px;
+}
+
+.tema-opcao {
+    background: var(--card-dark);
+    border-radius: 16px;
+    padding: 16px;
+    cursor: pointer;
+    transition: var(--transition);
+    border: 2px solid transparent;
+}
+
+.tema-opcao:hover {
+    transform: translateY(-3px);
+    box-shadow: var(--shadow-md);
+}
+
+.tema-opcao.active {
+    border-color: var(--primary);
+    background: var(--primary-soft);
+}
+
+.tema-preview {
+    height: 100px;
+    border-radius: 12px;
+    overflow: hidden;
+    margin-bottom: 12px;
+    display: flex;
+    gap: 2px;
+    padding: 4px;
+}
+
+.tema-preview-light {
+    background: #f1f5f9;
+}
+
+.tema-preview-dark {
+    background: #1e293b;
+}
+
+.preview-header {
+    height: 20px;
+    background: var(--primary);
+    border-radius: 4px;
+    margin-bottom: 4px;
+}
+
+.preview-sidebar {
+    width: 30px;
+    background: var(--sidebar);
+    border-radius: 4px;
+}
+
+.preview-content {
+    flex: 1;
+    background: var(--card);
+    border-radius: 4px;
+}
+
+.tema-info {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    color: var(--text);
+    font-weight: 600;
+}
+
+.tema-info i {
+    font-size: 18px;
+    color: var(--primary);
+}
+
+/* ================= ITENS DE CONFIGURAÇÃO ================= */
+.config-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 0;
+    border-bottom: 1px solid var(--border);
+}
+
+.config-item:last-child {
+    border-bottom: none;
+}
+
+.config-item-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.config-item-info i {
+    width: 32px;
+    height: 32px;
+    background: var(--primary-soft);
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--primary);
+    font-size: 16px;
+}
+
+.config-item-info div {
+    display: flex;
+    flex-direction: column;
+}
+
+.config-item-info strong {
+    font-size: 14px;
+    color: var(--text);
+}
+
+.config-item-info p {
+    font-size: 12px;
+    color: var(--text-light);
+    margin-top: 2px;
+}
+
+.config-select {
+    padding: 8px 12px;
+    border-radius: 10px;
+    border: 2px solid var(--border);
+    background: var(--card);
+    color: var(--text);
+    font-size: 14px;
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.config-select:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px var(--primary-soft);
+}
+
+/* ================= SWITCH TOGGLE ================= */
+.switch {
+    position: relative;
+    display: inline-block;
+    width: 52px;
+    height: 28px;
+}
+
+.switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: var(--border);
+    transition: .3s;
+    border-radius: 34px;
+}
+
+.slider:before {
+    position: absolute;
+    content: "";
+    height: 22px;
+    width: 22px;
+    left: 3px;
+    bottom: 3px;
+    background-color: white;
+    transition: .3s;
+    border-radius: 50%;
+}
+
+input:checked + .slider {
+    background-color: var(--primary);
+}
+
+input:checked + .slider:before {
+    transform: translateX(24px);
+}
+
+/* ================= SOBRE ================= */
+.sobre-info {
+    text-align: center;
+    margin-bottom: 24px;
+    padding-bottom: 24px;
+    border-bottom: 2px solid var(--border);
+}
+
+.sobre-icon {
+    font-size: 48px;
+    color: var(--primary);
+    margin-bottom: 16px;
+    background: var(--primary-soft);
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 16px;
+}
+
+.sobre-info h3 {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 4px;
+}
+
+.versao {
+    color: var(--primary);
+    font-weight: 600;
+    font-size: 14px;
+    margin-bottom: 12px;
+}
+
+.descricao {
+    color: var(--text-light);
+    font-size: 14px;
+    line-height: 1.6;
+    max-width: 300px;
+    margin: 0 auto;
+}
+
+.info-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 0;
+    color: var(--text-secondary);
+    font-size: 14px;
+}
+
+.info-item i {
+    width: 24px;
+    color: var(--primary);
+}
+
+/* ================= BOTÕES DE CONFIGURAÇÃO ================= */
+.config-btn {
+    width: 100%;
+    padding: 14px;
+    border: none;
+    border-radius: 12px;
+    background: var(--card-dark);
+    color: var(--text);
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: var(--transition);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin-bottom: 12px;
+    border: 2px solid transparent;
+}
+
+.config-btn:hover {
+    background: var(--primary-soft);
+    color: var(--primary);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+}
+
+.config-btn i {
+    font-size: 18px;
+}
+
+.config-btn-danger {
+    background: var(--danger-soft);
+    color: var(--danger);
+    margin-bottom: 0;
+}
+
+.config-btn-danger:hover {
+    background: var(--danger);
+    color: white;
+}
+
+/* Responsividade */
+@media (max-width: 768px) {
+    .configuracoes-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .config-item {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 12px;
+    }
+    
+    .config-select {
+        width: 100%;
+    }
+}
+
+/* Inputs number nas configurações */
+.configuracoes-grid input[type="number"].form-control {
+    background: var(--card);
+    color: var(--text);
+}
+
+[data-theme="dark"] .configuracoes-grid input[type="number"].form-control {
+    background: var(--card-dark);
+    color: var(--text);
+    border-color: var(--border);
+}
+
+[data-theme="dark"] .configuracoes-grid input[type="number"].form-control:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px var(--primary-soft);
+}

@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Software de Escalas</title>
-  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="style.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
@@ -15,14 +15,14 @@
 <div class="container">
 
     <aside class="sidebar" id="mainSidebar">
-
       <div class="sidebar-header">
         <div class="logo-container">
           <i class="fas fa-calendar-check"></i>
         </div>
-        <span class="sidebar-title">Escalas</span></span>
+        <span class="sidebar-title">Escalas</span>
       </div>
-       <button class="sidebar-btn" data-page="calendario">
+      
+      <button class="sidebar-btn" data-page="calendario">
         <div class="btn-content">
           <div class="icon-wrapper">
             <i class="fas fa-calendar-alt"></i>
@@ -31,11 +31,10 @@
         </div>
       </button>
 
-      <button class="sidebar-btn active" data-page="colaboradores">
+      <button class="sidebar-btn" data-page="colaboradores">
         <div class="btn-content">
           <div class="icon-wrapper">
             <i class="fas fa-users"></i>
-
           </div>
           <span class="btn-text">Colaboradores</span>
         </div>
@@ -109,302 +108,327 @@
       </div>
     </aside>
 
-  <!-- CONTEÚDO PRINCIPAL -->
-  <main id="appContent">
-    <div class="loading-indicator">
-      <i class="fas fa-spinner fa-spin"></i> Carregando...
-    </div>
-  </main>
-</div>
-<!-- MODAL DE LANÇAMENTO (ATUALIZADO) -->
-<div id="modal" class="modal hidden">
-  <div class="modal-content modal-lg">
-    <div class="modal-header">
-      <h3><i class="fas fa-calendar-alt"></i> Gerenciar Lançamentos</h3>
-      <button class="modal-close" id="fecharModalBtn">&times;</button>
-    </div>
-    
-    <div class="modal-body modal-columns">
-      <div class="modal-column list-column">
-        <div class="list-section">
-          <h4><i class="fas fa-list"></i> Lançamentos do Dia</h4>
-          <div id="loadingAusencias" class="loading-state">
-            <i class="fas fa-spinner fa-spin"></i>
-            <p>Carregando lançamentos...</p>
-          </div>
-          <div id="emptyAusencias" class="empty-state hidden">
-            <i class="fas fa-calendar-times"></i>
-            <p>Nenhum lançamento encontrado</p>
-            <small>Clique em "Novo Lançamento" para adicionar</small>
-          </div>
-          <div id="listaAusencias" class="ausencias-list hidden"></div>
+    <!-- CONTEÚDO PRINCIPAL -->
+    <main id="appContent">
+        <div class="loading-indicator">
+            <i class="fas fa-spinner fa-spin"></i> Carregando...
         </div>
-      </div>
+    </main>
+</div>
 
-      <div class="modal-column form-column">
-        <div class="form-section">
-          <h4><i class="fas fa-pen"></i> Novo Lançamento</h4>
-          
-          <div class="form-group">
-            <label><i class="fas fa-user"></i> Colaborador</label>
-            <select id="colaboradorSelect" class="form-control">
-              <option value="">Selecione um colaborador</option>
-            </select>
-          </div>
+<!-- MODAL DE LANÇAMENTOS UNIFICADO -->
+<!-- MODAL DE LANÇAMENTOS UNIFICADO - VERSÃO MELHORADA -->
+<div id="modalLancamento" class="modal hidden">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3><i class="fas fa-calendar-alt"></i> Gerenciar Lançamentos</h3>
+            <button class="modal-close" id="fecharModalLancamentoBtn">&times;</button>
+        </div>
+        
+        <div class="modal-body">
+            <div class="modal-columns">
+                <!-- COLUNA ESQUERDA: Listagem -->
+                <div class="list-column">
+                    <!-- Abas -->
+                    <div class="list-tabs">
+                        <button class="tab-btn active" data-tab="pessoal" id="tabPessoal">
+                            <i class="fas fa-users"></i>
+                            <span>Pessoal</span>
+                        </button>
+                        <button class="tab-btn" data-tab="feriados" id="tabFeriados">
+                            <i class="fas fa-city"></i>
+                            <span>Feriados</span>
+                        </button>
+                    </div>
+                    
+                    <!-- Loading State -->
+                    <div id="loadingLancamentos" class="loading-state">
+                        <i class="fas fa-spinner fa-spin"></i>
+                        <p>Carregando lançamentos...</p>
+                    </div>
+                    
+                    <!-- Lista de Lançamentos Pessoais -->
+                    <div id="listaPessoalContainer" class="tab-content active">
+                        <h4 class="section-title">
+                            <i class="fas fa-list"></i>
+                            Lançamentos Pessoais
+                        </h4>
+                        <div id="listaPessoal" class="lancamentos-list"></div>
+                    </div>
+                    
+                    <!-- Lista de Feriados -->
+                    <div id="listaFeriadosContainer" class="tab-content">
+                        <h4 class="section-title">
+                            <i class="fas fa-list"></i>
+                            Feriados
+                        </h4>
+                        <div id="listaFeriados" class="lancamentos-list"></div>
+                    </div>
+                    
+                    <!-- Empty State -->
+                    <div id="emptyLancamentos" class="empty-state hidden">
+                        <i class="fas fa-calendar-times"></i>
+                        <p>Nenhum lançamento encontrado</p>
+                        <small>Clique em "Novo Lançamento" para adicionar</small>
+                    </div>
+                </div>
 
-          <div class="form-group">
-            <label><i class="fas fa-tag"></i> Tipo</label>
-            <select id="tipoSelect" class="form-control">
-              <option value="folga">🌸 Folga</option>
-              <option value="ausencia">⚠️ Ausência</option>
-              <option value="ferias">🏖️ Férias</option>
-            </select>
-          </div>
+                <!-- COLUNA DIREITA: Formulário -->
+                <div class="form-column">
+                    <div class="form-section">
+                        <h4 class="form-titulo" id="formTitulo">
+                            <i class="fas fa-pen"></i>
+                            Novo Lançamento
+                        </h4>
+                        
+                        <!-- Tipo de Lançamento -->
+                        <div class="form-group">
+                            <label>
+                                <i class="fas fa-tag"></i>
+                                Tipo
+                            </label>
+                            <select id="tipoLancamento" class="form-control">
+                                <option value="folga">🌸 Folga</option>
+                                <option value="ausencia">⚠️ Ausência</option>
+                                <option value="ferias">🏖️ Férias</option>
+                                <option value="feriado">🏛️ Feriado</option>
+                            </select>
+                        </div>
 
-          <!-- NOVO: Opção de período inteiro ou horas -->
-          <div class="form-group">
-            <label><i class="fas fa-clock"></i> Tipo de Período</label>
-            <select id="periodoTipo" class="form-control" onchange="toggleCamposHora(this)">
-              <option value="dia_inteiro">📅 Dia inteiro</option>
-              <option value="horas">⏰ Horas específicas</option>
-            </select>
-          </div>
+                        <!-- Campos para Pessoal -->
+                        <div id="camposPessoal">
+                            <div class="form-group">
+                                <label>
+                                    <i class="fas fa-user"></i>
+                                    Colaborador
+                                </label>
+                                <select id="colaboradorSelect" class="form-control">
+                                    <option value="">Selecione um colaborador</option>
+                                </select>
+                            </div>
 
-          <!-- Campos de data (sempre visíveis) -->
-          <div class="form-group">
-            <label><i class="fas fa-calendar-day"></i> Data Início</label>
-            <input type="date" id="dataInicio" class="form-control">
-          </div>
+                            <div class="form-group">
+                                <label>
+                                    <i class="fas fa-clock"></i>
+                                    Tipo de Período
+                                </label>
+                                <select id="periodoTipo" class="form-control">
+                                    <option value="dia_inteiro">📅 Dia inteiro</option>
+                                    <option value="horas">⏰ Horas específicas</option>
+                                </select>
+                            </div>
+                        </div>
 
-          <div class="form-group">
-            <label><i class="fas fa-calendar-check"></i> Data Fim</label>
-            <input type="date" id="dataFim" class="form-control">
-          </div>
+                        <!-- Campos para Feriado -->
+                        <div id="camposFeriado" class="hidden">
+                            <div class="form-group">
+                                <label>
+                                    <i class="fas fa-map-marker-alt"></i>
+                                    Abrangência
+                                </label>
+                                <select id="feriadoTipo" class="form-control">
+                                    <option value="municipal">🏛️ Municipal</option>
+                                    <option value="estadual">🏛️ Estadual</option>
+                                </select>
+                            </div>
+                        </div>
 
-       
-          <div id="camposHora" class="hidden">
-            <div class="form-row">
-              <div class="form-group">
-                <label><i class="fas fa-hourglass-start"></i> Hora Início</label>
-                <input type="time" id="horaInicio" class="form-control">
-              </div>
-              <div class="form-group">
-                <label><i class="fas fa-hourglass-end"></i> Hora Fim</label>
-                <input type="time" id="horaFim" class="form-control">
-              </div>
+                        <!-- Datas -->
+                        <div class="form-group">
+                            <label>
+                                <i class="fas fa-calendar-day"></i>
+                                Data Início
+                            </label>
+                            <input type="date" id="dataInicio" class="form-control">
+                        </div>
+
+                        <div class="form-group">
+                            <label>
+                                <i class="fas fa-calendar-check"></i>
+                                Data Fim
+                            </label>
+                            <input type="date" id="dataFim" class="form-control">
+                        </div>
+
+                        <!-- Campos de Hora (condicional) -->
+                        <div id="camposHora" class="conditional-fields hidden">
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>Início</label>
+                                    <input type="time" id="horaInicio" class="form-control">
+                                </div>
+                                <div class="form-group">
+                                    <label>Fim</label>
+                                    <input type="time" id="horaFim" class="form-control">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Nome do Feriado (condicional) -->
+                        <div id="campoNomeFeriado" class="conditional-fields hidden">
+                            <div class="form-group">
+                                <label>
+                                    <i class="fas fa-tag"></i>
+                                    Nome do Feriado
+                                </label>
+                                <input type="text" id="feriadoNome" class="form-control" 
+                                       placeholder="Ex: Aniversário da Cidade">
+                            </div>
+                        </div>
+
+                        <!-- Botões de ação -->
+                        <div class="form-actions">
+                            <button id="salvarLancamentoBtn" class="btn-primary full-width">
+                                <i class="fas fa-save"></i>
+                                Salvar
+                            </button>
+                            <button id="cancelarEdicaoLancamentoBtn" class="btn-secondary full-width hidden">
+                                <i class="fas fa-times"></i>
+                                Cancelar Edição
+                            </button>
+                        </div>
+                    </div>
+                </div>
             </div>
-          </div>
-
-          <div class="form-actions column">
-            <button id="salvarAusenciaBtn" class="btn-primary full-width">
-              <i class="fas fa-save"></i> Salvar
-            </button>
-            <button id="cancelarEdicaoLancamentoBtn" class="btn-secondary full-width hidden">
-              <i class="fas fa-times"></i> Cancelar Edição
-            </button>
-          </div>
         </div>
-      </div>
     </div>
-  </div>
 </div>
 
-<!-- MODAL DE FERIADOS MUNICIPAIS/ESTADUAIS -->
-<div id="modalFeriado" class="modal hidden">
-  <div class="modal-content modal-lg">
-    <div class="modal-header">
-      <h3><i class="fas fa-city"></i> Gerenciar Feriados</h3>
-      <button class="modal-close" id="fecharModalFeriadoBtn">&times;</button>
-    </div>
-    
-    <div class="modal-body modal-columns">
-      <!-- COLUNA ESQUERDA: Formulário -->
-      <div class="modal-column form-column">
-        <div class="form-section">
-          <h4><i class="fas fa-pen"></i> Novo Feriado</h4>
-          
-          <div class="form-group">
-            <label><i class="fas fa-calendar-day"></i> Data</label>
-            <input type="date" id="feriadoData" class="form-control">
-          </div>
-          
-          <div class="form-group">
-            <label><i class="fas fa-tag"></i> Nome do Feriado</label>
-            <input type="text" id="feriadoNome" class="form-control" placeholder="Ex: Aniversário da Cidade">
-          </div>
-
-          <div class="form-group">
-            <label><i class="fas fa-map-marker-alt"></i> Tipo</label>
-            <select id="feriadoTipo" class="form-control">
-              <option value="municipal">🏛️ Municipal</option>
-              <option value="estadual">🏛️ Estadual</option>
-            </select>
-          </div>
-
-          <div class="form-actions column">
-            <button id="salvarFeriadoBtn" class="btn-primary full-width">
-              <i class="fas fa-save"></i> Salvar Feriado
-            </button>
-            <button id="cancelarEdicaoFeriadoBtn" class="btn-secondary full-width hidden">
-              <i class="fas fa-times"></i> Cancelar Edição
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <!-- COLUNA DIREITA: Listagem -->
-      <div class="modal-column list-column">
-        <div class="list-section">
-          <h4><i class="fas fa-list"></i> Feriados</h4>
-          
-          <div id="loadingFeriados" class="loading-state">
-            <i class="fas fa-spinner fa-spin"></i>
-            <p>Carregando feriados...</p>
-          </div>
-
-          <div id="emptyFeriados" class="empty-state hidden">
-            <i class="fas fa-calendar-times"></i>
-            <p>Nenhum feriado encontrado</p>
-            <small>Adicione feriados municipais ou estaduais</small>
-          </div>
-          
-          <div id="listaFeriados" class="feriados-list hidden"></div>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
-
-
+<!-- MODAL DE CONFIRMAÇÃO -->
 <div id="modalConfirmacao" class="modal hidden">
-  <div class="modal-content modal-small">
-    <div class="modal-header">
-      <h3><i class="fas fa-exclamation-triangle" style="color: var(--warning);"></i> Confirmar Exclusão</h3>
-      <button class="modal-close" id="fecharModalConfirmacaoBtn">&times;</button>
-    </div>
-    
-    <div class="modal-body" style="text-align: center; padding: 24px;">
-      <i class="fas fa-trash-alt" style="font-size: 48px; color: var(--danger); margin-bottom: 16px;"></i>
-      <p style="font-size: 16px; margin-bottom: 8px;">Tem certeza que deseja excluir este lançamento?</p>
-      <p style="font-size: 14px; color: var(--text-light);" id="confirmacaoInfo"></p>
-    </div>
+    <div class="modal-content modal-small">
+        <div class="modal-header">
+            <h3><i class="fas fa-exclamation-triangle" style="color: var(--warning);"></i> Confirmar Exclusão</h3>
+            <button class="modal-close" id="fecharModalConfirmacaoBtn">&times;</button>
+        </div>
+        
+        <div class="modal-body" style="text-align: center; padding: 24px;">
+            <i class="fas fa-trash-alt" style="font-size: 48px; color: var(--danger); margin-bottom: 16px;"></i>
+            <p style="font-size: 16px; margin-bottom: 8px;">Tem certeza que deseja excluir este lançamento?</p>
+            <p style="font-size: 14px; color: var(--text-light);" id="confirmacaoInfo"></p>
+        </div>
 
-    <div class="modal-actions" style="justify-content: center; gap: 12px;">
-      <button id="confirmarExclusaoBtn" class="btn-danger">
-        <i class="fas fa-check"></i> Sim, excluir
-      </button>
-      <button id="cancelarExclusaoBtn" class="btn-secondary">
-        <i class="fas fa-times"></i> Cancelar
-      </button>
+        <div class="modal-actions" style="justify-content: center; gap: 12px;">
+            <button id="confirmarExclusaoBtn" class="btn-danger">
+                <i class="fas fa-check"></i> Sim, excluir
+            </button>
+            <button id="cancelarExclusaoBtn" class="btn-secondary">
+                <i class="fas fa-times"></i> Cancelar
+            </button>
+        </div>
     </div>
-  </div>
 </div>
 
 <!-- MODAL DE HORÁRIOS -->
 <div id="modalHorario" class="modal hidden">
-  <div class="modal-content">
-    <div class="modal-header">
-      <h3><i class="fas fa-clock"></i> Editar Horários</h3>
-      <button class="modal-close" id="fecharModalHorarioBtn">&times;</button>
-    </div>
-    
-    <div class="modal-body">
-      <h4 id="modalNome" style="margin-bottom: 20px; color: var(--primary);"></h4>
-      
-      <div class="form-group">
-        <label>Início do Trabalho</label>
-        <input type="time" id="modalTrabInicio" class="form-control">
-      </div>
-      
-      <div class="form-group">
-        <label>Fim do Trabalho</label>
-        <input type="time" id="modalTrabFim" class="form-control">
-      </div>
-      
-      <div class="form-group">
-        <label>Início do Almoço</label>
-        <input type="time" id="modalAlmInicio" class="form-control">
-      </div>
-      
-      <div class="form-group">
-        <label>Fim do Almoço</label>
-        <input type="time" id="modalAlmFim" class="form-control">
-      </div>
-    </div>
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3><i class="fas fa-clock"></i> Editar Horários</h3>
+            <button class="modal-close" id="fecharModalHorarioBtn">&times;</button>
+        </div>
+        
+        <div class="modal-body">
+            <h4 id="modalNome" style="margin-bottom: 20px; color: var(--primary);"></h4>
+            
+            <div class="form-group">
+                <label>Início do Trabalho</label>
+                <input type="time" id="modalTrabInicio" class="form-control">
+            </div>
+            
+            <div class="form-group">
+                <label>Fim do Trabalho</label>
+                <input type="time" id="modalTrabFim" class="form-control">
+            </div>
+            
+            <div class="form-group">
+                <label>Início do Almoço</label>
+                <input type="time" id="modalAlmInicio" class="form-control">
+            </div>
+            
+            <div class="form-group">
+                <label>Fim do Almoço</label>
+                <input type="time" id="modalAlmFim" class="form-control">
+            </div>
+        </div>
 
-    <div class="modal-actions">
-      <button onclick="salvarHorarioModal()" class="btn-primary">
-        <i class="fas fa-save"></i> Salvar
-      </button>
-      <button id="fecharModalHorarioBtn2" class="btn-secondary">
-        <i class="fas fa-times"></i> Cancelar
-      </button>
+        <div class="modal-actions">
+            <button onclick="salvarHorarioModal()" class="btn-primary">
+                <i class="fas fa-save"></i> Salvar
+            </button>
+            <button id="fecharModalHorarioBtn2" class="btn-secondary">
+                <i class="fas fa-times"></i> Cancelar
+            </button>
+        </div>
     </div>
-  </div>
 </div>
 
+<!-- Toast Container -->
 <div id="toastContainer" style="position: fixed; bottom: 20px; right: 20px; z-index: 9999;"></div>
+
+<!-- Scripts -->
+<script src="js/api.js"></script>
 <script src="js/calendar.js"></script>
+<script src="js/lancamentos.js"></script>
 <script src="js/app.js"></script>
 <script src="https://unpkg.com/lucide@latest"></script>
-<script>
-  lucide.createIcons();
-  
-  document.addEventListener('DOMContentLoaded', function() {
-    setTimeout(() => {
-      const loading = document.querySelector('.loading-indicator');
-      if (loading) loading.style.display = 'none';
-    }, 500);
-  });
-</script>
-
 
 <script>
-  (function() {
-    console.log('Inicializando sidebar...');
+    lucide.createIcons();
     
     document.addEventListener('DOMContentLoaded', function() {
-      
-      // ===== NAVEGAÇÃO DOS BOTÕES =====
-      const sidebarBtns = document.querySelectorAll('.sidebar-btn');
-      
-      sidebarBtns.forEach(btn => {
-        btn.addEventListener('click', function(e) {
-          e.preventDefault();
-          e.stopPropagation();
-          
-          const page = this.dataset.page;
-          console.log('Botão clicado:', page);
-          
-          // Remove active de todos
-          sidebarBtns.forEach(b => b.classList.remove('active'));
-          
-          // Adiciona active no clicado
-          this.classList.add('active');
-          
-          // Chama a função carregarPagina
-          if (typeof window.carregarPagina === 'function') {
-            window.carregarPagina(page);
-          } else if (typeof carregarPagina === 'function') {
-            carregarPagina(page);
-          } else {
-            console.error('Função carregarPagina não encontrada!');
-          }
-        });
-      });
-      
-      // Função para ativar botão por página
-      window.setActiveButton = function(page) {
-        sidebarBtns.forEach(btn => {
-          if (btn.dataset.page === page) {
-            btn.classList.add('active');
-          } else {
-            btn.classList.remove('active');
-          }
-        });
-      };
-      
+        setTimeout(() => {
+            const loading = document.querySelector('.loading-indicator');
+            if (loading) loading.style.display = 'none';
+        }, 500);
     });
-  })();
 </script>
 
+<script>
+    (function() {
+        console.log('Inicializando sidebar...');
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            // ===== NAVEGAÇÃO DOS BOTÕES =====
+            const sidebarBtns = document.querySelectorAll('.sidebar-btn');
+            
+            sidebarBtns.forEach(btn => {
+                btn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    
+                    const page = this.dataset.page;
+                    console.log('Botão clicado:', page);
+                    
+                    // Remove active de todos
+                    sidebarBtns.forEach(b => b.classList.remove('active'));
+                    
+                    // Adiciona active no clicado
+                    this.classList.add('active');
+                    
+                    // Chama a função carregarPagina
+                    if (typeof window.carregarPagina === 'function') {
+                        window.carregarPagina(page);
+                    } else if (typeof carregarPagina === 'function') {
+                        carregarPagina(page);
+                    } else {
+                        console.error('Função carregarPagina não encontrada!');
+                    }
+                });
+            });
+            
+            // Função para ativar botão por página
+            window.setActiveButton = function(page) {
+                sidebarBtns.forEach(btn => {
+                    if (btn.dataset.page === page) {
+                        btn.classList.add('active');
+                    } else {
+                        btn.classList.remove('active');
+                    }
+                });
+            };
+        });
+    })();
+</script>
+
+</body>
+</html>

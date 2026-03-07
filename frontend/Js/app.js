@@ -5,10 +5,12 @@ let editandoAusenciaId = null;
 let plantoesLancados = [];
 let feriadosLocais = []
 let editandoFeriadoId = null;
+let exclusaoPendenteId = null;
+let exclusaoTipo = 'ausencia';
+
 
 // EXPOR FUNÇÕES GLOBAIS (já está correto)
 window.carregarPagina = carregarPagina;
-window.abrirModalAusencia = abrirModalAusencia;
 window.abrirModalHorario = abrirModalHorario;
 window.debugTiposAusencias = debugTiposAusencias;
 window.debugDados = debugDados;
@@ -17,21 +19,46 @@ window.testarAtualizacao = testarAtualizacao;
 window.ausencias = ausencias;
 window.colaboradores = colaboradores;
 window.feriadosLocais = feriadosLocais;
+window.editarFeriado = editarFeriado;
+window.excluirFeriado = excluirFeriado;
+window.gerarRelatorioCompleto = gerarRelatorioCompleto;
+window.toggleCamposHora = toggleCamposHora;
+
+// Substituir as funções antigas de abrir modal
+window.abrirModalAusencia = function(dataISO) {
+    window.abrirModalLancamento('pessoal', dataISO);
+};
+window.abrirModalFeriado = function(dataISO) {
+    window.abrirModalLancamento('feriados', dataISO);
+};
+
 
 // Elemento principal onde o conteúdo será renderizado
 const appContent = document.getElementById("appContent");
-
 document.addEventListener("DOMContentLoaded", async () => {
     console.log("Inicializando aplicação...");
     
     const temaSalvo = localStorage.getItem('tema') || 'light';
     document.documentElement.setAttribute('data-theme', temaSalvo);
 
-    await carregarColaboradores();
-    await carregarAusencias();
+    try {
+        await carregarColaboradores();
+        console.log("Colaboradores carregados:", colaboradores.length);
+        
+        await carregarAusencias();
+        console.log("Ausências carregadas:", ausencias.length);
+        
+        await carregarFeriadosLocais();
+        console.log("Feriados locais carregados:", feriadosLocais.length);
+        
+    } catch (error) {
+        console.error("Erro ao carregar dados:", error);
+        mostrarToast("Erro ao carregar dados do servidor", "error");
+    }
+    
     configurarNavegacao();
     configurarModais();
-    
+    configurarObservers();
     renderCalendario();
 });
 
@@ -222,132 +249,6 @@ function abrirModalHorario(colaborador) {
 }
 
 
-async function carregarAusenciasDoDia(dataISO) {
-    const loadingEl = document.getElementById("loadingAusencias");
-    const emptyEl = document.getElementById("emptyAusencias");
-    const listaEl = document.getElementById("listaAusencias");
-    
-    if (!loadingEl || !emptyEl || !listaEl) return;
-    
-    try {
-        await carregarAusencias();
-        
-        loadingEl.classList.add("hidden");
-        
-        if (!ausencias || ausencias.length === 0 || !dataISO) {
-            emptyEl.classList.remove("hidden");
-            listaEl.classList.add("hidden");
-            return;
-        }
-        
-        // 🔥 Garantir que dataISO está no formato YYYY-MM-DD
-        const dataAlvoStr = dataISO.split('T')[0];
-        
-        console.log("Buscando ausências para:", dataAlvoStr);
-        
-        // Filtra as ausências comparando STRINGS diretamente
-        const ausenciasDoDia = ausencias.filter(a => {
-            const dataInicioStr = (a.DataInicio || a.dataInicio).split('T')[0];
-            const dataFimStr = (a.DataFim || a.dataFim).split('T')[0];
-            
-            // Comparação como string YYYY-MM-DD
-            return dataAlvoStr >= dataInicioStr && dataAlvoStr <= dataFimStr;
-        });
-        
-        console.log("Ausências encontradas:", ausenciasDoDia.length);
-        
-        if (ausenciasDoDia.length === 0) {
-            emptyEl.classList.remove("hidden");
-            listaEl.classList.add("hidden");
-            return;
-        }
-        
-        emptyEl.classList.add("hidden");
-        listaEl.classList.remove("hidden");
-        
-        // Ordena por data (mais recentes primeiro)
-        const ausenciasOrdenadas = [...ausenciasDoDia].sort((a, b) => {
-            const dataA = a.DataInicio || a.dataInicio;
-            const dataB = b.DataInicio || b.dataInicio;
-            return dataB.localeCompare(dataA);
-        });
-        
-        listaEl.innerHTML = "";
-        
-        ausenciasOrdenadas.forEach(a => {
-            const id = a.id || a.Id;
-            const colaboradorId = a.colaboradorId || a.ColaboradorId;
-            const dataInicio = (a.DataInicio || a.dataInicio).split('T')[0];
-            const dataFim = (a.DataFim || a.dataFim).split('T')[0];
-            const tipo = a.tipo || a.Tipo;
-            
-            const colaborador = colaboradores.find(c => c.Id === colaboradorId);
-            
-            const card = document.createElement("div");
-            card.className = "ausencia-card";
-            card.setAttribute('data-id', id);
-            
-            // Formatar datas para exibição
-            const [anoInicio, mesInicio, diaInicio] = dataInicio.split('-');
-            const [anoFim, mesFim, diaFim] = dataFim.split('-');
-            
-            const dataInicioFormatada = `${diaInicio}/${mesInicio}/${anoInicio}`;
-            const dataFimFormatada = `${diaFim}/${mesFim}/${anoFim}`;
-            
-            const tipoConfig = {
-                folga: { icon: '🌸', classe: 'folga', texto: 'Folga' },
-                ausencia: { icon: '⚠️', classe: 'ausencia', texto: 'Ausência' },
-                ferias: { icon: '🏖️', classe: 'ferias', texto: 'Férias' }
-            };
-            
-            const config = tipoConfig[tipo] || tipoConfig.ausencia;
-            
-            card.innerHTML = `
-                <div class="ausencia-header">
-                    <div class="ausencia-colaborador">
-                        <i class="fas fa-user-circle"></i>
-                        ${colaborador?.Nome || 'Colaborador não encontrado'}
-                    </div>
-                    <span class="ausencia-tipo-badge ${config.classe}">
-                        ${config.icon} ${config.texto}
-                    </span>
-                </div>
-                <div class="ausencia-datas">
-                    <div class="ausencia-data-item">
-                        <i class="fas fa-calendar-day"></i>
-                        <span>Início: <strong>${dataInicioFormatada}</strong></span>
-                    </div>
-                    <div class="ausencia-data-item">
-                        <i class="fas fa-calendar-check"></i>
-                        <span>Fim: <strong>${dataFimFormatada}</strong></span>
-                    </div>
-                </div>
-                <div class="ausencia-actions">
-                    <button onclick="editarAusencia(${id})" class="btn-icon-sm edit" title="Editar">
-                        <i class="fas fa-edit"></i>
-                    </button>
-                    <button onclick="excluirAusencia(${id})" class="btn-icon-sm delete" title="Excluir">
-                        <i class="fas fa-trash"></i>
-                    </button>
-                </div>
-            `;
-            
-            listaEl.appendChild(card);
-        });
-        
-    } catch (error) {
-        console.error("Erro ao carregar lista:", error);
-        loadingEl.classList.add("hidden");
-        emptyEl.classList.remove("hidden");
-        emptyEl.innerHTML = `
-            <i class="fas fa-exclamation-triangle" style="color: var(--danger);"></i>
-            <p style="color: var(--danger);">Erro ao carregar lançamentos</p>
-            <button onclick="carregarAusenciasDoDia('${dataISO}')" class="btn-primary" style="margin-top: 10px;">
-                <i class="fas fa-sync"></i> Tentar novamente
-            </button>
-        `;
-    }
-}
 
 // Função para salvar ausência
 async function salvarAusencia() {
@@ -455,166 +356,8 @@ function carregarColaboradoresNoSelect() {
     }
 }
 
-async function carregarListaAusencias() {
-    const loadingEl = document.getElementById("loadingAusencias");
-    const emptyEl = document.getElementById("emptyAusencias");
-    const listaEl = document.getElementById("listaAusencias");
-    
-    if (!loadingEl || !emptyEl || !listaEl) return;
-    
-    try {
-        await carregarAusencias();
-        
-        // Esconde loading
-        loadingEl.classList.add("hidden");
-        
-        if (!ausencias || ausencias.length === 0) {
-            // Mostra empty state
-            emptyEl.classList.remove("hidden");
-            listaEl.classList.add("hidden");
-            return;
-        }
-        
-        // Mostra lista
-        emptyEl.classList.add("hidden");
-        listaEl.classList.remove("hidden");
-        
-        const ausenciasOrdenadas = [...ausencias].sort((a, b) => 
-            new Date(b.DataInicio) - new Date(a.DataInicio)
-        );
-        
-        listaEl.innerHTML = "";
-        
-        ausenciasOrdenadas.forEach(a => {
-            const colaborador = colaboradores.find(c => c.Id === a.colaboradorId);
-            const card = document.createElement("div");
-            card.className = "ausencia-card";
-            card.setAttribute('data-id', a.id);
-            
-            const dataInicio = new Date(a.DataInicio).toLocaleDateString('pt-BR');
-            const dataFim = new Date(a.DataFim).toLocaleDateString('pt-BR');
-            
-            const tipoConfig = {
-                folga: { icon: '🌸', classe: 'folga', texto: 'Folga' },
-                ausencia: { icon: '⚠️', classe: 'ausencia', texto: 'Ausência' },
-                ferias: { icon: '🏖️', classe: 'ferias', texto: 'Férias' }
-            };
-            
-            const config = tipoConfig[a.tipo] || tipoConfig.ausencia;
-            
-            card.innerHTML = `
-                <div class="ausencia-header">
-                    <div class="ausencia-colaborador">
-                        <i class="fas fa-user-circle"></i>
-                        ${colaborador?.Nome || 'Colaborador não encontrado'}
-                    </div>
-                    <span class="ausencia-tipo-badge ${config.classe}">
-                        ${config.icon} ${config.texto}
-                    </span>
-                </div>
-                <div class="ausencia-datas">
-                    <div class="ausencia-data-item">
-                        <i class="fas fa-calendar-day"></i>
-                        <span>Início: <strong>${dataInicio}</strong></span>
-                    </div>
-                    <div class="ausencia-data-item">
-                        <i class="fas fa-calendar-check"></i>
-                        <span>Fim: <strong>${dataFim}</strong></span>
-                    </div>
-                </div>
-                <div class="ausencia-actions">
-                    <button onclick="editarAusencia(${a.id})" class="btn-icon-sm edit" title="Editar">
-                        <i class="fas fa-edit"></i>
-                    </button>
-                    <button onclick="excluirAusencia(${a.id})" class="btn-icon-sm delete" title="Excluir">
-                        <i class="fas fa-trash"></i>
-                    </button>
-                </div>
-            `;
-            
-            listaEl.appendChild(card);
-        });
-        
-    } catch (error) {
-        console.error("Erro ao carregar lista:", error);
-        loadingEl.classList.add("hidden");
-        emptyEl.classList.remove("hidden");
-        emptyEl.innerHTML = `
-            <i class="fas fa-exclamation-triangle" style="color: var(--danger);"></i>
-            <p style="color: var(--danger);">Erro ao carregar lançamentos</p>
-            <button onclick="carregarListaAusencias()" class="btn-primary" style="margin-top: 10px;">
-                <i class="fas fa-sync"></i> Tentar novamente
-            </button>
-        `;
-    }
-}
 
-async function editarAusencia(id) {
-    console.log("Editando ausência ID:", id);
-    
-    const ausencia = ausencias.find(a => {
-        const aId = a.id || a.Id;
-        return aId === id;
-    });
-    
-    if (!ausencia) {
-        console.error("Ausência não encontrada:", id);
-        mostrarToast("Erro ao carregar lançamento para edição", "error");
-        return;
-    }
-    
-    console.log("Ausência encontrada:", ausencia);
-    
-    editandoAusenciaId = id;
-    
-    // Pega os campos considerando ambas nomenclaturas
-    const colaboradorId = ausencia.colaboradorId || ausencia.ColaboradorId;
-    const tipo = ausencia.tipo || ausencia.Tipo;
-    let dataInicio = ausencia.DataInicio || ausencia.dataInicio;
-    let dataFim = ausencia.DataFim || ausencia.dataFim;
-    
-    // Garante o formato YYYY-MM-DD para o input date
-    if (dataInicio) {
-        const date = new Date(dataInicio);
-        dataInicio = date.toISOString().split('T')[0];
-    }
-    
-    if (dataFim) {
-        const date = new Date(dataFim);
-        dataFim = date.toISOString().split('T')[0];
-    }
-    
-    document.getElementById("colaboradorSelect").value = colaboradorId || "";
-    document.getElementById("tipoSelect").value = tipo || "folga";
-    document.getElementById("dataInicio").value = dataInicio || "";
-    document.getElementById("dataFim").value = dataFim || "";
-    
-    // 🔥 MUDA O BOTÃO PARA MODO EDIÇÃO
-    document.getElementById("salvarAusenciaBtn").innerHTML = '<i class="fas fa-check"></i> Atualizar';
-    document.getElementById("cancelarEdicaoLancamentoBtn").classList.remove("hidden");
-    
-    document.querySelector('.form-section')?.scrollIntoView({ behavior: 'smooth' });
-}
 
-function cancelarEdicaoAusencia() {
-    editandoAusenciaId = null;
-    
-    const colaboradorSelect = document.getElementById("colaboradorSelect");
-    const tipoSelect = document.getElementById("tipoSelect");
-    const dataInicio = document.getElementById("dataInicio");
-    const dataFim = document.getElementById("dataFim");
-    const salvarBtn = document.getElementById("salvarAusenciaBtn");
-    const cancelarBtn = document.getElementById("cancelarEdicaoLancamentoBtn");
-    
-    if (colaboradorSelect) colaboradorSelect.value = "";
-    if (tipoSelect) tipoSelect.value = "folga";
-    if (dataInicio) dataInicio.value = "";
-    if (dataFim) dataFim.value = "";
-    
-    // 🔥 VOLTA O BOTÃO PARA MODO NORMAL E ESCONDE CANCELAR
-    if (salvarBtn) salvarBtn.innerHTML = '<i class="fas fa-save"></i> Salvar';
-    if (cancelarBtn) cancelarBtn.classList.add("hidden");
-}
 
 // Atualize a função configurarModais para incluir o novo modal
 function configurarModais() {
@@ -699,37 +442,7 @@ function configurarModais() {
         cancelarEdicaoBtn.addEventListener('click', cancelarEdicaoAusencia);
     }
 }
-let exclusaoPendenteId = null;
 
-async function excluirAusencia(id) {
-    const ausencia = ausencias.find(a => {
-        const aId = a.id || a.Id;
-        return aId === id;
-    });
-    
-    if (!ausencia) {
-        mostrarToast("Lançamento não encontrado", "error");
-        return;
-    }
-    
-    // Busca o colaborador
-    const colaboradorId = ausencia.colaboradorId || ausencia.ColaboradorId;
-    const colaborador = colaboradores.find(c => c.Id === colaboradorId);
-    
-    // Prepara informações para o modal
-    const dataInicio = new Date(ausencia.DataInicio || ausencia.dataInicio).toLocaleDateString('pt-BR');
-    const info = `${colaborador?.Nome || 'Colaborador'} - ${dataInicio}`;
-    
-    document.getElementById("confirmacaoInfo").innerText = info;
-    
-    // Armazena o ID para exclusão
-    exclusaoPendenteId = id;
-    
-    // Abre modal de confirmação
-    const modal = document.getElementById("modalConfirmacao");
-    modal.classList.remove("hidden");
-    modal.classList.add("active");
-}
 
 async function confirmarExclusao() {
     if (!exclusaoPendenteId) {
@@ -738,19 +451,22 @@ async function confirmarExclusao() {
     }
     
     try {
-        console.log("Excluindo ID:", exclusaoPendenteId);
+        console.log("Excluindo ID:", exclusaoPendenteId, "Tipo:", exclusaoTipo);
         
         let response;
+        let url;
         
         if (exclusaoTipo === 'feriado') {
-            response = await fetch(`http://localhost:3000/api/feriados/${exclusaoPendenteId}`, {
-                method: 'DELETE'
-            });
+            url = `http://localhost:3000/api/feriados/${exclusaoPendenteId}`;
         } else {
-            response = await fetch(`http://localhost:3000/api/ausencias/${exclusaoPendenteId}`, {
-                method: 'DELETE'
-            });
+            url = `http://localhost:3000/api/ausencias/${exclusaoPendenteId}`;
         }
+        
+        console.log("URL:", url);
+        
+        response = await fetch(url, {
+            method: 'DELETE'
+        });
         
         if (!response.ok) {
             const errorText = await response.text();
@@ -773,6 +489,12 @@ async function confirmarExclusao() {
             await carregarAusenciasDoDia(dataSelecionada);
         }
         
+        // Se o modal de feriado estiver aberto, recarregar a listagem
+        const modalFeriado = document.getElementById("modalFeriado");
+        if (modalFeriado && !modalFeriado.classList.contains('hidden')) {
+            await carregarListaFeriados();
+        }
+        
         mostrarToast("Excluído com sucesso!", "success");
         
     } catch (error) {
@@ -781,9 +503,9 @@ async function confirmarExclusao() {
     } finally {
         fecharModal('modalConfirmacao');
         exclusaoPendenteId = null;
+        exclusaoTipo = 'ausencia';
     }
 }
-
 
 /* ===========================
    NAVEGAÇÃO
@@ -1354,26 +1076,56 @@ async function carregarAusencias() {
 async function carregarFeriadosLocais() {
     try {
         console.log("Carregando feriados do backend...");
+        
+        // Tenta carregar do backend primeiro
         const response = await fetch('http://localhost:3000/api/feriados');
         
-        if (!response.ok) {
-            throw new Error(`Erro ${response.status}: ${response.statusText}`);
+        if (response.ok) {
+            const data = await response.json();
+            feriadosLocais = Array.isArray(data) ? data : [];
+            
+            // 🔥 Salva no localStorage como backup
+            localStorage.setItem('feriadosLocais', JSON.stringify(feriadosLocais));
+            
+            console.log(`Feriados locais carregados do backend: ${feriadosLocais.length}`);
+        } else {
+            // Se o backend falhar, carrega do localStorage
+            console.log("Backend não disponível, carregando do localStorage");
+            const feriadosSalvos = localStorage.getItem('feriadosLocais');
+            
+            if (feriadosSalvos) {
+                feriadosLocais = JSON.parse(feriadosSalvos);
+                console.log(`Feriados carregados do localStorage: ${feriadosLocais.length}`);
+            } else {
+                // Se não houver no localStorage, cria dados de exemplo
+                inicializarFeriadosExemplo();
+            }
         }
-        
-        const data = await response.json();
-        feriadosLocais = Array.isArray(data) ? data : [];
         
         // 🔥 ATUALIZAR A VARIÁVEL GLOBAL
         window.feriadosLocais = feriadosLocais;
         
-        console.log(`Feriados locais carregados: ${feriadosLocais.length}`);
         return feriadosLocais;
         
     } catch (error) {
         console.error("Erro ao carregar feriados locais:", error);
-        feriadosLocais = [];
-        window.feriadosLocais = [];
-        return [];
+        
+        // Em caso de erro, tenta carregar do localStorage
+        try {
+            const feriadosSalvos = localStorage.getItem('feriadosLocais');
+            if (feriadosSalvos) {
+                feriadosLocais = JSON.parse(feriadosSalvos);
+                console.log(`Feriados recuperados do localStorage após erro: ${feriadosLocais.length}`);
+            } else {
+                inicializarFeriadosExemplo();
+            }
+        } catch (e) {
+            console.error("Erro ao recuperar do localStorage:", e);
+            feriadosLocais = [];
+        }
+        
+        window.feriadosLocais = feriadosLocais;
+        return feriadosLocais;
     }
 }
 /* ===========================
@@ -1799,24 +1551,44 @@ function obterHoraNumerica(hora) {
     return parseInt(partes[0]);
 }
 
+// Função para mostrar toast
 function mostrarToast(mensagem, tipo = "success") {
-    const container = document.getElementById("toastContainer");
-    if (!container) return;
-
+    console.log(`Toast: ${mensagem} (${tipo})`);
+    
+    // Cria o container se não existir
+    let container = document.getElementById("toastContainer");
+    if (!container) {
+        container = document.createElement("div");
+        container.id = "toastContainer";
+        container.className = "toast-container";
+        document.body.appendChild(container);
+    }
+    
     const toast = document.createElement("div");
     toast.className = `toast ${tipo}`;
     
-    const icone = tipo === "success" ? "fa-check-circle" : 
-                  tipo === "error" ? "fa-exclamation-circle" : 
-                  "fa-info-circle";
+    let icone = "fa-info-circle";
+    if (tipo === "success") icone = "fa-check-circle";
+    else if (tipo === "error") icone = "fa-exclamation-circle";
+    else if (tipo === "warning") icone = "fa-exclamation-triangle";
     
     toast.innerHTML = `<i class="fas ${icone}"></i> ${mensagem}`;
-
+    
     container.appendChild(toast);
-
+    
+    // Remove após 3 segundos
     setTimeout(() => {
         toast.style.animation = "slideOut 0.3s ease";
-        setTimeout(() => toast.remove(), 300);
+        setTimeout(() => {
+            if (toast.parentNode === container) {
+                toast.remove();
+            }
+            
+            // Remove container se estiver vazio
+            if (container.children.length === 0) {
+                container.remove();
+            }
+        }, 300);
     }, 3000);
 }
 
@@ -2304,10 +2076,6 @@ function renderConfiguracoes() {
                         <span>Backend: Node.js + Express</span>
                     </div>
                     
-                    <div class="info-item">
-                        <i class="fas fa-heart" style="color: var(--danger);"></i>
-                        <span>Feito com dedicação</span>
-                    </div>
                 </div>
             </div>
 
@@ -2363,12 +2131,6 @@ function renderConfiguracoes() {
 function mudarTema(tema) {
     document.documentElement.setAttribute('data-theme', tema);
     localStorage.setItem('tema', tema);
-    
-    // Atualiza o ícone do botão na sidebar se existir
-    const configBtn = document.querySelector('[data-page="configuracoes"] i');
-    if (configBtn) {
-        configBtn.className = tema === 'dark' ? 'fas fa-moon' : 'fas fa-sun';
-    }
     
     mostrarToast(`Tema ${tema === 'dark' ? 'escuro' : 'claro'} ativado!`, 'success');
 }
@@ -3030,115 +2792,386 @@ async function gerarRelatorioCompleto() {
     const mes = parseInt(document.getElementById('relatorioMesCompleto').value);
     const ano = parseInt(document.getElementById('relatorioAnoCompleto').value);
     
-    console.log("Recarregando dados antes de gerar relatório...");
+    console.log("📊 Gerando relatório para:", mes + 1, "/", ano);
+    console.log("Recarregando dados...");
 
+    // 🔥 IMPORTANTE: Carregar todos os dados
     await carregarColaboradores();
     await carregarAusencias();
+    await carregarFeriadosLocais();
+    await carregarFeriadosAPI(ano); // 🔥 Carregar feriados da API
 
-    console.log("Dados recarregados:", {
+    console.log("Dados carregados:", {
         colaboradores: colaboradores.length,
-        ausencias: ausencias.length
+        ausencias: ausencias.length,
+        feriadosLocais: feriadosLocais.length,
+        feriadosAPI: feriadosAPI.length
     });
 
-    gerarRelatorioCalendario(mes, ano);
-    
-    const diasNoMes = new Date(ano, mes + 1, 0).getDate();
-    const relatorio = [];
-    
-    for (let dia = 1; dia <= diasNoMes; dia++) {
-        const data = new Date(ano, mes, dia);
-        const dataISO = `${ano}-${String(mes+1).padStart(2,'0')}-${String(dia).padStart(2,'0')}`;
-        const diaSemana = data.toLocaleDateString('pt-BR', { weekday: 'long' });
-        
-
-        const registro = {
-            data: `${dia}/${String(mes+1).padStart(2,'0')}/${ano}`,
-            diaSemana: diaSemana,
-            feriado: null,
-            eventos: []
-        };
-        
-        // Verifica feriado
-        const feriado = feriados?.find(f => f.date === dataISO);
-        if (feriado) {
-            registro.feriado = feriado.name;
-        }
-        
-        // Verifica ausências do dia
-        const ausenciasDoDia = ausencias.filter(a => {
-            const dataInicio = new Date(a.DataInicio).toISOString().split('T')[0];
-            const dataFim = new Date(a.DataFim).toISOString().split('T')[0];
-            return dataISO >= dataInicio && dataISO <= dataFim;
-        });
-        
-        ausenciasDoDia.forEach(a => {
-            const colaborador = colaboradores.find(c => c.Id === (a.colaboradorId || a.ColaboradorId));
-            registro.eventos.push({
-                tipo: a.tipo,
-                colaborador: colaborador?.Nome || 'Desconhecido'
-            });
-        });
-        
-        relatorio.push(registro);
-    }
-    
-    mostrarRelatorio('Relatório Mensal Completo', renderRelatorioCompleto(relatorio, mes, ano));
+    // Gerar o relatório calendário
+    gerarRelatorioCalendarioCompleto(mes, ano);
 }
 
-function renderRelatorioCompleto(dados, mes, ano) {
-    const meses = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+// Função principal para gerar o relatório calendário
+function gerarRelatorioCalendarioCompleto(mes, ano) {
+    const diasNoMes = new Date(ano, mes + 1, 0).getDate();
+    const primeiroDia = new Date(ano, mes, 1).getDay(); // 0 = Domingo
+    
+    const meses = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 
+                   'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+    
+    // Estruturas para armazenar os dados
+    const eventosPorData = {};
+    const ferias = [];
+    const folgas = [];
+    const ausenciasLista = [];
+    const feriadosLista = [];
+    
+    // Inicializar eventosPorData para todos os dias do mês
+    for (let dia = 1; dia <= diasNoMes; dia++) {
+        const dataISO = `${ano}-${String(mes+1).padStart(2,'0')}-${String(dia).padStart(2,'0')}`;
+        eventosPorData[dataISO] = {
+            feriado: null,
+            colaboradores: []
+        };
+    }
+    
+    // 🔥 PROCESSAR FERIADOS DA API (nacionais)
+    if (feriadosAPI && feriadosAPI.length > 0) {
+        console.log("📅 Processando feriados da API para visualização:", feriadosAPI.length);
+        
+        feriadosAPI.forEach(f => {
+            if (f.date) {
+                const [anoF, mesF, diaF] = f.date.split('-').map(Number);
+                // Verificar se é do mês/ano selecionado
+                if (anoF === ano && mesF === mes + 1) {
+                    const dataISO = f.date;
+                    if (eventosPorData[dataISO]) {
+                        eventosPorData[dataISO].feriado = f.name;
+                        feriadosLista.push({
+                            nome: f.name,
+                            data: dataISO,
+                            dataFormatada: formatarDataBR(dataISO),
+                            tipo: 'federal'
+                        });
+                        console.log(`✅ Feriado nacional na visualização: ${f.name} em ${dataISO}`);
+                    }
+                }
+            }
+        });
+    } else {
+        console.log("⚠️ Nenhum feriado da API carregado para visualização");
+    }
+    
+    // 🔥 PROCESSAR FERIADOS LOCAIS (manuais do banco de dados)
+    if (window.feriadosLocais && window.feriadosLocais.length > 0) {
+        console.log("🏛️ Processando feriados locais para visualização:", window.feriadosLocais.length);
+        
+        window.feriadosLocais.forEach(f => {
+            // Pega a data (pode estar em Data ou data)
+            const dataFeriado = f.Data || f.data;
+            if (!dataFeriado) return;
+            
+            const data = new Date(dataFeriado);
+            if (isNaN(data.getTime())) return;
+            
+            // Verifica se é do mês/ano selecionado
+            if (data.getMonth() === mes && data.getFullYear() === ano) {
+                const dia = data.getDate();
+                const dataISO = `${ano}-${String(mes+1).padStart(2,'0')}-${String(dia).padStart(2,'0')}`;
+                
+                const nome = f.Nome || f.nome || 'Feriado';
+                const tipo = f.Tipo || f.tipo || 'municipal';
+                
+                // Só adicionar se já não tiver um feriado no mesmo dia
+                if (!eventosPorData[dataISO].feriado) {
+                    eventosPorData[dataISO].feriado = nome;
+                    feriadosLista.push({
+                        nome: nome,
+                        data: dataISO,
+                        dataFormatada: formatarDataBR(dataISO),
+                        tipo: tipo
+                    });
+                    console.log(`✅ Feriado local na visualização: ${nome} em ${dataISO} (${tipo})`);
+                }
+            }
+        });
+    }
+    
+    // 🔥 PROCESSAR AUSÊNCIAS (lançamentos dos colaboradores)
+    if (window.ausencias && window.ausencias.length > 0 && 
+        window.colaboradores && window.colaboradores.length > 0) {
+        
+        console.log("👥 Processando ausências para visualização:", window.ausencias.length);
+        
+        window.ausencias.forEach(a => {
+            if (!a.DataInicio || !a.DataFim) return;
+            
+            const dataInicio = new Date(a.DataInicio);
+            const dataFim = new Date(a.DataFim);
+            
+            // Verificar se o período cruza com o mês selecionado
+            const primeiroDiaMes = new Date(ano, mes, 1);
+            const ultimoDiaMes = new Date(ano, mes + 1, 0);
+            
+            if (dataFim >= primeiroDiaMes && dataInicio <= ultimoDiaMes) {
+                
+                const colaborador = window.colaboradores.find(c => c.Id === (a.colaboradorId || a.ColaboradorId));
+                if (!colaborador) return;
+                
+                const tipo = (a.tipo || a.Tipo || '').toLowerCase();
+                const nomeColaborador = colaborador.Nome || 'Desconhecido';
+                
+                // Determinar o período dentro do mês
+                const primeiroDiaPeriodo = dataInicio < primeiroDiaMes ? primeiroDiaMes : dataInicio;
+                const ultimoDiaPeriodo = dataFim > ultimoDiaMes ? ultimoDiaMes : dataFim;
+                
+                const diaInicio = primeiroDiaPeriodo.getDate();
+                const diaFim = ultimoDiaPeriodo.getDate();
+                
+                for (let dia = diaInicio; dia <= diaFim; dia++) {
+                    const dataDia = new Date(ano, mes, dia);
+                    const dataISO = `${ano}-${String(mes+1).padStart(2,'0')}-${String(dia).padStart(2,'0')}`;
+                    
+                    // Adicionar aos eventos do dia
+                    eventosPorData[dataISO].colaboradores.push({
+                        nome: nomeColaborador,
+                        tipo: tipo
+                    });
+                    
+                    // Adicionar às listas específicas
+                    const eventoInfo = {
+                        colaborador: nomeColaborador,
+                        data: dataISO,
+                        dataFormatada: formatarDataBR(dataISO),
+                        tipo: tipo
+                    };
+                    
+                    if (tipo === 'ferias') {
+                        ferias.push(eventoInfo);
+                    } else if (tipo === 'folga') {
+                        folgas.push(eventoInfo);
+                    } else if (tipo === 'ausencia') {
+                        ausenciasLista.push(eventoInfo);
+                    }
+                }
+            }
+        });
+        
+        console.log("📊 Eventos encontrados na visualização:", {
+            ferias: ferias.length,
+            folgas: folgas.length,
+            ausencias: ausenciasLista.length,
+            feriados: feriadosLista.length
+        });
+    }
+    
+    // Ordenar as listas por data
+    ferias.sort((a, b) => a.data.localeCompare(b.data));
+    folgas.sort((a, b) => a.data.localeCompare(b.data));
+    ausenciasLista.sort((a, b) => a.data.localeCompare(b.data));
+    feriadosLista.sort((a, b) => a.data.localeCompare(b.data));
+    
+    // Mostrar o relatório
+    mostrarRelatorioCalendarioCompleto(
+        meses[mes], ano, primeiroDia, diasNoMes, 
+        eventosPorData, ferias, folgas, ausenciasLista, feriadosLista, mes
+    );
+}
+
+// Função para mostrar o relatório calendário
+function mostrarRelatorioCalendarioCompleto(mesNome, ano, primeiroDia, diasNoMes, eventosPorData, ferias, folgas, ausencias, feriados, mes) {
+    const diasSemana = ['DOM', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SÁB'];
+    
+    console.log("📊 Renderizando relatório com:", {
+        feriados: feriados.length,
+        ferias: ferias.length,
+        folgas: folgas.length,
+        ausencias: ausencias.length
+    });
     
     let html = `
-        <div class="relatorio-tabela-container">
-            <h4>${meses[mes]} de ${ano}</h4>
-            <table class="relatorio-tabela">
+        <div class="relatorio-calendario">
+            <div class="calendario-titulo">
+                <h2>${ano}</h2>
+                <h3>${mesNome.toUpperCase()}</h3>
+            </div>
+            
+            <table class="calendario-tabela">
                 <thead>
                     <tr>
-                        <th>Data</th>
-                        <th>Dia</th>
-                        <th>Feriado</th>
-                        <th>Eventos</th>
+                        ${diasSemana.map(dia => `<th>${dia}</th>`).join('')}
                     </tr>
                 </thead>
                 <tbody>
+                    <tr>
     `;
     
-    dados.forEach(d => {
-        const feriadoClass = d.feriado ? 'feriado' : '';
-        html += `
-            <tr class="${feriadoClass}">
-                <td><strong>${d.data}</strong></td>
-                <td>${d.diaSemana}</td>
-                <td>${d.feriado || '-'}</td>
-                <td>
-        `;
+    // Preencher dias vazios do início
+    for (let i = 0; i < primeiroDia; i++) {
+        html += '<td class="vazio"></td>';
+    }
+    
+    // Preencher os dias do mês
+    for (let dia = 1; dia <= diasNoMes; dia++) {
+        const dataISO = `${ano}-${String(mes + 1).padStart(2, '0')}-${String(dia).padStart(2, '0')}`;
+        const eventos = eventosPorData[dataISO];
+        const isFeriado = eventos?.feriado;
         
-        if (d.eventos.length === 0) {
-            html += '<span class="sem-eventos">-</span>';
-        } else {
-            d.eventos.forEach(e => {
-                const tipoClass = e.tipo === 'ferias' ? 'badge-ferias' : 
-                                 e.tipo === 'ausencia' ? 'badge-ausencia' : 
-                                 'badge-folga';
-                html += `
-                    <div class="evento-item">
-                        <span class="evento-tipo ${tipoClass}">${e.tipo}</span>
-                        <span class="evento-colaborador">${e.colaborador}</span>
-                    </div>
-                `;
-            });
+        // DEBUG: Mostrar feriados no console
+        if (isFeriado) {
+            console.log(`📅 Dia ${dia}: ${eventos.feriado}`);
         }
         
-        html += `</td></tr>`;
-    });
+        // Coletar colaboradores por tipo para este dia
+        const colaboradoresDia = eventos?.colaboradores || [];
+        const folgasDia = colaboradoresDia.filter(c => c.tipo === 'folga').map(c => c.nome);
+        const feriasDia = colaboradoresDia.filter(c => c.tipo === 'ferias').map(c => c.nome);
+        const ausenciasDia = colaboradoresDia.filter(c => c.tipo === 'ausencia').map(c => c.nome);
+        
+        html += `<td class="${isFeriado ? 'feriado' : ''}">`;
+        html += `<div class="dia-numero">${dia}</div>`;
+        
+        // Mostrar feriado se houver (inclui feriados locais e da API)
+        if (isFeriado) {
+            html += `<div class="dia-feriado" title="${eventos.feriado}">📅 ${eventos.feriado}</div>`;
+        }
+        
+        // Mostrar folgas
+        if (folgasDia.length > 0) {
+            html += `<div class="dia-folgas">`;
+            folgasDia.slice(0, 2).forEach(nome => {
+                const nomeCurto = nome.length > 15 ? nome.substring(0, 12) + '...' : nome;
+                html += `<span class="folga-tag" title="${nome}">🌸 ${nomeCurto}</span>`;
+            });
+            if (folgasDia.length > 2) {
+                html += `<span class="mais-tag">+${folgasDia.length - 2}</span>`;
+            }
+            html += `</div>`;
+        }
+        
+        // Mostrar férias
+        if (feriasDia.length > 0) {
+            html += `<div class="dia-ferias">`;
+            feriasDia.slice(0, 2).forEach(nome => {
+                const nomeCurto = nome.length > 15 ? nome.substring(0, 12) + '...' : nome;
+                html += `<span class="ferias-tag" title="${nome}">🏖️ ${nomeCurto}</span>`;
+            });
+            if (feriasDia.length > 2) {
+                html += `<span class="mais-tag">+${feriasDia.length - 2}</span>`;
+            }
+            html += `</div>`;
+        }
+        
+        // Mostrar ausências
+        if (ausenciasDia.length > 0) {
+            html += `<div class="dia-ausencias">`;
+            ausenciasDia.slice(0, 2).forEach(nome => {
+                const nomeCurto = nome.length > 15 ? nome.substring(0, 12) + '...' : nome;
+                html += `<span class="ausencia-tag" title="${nome}">⚠️ ${nomeCurto}</span>`;
+            });
+            if (ausenciasDia.length > 2) {
+                html += `<span class="mais-tag">+${ausenciasDia.length - 2}</span>`;
+            }
+            html += `</div>`;
+        }
+        
+        html += '</td>';
+        
+        // Quebrar linha no sábado
+        if ((primeiroDia + dia) % 7 === 0) {
+            html += '</tr><tr>';
+        }
+    }
+    
+    // Preencher dias vazios do final
+    const totalCelulas = Math.ceil((primeiroDia + diasNoMes) / 7) * 7;
+    const celulasRestantes = totalCelulas - (primeiroDia + diasNoMes);
+    for (let i = 0; i < celulasRestantes; i++) {
+        html += '<td class="vazio"></td>';
+    }
     
     html += `
+                    </tr>
                 </tbody>
             </table>
+            
+            <!-- LEGENDAS -->
+            <div class="calendario-legendas">
+                <div class="legenda-item">
+                    <span class="legenda-cor ferias-cor"></span>
+                    <span>Férias</span>
+                </div>
+                <div class="legenda-item">
+                    <span class="legenda-cor folga-cor"></span>
+                    <span>Folga</span>
+                </div>
+                <div class="legenda-item">
+                    <span class="legenda-cor ausencia-cor"></span>
+                    <span>Ausência</span>
+                </div>
+                <div class="legenda-item">
+                    <span class="legenda-cor feriado-cor"></span>
+                    <span>Feriado</span>
+                </div>
+            </div>
+    `;
+    
+    // LISTAS RESUMO (igual ao que você já tem)
+    html += `
+            <div class="calendario-resumo">
+                <!-- FERIADOS -->
+                <div class="resumo-coluna">
+                    <h4>📅 Feriados (${feriados.length})</h4>
+                    <table class="resumo-tabela">
+                        <thead>
+                            <tr>
+                                <th>Feriado</th>
+                                <th>Data</th>
+                                <th>Tipo</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+    `;
+    
+    if (feriados.length > 0) {
+        feriados.slice(0, 10).forEach(f => {
+            html += `
+                <tr>
+                    <td><strong>${f.nome.length > 25 ? f.nome.substring(0, 22) + '...' : f.nome}</strong></td>
+                    <td>${f.dataFormatada}</td>
+                    <td>${f.tipo || 'municipal'}</td>
+                </tr>
+            `;
+        });
+        
+        if (feriados.length > 10) {
+            html += `<tr><td colspan="3" style="text-align: center; color: var(--text-light);">... e mais ${feriados.length - 10} feriado(s)</td></tr>`;
+        }
+    } else {
+        html += `<tr><td colspan="3" style="text-align: center; color: var(--text-light);">Nenhum feriado no período</td></tr>`;
+    }
+    
+    // Continuar com as outras listas (férias, folgas, ausências)...
+    // [Mantenha o resto do código igual]
+    
+    html += `
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <!-- RESUMO GERAL -->
+            <div class="relatorio-total">
+                <strong>Total de lançamentos no mês: ${ferias.length + folgas.length + ausencias.length + feriados.length}</strong><br>
+                <small>${feriados.length} feriados, ${ferias.length} férias, ${folgas.length} folgas, ${ausencias.length} ausências</small>
+            </div>
         </div>
     `;
     
-    return html;
+    document.getElementById('relatorioTitulo').innerText = `Relatório de ${mesNome} ${ano}`;
+    document.getElementById('relatorioConteudo').innerHTML = html;
+    document.getElementById('relatorioVisualizacao').style.display = 'block';
 }
 
 // ========== RELATÓRIO DE ESCALA ==========
@@ -3454,16 +3487,11 @@ function fecharRelatorio() {
 }
 
 // ========== FUNÇÕES DE EXPORTAÇÃO ==========
-
 async function exportarRelatorioCompleto() {
     const mes = parseInt(document.getElementById('relatorioMesCompleto').value);
     const ano = parseInt(document.getElementById('relatorioAnoCompleto').value);
     
-    // Gera o relatório em memória (sem mostrar na tela)
-    const relatorioHTML = await gerarRelatorioCalendarioParaExportar(mes, ano);
-    
-    // Mostra opções de exportação
-    mostrarOpcoesExportacao(relatorioHTML, mes, ano);
+    await exportarComoPDF(mes, ano);
 }
 
 async function gerarRelatorioCalendarioParaExportar(mes, ano) {
@@ -4051,34 +4079,41 @@ function mostrarOpcoesExportacao(dados, mes, ano) {
 
 
 // ========== FUNÇÕES DE EXPORTAÇÃO POR FORMATO ==========
-
 async function exportarComoPDF(mes, ano) {
     document.querySelector('.exportar-modal-overlay')?.remove();
     mostrarToast('Gerando PDF... Aguarde', 'warning');
     
     try {
-        // Garantir que os dados estão carregados
+        // 🔥 IMPORTANTE: Garantir que todos os dados estão carregados
         await carregarColaboradores();
         await carregarAusencias();
+        await carregarFeriadosLocais();
         
+        console.log("📊 Exportando PDF para:", mes + 1, "/", ano);
         console.log("Dados carregados:", {
             colaboradores: colaboradores.length,
-            ausencias: ausencias.length
+            ausencias: ausencias.length,
+            feriadosLocais: feriadosLocais.length
         });
         
-        // Gera os dados do relatório
-        const dados = await gerarRelatorioCalendarioParaExportar(mes, ano);
+        // 🔥 Usar a MESMA função que gera o relatório na tela
+        const dados = await gerarDadosRelatorioCompleto(mes, ano);
         
-        console.log("Dados do relatório gerados");
+        console.log("✅ Dados processados:", {
+            feriados: dados.feriados.length,
+            ferias: dados.ferias.length,
+            folgas: dados.folgas.length,
+            ausencias: dados.ausencias.length
+        });
         
         // Gera o HTML completo para o PDF
-        const htmlPDF = gerarHTMLCalendarioPDF(dados);
+        const htmlPDF = gerarHTMLCompletoPDF(dados);
         
         // Cria um iframe temporário
         const iframe = document.createElement('iframe');
         iframe.style.position = 'absolute';
-        iframe.style.width = '1200px';
-        iframe.style.height = '900px'; // Altura menor para landscape
+        iframe.style.width = '1280px';  // Aumentado
+        iframe.style.height = '800px';   // Ajustado
         iframe.style.left = '-9999px';
         iframe.style.top = '-9999px';
         document.body.appendChild(iframe);
@@ -4094,20 +4129,20 @@ async function exportarComoPDF(mes, ano) {
         
         // Gera o PDF
         const canvas = await html2canvas(iframeDoc.body, {
-            scale: 2,
+            scale: 1.5,  // Reduzido para caber melhor
             backgroundColor: '#ffffff',
-            windowWidth: 1200,
-            windowHeight: 900,
-            logging: true,
+            windowWidth: 1280,
+            windowHeight: 800,
+            logging: false,
             allowTaint: true,
             useCORS: true
         });
         
         const imgData = canvas.toDataURL('image/png');
         
-        // 🔥 PDF NA HORIZONTAL (landscape)
+        // PDF na horizontal (landscape) - A4
         const pdf = new jspdf.jsPDF({
-            orientation: 'landscape', // Horizontal
+            orientation: 'landscape',
             unit: 'mm',
             format: 'a4'
         });
@@ -4117,13 +4152,19 @@ async function exportarComoPDF(mes, ano) {
         const pageHeight = 210;
         
         // Calcular dimensões da imagem para caber na página
-        const imgWidth = pageWidth - 20; // Margem de 10mm de cada lado
+        const imgWidth = pageWidth - 15;  // Margem menor
         const imgHeight = (canvas.height * imgWidth) / canvas.width;
         
-        // Centralizar verticalmente se necessário
-        const yPos = (pageHeight - imgHeight) / 2;
+        // Se a altura exceder, redimensionar proporcionalmente
+        if (imgHeight > pageHeight - 15) {
+            const ratio = (pageHeight - 15) / imgHeight;
+            pdf.addImage(imgData, 'PNG', 7.5, 7.5, imgWidth * ratio, pageHeight - 15);
+        } else {
+            // Centralizar verticalmente
+            const yPos = (pageHeight - imgHeight) / 2;
+            pdf.addImage(imgData, 'PNG', 7.5, yPos, imgWidth, imgHeight);
+        }
         
-        pdf.addImage(imgData, 'PNG', 10, yPos, imgWidth, imgHeight);
         pdf.save(`Relatorio_${dados.mesNome}_${dados.ano}.pdf`);
         
         // Limpa o iframe
@@ -4132,9 +4173,155 @@ async function exportarComoPDF(mes, ano) {
         mostrarToast('PDF gerado com sucesso!', 'success');
         
     } catch (error) {
-        console.error('Erro ao gerar PDF:', error);
+        console.error('❌ Erro ao gerar PDF:', error);
         mostrarToast('Erro ao gerar PDF: ' + error.message, 'error');
     }
+}
+
+// ========== FUNÇÃO PARA GERAR DADOS DO RELATÓRIO COMPLETO ==========
+async function gerarDadosRelatorioCompleto(mes, ano) {
+    const diasNoMes = new Date(ano, mes + 1, 0).getDate();
+    const primeiroDia = new Date(ano, mes, 1).getDay();
+    const meses = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 
+                   'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+    
+    // Estruturas para armazenar os dados
+    const eventosPorData = {};
+    const ferias = [];
+    const folgas = [];
+    const ausenciasLista = [];
+    const feriadosLista = [];
+    
+    // Inicializar eventosPorData para todos os dias do mês
+    for (let dia = 1; dia <= diasNoMes; dia++) {
+        const dataISO = `${ano}-${String(mes+1).padStart(2,'0')}-${String(dia).padStart(2,'0')}`;
+        eventosPorData[dataISO] = {
+            feriado: null,
+            colaboradores: []
+        };
+    }
+    
+    // 🔥 PROCESSAR FERIADOS DA API (nacionais)
+    try {
+        const response = await fetch(`https://brasilapi.com.br/api/feriados/v1/${ano}`);
+        if (response.ok) {
+            const feriadosAPI = await response.json();
+            feriadosAPI.forEach(f => {
+                if (eventosPorData[f.date]) {
+                    eventosPorData[f.date].feriado = f.name;
+                    feriadosLista.push({
+                        nome: f.name,
+                        data: f.date,
+                        dataFormatada: formatarDataBR(f.date),
+                        tipo: 'federal'
+                    });
+                }
+            });
+        }
+    } catch (error) {
+        console.error("Erro ao carregar feriados da API:", error);
+    }
+    
+    // 🔥 PROCESSAR FERIADOS LOCAIS (manuais)
+    if (window.feriadosLocais && window.feriadosLocais.length > 0) {
+        window.feriadosLocais.forEach(f => {
+            const dataFeriado = f.Data || f.data;
+            if (!dataFeriado) return;
+            
+            const data = new Date(dataFeriado);
+            if (isNaN(data.getTime())) return;
+            
+            if (data.getMonth() === mes && data.getFullYear() === ano) {
+                const dia = data.getDate();
+                const dataISO = `${ano}-${String(mes+1).padStart(2,'0')}-${String(dia).padStart(2,'0')}`;
+                
+                const nome = f.Nome || f.nome || 'Feriado';
+                const tipo = f.Tipo || f.tipo || 'municipal';
+                
+                eventosPorData[dataISO].feriado = nome;
+                feriadosLista.push({
+                    nome: nome,
+                    data: dataISO,
+                    dataFormatada: formatarDataBR(dataISO),
+                    tipo: tipo
+                });
+            }
+        });
+    }
+    
+    // 🔥 PROCESSAR AUSÊNCIAS
+    if (window.ausencias && window.ausencias.length > 0 && 
+        window.colaboradores && window.colaboradores.length > 0) {
+        
+        window.ausencias.forEach(a => {
+            if (!a.DataInicio || !a.DataFim) return;
+            
+            const dataInicio = new Date(a.DataInicio);
+            const dataFim = new Date(a.DataFim);
+            
+            const primeiroDiaMes = new Date(ano, mes, 1);
+            const ultimoDiaMes = new Date(ano, mes + 1, 0);
+            
+            if (dataFim >= primeiroDiaMes && dataInicio <= ultimoDiaMes) {
+                
+                const colaborador = window.colaboradores.find(c => c.Id === (a.colaboradorId || a.ColaboradorId));
+                if (!colaborador) return;
+                
+                const tipo = (a.tipo || a.Tipo || '').toLowerCase();
+                const nomeColaborador = colaborador.Nome || 'Desconhecido';
+                
+                const primeiroDiaPeriodo = dataInicio < primeiroDiaMes ? primeiroDiaMes : dataInicio;
+                const ultimoDiaPeriodo = dataFim > ultimoDiaMes ? ultimoDiaMes : dataFim;
+                
+                const diaInicio = primeiroDiaPeriodo.getDate();
+                const diaFim = ultimoDiaPeriodo.getDate();
+                
+                for (let dia = diaInicio; dia <= diaFim; dia++) {
+                    const dataDia = new Date(ano, mes, dia);
+                    const dataISO = `${ano}-${String(mes+1).padStart(2,'0')}-${String(dia).padStart(2,'0')}`;
+                    
+                    eventosPorData[dataISO].colaboradores.push({
+                        nome: nomeColaborador,
+                        tipo: tipo
+                    });
+                    
+                    const eventoInfo = {
+                        colaborador: nomeColaborador,
+                        data: dataISO,
+                        dataFormatada: formatarDataBR(dataISO),
+                        tipo: tipo
+                    };
+                    
+                    if (tipo === 'ferias') {
+                        ferias.push(eventoInfo);
+                    } else if (tipo === 'folga') {
+                        folgas.push(eventoInfo);
+                    } else if (tipo === 'ausencia') {
+                        ausenciasLista.push(eventoInfo);
+                    }
+                }
+            }
+        });
+    }
+    
+    // Ordenar listas
+    ferias.sort((a, b) => a.data.localeCompare(b.data));
+    folgas.sort((a, b) => a.data.localeCompare(b.data));
+    ausenciasLista.sort((a, b) => a.data.localeCompare(b.data));
+    feriadosLista.sort((a, b) => a.data.localeCompare(b.data));
+    
+    return {
+        mesNome: meses[mes],
+        ano: ano,
+        primeiroDia: primeiroDia,
+        diasNoMes: diasNoMes,
+        eventosPorData: eventosPorData,
+        ferias: ferias,
+        folgas: folgas,
+        ausencias: ausenciasLista,
+        feriados: feriadosLista,
+        mes: mes
+    };
 }
 
 async function exportarComoImagem(mes, ano) {
@@ -4442,56 +4629,87 @@ function gerarEstiloPDF() {
     `;
 }
 
-function gerarHTMLCalendarioPDF(dados) {
+// ========== FUNÇÃO PARA GERAR HTML COMPLETO DO PDF ==========
+// ========== FUNÇÃO PARA GERAR HTML COMPLETO DO PDF ==========
+function gerarHTMLCompletoPDF(dados) {
     const { mesNome, ano, primeiroDia, diasNoMes, eventosPorData, mes, ferias, folgas, ausencias, feriados } = dados;
     const diasSemana = ['DOM', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SÁB'];
+    
+    const totalEventos = ferias.length + folgas.length + ausencias.length + feriados.length;
     
     let html = `
         <!DOCTYPE html>
         <html>
         <head>
             <meta charset="UTF-8">
+            <title>Relatório ${mesNome} ${ano}</title>
             <style>
-                body { font-family: Arial, sans-serif; margin: 20px; }
-                h1 { color: #6366f1; text-align: center; font-size: 32px; margin-bottom: 5px; }
-                h2 { color: #1e293b; text-align: center; font-size: 24px; text-transform: uppercase; margin-top: 0; margin-bottom: 20px; }
+                * {
+                    box-sizing: border-box;
+                    margin: 0;
+                    padding: 0;
+                }
                 
+                body { 
+                    font-family: 'Inter', Arial, sans-serif; 
+                    margin: 15px; 
+                    background: white;
+                    color: #1e293b;
+                    width: 1200px; /* Largura fixa para landscape */
+                }
+                
+                h1 { 
+                    color: #6366f1; 
+                    text-align: center; 
+                    font-size: 28px; 
+                    margin-bottom: 5px; 
+                }
+                
+                h2 { 
+                    color: #1e293b; 
+                    text-align: center; 
+                    font-size: 20px; 
+                    text-transform: uppercase; 
+                    margin-top: 0; 
+                    margin-bottom: 15px; 
+                }
+                
+                /* Calendário */
                 .calendario-pdf {
                     width: 100%;
                     border-collapse: collapse;
-                    margin-bottom: 20px;
+                    margin-bottom: 15px;
+                    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+                    table-layout: fixed;
                 }
                 
                 .calendario-pdf th {
                     background: #6366f1;
                     color: white;
-                    padding: 10px;
+                    padding: 8px;
                     font-weight: 600;
                     font-size: 12px;
                     border: 1px solid #cbd5e1;
+                    text-align: center;
+                    width: 14.28%;
                 }
                 
                 .calendario-pdf td {
                     border: 1px solid #cbd5e1;
                     vertical-align: top;
-                    height: 80px;
-                    width: 14.28%;
+                    height: 70px;
                     padding: 4px;
-                    font-size: 11px;
+                    font-size: 10px;
+                    background: white;
+                    overflow: hidden;
                 }
                 
                 .calendario-pdf td.vazio {
                     background: #f8fafc;
                 }
                 
-                /* DESTAQUE PARA DOMINGOS */
                 .calendario-pdf td.domingo {
                     background-color: #fef9c3 !important;
-                }
-                
-                .calendario-pdf td.domingo .dia-numero {
-                    color: #b45309;
-                    font-weight: 800;
                 }
                 
                 .calendario-pdf td.feriado {
@@ -4501,56 +4719,73 @@ function gerarHTMLCalendarioPDF(dados) {
                 .dia-numero {
                     font-weight: bold;
                     font-size: 14px;
-                    margin-bottom: 3px;
+                    margin-bottom: 2px;
+                    color: #1e293b;
                 }
                 
                 .dia-feriado {
                     font-size: 8px;
-                    color: #ef4444;
+                    color: #dc2626;
                     font-weight: 600;
-                    margin-bottom: 3px;
+                    margin-bottom: 2px;
                     white-space: nowrap;
                     overflow: hidden;
                     text-overflow: ellipsis;
+                    background: #fee2e2;
+                    padding: 1px 3px;
+                    border-radius: 3px;
                 }
                 
                 .evento-tag {
                     font-size: 7px;
-                    padding: 2px 3px;
+                    padding: 1px 3px;
                     border-radius: 3px;
-                    margin-top: 2px;
+                    margin-top: 1px;
                     white-space: nowrap;
                     overflow: hidden;
                     text-overflow: ellipsis;
+                    font-weight: 500;
                 }
                 
-                .folga-tag { background: #d1fae5; color: #059669; }
-                .ferias-tag { background: #e0e7ff; color: #4f52e0; }
-                .ausencia-tag { background: #fee2e2; color: #dc2626; }
+                .folga-tag { 
+                    background: #d1fae5; 
+                    color: #059669; 
+                    border-left: 2px solid #10b981;
+                }
+                .ferias-tag { 
+                    background: #e0e7ff; 
+                    color: #4f52e0; 
+                    border-left: 2px solid #6366f1;
+                }
+                .ausencia-tag { 
+                    background: #fee2e2; 
+                    color: #dc2626; 
+                    border-left: 2px solid #ef4444;
+                }
                 
-                /* Legendas */
-                .legendas-calendario {
+                /* Legendas compactas */
+                .legendas-pdf {
                     display: flex;
                     gap: 15px;
-                    margin-top: 10px;
-                    margin-bottom: 25px;
-                    padding: 10px;
+                    margin: 10px 0;
+                    padding: 8px 12px;
                     background: #f8fafc;
-                    border-radius: 8px;
+                    border-radius: 6px;
                     flex-wrap: wrap;
+                    border: 1px solid #e2e8f0;
+                    font-size: 10px;
                 }
                 
                 .legenda-item {
                     display: flex;
                     align-items: center;
-                    gap: 6px;
-                    font-size: 11px;
+                    gap: 5px;
                 }
                 
                 .legenda-cor {
-                    width: 14px;
-                    height: 14px;
-                    border-radius: 4px;
+                    width: 12px;
+                    height: 12px;
+                    border-radius: 3px;
                 }
                 
                 .legenda-folga { background: #d1fae5; border: 1px solid #059669; }
@@ -4559,56 +4794,95 @@ function gerarHTMLCalendarioPDF(dados) {
                 .legenda-feriado { background: #fee2e2; border: 1px solid #dc2626; }
                 .legenda-domingo { background: #fef9c3; border: 1px solid #b45309; }
                 
-                /* Listas de eventos */
-                .eventos-listas {
-                    margin-top: 25px;
+                /* Listas em grid 2x2 */
+                .listas-container {
+                    margin-top: 15px;
                 }
                 
-                .eventos-coluna {
-                    margin-bottom: 20px;
+                .listas-grid {
+                    display: grid;
+                    grid-template-columns: repeat(2, 1fr);
+                    gap: 12px;
                 }
                 
-                .eventos-coluna h3 {
-                    font-size: 14px;
+                .lista-card {
+                    background: #f8fafc;
+                    border-radius: 6px;
+                    padding: 10px;
+                    border: 1px solid #e2e8f0;
+                }
+                
+                .lista-card h3 {
+                    font-size: 13px;
                     font-weight: 700;
                     color: #1e293b;
-                    margin-bottom: 10px;
+                    margin: 0 0 8px 0;
                     padding-bottom: 5px;
-                    border-bottom: 2px solid #e2e8f0;
+                    border-bottom: 1px solid #e2e8f0;
+                    display: flex;
+                    align-items: center;
+                    gap: 5px;
                 }
                 
-                .eventos-tabela {
+                .lista-card table {
                     width: 100%;
                     border-collapse: collapse;
-                    font-size: 11px;
+                    font-size: 9px;
                 }
                 
-                .eventos-tabela th {
+                .lista-card th {
                     text-align: left;
-                    padding: 6px;
-                    background: #f1f5f9;
+                    padding: 3px;
+                    background: #e2e8f0;
                     color: #475569;
                     font-weight: 600;
+                    font-size: 8px;
                 }
                 
-                .eventos-tabela td {
-                    padding: 4px 6px;
+                .lista-card td {
+                    padding: 2px 3px;
                     border-bottom: 1px solid #e2e8f0;
+                    white-space: nowrap;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                    max-width: 100px;
                 }
                 
-                .resumo-rodape {
-                    margin-top: 20px;
-                    padding: 10px;
-                    background: #f8fafc;
-                    border-radius: 8px;
+                .lista-card td:first-child {
+                    max-width: 80px;
+                }
+                
+                .lista-card tr:last-child td {
+                    border-bottom: none;
+                }
+                
+                .empty-message {
                     text-align: center;
-                    font-size: 11px;
-                    color: #475569;
+                    color: #64748b;
+                    font-size: 9px;
+                    padding: 10px;
+                    font-style: italic;
+                }
+                
+                /* Resumo rodapé */
+                .resumo-rodape {
+                    margin-top: 15px;
+                    padding: 10px;
+                    background: linear-gradient(135deg, #6366f1 0%, #4f52e0 100%);
+                    border-radius: 6px;
+                    text-align: center;
+                    color: white;
                 }
                 
                 .resumo-rodape strong {
-                    color: #6366f1;
-                    font-size: 13px;
+                    font-size: 14px;
+                }
+                
+                .resumo-rodape small {
+                    display: block;
+                    margin-top: 3px;
+                    font-size: 10px;
+                    opacity: 0.9;
                 }
             </style>
         </head>
@@ -4616,6 +4890,7 @@ function gerarHTMLCalendarioPDF(dados) {
             <h1>${ano}</h1>
             <h2>${mesNome.toUpperCase()}</h2>
             
+            <!-- CALENDÁRIO -->
             <table class="calendario-pdf">
                 <thead>
                     <tr>
@@ -4642,39 +4917,46 @@ function gerarHTMLCalendarioPDF(dados) {
         const eventos = eventosPorData[dataISO];
         const isFeriado = eventos?.feriado;
         
-        // Determinar classes da célula
         let classesCelula = [];
         if (isDomingo) classesCelula.push('domingo');
         if (isFeriado) classesCelula.push('feriado');
         
         const colaboradoresDia = eventos?.colaboradores || [];
-        const folgasDia = colaboradoresDia.filter(c => c.tipo === 'folga');
-        const feriasDia = colaboradoresDia.filter(c => c.tipo === 'ferias');
-        const ausenciasDia = colaboradoresDia.filter(c => c.tipo === 'ausencia');
+        const folgasDia = colaboradoresDia.filter(c => c.tipo === 'folga').slice(0, 2); // Limita a 2 por dia
+        const feriasDia = colaboradoresDia.filter(c => c.tipo === 'ferias').slice(0, 2);
+        const ausenciasDia = colaboradoresDia.filter(c => c.tipo === 'ausencia').slice(0, 2);
+        
+        const temMais = colaboradoresDia.length > 2;
         
         linhaAtual += `<td class="${classesCelula.join(' ')}">`;
         linhaAtual += `<div class="dia-numero">${dia}</div>`;
         
         if (isFeriado) {
-            linhaAtual += `<div class="dia-feriado">${eventos.feriado}</div>`;
+            const nomeFeriado = eventos.feriado.length > 15 ? eventos.feriado.substring(0, 12) + '...' : eventos.feriado;
+            linhaAtual += `<div class="dia-feriado" title="${eventos.feriado}">📅 ${nomeFeriado}</div>`;
         }
         
-        // Adiciona eventos
         folgasDia.forEach(e => {
-            linhaAtual += `<div class="evento-tag folga-tag">${e.nome}</div>`;
+            const nome = e.nome.length > 10 ? e.nome.substring(0, 8) + '...' : e.nome;
+            linhaAtual += `<div class="evento-tag folga-tag" title="${e.nome}">🌸 ${nome}</div>`;
         });
         
         feriasDia.forEach(e => {
-            linhaAtual += `<div class="evento-tag ferias-tag">${e.nome}</div>`;
+            const nome = e.nome.length > 10 ? e.nome.substring(0, 8) + '...' : e.nome;
+            linhaAtual += `<div class="evento-tag ferias-tag" title="${e.nome}">🏖️ ${nome}</div>`;
         });
         
         ausenciasDia.forEach(e => {
-            linhaAtual += `<div class="evento-tag ausencia-tag">${e.nome}</div>`;
+            const nome = e.nome.length > 10 ? e.nome.substring(0, 8) + '...' : e.nome;
+            linhaAtual += `<div class="evento-tag ausencia-tag" title="${e.nome}">⚠️ ${nome}</div>`;
         });
+        
+        if (temMais) {
+            linhaAtual += `<div style="font-size: 7px; color: #64748b; margin-top: 1px;">+${colaboradoresDia.length - 2}</div>`;
+        }
         
         linhaAtual += '</td>';
         
-        // Quebra linha no sábado
         if ((primeiroDia + dia) % 7 === 0) {
             linhaAtual += '</tr>';
             html += linhaAtual;
@@ -4684,7 +4966,7 @@ function gerarHTMLCalendarioPDF(dados) {
         }
     }
     
-    // Completa a última linha se necessário
+    // Completa a última linha
     if (linhaAtual !== '<tr>' && !linhaAtual.endsWith('</tr>')) {
         const celulasUsadas = (primeiroDia + diasNoMes) % 7;
         if (celulasUsadas > 0) {
@@ -4700,23 +4982,23 @@ function gerarHTMLCalendarioPDF(dados) {
                 </tbody>
             </table>
             
-            <!-- Legendas do calendário -->
-            <div class="legendas-calendario">
+            <!-- LEGENDAS -->
+            <div class="legendas-pdf">
                 <div class="legenda-item">
                     <span class="legenda-cor legenda-folga"></span>
-                    <span>Folga</span>
+                    <span>Folga (🌸)</span>
                 </div>
                 <div class="legenda-item">
                     <span class="legenda-cor legenda-ferias"></span>
-                    <span>Férias</span>
+                    <span>Férias (🏖️)</span>
                 </div>
                 <div class="legenda-item">
                     <span class="legenda-cor legenda-ausencia"></span>
-                    <span>Ausência</span>
+                    <span>Ausência (⚠️)</span>
                 </div>
                 <div class="legenda-item">
                     <span class="legenda-cor legenda-feriado"></span>
-                    <span>Feriado</span>
+                    <span>Feriado (📅)</span>
                 </div>
                 <div class="legenda-item">
                     <span class="legenda-cor legenda-domingo"></span>
@@ -4724,115 +5006,108 @@ function gerarHTMLCalendarioPDF(dados) {
                 </div>
             </div>
             
-            <!-- Listas detalhadas de eventos -->
-            <div class="eventos-listas">
+            <!-- LISTAS DETALHADAS (2x2) -->
+            <div class="listas-container">
+                <div class="listas-grid">
     `;
     
-    // Lista de Férias
-    if (ferias && ferias.length > 0) {
-        html += `
-                <div class="eventos-coluna">
-                    <h3>🌸 Férias</h3>
-                    <table class="eventos-tabela">
-                        <thead>
-                            <tr><th>Colaborador</th><th>Data</th></tr>
-                        </thead>
-                        <tbody>
-        `;
-        
-        ferias.forEach(f => {
-            html += `
-                <tr>
-                    <td>${f.colaborador}</td>
-                    <td>${f.dataFormatada}</td>
-                </tr>
-            `;
-        });
-        
-        html += '</tbody></table></div>';
-    }
-    
-    // Lista de Folgas
-    if (folgas && folgas.length > 0) {
-        html += `
-                <div class="eventos-coluna">
-                    <h3>🌸 Folgas</h3>
-                    <table class="eventos-tabela">
-                        <thead>
-                            <tr><th>Colaborador</th><th>Data</th></tr>
-                        </thead>
-                        <tbody>
-        `;
-        
-        folgas.forEach(f => {
-            html += `
-                <tr>
-                    <td>${f.colaborador}</td>
-                    <td>${f.dataFormatada}</td>
-                </tr>
-            `;
-        });
-        
-        html += '</tbody></table></div>';
-    }
-    
-    // Lista de Ausências
-    if (ausencias && ausencias.length > 0) {
-        html += `
-                <div class="eventos-coluna">
-                    <h3>⚠️ Ausências</h3>
-                    <table class="eventos-tabela">
-                        <thead>
-                            <tr><th>Colaborador</th><th>Data</th></tr>
-                        </thead>
-                        <tbody>
-        `;
-        
-        ausencias.forEach(a => {
-            html += `
-                <tr>
-                    <td>${a.colaborador}</td>
-                    <td>${a.dataFormatada}</td>
-                </tr>
-            `;
-        });
-        
-        html += '</tbody></table></div>';
-    }
-    
-    // Lista de Feriados
-    if (feriados && feriados.length > 0) {
-        html += `
-                <div class="eventos-coluna">
-                    <h3>📅 Feriados</h3>
-                    <table class="eventos-tabela">
-                        <thead>
-                            <tr><th>Feriado</th><th>Data</th></tr>
-                        </thead>
-                        <tbody>
-        `;
-        
-        feriados.forEach(f => {
-            html += `
-                <tr>
-                    <td>${f.nome}</td>
-                    <td>${formatarDataBR(f.data)}</td>
-                </tr>
-            `;
-        });
-        
-        html += '</tbody></table></div>';
-    }
-    
-    // Resumo
-    const totalEventos = (ferias?.length || 0) + (folgas?.length || 0) + (ausencias?.length || 0) + (feriados?.length || 0);
-    
+    // Card de Feriados
     html += `
+                    <div class="lista-card">
+                        <h3>📅 Feriados</h3>
+                        ${feriados.length > 0 ? `
+                        <table>
+                            <thead>
+                                <tr><th style="width: 60%">Feriado</th><th style="width: 40%">Data</th></tr>
+                            </thead>
+                            <tbody>
+                                ${feriados.slice(0, 8).map(f => `
+                                    <tr>
+                                        <td title="${f.nome}">${f.nome.length > 18 ? f.nome.substring(0, 15) + '...' : f.nome}</td>
+                                        <td>${f.dataFormatada}</td>
+                                    </tr>
+                                `).join('')}
+                                ${feriados.length > 8 ? `<tr><td colspan="2" style="text-align: center; color: #64748b;">... e mais ${feriados.length - 8}</td></tr>` : ''}
+                            </tbody>
+                        </table>
+                        ` : '<div class="empty-message">Nenhum feriado</div>'}
+                    </div>
+    `;
+    
+    // Card de Férias
+    html += `
+                    <div class="lista-card">
+                        <h3>🏖️ Férias</h3>
+                        ${ferias.length > 0 ? `
+                        <table>
+                            <thead>
+                                <tr><th style="width: 60%">Colaborador</th><th style="width: 40%">Data</th></tr>
+                            </thead>
+                            <tbody>
+                                ${ferias.slice(0, 8).map(f => `
+                                    <tr>
+                                        <td title="${f.colaborador}">${f.colaborador.length > 15 ? f.colaborador.substring(0, 12) + '...' : f.colaborador}</td>
+                                        <td>${f.dataFormatada}</td>
+                                    </tr>
+                                `).join('')}
+                                ${ferias.length > 8 ? `<tr><td colspan="2" style="text-align: center; color: #64748b;">... e mais ${ferias.length - 8}</td></tr>` : ''}
+                            </tbody>
+                        </table>
+                        ` : '<div class="empty-message">Nenhuma férias</div>'}
+                    </div>
+    `;
+    
+    // Card de Folgas
+    html += `
+                    <div class="lista-card">
+                        <h3>🌸 Folgas</h3>
+                        ${folgas.length > 0 ? `
+                        <table>
+                            <thead>
+                                <tr><th style="width: 60%">Colaborador</th><th style="width: 40%">Data</th></tr>
+                            </thead>
+                            <tbody>
+                                ${folgas.slice(0, 8).map(f => `
+                                    <tr>
+                                        <td title="${f.colaborador}">${f.colaborador.length > 15 ? f.colaborador.substring(0, 12) + '...' : f.colaborador}</td>
+                                        <td>${f.dataFormatada}</td>
+                                    </tr>
+                                `).join('')}
+                                ${folgas.length > 8 ? `<tr><td colspan="2" style="text-align: center; color: #64748b;">... e mais ${folgas.length - 8}</td></tr>` : ''}
+                            </tbody>
+                        </table>
+                        ` : '<div class="empty-message">Nenhuma folga</div>'}
+                    </div>
+    `;
+    
+    // Card de Ausências
+    html += `
+                    <div class="lista-card">
+                        <h3>⚠️ Ausências</h3>
+                        ${ausencias.length > 0 ? `
+                        <table>
+                            <thead>
+                                <tr><th style="width: 60%">Colaborador</th><th style="width: 40%">Data</th></tr>
+                            </thead>
+                            <tbody>
+                                ${ausencias.slice(0, 8).map(a => `
+                                    <tr>
+                                        <td title="${a.colaborador}">${a.colaborador.length > 15 ? a.colaborador.substring(0, 12) + '...' : a.colaborador}</td>
+                                        <td>${a.dataFormatada}</td>
+                                    </tr>
+                                `).join('')}
+                                ${ausencias.length > 8 ? `<tr><td colspan="2" style="text-align: center; color: #64748b;">... e mais ${ausencias.length - 8}</td></tr>` : ''}
+                            </tbody>
+                        </table>
+                        ` : '<div class="empty-message">Nenhuma ausência</div>'}
+                    </div>
+                </div>
             </div>
             
+            <!-- RESUMO GERAL -->
             <div class="resumo-rodape">
-                <strong>Total de lançamentos no mês: ${totalEventos}</strong> 
-                (${ferias?.length || 0} férias, ${folgas?.length || 0} folgas, ${ausencias?.length || 0} ausências, ${feriados?.length || 0} feriados)
+                <strong>Total de lançamentos no mês: ${totalEventos}</strong><br>
+                <small>${feriados.length} feriados, ${ferias.length} férias, ${folgas.length} folgas, ${ausencias.length} ausências</small>
             </div>
         </body>
         </html>
@@ -4840,7 +5115,6 @@ function gerarHTMLCalendarioPDF(dados) {
     
     return html;
 }
-
 // ================= FERIADOS MUNICIPAIS/ESTADUAIS =================
 
 // Carregar feriados locais do backend
@@ -4881,10 +5155,12 @@ function abrirModalFeriado() {
         return;
     }
 
+    // Mostra loading, esconde outros
     document.getElementById("loadingFeriados").classList.remove("hidden");
     document.getElementById("emptyFeriados").classList.add("hidden");
     document.getElementById("listaFeriados").classList.add("hidden");
 
+    // Limpa formulário
     document.getElementById("feriadoNome").value = "";
     document.getElementById("feriadoData").value = "";
     document.getElementById("feriadoTipo").value = "municipal";
@@ -4893,146 +5169,87 @@ function abrirModalFeriado() {
     document.getElementById("salvarFeriadoBtn").innerHTML = '<i class="fas fa-save"></i> Salvar Feriado';
     document.getElementById("cancelarEdicaoFeriadoBtn").classList.add("hidden");
 
+    // Carrega a lista de feriados
     carregarListaFeriados();
 
+    // Abre o modal
     modal.classList.remove("hidden");
     modal.classList.add("active");
 }
 
 // Carregar listagem de feriados
 async function carregarListaFeriados() {
-    const loadingEl = document.getElementById("loadingFeriados");
-    const emptyEl = document.getElementById("emptyFeriados");
-    const listaEl = document.getElementById("listaFeriados");
 
-    if (!loadingEl || !emptyEl || !listaEl) return;
+    const lista = document.getElementById("listaFeriados");
+
+    if (!lista) return;
+
+    lista.innerHTML = "";
 
     try {
-        await carregarFeriadosLocais();
-        
-        loadingEl.classList.add("hidden");
 
-        if (!feriadosLocais || feriadosLocais.length === 0) {
-            emptyEl.classList.remove("hidden");
-            listaEl.classList.add("hidden");
-            return;
-        }
+        const feriados = await API.getFeriados();
 
-        emptyEl.classList.add("hidden");
-        listaEl.classList.remove("hidden");
+        if (!feriados || feriados.length === 0) return;
 
-        const feriadosOrdenados = [...feriadosLocais].sort((a, b) => 
-            new Date(a.Data) - new Date(b.Data)
-        );
+        feriados.forEach(f => {
 
-        listaEl.innerHTML = "";
+            const div = document.createElement("div");
+            div.className = "item-lista";
 
-        feriadosOrdenados.forEach(f => {
-            const card = document.createElement("div");
-            card.className = "feriado-card";
-            card.setAttribute("data-id", f.Id);
-
-            const dataFormatada = new Date(f.Data).toLocaleDateString("pt-BR");
-            
-            const tipoIcon = f.Tipo === 'estadual' ? '🏛️' : '🏛️';
-            const tipoClass = f.Tipo || 'municipal';
-            
-            card.innerHTML = `
-                <div class="feriado-header">
-                    <div class="feriado-nome">
-                        <i class="fas fa-city"></i>
-                        ${f.Nome}
-                    </div>
-                    <span class="feriado-tipo-badge ${tipoClass}">${tipoIcon} ${f.Tipo || 'municipal'}</span>
-                </div>
-                <div class="feriado-data">
-                    <i class="fas fa-calendar-alt"></i>
-                    <span>${dataFormatada}</span>
-                </div>
-                <div class="feriado-actions">
-                    <button onclick="editarFeriado(${f.Id})" class="btn-icon-sm edit" title="Editar">
-                        <i class="fas fa-edit"></i>
-                    </button>
-                    <button onclick="excluirFeriado(${f.Id})" class="btn-icon-sm delete" title="Excluir">
-                        <i class="fas fa-trash"></i>
-                    </button>
-                </div>
+            div.innerHTML = `
+                <strong>${f.Nome}</strong>
+                <span>${new Date(f.Data).toLocaleDateString("pt-BR")}</span>
+                <button onclick="excluirFeriado(${f.Id})" class="btn-danger">
+                    Excluir
+                </button>
             `;
 
-            listaEl.appendChild(card);
+            lista.appendChild(div);
+
         });
 
     } catch (error) {
-        console.error("Erro ao carregar lista:", error);
-        loadingEl.classList.add("hidden");
-        emptyEl.classList.remove("hidden");
-        emptyEl.innerHTML = `
-            <i class="fas fa-exclamation-triangle" style="color: var(--danger);"></i>
-            <p style="color: var(--danger);">Erro ao carregar feriados</p>
-            <button onclick="carregarListaFeriados()" class="btn-primary" style="margin-top: 10px;">
-                <i class="fas fa-sync"></i> Tentar novamente
-            </button>
-        `;
+
+        console.error("Erro ao carregar feriados:", error);
+
     }
+
 }
 
 // Salvar feriado
 async function salvarFeriado() {
-    const nome = document.getElementById("feriadoNome")?.value;
-    const data = document.getElementById("feriadoData")?.value;
-    const tipo = document.getElementById("feriadoTipo")?.value;
-    
-    if (!nome || !data) {
-        mostrarToast("Preencha todos os campos", "error");
-        return;
-    }
-    
     try {
-        let response;
-        const url = editandoFeriadoId 
-            ? `http://localhost:3000/api/feriados/${editandoFeriadoId}`
-            : 'http://localhost:3000/api/feriados';
-        
-        const metodo = editandoFeriadoId ? 'PUT' : 'POST';
-        
-        const payload = {
-            nome: nome,
-            data: data,
-            tipo: tipo
+
+        const dataInicio = normalizarData(document.getElementById("dataInicio").value);
+        const dataFim = normalizarData(document.getElementById("dataFim").value);
+        const nome = document.getElementById("feriadoNome").value;
+        const tipo = document.getElementById("feriadoTipo").value;
+
+        const data = {
+            Nome: nome,
+            Tipo: tipo,
+            Data: dataInicio
         };
-        
-        console.log("Enviando feriado:", payload);
-        
-        response = await fetch(url, {
-            method: metodo,
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-        });
-        
-        if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(`Erro ${response.status}: ${errorText}`);
-        }
-        
-        // 🔥 ATUALIZAR TUDO
-        await atualizarTudo();
-        
-        cancelarEdicaoFeriado();
-        
-        mostrarToast(
-            editandoFeriadoId ? "Feriado atualizado!" : "Feriado salvo com sucesso!", 
-            "success"
-        );
-        
+
+        await API.salvarFeriado(data);
+
+        await carregarFeriadosLocais();
+        await carregarListaFeriados();
+
+        alert("Feriado salvo com sucesso!");
+
     } catch (error) {
         console.error("Erro ao salvar feriado:", error);
-        mostrarToast(`Erro ao salvar: ${error.message}`, "error");
+        alert("Erro ao salvar feriado");
     }
 }
 
 // Editar feriado
 function editarFeriado(id) {
-    const feriado = feriadosLocais.find(f => f.Id === id);
+    console.log("Editando feriado ID:", id);
+    
+    const feriado = feriadosLocais.find(f => (f.Id === id || f.id === id));
     if (!feriado) {
         mostrarToast("Feriado não encontrado", "error");
         return;
@@ -5040,11 +5257,16 @@ function editarFeriado(id) {
 
     editandoFeriadoId = id;
     
-    document.getElementById("feriadoNome").value = feriado.Nome;
-    const data = new Date(feriado.Data);
-    const dataFormatada = data.toISOString().split('T')[0];
-    document.getElementById("feriadoData").value = dataFormatada;
-    document.getElementById("feriadoTipo").value = feriado.Tipo || 'municipal';
+    document.getElementById("feriadoNome").value = feriado.Nome || feriado.nome;
+    
+    // Formata a data para o input
+    if (feriado.Data || feriado.data) {
+        const dataObj = new Date(feriado.Data || feriado.data);
+        const dataFormatada = dataObj.toISOString().split('T')[0];
+        document.getElementById("feriadoData").value = dataFormatada;
+    }
+    
+    document.getElementById("feriadoTipo").value = feriado.Tipo || feriado.tipo || 'municipal';
     
     document.getElementById("salvarFeriadoBtn").innerHTML = '<i class="fas fa-check"></i> Atualizar';
     document.getElementById("cancelarEdicaoFeriadoBtn").classList.remove("hidden");
@@ -5064,18 +5286,26 @@ function cancelarEdicaoFeriado() {
 
 // Excluir feriado
 async function excluirFeriado(id) {
-    const feriado = feriadosLocais.find(f => f.Id === id);
-    
-    document.getElementById("confirmacaoInfo").innerText = feriado?.Nome || "Feriado";
-    
-    exclusaoPendenteId = id;
-    exclusaoTipo = 'feriado';
-    
-    const modal = document.getElementById("modalConfirmacao");
-    modal.classList.remove("hidden");
-    modal.classList.add("active");
-}
 
+    if (!confirm("Deseja realmente excluir este feriado?")) return;
+
+    try {
+
+        await API.excluirFeriado(id);
+
+        await carregarFeriadosLocais();
+        await carregarListaFeriados();
+
+        console.log("Feriado removido");
+
+    } catch (error) {
+
+        console.error("Erro ao excluir feriado:", error);
+        alert("Erro ao excluir feriado");
+
+    }
+
+}
 // Confirmar exclusão de feriado
 async function confirmarExclusaoFeriado(id) {
     try {
@@ -5330,116 +5560,14 @@ function debugTiposAusencias() {
 }
 
 
-
-// ================= CONFIGURAÇÃO DO MODAL DE AUSÊNCIA COM HORAS =================
-function configurarCamposHora() {
-    const periodoTipo = document.getElementById('periodoTipo');
-    const camposHora = document.getElementById('camposHora');
-    
-    if (periodoTipo && camposHora) {
-        periodoTipo.addEventListener('change', function() {
-            if (this.value === 'horas') {
-                camposHora.classList.remove('hidden');
-            } else {
-                camposHora.classList.add('hidden');
-            }
-        });
-    }
-}
-
-// Modificar a função salvarAusencia para incluir horas
-async function salvarAusencia() {
-    const colaboradorId = document.getElementById("colaboradorSelect")?.value;
-    const tipo = document.getElementById("tipoSelect")?.value;
-    const dataInicio = document.getElementById("dataInicio")?.value;
-    const dataFim = document.getElementById("dataFim")?.value;
-    const periodoTipo = document.getElementById("periodoTipo")?.value;
-    const horaInicio = document.getElementById("horaInicio")?.value;
-    const horaFim = document.getElementById("horaFim")?.value;
-    
-    console.log("Dados do formulário:", { colaboradorId, tipo, dataInicio, dataFim, periodoTipo, horaInicio, horaFim });
-    
-    if (!colaboradorId || !dataInicio || !dataFim) {
-        mostrarToast("Preencha todos os campos", "error");
-        return;
-    }
-    
-    if (dataFim < dataInicio) {
-        mostrarToast("Data fim deve ser maior ou igual à data início", "error");
-        return;
-    }
-    
-    if (periodoTipo === 'horas' && (!horaInicio || !horaFim)) {
-        mostrarToast("Preencha as horas de início e fim", "error");
-        return;
-    }
-    
-    if (periodoTipo === 'horas' && horaFim <= horaInicio && dataInicio === dataFim) {
-        mostrarToast("Hora fim deve ser maior que hora início no mesmo dia", "error");
-        return;
-    }
-    
-    try {
-        let response;
-        const url = editandoAusenciaId 
-            ? `http://localhost:3000/api/ausencias/${editandoAusenciaId}`
-            : 'http://localhost:3000/api/ausencias';
-        
-        const metodo = editandoAusenciaId ? 'PUT' : 'POST';
-        
-        const payload = {
-            colaboradorId: parseInt(colaboradorId),
-            tipo: tipo,
-            dataInicio: dataInicio,
-            dataFim: dataFim,
-            periodoTipo: periodoTipo,
-            horaInicio: periodoTipo === 'horas' ? horaInicio : null,
-            horaFim: periodoTipo === 'horas' ? horaFim : null
-        };
-        
-        console.log("Enviando payload:", payload);
-        
-        response = await fetch(url, {
-            method: metodo,
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-        });
-        
-        if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(`Erro ${response.status}: ${errorText}`);
-        }
-        
-        // 🔥 ATUALIZAR TUDO
-        await atualizarTudo();
-        
-        // Se for edição, recarregar a listagem do dia
-        if (editandoAusenciaId && dataSelecionada) {
-            await carregarAusenciasDoDia(dataSelecionada);
-        }
-        
-        cancelarEdicaoAusencia();
-        
-        mostrarToast(
-            editandoAusenciaId ? "Lançamento atualizado!" : "Lançamento salvo com sucesso!", 
-            "success"
-        );
-        
-    } catch (error) {
-        console.error("Erro ao salvar ausência:", error);
-        mostrarToast(`Erro ao salvar: ${error.message}`, "error");
-    }
-}
-
 // Modificar a função renderCalendario para incluir a legenda
 function renderCalendario() {
+    console.log('Renderizando calendário...');
+    
     appContent.innerHTML = `
         <div class="page-header">
             <h1>Calendário Mensal</h1>
             <div class="header-actions">
-                <button id="btnFeriadoMunicipal" class="btn-primary">
-                    <i class="fas fa-city"></i> Feriados
-                </button>
                 <button id="btnLancamentoAjuste" class="btn-primary">
                     <i class="fas fa-plus"></i> Lançamento
                 </button>
@@ -5462,28 +5590,23 @@ function renderCalendario() {
             <div class="weekdays"></div>
             <div id="calendar" class="calendar-grid"></div>
         </div>
-
-        <!-- LEGENDA MENSAL -->
-        <div class="calendario-legenda-mensal">
-            <div class="legenda-mensal-header">
-                <i class="fas fa-info-circle"></i>
-                <h4>Resumo do Mês</h4>
-            </div>
-            <div class="legenda-mensal-content" id="legendaMensalContent">
-                Carregando...
-            </div>
-        </div>
     `;
 
+    // Verificar se os elementos foram criados
+    console.log('Elementos do calendário criados');
+    console.log('- calendar:', document.getElementById('calendar'));
+    console.log('- prevMonth:', document.getElementById('prevMonth'));
+    console.log('- nextMonth:', document.getElementById('nextMonth'));
+
+    // Inicializar o calendário após um pequeno delay
     setTimeout(() => {
-        if (typeof inicializarCalendario === 'function') {
-            inicializarCalendario();
+        if (typeof window.inicializarCalendario === 'function') {
+            console.log('Chamando inicializarCalendario...');
+            window.inicializarCalendario();
+        } else {
+            console.error('Função inicializarCalendario não encontrada!');
         }
-        // Garantir que os dados estão carregados antes de gerar a legenda
-        setTimeout(() => {
-            gerarLegendaMensal();
-        }, 500);
-    }, 100);
+    }, 200);
 }
 
 // Modificar a função abrirModalAusencia para resetar os campos de hora
@@ -5538,28 +5661,24 @@ function abrirModalAusencia(dataISO = null) {
 function configurarModais() {
     console.log("Configurando modais...");
     
+    // Botão de lançamento (pessoal)
     document.addEventListener('click', function(e) {
-        if (e.target.id === 'btnLancamentoAjuste' || e.target.closest('#btnLancamentoAjuste')) {
+        if (e.target.id === 'btnLLancamentoAjuste' || e.target.closest('#btnLancamentoAjuste')) {
             e.preventDefault();
-            abrirModalAusencia();
+            window.abrirModalLancamento('pessoal');
         }
     });
 
-    document.addEventListener('click', function(e) {
-        if (e.target.id === 'btnFeriadoMunicipal' || e.target.closest('#btnFeriadoMunicipal')) {
-            e.preventDefault();
-            console.log("Botão feriado clicado!");
-            abrirModalFeriado();
-        }
-    });
-    
-    const fecharModalBtn = document.getElementById('fecharModalBtn');
-    if (fecharModalBtn) {
-        fecharModalBtn.addEventListener('click', function() {
-            fecharModal('modal');
+
+    // Fechar modal de lançamento
+    const fecharModalLancamentoBtn = document.getElementById('fecharModalLancamentoBtn');
+    if (fecharModalLancamentoBtn) {
+        fecharModalLancamentoBtn.addEventListener('click', function() {
+            fecharModal('modalLancamento');
         });
     }
     
+    // Fechar modal de confirmação (botão X)
     const fecharModalConfirmacaoBtn = document.getElementById('fecharModalConfirmacaoBtn');
     if (fecharModalConfirmacaoBtn) {
         fecharModalConfirmacaoBtn.addEventListener('click', function() {
@@ -5568,6 +5687,7 @@ function configurarModais() {
         });
     }
     
+    // Cancelar exclusão (botão Cancelar)
     const cancelarExclusaoBtn = document.getElementById('cancelarExclusaoBtn');
     if (cancelarExclusaoBtn) {
         cancelarExclusaoBtn.addEventListener('click', function() {
@@ -5576,11 +5696,13 @@ function configurarModais() {
         });
     }
     
+    // Confirmar exclusão
     const confirmarExclusaoBtn = document.getElementById('confirmarExclusaoBtn');
     if (confirmarExclusaoBtn) {
         confirmarExclusaoBtn.addEventListener('click', confirmarExclusao);
     }
     
+    // Fechar modal de horário (botão X)
     const fecharModalHorarioBtn = document.getElementById('fecharModalHorarioBtn');
     if (fecharModalHorarioBtn) {
         fecharModalHorarioBtn.addEventListener('click', function() {
@@ -5588,6 +5710,7 @@ function configurarModais() {
         });
     }
     
+    // Fechar modal de horário (botão Cancelar)
     const fecharModalHorarioBtn2 = document.getElementById('fecharModalHorarioBtn2');
     if (fecharModalHorarioBtn2) {
         fecharModalHorarioBtn2.addEventListener('click', function() {
@@ -5595,6 +5718,7 @@ function configurarModais() {
         });
     }
     
+    // Fechar ao clicar fora do modal
     window.addEventListener('click', function(e) {
         if (e.target.classList.contains('modal')) {
             e.target.classList.add('hidden');
@@ -5604,44 +5728,8 @@ function configurarModais() {
             }
         }
     });
-    
-    const salvarAusenciaBtn = document.getElementById('salvarAusenciaBtn');
-    if (salvarAusenciaBtn) {
-        salvarAusenciaBtn.addEventListener('click', salvarAusencia);
-    }
-    
-    const cancelarEdicaoBtn = document.getElementById('cancelarEdicaoLancamentoBtn');
-    if (cancelarEdicaoBtn) {
-        cancelarEdicaoBtn.addEventListener('click', cancelarEdicaoAusencia);
-    }
-
-    // Botões do modal de feriado
-    const salvarFeriadoBtn = document.getElementById('salvarFeriadoBtn');
-    if (salvarFeriadoBtn) {
-        salvarFeriadoBtn.addEventListener('click', salvarFeriado);
-    }
-
-    const cancelarEdicaoFeriadoBtn = document.getElementById('cancelarEdicaoFeriadoBtn');
-    if (cancelarEdicaoFeriadoBtn) {
-        cancelarEdicaoFeriadoBtn.addEventListener('click', cancelarEdicaoFeriado);
-    }
-
-    const fecharModalFeriadoBtn = document.getElementById('fecharModalFeriadoBtn');
-    if (fecharModalFeriadoBtn) {
-        fecharModalFeriadoBtn.addEventListener('click', function() {
-            fecharModal('modalFeriado');
-            cancelarEdicaoFeriado();
-        });
-    }
 }
 
-// EXPOR FUNÇÕES GLOBAIS
-window.carregarPagina = carregarPagina;
-window.abrirModalAusencia = abrirModalAusencia;
-window.abrirModalHorario = abrirModalHorario;
-window.abrirModalFeriado = abrirModalFeriado;
-window.editarFeriado = editarFeriado;
-window.excluirFeriado = excluirFeriado;
 
 // Atualizar carregamento inicial
 document.addEventListener("DOMContentLoaded", async () => {
@@ -5867,5 +5955,28 @@ function toggleCamposHora(select) {
     }
 }
 
-// EXPOR GLOBALMENTE
-window.toggleCamposHora = toggleCamposHora;
+
+// ========== FUNÇÃO PARA CARREGAR FERIADOS DA API ==========
+async function carregarFeriadosAPI(ano) {
+    try {
+        console.log(`📡 Carregando feriados da API para ${ano}...`);
+        const response = await fetch(`https://brasilapi.com.br/api/feriados/v1/${ano}`);
+        
+        if (response.ok) {
+            feriadosAPI = await response.json();
+            window.feriadosAPI = feriadosAPI; // Disponibilizar globalmente
+            console.log(`✅ Feriados da API carregados: ${feriadosAPI.length}`);
+            return feriadosAPI;
+        } else {
+            console.error("❌ Erro ao carregar feriados da API:", response.status);
+            feriadosAPI = [];
+            window.feriadosAPI = [];
+            return [];
+        }
+    } catch (error) {
+        console.error("❌ Erro na requisição da API:", error);
+        feriadosAPI = [];
+        window.feriadosAPI = [];
+        return [];
+    }
+}

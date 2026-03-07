@@ -1,0 +1,253 @@
+/* ================= CALENDÁRIO ================= */
+.calendar-wrapper {
+  background: white;
+  border-radius: 24px;
+  padding: 24px;
+  box-shadow: var(--shadow-xl);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  backdrop-filter: blur(10px);
+}
+
+[data-theme="dark"] .calendar-wrapper {
+    background: var(--card);
+    border: 1px solid var(--border);
+}
+
+.calendar-header {
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+  margin-bottom: 15px;
+  gap: 10px;
+}
+
+.month-nav {
+  display: flex;
+  align-items: center;
+  gap: 8px; 
+}
+
+.calendar-header .nav-btn {
+  width: 40px;
+  height: 40px;
+  border: none;
+  border-radius: 12px;
+  background: var(--card-dark);
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.calendar-header .nav-btn:hover {
+  background: var(--primary);
+  color: white;
+}
+
+[data-theme="dark"] .month-nav button {
+    background: var(--card-dark);
+    color: var(--text);
+    border: 1px solid var(--border);
+}
+
+[data-theme="dark"] .month-nav button:hover {
+    background: var(--primary);
+    color: white;
+    border-color: var(--primary);
+}
+
+.weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 8px;
+  margin-bottom: 12px;
+  padding: 0 8px;
+}
+
+.weekday {
+  text-align: center;
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--text-light);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+#calendar {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 8px;
+}
+
+.day {
+  background: var(--card-dark);
+  border-radius: 16px;
+  min-height: 120px;
+  padding: 12px;
+  box-shadow: var(--shadow-sm);
+  transition: var(--transition);
+  cursor: pointer;
+  border: 2px solid transparent;
+  position: relative;
+}
+
+.day:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-lg);
+  border-color: var(--primary);
+  background: white;
+}
+
+.today {
+  background: linear-gradient(135deg, var(--primary-soft) 0%, white 100%);
+  border: 2px solid var(--primary);
+}
+
+.empty-day {
+    background: transparent;
+    min-height: 100px;
+}
+
+.holiday {
+  background-color: #fee2e2; 
+  border: 1px solid #ef4444; 
+}
+
+[data-theme="dark"] .day {
+    background: var(--card-dark);
+    color: var(--text);
+}
+
+[data-theme="dark"] .day:hover {
+    background: var(--card);
+}
+
+[data-theme="dark"] .today {
+    background: linear-gradient(135deg, var(--primary-soft) 0%, var(--card) 100%);
+}
+
+[data-theme="dark"] .weekday {
+    color: var(--text-light);
+}
+
+/* ================= TAGS DO CALENDÁRIO ================= */
+.ausencia-tag {
+    font-size: 10px;
+    margin-top: 2px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    background: white;
+    border-left: 3px solid;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+    box-shadow: var(--shadow-sm);
+    font-weight: 500;
+}
+
+.ausencia-tag.ferias {
+    border-left-color: #3b82f6;
+    color: #1e40af;
+    background: #eff6ff;
+}
+
+.ausencia-tag.ausencia {
+    border-left-color: #ef4444;
+    color: #991b1b;
+    background: #fef2f2;
+}
+
+.ausencia-tag.folga {
+    border-left-color: #10b981;
+    color: #065f46;
+    background: #ecfdf5;
+}
+
+.holiday-tag {
+    font-size: 10px;
+    margin-top: 2px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    background: white;
+    border-left: 3px solid;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+    box-shadow: var(--shadow-sm);
+    font-weight: 500;
+}
+
+.holiday-tag.federal {
+    border-left-color: #2563eb;
+    color: #1e40af;
+    background: #dbeafe;
+}
+
+.holiday-tag.estadual {
+    border-left-color: #7c3aed;
+    color: #5b21b6;
+    background: #ede9fe;
+}
+
+.holiday-tag.municipal {
+    border-left-color: #bd3333;
+    color: #500606;
+    background: #f1a7a7;
+}
+
+/* MUNICIPAL */
+.holiday-municipal{
+    background: #4b6cff;
+    color: white;
+}
+
+/* ESTADUAL */
+.holiday-estadual{
+    background: #9c4bff;
+    color: white;
+}
+
+/* FEDERAL (API) */
+.holiday-federal{
+    background: #ff4b4b;
+    color: white;
+}
+
+/* Tema escuro para tags */
+[data-theme="dark"] .holiday-tag {
+    background: var(--card-dark);
+    color: var(--text);
+}
+
+[data-theme="dark"] .holiday-tag.federal {
+    background: #1e3a8a;
+    color: #bfdbfe;
+    border-left-color: #3b82f6;
+}
+
+[data-theme="dark"] .holiday-tag.estadual {
+    background: #4c1d95;
+    color: #ddd6fe;
+    border-left-color: #8b5cf6;
+}
+
+[data-theme="dark"] .holiday-tag.municipal {
+    background: #064e3b;
+    color: #a7f3d0;
+    border-left-color: #10b981;
+}
+
+[data-theme="dark"] .ausencia-tag.ferias {
+    background: var(--primary-soft) !important;
+    color: var(--primary-dark) !important;
+}
+
+[data-theme="dark"] .ausencia-tag.ausencia {
+    background: var(--danger-soft) !important;
+    color: var(--danger) !important;
+}
+
+[data-theme="dark"] .ausencia-tag.folga {
+    background: var(--success-soft) !important;
+    color: var(--success) !important;
+}

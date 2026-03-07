@@ -1,0 +1,812 @@
+/* ================= ESCALA DO DIA ================= */
+.escala-layout {
+    display: flex;
+    gap: 20px;
+    margin-bottom: 30px;
+    min-height: 600px;
+}
+
+.timeline-container {
+    flex: 1;
+    background: white;
+    border-radius: 24px;
+    padding: 20px;
+    box-shadow: var(--shadow-lg);
+    overflow-x: auto;
+}
+
+.timeline-header {
+    display: grid;
+    grid-template-columns: 260px repeat(12, 1fr);
+    background: var(--card-dark);
+    border-radius: 16px;
+    margin-bottom: 16px;
+    font-weight: 600;
+    font-size: 12px;
+    color: var(--text-light);
+    border: 1px solid var(--border);
+    overflow: hidden;
+}
+
+.timeline-header div {
+    text-align: center;
+    padding: 14px 0;
+    border-right: 1px solid var(--border);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.timeline-header div:last-child {
+    border-right: none;
+}
+
+.timeline-row {
+    display: grid;
+    grid-template-columns: 260px repeat(12, 1fr);
+    border-radius: 14px;
+    overflow: hidden;
+    margin-bottom: 8px;
+    background: var(--card-dark);
+    border: 1px solid var(--border);
+    transition: var(--transition);
+}
+
+.timeline-row:hover {
+    transform: translateX(5px);
+    box-shadow: var(--shadow-md);
+    border-color: var(--primary);
+}
+
+.timeline-name {
+    padding: 16px;
+    font-weight: 600;
+    background: var(--card);
+    border-right: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.timeline-name i {
+    color: var(--primary);
+    font-size: 16px;
+}
+
+.timeline-name:hover {
+    background: var(--primary-soft);
+    color: var(--primary);
+}
+
+.timeline-name:hover .edit-indicator {
+    opacity: 1;
+    transform: translateX(0);
+}
+
+.edit-indicator {
+    font-size: 12px;
+    color: var(--primary);
+    margin-left: auto;
+    opacity: 0;
+    transform: translateX(-10px);
+    transition: all 0.3s ease;
+}
+
+.timeline-cell {
+    height: 52px;
+    background: var(--card);
+    border-right: 1px solid var(--border);
+    position: relative;
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.timeline-cell:last-child {
+    border-right: none;
+}
+
+.timeline-cell:hover {
+    background: var(--primary-soft);
+}
+
+.timeline-cell.trabalhando::after {
+    content: "";
+    position: absolute;
+    inset: 6px;
+    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(99, 102, 241, 0.3);
+}
+
+.timeline-cell.almoco::after {
+    content: "";
+    position: absolute;
+    inset: 6px;
+    background: linear-gradient(135deg, var(--warning) 0%, #d97706 100%);
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(245, 158, 11, 0.3);
+}
+
+.timeline-cell.fora-expediente {
+    background: var(--card);
+    position: relative;
+}
+
+.timeline-cell.fora-expediente::before {
+    content: "✕";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: var(--text-lighter);
+    font-size: 12px;
+    opacity: 0.5;
+}
+
+/* ================= BARRA LATERAL EDITOR ================= */
+.editor-sidebar {
+    width: 400px;
+    background: var(--card);
+    border-radius: 24px;
+    box-shadow: var(--shadow-xl);
+    position: relative;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    overflow: hidden;
+}
+
+.editor-sidebar.collapsed {
+    width: 60px;
+    min-width: 60px;
+}
+
+.editor-sidebar.collapsed .editor-content {
+    opacity: 0;
+    visibility: hidden;
+    transform: translateX(20px);
+}
+
+.editor-toggle {
+    position: absolute;
+    left: -12px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 28px;
+    height: 48px;
+    background: var(--primary);
+    border-radius: 12px 0 0 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: white;
+    box-shadow: var(--shadow-md);
+    z-index: 100;
+    transition: all 0.3s ease;
+    border: 2px solid white;
+}
+
+.editor-toggle:hover {
+    background: var(--primary-dark);
+    width: 32px;
+}
+
+.editor-toggle i {
+    font-size: 16px;
+}
+
+.editor-sidebar.collapsed .editor-toggle {
+    left: 0;
+    border-radius: 0 12px 12px 0;
+}
+
+.editor-content {
+    height: 100%;
+    padding: 24px;
+    transition: all 0.3s ease;
+    overflow-y: auto;
+    max-height: 600px;
+}
+
+.editor-content h3 {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding-bottom: 16px;
+    border-bottom: 2px solid var(--border);
+}
+
+.editor-content h3 i {
+    color: var(--primary);
+}
+
+.editor-empty {
+    height: 100%;
+    min-height: 400px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    color: var(--text-lighter);
+    background: var(--card-dark);
+    border-radius: 16px;
+    padding: 40px 20px;
+    animation: fadeIn 0.3s ease;
+}
+
+.editor-empty i {
+    font-size: 48px;
+    margin-bottom: 16px;
+    color: var(--primary);
+    opacity: 0.5;
+}
+
+.editor-empty p {
+    font-size: 14px;
+    max-width: 200px;
+    line-height: 1.5;
+}
+
+/* Formulário do editor */
+.editor-colaborador {
+    animation: slideIn 0.3s ease;
+}
+
+.editor-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+    background: linear-gradient(135deg, var(--primary-soft) 0%, transparent 100%);
+    padding: 16px;
+    border-radius: 16px;
+}
+
+.editor-header h4 {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--primary-dark);
+    margin: 0;
+}
+
+/* ================= RESUMO POR HORÁRIO ================= */
+.resumo-container {
+    background: white;
+    border-radius: 24px;
+    padding: 24px;
+    margin-top: 24px;
+    box-shadow: var(--shadow-lg);
+    border: 1px solid var(--border);
+    width: 100%;
+}
+
+.resumo-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 20px;
+    padding-bottom: 16px;
+    border-bottom: 2px solid var(--border);
+}
+
+.resumo-header i {
+    font-size: 22px;
+    color: var(--primary);
+    background: var(--primary-soft);
+    padding: 10px;
+    border-radius: 12px;
+}
+
+.resumo-header h4 {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text);
+    margin: 0;
+}
+
+.resumo-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 16px;
+}
+
+.resumo-card {
+    background: var(--card-dark);
+    border-radius: 16px;
+    padding: 16px;
+    transition: var(--transition);
+    border: 1px solid var(--border);
+}
+
+.resumo-card:hover {
+    transform: translateY(-3px);
+    box-shadow: var(--shadow-lg);
+    border-color: var(--primary);
+}
+
+.resumo-hora {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--primary);
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 2px dashed var(--border);
+}
+
+.resumo-barras {
+    margin-bottom: 12px;
+}
+
+.resumo-barra-container {
+    display: flex;
+    height: 10px;
+    border-radius: 20px;
+    overflow: hidden;
+    background: #f1f5f9;
+}
+
+.resumo-barra {
+    height: 100%;
+    transition: width 0.3s ease;
+}
+
+.resumo-barra.trabalhando {
+    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+}
+
+.resumo-barra.almoco {
+    background: linear-gradient(135deg, var(--warning) 0%, #d97706 100%);
+}
+
+.resumo-barra.fora {
+    background: #cbd5e1;
+}
+
+.resumo-numeros {
+    display: flex;
+    justify-content: space-between;
+    font-size: 13px;
+    gap: 8px;
+}
+
+.resumo-num {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 8px;
+    border-radius: 20px;
+    background: white;
+    font-size: 12px;
+}
+
+.resumo-num i {
+    font-size: 11px;
+}
+
+.trabalhando-num {
+    color: var(--primary);
+    border: 1px solid var(--primary-soft);
+}
+
+.almoco-num {
+    color: var(--warning);
+    border: 1px solid var(--warning-soft);
+}
+
+.fora-num {
+    color: var(--text-lighter);
+    border: 1px solid var(--border);
+}
+
+.resumo-empty {
+    text-align: center;
+    padding: 40px;
+    color: var(--text-light);
+    background: var(--card-dark);
+    border-radius: 16px;
+    font-size: 14px;
+}
+
+/* ================= LEGENDA E ESTATÍSTICAS ================= */
+.escala-footer {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    margin-top: 20px;
+}
+
+.legend-section, .stats-section {
+    background: white;
+    border-radius: 20px;
+    padding: 20px;
+    box-shadow: var(--shadow-lg);
+}
+
+.legend-section h4, .stats-section h4 {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.legend-section h4 i, .stats-section h4 i {
+    color: var(--primary);
+}
+
+.legend-items {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 14px;
+    color: var(--text);
+    padding: 8px;
+    border-radius: 10px;
+    transition: var(--transition);
+}
+
+.legend-item:hover {
+    background: var(--card-dark);
+}
+
+.legend-color {
+    width: 24px;
+    height: 24px;
+    border-radius: 8px;
+}
+
+.legend-color.trabalhando {
+    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+    box-shadow: 0 2px 8px rgba(99, 102, 241, 0.3);
+}
+
+.legend-color.almoco {
+    background: linear-gradient(135deg, var(--warning) 0%, #d97706 100%);
+    box-shadow: 0 2px 8px rgba(245, 158, 11, 0.3);
+}
+
+.legend-color.fora-expediente {
+    background: #f1f5f9;
+    border: 2px dashed var(--text-lighter);
+}
+
+/* Estatísticas */
+.stats-content {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.stat-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px;
+    background: var(--card-dark);
+    border-radius: 12px;
+    font-size: 14px;
+}
+
+.stat-item.total {
+    background: var(--primary-soft);
+    font-weight: 700;
+    margin-top: 8px;
+}
+
+.stat-label {
+    color: var(--text-light);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.stat-label.trabalhando-text {
+    color: var(--primary);
+}
+
+.stat-label.almoco-text {
+    color: var(--warning);
+}
+
+.stat-label.fora-text {
+    color: var(--text-lighter);
+}
+
+.stat-value {
+    font-weight: 700;
+    font-size: 18px;
+    color: var(--text);
+}
+
+/* Animações */
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateX(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+/* Responsividade */
+@media (max-width: 1200px) {
+    .escala-layout {
+        flex-direction: column;
+    }
+    
+    .editor-sidebar {
+        width: 100%;
+    }
+    
+    .editor-sidebar.collapsed {
+        width: 60px;
+    }
+    
+    .editor-sidebar.collapsed .editor-toggle {
+        left: 0;
+    }
+    
+    .escala-footer {
+        grid-template-columns: 1fr;
+    }
+    
+    .timeline-header,
+    .timeline-row {
+        grid-template-columns: 200px repeat(12, 1fr);
+    }
+}
+
+@media (max-width: 768px) {
+    .timeline-name {
+        min-width: 200px;
+    }
+    
+    .resumo-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+/* ================= TEMA ESCURO - ESCALA DO DIA ================= */
+[data-theme="dark"] .timeline-container {
+    background: var(--card);
+    border-color: var(--border);
+}
+
+[data-theme="dark"] .timeline-header {
+    background: var(--card-dark);
+    border-color: var(--border);
+}
+
+[data-theme="dark"] .timeline-header div {
+    color: var(--text-light);
+    border-right-color: var(--border);
+}
+
+[data-theme="dark"] .timeline-row {
+    background: var(--card-dark);
+    border-color: var(--border);
+}
+
+[data-theme="dark"] .timeline-row:hover {
+    border-color: var(--primary);
+}
+
+[data-theme="dark"] .timeline-name {
+    background: var(--card);
+    color: var(--text);
+    border-right-color: var(--border);
+}
+
+[data-theme="dark"] .timeline-name i {
+    color: var(--primary);
+}
+
+[data-theme="dark"] .timeline-name:hover {
+    background: var(--primary-soft);
+    color: var(--primary);
+}
+
+[data-theme="dark"] .timeline-cell {
+    background: var(--card);
+    border-right-color: var(--border);
+}
+
+[data-theme="dark"] .timeline-cell.fora-expediente {
+    background: var(--card-dark);
+}
+
+[data-theme="dark"] .timeline-cell.fora-expediente::before {
+    color: var(--text-lighter);
+}
+
+[data-theme="dark"] .timeline-cell:hover {
+    background: var(--primary-soft);
+}
+
+/* Editor sidebar no tema escuro */
+[data-theme="dark"] .editor-sidebar {
+    background: var(--card);
+    border-color: var(--border);
+}
+
+[data-theme="dark"] .editor-content h3 {
+    color: var(--text);
+    border-bottom-color: var(--border);
+}
+
+[data-theme="dark"] .editor-content h3 i {
+    color: var(--primary);
+}
+
+[data-theme="dark"] .editor-empty {
+    background: var(--card-dark);
+    color: var(--text-lighter);
+}
+
+[data-theme="dark"] .editor-empty i {
+    color: var(--primary);
+    opacity: 0.5;
+}
+
+[data-theme="dark"] .editor-header {
+    background: linear-gradient(135deg, var(--primary-soft) 0%, transparent 100%);
+}
+
+[data-theme="dark"] .editor-header h4 {
+    color: var(--primary);
+}
+
+[data-theme="dark"] .editor-form-group label {
+    color: var(--text-light);
+}
+
+[data-theme="dark"] .editor-form-group label i {
+    color: var(--primary);
+}
+
+[data-theme="dark"] .time-inputs {
+    background: var(--card-dark);
+}
+
+[data-theme="dark"] .time-inputs input {
+    background: var(--card);
+    color: var(--text);
+    border-color: var(--border);
+}
+
+[data-theme="dark"] .time-inputs input:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px var(--primary-soft);
+}
+
+[data-theme="dark"] .time-inputs span {
+    color: var(--text-light);
+}
+
+/* Resumo no tema escuro */
+[data-theme="dark"] .resumo-container {
+    background: var(--card);
+    border-color: var(--border);
+}
+
+[data-theme="dark"] .resumo-header {
+    border-bottom-color: var(--border);
+}
+
+[data-theme="dark"] .resumo-header i {
+    color: var(--primary);
+    background: var(--primary-soft);
+}
+
+[data-theme="dark"] .resumo-header h4 {
+    color: var(--text);
+}
+
+[data-theme="dark"] .resumo-card {
+    background: var(--card-dark);
+    border-color: var(--border);
+}
+
+[data-theme="dark"] .resumo-card:hover {
+    border-color: var(--primary);
+}
+
+[data-theme="dark"] .resumo-hora {
+    color: var(--primary);
+    border-bottom-color: var(--border);
+}
+
+[data-theme="dark"] .resumo-barra-container {
+    background: var(--card);
+}
+
+[data-theme="dark"] .resumo-num {
+    background: var(--card);
+    color: var(--text);
+    border-color: var(--border);
+}
+
+[data-theme="dark"] .trabalhando-num {
+    color: var(--primary);
+    border-color: var(--primary-soft);
+}
+
+[data-theme="dark"] .almoco-num {
+    color: var(--warning);
+    border-color: var(--warning-soft);
+}
+
+[data-theme="dark"] .fora-num {
+    color: var(--text-lighter);
+    border-color: var(--border);
+}
+
+[data-theme="dark"] .resumo-empty {
+    background: var(--card-dark);
+    color: var(--text-light);
+    border-color: var(--border);
+}
+
+/* Legendas e estatísticas no tema escuro */
+[data-theme="dark"] .legend-section,
+[data-theme="dark"] .stats-section {
+    background: var(--card);
+    border-color: var(--border);
+}
+
+[data-theme="dark"] .legend-section h4,
+[data-theme="dark"] .stats-section h4 {
+    color: var(--text);
+}
+
+[data-theme="dark"] .legend-section h4 i,
+[data-theme="dark"] .stats-section h4 i {
+    color: var(--primary);
+}
+
+[data-theme="dark"] .legend-item {
+    color: var(--text);
+}
+
+[data-theme="dark"] .legend-item:hover {
+    background: var(--card-dark);
+}
+
+[data-theme="dark"] .stat-item {
+    background: var(--card-dark);
+}
+
+[data-theme="dark"] .stat-item.total {
+    background: var(--primary-soft);
+}
+
+[data-theme="dark"] .stat-label {
+    color: var(--text-light);
+}
+
+[data-theme="dark"] .stat-value {
+    color: var(--text);
+}

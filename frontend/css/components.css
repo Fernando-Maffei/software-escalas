@@ -1,0 +1,506 @@
+/* ================= BOTÕES ================= */
+.btn-primary {
+  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+  color: white;
+  border: none;
+  border-radius: 12px;
+  padding: 12px 24px;
+  cursor: pointer;
+  transition: var(--transition);
+  font-weight: 600;
+  font-size: 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+}
+
+.btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(99, 102, 241, 0.4);
+}
+
+.btn-secondary {
+  background: var(--card);
+  color: var(--text);
+  border: 2px solid var(--border);
+  border-radius: 12px;
+  padding: 12px 24px;
+  cursor: pointer;
+  transition: var(--transition);
+  font-weight: 600;
+  font-size: 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn-secondary:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+  transform: translateY(-2px);
+}
+
+.btn-danger {
+  background: linear-gradient(135deg, var(--danger) 0%, #dc2626 100%);
+  color: white;
+  border: none;
+  border-radius: 10px;
+  padding: 8px 16px;
+  cursor: pointer;
+  transition: var(--transition);
+  font-weight: 500;
+  font-size: 13px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+}
+
+.btn-danger:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(239, 68, 68, 0.4);
+}
+
+.btn-icon-sm {
+    width: 28px;
+    height: 28px;
+    border: none;
+    border-radius: 6px;
+    background: var(--bg-secondary);
+    color: var(--text-secondary);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+}
+
+.btn-icon-sm:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-sm);
+}
+
+.btn-icon-sm.edit:hover {
+    background: #e0f2fe;
+    color: #0369a1;
+}
+
+.btn-icon-sm.delete:hover {
+    background: #fee2e2;
+    color: #dc2626;
+}
+
+/* ================= FORMULÁRIOS ================= */
+.form-control {
+  width: 100%;
+  padding: 12px;
+  border-radius: 12px;
+  border: 2px solid var(--border);
+  font-size: 14px;
+  transition: var(--transition);
+  background: var(--card);
+  color: var(--text);
+}
+
+/* Estilo específico para inputs number */
+input[type="number"].form-control {
+  -moz-appearance: textfield; /* Remove setas no Firefox */
+  appearance: textfield;
+}
+
+/* Personaliza as setas do input number para Chrome, Safari, Edge */
+input[type="number"].form-control::-webkit-inner-spin-button,
+input[type="number"].form-control::-webkit-outer-spin-button {
+  opacity: 0.5;
+  height: 24px;
+  margin-left: 5px;
+  cursor: pointer;
+  background: var(--card-dark);
+  border-radius: 4px;
+}
+
+input[type="number"].form-control::-webkit-inner-spin-button:hover,
+input[type="number"].form-control::-webkit-outer-spin-button:hover {
+  opacity: 1;
+  background: var(--primary-soft);
+}
+
+/* Estilo específico para selects */
+select.form-control {
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 16px;
+  padding-right: 40px;
+}
+
+select.form-control:focus {
+  border-color: var(--primary);
+  outline: none;
+  box-shadow: 0 0 0 4px var(--primary-soft);
+}
+
+/* Estilo para as opções do select */
+select.form-control option {
+  background: var(--card);
+  color: var(--text);
+  padding: 12px;
+}
+
+/* Hover nas opções */
+select.form-control option:hover {
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+
+/* Tema escuro para inputs number */
+[data-theme="dark"] input[type="number"].form-control {
+  background: var(--card-dark);
+  color: var(--text);
+  border-color: var(--border);
+}
+
+[data-theme="dark"] input[type="number"].form-control:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.2);
+}
+
+/* Personaliza as setas do input number no tema escuro */
+[data-theme="dark"] input[type="number"].form-control::-webkit-inner-spin-button,
+[data-theme="dark"] input[type="number"].form-control::-webkit-outer-spin-button {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+
+[data-theme="dark"] input[type="number"].form-control::-webkit-inner-spin-button:hover,
+[data-theme="dark"] input[type="number"].form-control::-webkit-outer-spin-button:hover {
+  background: var(--primary-soft);
+}
+
+/* Tema escuro para selects */
+[data-theme="dark"] select.form-control {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  background-color: var(--card-dark);
+  color: var(--text);
+  border-color: var(--border);
+}
+
+[data-theme="dark"] select.form-control option {
+  background: var(--card-dark);
+  color: var(--text);
+}
+
+[data-theme="dark"] select.form-control option:hover {
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+
+/* Firefox specific */
+@-moz-document url-prefix() {
+  select.form-control {
+    text-indent: 0.01px;
+    text-overflow: '';
+  }
+}
+
+.form-control:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 4px var(--primary-soft);
+}
+
+/* ================= MODAIS GENÉRICOS ================= */
+.modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(8px);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+  opacity: 0;
+  visibility: hidden;
+  transition: var(--transition);
+}
+
+.modal.active {
+  opacity: 1;
+  visibility: visible;
+}
+
+.modal-content {
+  background: var(--card);
+  padding: 32px;
+  width: 420px;
+  border-radius: 24px;
+  box-shadow: var(--shadow-xl);
+  transform: scale(0.9);
+  transition: var(--transition);
+  border: 1px solid var(--border);
+}
+
+.modal.active .modal-content {
+  transform: scale(1);
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+.modal-header h3 {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.modal-close {
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 10px;
+  background: var(--danger-soft);
+  color: var(--danger);
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.modal-close:hover {
+  background: var(--danger);
+  color: white;
+  transform: rotate(90deg);
+}
+
+.modal-body {
+  margin-bottom: 24px;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  border-top: 2px solid var(--border);
+  padding-top: 20px;
+}
+
+.modal-small {
+    max-width: 400px !important;
+    width: 90%;
+}
+
+.modal-lg {
+    max-width: 1000px !important; 
+    width: 90%;
+    margin: 20px auto;
+}
+
+/* ================= TOASTS ================= */
+.toast-container {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    pointer-events: none;
+}
+
+.toast {
+    background: var(--card);
+    color: var(--text);
+    padding: 16px 24px;
+    border-radius: 12px;
+    box-shadow: var(--shadow-lg);
+    animation: slideIn 0.3s ease;
+    border-left: 4px solid var(--success);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 300px;
+    max-width: 400px;
+    pointer-events: auto;
+    backdrop-filter: blur(10px);
+    border: 1px solid var(--border);
+}
+
+.toast i {
+    font-size: 20px;
+    color: currentColor;
+}
+
+.toast.success {
+    border-left-color: var(--success);
+    background: var(--card);
+    color: var(--text);
+}
+
+.toast.success i {
+    color: var(--success);
+}
+
+.toast.error {
+    border-left-color: var(--danger);
+    background: var(--card);
+    color: var(--text);
+}
+
+.toast.error i {
+    color: var(--danger);
+}
+
+.toast.warning {
+    border-left-color: var(--warning);
+    background: var(--card);
+    color: var(--text);
+}
+
+.toast.warning i {
+    color: var(--warning);
+}
+
+.toast.info {
+    border-left-color: var(--primary);
+    background: var(--card);
+    color: var(--text);
+}
+
+.toast.info i {
+    color: var(--primary);
+}
+
+/* Tema escuro específico para toasts */
+[data-theme="dark"] .toast {
+    background: var(--card-dark);
+    color: var(--text);
+    border: 1px solid var(--border);
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.5);
+}
+
+[data-theme="dark"] .toast.success {
+    border-left: 4px solid var(--success);
+    background: var(--card-dark);
+}
+
+[data-theme="dark"] .toast.error {
+    border-left: 4px solid var(--danger);
+    background: var(--card-dark);
+}
+
+[data-theme="dark"] .toast.warning {
+    border-left: 4px solid var(--warning);
+    background: var(--card-dark);
+}
+
+[data-theme="dark"] .toast.info {
+    border-left: 4px solid var(--primary);
+    background: var(--card-dark);
+}
+
+[data-theme="dark"] .toast i {
+    color: var(--text);
+}
+
+[data-theme="dark"] .toast.success i {
+    color: var(--success);
+}
+
+[data-theme="dark"] .toast.error i {
+    color: var(--danger);
+}
+
+[data-theme="dark"] .toast.warning i {
+    color: var(--warning);
+}
+
+[data-theme="dark"] .toast.info i {
+    color: var(--primary);
+}
+
+@keyframes slideIn {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+@keyframes slideOut {
+    from {
+        transform: translateX(0);
+        opacity: 1;
+    }
+    to {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+}
+
+/* ================= LOADING E EMPTY STATES ================= */
+.loading-state,
+.empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 400px;
+    color: var(--text-light);
+    background: #f8fafc;
+    border-radius: 20px;
+    padding: 40px;
+    text-align: center;
+    border: 1px dashed var(--border);
+}
+
+.loading-state i,
+.empty-state i {
+    font-size: 56px;
+    margin-bottom: 16px;
+    color: var(--primary);
+    opacity: 0.6;
+}
+
+.loading-state p,
+.empty-state p {
+    font-size: 16px;
+    margin-bottom: 4px;
+    color: var(--text-light);
+    font-weight: 500;
+}
+
+.empty-state small {
+    font-size: 12px;
+    color: var(--text-lighter);
+}
+
+/* ================= SCROLLBAR ================= */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--card-dark);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--primary);
+  border-radius: 20px;
+  border: 2px solid var(--card-dark);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--primary-dark);
+}

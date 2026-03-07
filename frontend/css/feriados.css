@@ -1,0 +1,490 @@
+/* ================= MODAL DE FERIADOS ================= */
+#modalFeriado .modal-content {
+    max-width: 1000px;
+    width: 95%;
+    margin: 20px auto;
+    padding: 0;
+    overflow: hidden;
+}
+
+#modalFeriado .modal-header {
+    background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+    padding: 16px 24px;
+}
+
+#modalFeriado .modal-header h3 {
+    color: white;
+    font-size: 20px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+#modalFeriado .modal-header h3 i {
+    font-size: 22px;
+    color: rgba(255, 255, 255, 0.9);
+}
+
+#modalFeriado .modal-close {
+    background: rgba(255, 255, 255, 0.2);
+    color: white;
+    border: none;
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+#modalFeriado .modal-close:hover {
+    background: rgba(255, 255, 255, 0.3);
+    transform: rotate(90deg);
+}
+
+#modalFeriado .modal-body {
+    padding: 0;
+}
+
+#modalFeriado .modal-columns {
+    display: flex;
+    gap: 0;
+    min-height: 600px;
+    max-height: 80vh;
+    background: var(--bg-soft);
+}
+
+/* Coluna do formulário */
+#modalFeriado .form-column {
+    flex: 1;
+    padding: 24px;
+    background: var(--card);
+    border-right: 2px solid var(--border);
+    overflow-y: auto;
+    max-height: 600px;
+}
+
+#modalFeriado .form-section h4 {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding-bottom: 12px;
+    border-bottom: 2px solid #f59e0b;
+}
+
+#modalFeriado .form-section h4 i {
+    color: #f59e0b;
+    font-size: 18px;
+}
+
+#modalFeriado .form-group {
+    margin-bottom: 20px;
+}
+
+#modalFeriado .form-group label {
+    display: block;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-light);
+    margin-bottom: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+
+#modalFeriado .form-group label i {
+    margin-right: 6px;
+    color: #f59e0b;
+    font-size: 13px;
+}
+
+#modalFeriado .form-control {
+    width: 100%;
+    padding: 10px 12px;
+    border-radius: 8px;
+    border: 2px solid var(--border);
+    background: var(--card);
+    color: var(--text);
+    font-size: 14px;
+    transition: all 0.2s ease;
+}
+
+#modalFeriado .form-control:focus {
+    border-color: #f59e0b;
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.15);
+}
+
+#modalFeriado select.form-control {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    padding-right: 40px;
+}
+[data-theme="dark"] #modalFeriado select.form-control {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23cbd5e1' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+}
+
+#modalFeriado select.form-control option {
+    background: var(--card);
+    color: var(--text);
+}
+
+[data-theme="dark"] #modalFeriado select.form-control option {
+    background: var(--card-dark);
+    color: var(--text);
+}
+
+/* Coluna da listagem */
+#modalFeriado .list-column {
+    flex: 1;
+    padding: 24px;
+    background: var(--bg-soft);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+#modalFeriado .list-section {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+#modalFeriado .list-section h4 {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding-bottom: 12px;
+    border-bottom: 2px solid var(--border);
+}
+
+#modalFeriado .list-section h4 i {
+    color: #f59e0b;
+    font-size: 18px;
+}
+
+/* Lista de feriados */
+#modalFeriado .feriados-list {
+    flex: 1;
+    overflow-y: auto;
+    padding-right: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    max-height: 500px;
+}
+
+/* Cards de feriado */
+#modalFeriado .feriado-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px;
+    transition: all 0.2s ease;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    border-left: 4px solid #f59e0b;
+    box-shadow: var(--shadow-sm);
+}
+
+#modalFeriado .feriado-card:hover {
+    border-color: #f59e0b;
+    box-shadow: var(--shadow-md);
+    transform: translateY(-2px);
+}
+
+#modalFeriado .feriado-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+}
+
+#modalFeriado .feriado-nome {
+    font-weight: 600;
+    color: var(--text);
+    font-size: 15px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 70%;
+}
+
+#modalFeriado .feriado-nome i {
+    color: #f59e0b;
+    font-size: 16px;
+    flex-shrink: 0;
+}
+
+/* Badge de tipo */
+#modalFeriado .feriado-tipo-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 500;
+    white-space: nowrap;
+    background: white;
+    border: 1px solid;
+    flex-shrink: 0;
+}
+
+#modalFeriado .feriado-tipo-badge.municipal {
+    color: #b45309;
+    border-color: #fcd34d;
+    background: #fffbeb;
+}
+
+#modalFeriado .feriado-tipo-badge.estadual {
+    color: #6d28d9;
+    border-color: #c4b5fd;
+    background: #f5f3ff;
+}
+
+/* Data do feriado */
+#modalFeriado .feriado-data {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: var(--text-light);
+    background: var(--card-dark);
+    padding: 8px 12px;
+    border-radius: 8px;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+#modalFeriado .feriado-data i {
+    color: #f59e0b;
+    font-size: 14px;
+    flex-shrink: 0;
+}
+
+#modalFeriado .feriado-data span {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Ações do card */
+#modalFeriado .feriado-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+    padding-top: 8px;
+    border-top: 1px dashed var(--border);
+    width: 100%;
+}
+
+#modalFeriado .btn-icon-sm {
+    width: 32px;
+    height: 32px;
+    border: none;
+    border-radius: 8px;
+    background: var(--card-dark);
+    color: var(--text-light);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--border);
+}
+
+#modalFeriado .btn-icon-sm:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-sm);
+}
+
+#modalFeriado .btn-icon-sm.edit:hover {
+    background: #f59e0b;
+    color: white;
+    border-color: #f59e0b;
+}
+
+#modalFeriado .btn-icon-sm.delete:hover {
+    background: var(--danger);
+    color: white;
+    border-color: var(--danger);
+}
+
+/* Botões do formulário */
+#modalFeriado .form-actions.column {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 24px;
+    padding-top: 20px;
+    border-top: 2px solid var(--border);
+}
+
+#modalFeriado .btn-primary.full-width {
+    background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    padding: 12px;
+    font-weight: 600;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+#modalFeriado .btn-primary.full-width:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+}
+
+#modalFeriado .btn-secondary.full-width {
+    background: var(--card-dark);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px;
+    font-weight: 600;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+#modalFeriado .btn-secondary.full-width:hover {
+    border-color: #f59e0b;
+    color: #f59e0b;
+}
+
+/* Loading e Empty states */
+#modalFeriado .loading-state,
+#modalFeriado .empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 300px;
+    color: var(--text-light);
+    background: var(--card-dark);
+    border-radius: 16px;
+    padding: 40px;
+    text-align: center;
+    border: 2px dashed var(--border);
+    width: 100%;
+    box-sizing: border-box;
+}
+
+#modalFeriado .loading-state i,
+#modalFeriado .empty-state i {
+    font-size: 48px;
+    margin-bottom: 16px;
+    color: var(--primary);
+    opacity: 0.5;
+}
+
+#modalFeriado .empty-state p {
+    font-size: 16px;
+    margin-bottom: 8px;
+    color: var(--text-light);
+}
+
+#modalFeriado .empty-state small {
+    font-size: 13px;
+    color: var(--text-lighter);
+}
+
+/* Scrollbar personalizada */
+#modalFeriado .feriados-list::-webkit-scrollbar {
+    width: 6px;
+}
+
+#modalFeriado .feriados-list::-webkit-scrollbar-track {
+    background: var(--card-dark);
+    border-radius: 10px;
+}
+
+#modalFeriado .feriados-list::-webkit-scrollbar-thumb {
+    background: #f59e0b;
+    border-radius: 10px;
+}
+
+#modalFeriado .feriados-list::-webkit-scrollbar-thumb:hover {
+    background: #d97706;
+}
+
+/* Tema escuro */
+[data-theme="dark"] #modalFeriado .feriado-card {
+    background: var(--card-dark);
+    border-color: var(--border);
+}
+
+[data-theme="dark"] #modalFeriado .feriado-tipo-badge.municipal {
+    background: #7b341e;
+    color: #fbbf24;
+    border-color: #b45309;
+}
+
+[data-theme="dark"] #modalFeriado .feriado-tipo-badge.estadual {
+    background: #2e1065;
+    color: #c4b5fd;
+    border-color: #6d28d9;
+}
+
+[data-theme="dark"] #modalFeriado .feriado-data {
+    background: var(--card);
+}
+
+[data-theme="dark"] #modalFeriado .btn-icon-sm {
+    background: var(--card);
+    border-color: var(--border);
+    color: var(--text-light);
+}
+
+[data-theme="dark"] #modalFeriado .btn-icon-sm.edit:hover {
+    background: #f59e0b;
+    color: white;
+    border-color: #f59e0b;
+}
+
+/* Responsividade */
+@media (max-width: 768px) {
+    #modalFeriado .modal-columns {
+        flex-direction: column;
+        gap: 20px;
+    }
+    
+    #modalFeriado .form-column {
+        border-right: none;
+        border-bottom: 2px solid var(--border);
+        padding-right: 0;
+        padding-bottom: 20px;
+        margin-bottom: 10px;
+    }
+    
+    #modalFeriado .list-column {
+        padding-left: 0;
+    }
+    
+    #modalFeriado .feriados-list {
+        max-height: 400px;
+    }
+}

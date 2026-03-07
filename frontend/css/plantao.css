@@ -1,0 +1,497 @@
+/* ================= LANÇAMENTO DE PLANTÃO ================= */
+.plantao-layout {
+    display: flex;
+    gap: 20px;
+    margin-bottom: 30px;
+}
+
+.sabados-container {
+    flex: 1;
+    background: var(--card);
+    border-radius: 24px;
+    padding: 20px;
+    box-shadow: var(--shadow-lg);
+}
+
+.sabados-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    padding-bottom: 16px;
+    border-bottom: 2px solid var(--border);
+}
+
+.sabados-header h3 {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.sabados-header h3 i {
+    color: var(--primary);
+}
+
+.sabados-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+    gap: 12px;
+}
+
+.sabado-card {
+    background: var(--card-dark);
+    border-radius: 16px;
+    padding: 16px 8px;
+    text-align: center;
+    cursor: pointer;
+    transition: var(--transition);
+    border: 2px solid transparent;
+    position: relative;
+}
+
+.sabado-card:hover {
+    transform: translateY(-3px);
+    box-shadow: var(--shadow-md);
+    border-color: var(--primary);
+}
+
+.sabado-card.lancado {
+    background: var(--primary-soft);
+    border-color: var(--primary);
+}
+
+.sabado-dia {
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--text);
+    line-height: 1;
+}
+
+.sabado-mes {
+    font-size: 14px;
+    color: var(--text-light);
+    text-transform: uppercase;
+    margin: 4px 0;
+}
+
+.sabado-ano {
+    font-size: 12px;
+    color: var(--text-lighter);
+}
+
+.badge-plantao {
+    position: absolute;
+    top: -5px;
+    right: -5px;
+    background: var(--success);
+    color: white;
+    font-size: 10px;
+    padding: 2px 6px;
+    border-radius: 20px;
+    font-weight: 600;
+}
+
+/* Painel editor */
+#plantaoEditor {
+    width: 400px;
+    background: var(--card);
+    border-radius: 24px;
+    box-shadow: var(--shadow-xl);
+    overflow: hidden;
+    animation: slideIn 0.3s ease;
+}
+
+/* Checklist de colaboradores */
+.colaboradores-checklist {
+    max-height: 300px;
+    overflow-y: auto;
+    padding: 8px;
+    background: var(--card-dark);
+    border-radius: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.colaborador-checkbox {
+    display: flex;
+    align-items: center;
+    padding: 6px 8px;
+    border-radius: 8px;
+    background: var(--card);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border: 1px solid var(--border);
+}
+
+.colaborador-checkbox:hover {
+    background: var(--primary-soft);
+    border-color: var(--primary);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-sm);
+}
+
+.colaborador-checkbox input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    margin-right: 8px;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.colaborador-checkbox input[type="checkbox"]:checked {
+    accent-color: var(--primary);
+}
+
+.checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--text);
+    cursor: pointer;
+    flex: 1;
+}
+
+.checkbox-label i {
+    width: 20px;
+    height: 20px;
+    font-size: 12px;
+    border-radius: 5px;
+    background: linear-gradient(135deg, var(--primary-soft) 0%, transparent 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--primary);
+}
+
+.checkbox-label strong {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text);
+    margin-left: 4px;
+}
+
+.selecionados-count {
+    margin-top: 8px;
+    padding: 6px;
+    font-size: 11px;
+    gap: 4px;
+    background: var(--primary-soft);
+    border-radius: 12px;
+    text-align: center;
+    color: var(--primary);
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--border);
+}
+
+.selecionados-count i {
+    font-size: 12px;
+}
+
+#plantaoEditor .editor-form-group label {
+    font-size: 11px;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+#plantaoEditor .editor-form-group label i {
+    font-size: 14px;
+    color: var(--primary);
+}
+
+/* Lista de plantões lançados */
+.plantoes-lancados-container {
+    background: var(--card);
+    border-radius: 24px;
+    padding: 20px;
+    box-shadow: var(--shadow-lg);
+}
+
+.plantoes-lancados-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    padding-bottom: 16px;
+    border-bottom: 2px solid var(--border);
+}
+
+.plantoes-lancados-header h3 {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.plantoes-lancados-header h3 i {
+    color: var(--primary);
+}
+
+.plantoes-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.plantao-card {
+    background: var(--card-dark);
+    border-radius: 16px;
+    padding: 16px;
+    transition: var(--transition);
+    border: 1px solid var(--border);
+}
+
+.plantao-card:hover {
+    transform: translateX(5px);
+    box-shadow: var(--shadow-md);
+    border-color: var(--primary);
+}
+
+.plantao-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+}
+
+.plantao-data {
+    font-weight: 600;
+    color: var(--primary);
+    font-size: 16px;
+}
+
+.plantao-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.plantao-colaboradores {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.colaborador-tag {
+    background: var(--card);
+    padding: 6px 12px;
+    border-radius: 30px;
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    border: 1px solid var(--border);
+}
+
+.colaborador-tag i {
+    color: var(--primary);
+}
+
+.sem-colaboradores {
+    color: var(--text-light);
+    font-style: italic;
+    font-size: 14px;
+}
+
+.empty-msg {
+    text-align: center;
+    padding: 30px;
+    color: var(--text-light);
+    background: var(--card);
+    border-radius: 12px;
+    border: 2px dashed var(--border);
+    font-size: 14px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+}
+
+.empty-msg i {
+    font-size: 40px;
+    color: var(--primary);
+    opacity: 0.5;
+}
+
+/* Responsividade */
+@media (max-width: 1200px) {
+    .plantao-layout {
+        flex-direction: column;
+    }
+    
+    #plantaoEditor {
+        width: 100%;
+    }
+}
+
+@media (max-width: 768px) {
+    .sabados-grid {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
+/* ================= TEMA ESCURO - LANÇAR PLANTÃO ================= */
+[data-theme="dark"] .sabados-container {
+    background: var(--card);
+    border-color: var(--border);
+}
+
+[data-theme="dark"] .sabados-header {
+    border-bottom-color: var(--border);
+}
+
+[data-theme="dark"] .sabados-header h3 {
+    color: var(--text);
+}
+
+[data-theme="dark"] .sabados-header h3 i {
+    color: var(--primary);
+}
+
+[data-theme="dark"] .sabado-card {
+    background: var(--card-dark);
+    color: var(--text);
+    border-color: var(--border);
+}
+
+[data-theme="dark"] .sabado-card:hover {
+    border-color: var(--primary);
+    background: var(--card);
+}
+
+[data-theme="dark"] .sabado-card.lancado {
+    background: var(--primary-soft);
+    border-color: var(--primary);
+}
+
+[data-theme="dark"] .sabado-dia {
+    color: var(--text);
+}
+
+[data-theme="dark"] .sabado-mes {
+    color: var(--text-light);
+}
+
+[data-theme="dark"] .sabado-ano {
+    color: var(--text-lighter);
+}
+
+/* Painel editor no tema escuro */
+[data-theme="dark"] #plantaoEditor {
+    background: var(--card);
+    border-color: var(--border);
+}
+
+[data-theme="dark"] #plantaoEditor .editor-form-group label {
+    color: var(--text);
+}
+
+[data-theme="dark"] #plantaoEditor .editor-form-group label i {
+    color: var(--primary);
+}
+
+[data-theme="dark"] .colaboradores-checklist {
+    background: var(--card-dark);
+}
+
+[data-theme="dark"] .colaborador-checkbox {
+    background: var(--card);
+    border-color: var(--border);
+}
+
+[data-theme="dark"] .colaborador-checkbox:hover {
+    background: var(--primary-soft);
+    border-color: var(--primary);
+}
+
+[data-theme="dark"] .checkbox-label {
+    color: var(--text);
+}
+
+[data-theme="dark"] .checkbox-label i {
+    color: var(--primary);
+    background: var(--card-dark);
+}
+
+[data-theme="dark"] .checkbox-label strong {
+    color: var(--text);
+}
+
+[data-theme="dark"] .selecionados-count {
+    background: var(--primary-soft);
+    color: var(--primary);
+    border-color: var(--border);
+}
+
+/* Lista de plantões lançados no tema escuro */
+[data-theme="dark"] .plantoes-lancados-container {
+    background: var(--card);
+    border-color: var(--border);
+}
+
+[data-theme="dark"] .plantoes-lancados-header {
+    border-bottom-color: var(--border);
+}
+
+[data-theme="dark"] .plantoes-lancados-header h3 {
+    color: var(--text);
+}
+
+[data-theme="dark"] .plantoes-lancados-header h3 i {
+    color: var(--primary);
+}
+
+[data-theme="dark"] .plantao-card {
+    background: var(--card-dark);
+    border-color: var(--border);
+}
+
+[data-theme="dark"] .plantao-card:hover {
+    border-color: var(--primary);
+    background: var(--card);
+}
+
+[data-theme="dark"] .plantao-header {
+    border-bottom-color: var(--border);
+}
+
+[data-theme="dark"] .plantao-data {
+    color: var(--primary);
+}
+
+[data-theme="dark"] .colaborador-tag {
+    background: var(--card);
+    color: var(--text);
+    border-color: var(--border);
+}
+
+[data-theme="dark"] .colaborador-tag i {
+    color: var(--primary);
+}
+
+[data-theme="dark"] .sem-colaboradores {
+    color: var(--text-light);
+}
+
+[data-theme="dark"] .empty-msg {
+    background: var(--card-dark);
+    color: var(--text-light);
+    border-color: var(--border);
+}
+
+[data-theme="dark"] .empty-msg i {
+    color: var(--primary);
+    opacity: 0.5;
+}

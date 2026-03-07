@@ -1,0 +1,63 @@
+/* ================= TEMA CLARO (PADRÃO) ================= */
+:root {
+  /* Cores principais */
+  --bg: #0b1120;
+  --bg-soft: #f8fafc;
+  --sidebar: #1a1f2f;
+  --card: #ffffff;
+  --card-dark: #f8fafc;
+  --primary: #6366f1;
+  --primary-dark: #4f52e0;
+  --primary-soft: #e0e7ff;
+  --success: #10b981;
+  --success-soft: #d1fae5;
+  --danger: #ef4444;
+  --danger-soft: #fee2e2;
+  --warning: #f59e0b;
+  --warning-soft: #fef3c7;
+  --text: #1e293b;
+  --text-secondary: #475569;
+  --text-light: #64748b;
+  --text-lighter: #94a3b8;
+  --border: #e2e8f0;
+  --border-dark: #cbd5e1;
+  
+  /* Sombras */
+  --shadow-sm: 0 2px 4px rgba(0,0,0,0.02), 0 1px 2px rgba(0,0,0,0.03);
+  --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -1px rgba(0,0,0,0.03);
+  --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.05), 0 4px 6px -2px rgba(0,0,0,0.02);
+  --shadow-xl: 0 20px 25px -5px rgba(0,0,0,0.05), 0 10px 10px -5px rgba(0,0,0,0.02);
+  
+  /* Transições */
+  --transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ================= TEMA ESCURO ================= */
+[data-theme="dark"] {
+  --bg: #0f172a;
+  --bg-soft: #1e293b;
+  --sidebar: #0b1120;
+  --card: #1e293b;
+  --card-dark: #0f172a;
+  --primary: #818cf8;
+  --primary-dark: #6366f1;
+  --primary-soft: #1e1b4b;
+  --success: #34d399;
+  --success-soft: #064e3b;
+  --danger: #f87171;
+  --danger-soft: #7f1d1d;
+  --warning: #fbbf24;
+  --warning-soft: #78350f;
+  --text: #f1f5f9;
+  --text-secondary: #cbd5e1;
+  --text-light: #94a3b8;
+  --text-lighter: #64748b;
+  --border: #334155;
+  --border-dark: #475569;
+  
+  /* Sombras - mais suaves no escuro */
+  --shadow-sm: 0 2px 4px rgba(0,0,0,0.3);
+  --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.4);
+  --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.4);
+  --shadow-xl: 0 20px 25px -5px rgba(0,0,0,0.5);
+}

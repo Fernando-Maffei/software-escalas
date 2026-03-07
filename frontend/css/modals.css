@@ -1,0 +1,417 @@
+/* ================= MODAL DE LANÇAMENTOS ================= */
+#modalLancamento .modal-content {
+    max-width: 1200px;
+    width: 95%;
+    background: var(--card);
+    border-radius: 24px;
+    overflow: hidden;
+    box-shadow: var(--shadow-xl);
+    border: 1px solid var(--border);
+}
+
+#modalLancamento .modal-header {
+    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+    padding: 12px 20px;
+}
+
+#modalLancamento .modal-header h3 {
+    font-size: 18px;
+    color: white;
+    gap: 8px;
+}
+
+#modalLancamento .modal-header h3 i {
+    font-size: 20px;
+}
+
+#modalLancamento .modal-close {
+    width: 32px;
+    height: 32px;
+    font-size: 18px;
+}
+
+#modalLancamento .modal-body {
+    padding: 16px;
+    background: var(--bg-soft);
+}
+
+#modalLancamento .modal-columns {
+    display: flex;
+    gap: 16px;
+    min-height: 450px;
+    max-height: 70vh;
+}
+
+/* ================= COLUNA ESQUERDA - LISTAGEM ================= */
+#modalLancamento .list-column {
+    flex: 1.2;
+    background: var(--card);
+    border-radius: 16px;
+    padding: 16px;
+    box-shadow: var(--shadow-sm);
+    border: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+}
+
+/* Abas de navegação */
+#modalLancamento .list-tabs {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 12px;
+    padding: 3px;
+    background: var(--card-dark);
+    border-radius: 10px;
+}
+
+#modalLancamento .tab-btn {
+    flex: 1;
+    padding: 8px 12px;
+    border: none;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--text-light);
+    font-weight: 600;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+}
+
+#modalLancamento .tab-btn:hover {
+    background: var(--primary-soft);
+    color: var(--primary);
+}
+
+#modalLancamento .tab-btn.active {
+    background: var(--primary);
+    color: white;
+}
+
+#modalLancamento .tab-btn.active i {
+    color: white;
+}
+
+#modalLancamento .tab-content {
+    display: none !important;
+    height: 100%;
+}
+
+#modalLancamento .tab-content.active {
+    display: flex !important;
+    flex-direction: column;
+}
+
+#modalLancamento .section-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 2px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+#modalLancamento .section-title i {
+    color: var(--primary);
+    font-size: 16px;
+}
+
+#modalLancamento .lancamentos-list {
+    flex: 1;
+    overflow-y: auto;
+    padding-right: 4px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-height: 350px;
+}
+
+/* Cards de lançamento */
+#modalLancamento .lancamento-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 12px;
+    transition: all 0.2s ease;
+    cursor: pointer;
+    position: relative;
+}
+
+#modalLancamento .lancamento-card:hover {
+    border-color: var(--primary);
+    box-shadow: var(--shadow-md);
+    transform: translateY(-2px);
+}
+
+#modalLancamento .lancamento-card.pessoal {
+    border-left: 4px solid var(--primary);
+}
+
+#modalLancamento .lancamento-card.feriado {
+    border-left: 4px solid #f59e0b;
+}
+
+#modalLancamento .lancamento-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--border);
+}
+
+#modalLancamento .lancamento-titulo {
+    font-weight: 600;
+    color: var(--text);
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+#modalLancamento .lancamento-titulo i {
+    font-size: 14px;
+}
+
+#modalLancamento .lancamento-titulo i.fa-user-circle { color: var(--primary); }
+#modalLancamento .lancamento-titulo i.fa-city { color: #f59e0b; }
+
+#modalLancamento .lancamento-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 8px;
+    border-radius: 20px;
+    font-size: 10px;
+    font-weight: 500;
+    background: white;
+    border: 1px solid;
+}
+
+#modalLancamento .lancamento-badge.folga {
+    color: #059669;
+    border-color: #d1fae5;
+    background: #f0fdf4;
+}
+
+#modalLancamento .lancamento-badge.ausencia {
+    color: #dc2626;
+    border-color: #fee2e2;
+    background: #fef2f2;
+}
+
+#modalLancamento .lancamento-badge.ferias {
+    color: #2563eb;
+    border-color: #dbeafe;
+    background: #eff6ff;
+}
+
+#modalLancamento .lancamento-badge.feriado,
+#modalLancamento .lancamento-badge.municipal {
+    color: #b45309;
+    border-color: #fcd34d;
+    background: #fffbeb;
+}
+
+#modalLancamento .lancamento-badge.estadual {
+    color: #6d28d9;
+    border-color: #c4b5fd;
+    background: #f5f3ff;
+}
+
+#modalLancamento .lancamento-data {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 12px;
+    color: var(--text-light);
+    background: var(--card-dark);
+    padding: 6px 8px;
+    border-radius: 6px;
+    margin-bottom: 8px;
+}
+
+#modalLancamento .lancamento-data i {
+    color: var(--primary);
+    font-size: 12px;
+}
+
+#modalLancamento .lancamento-actions {
+    display: flex;
+    gap: 4px;
+    justify-content: flex-end;
+    padding-top: 6px;
+    border-top: 1px dashed var(--border);
+}
+
+#modalLancamento .btn-icon-sm {
+    width: 24px;
+    height: 24px;
+    font-size: 11px;
+}
+
+/* ================= COLUNA DIREITA - FORMULÁRIO ================= */
+#modalLancamento .form-column {
+    width: 320px;
+    background: var(--card);
+    border-radius: 16px;
+    padding: 16px;
+    box-shadow: var(--shadow-sm);
+    border: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+}
+
+#modalLancamento .form-titulo {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 16px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+#modalLancamento .form-titulo i {
+    color: var(--primary);
+    font-size: 18px;
+}
+
+#modalLancamento .form-group {
+    margin-bottom: 12px;
+}
+
+#modalLancamento .form-group label {
+    font-size: 11px;
+    margin-bottom: 4px;
+    letter-spacing: 0.3px;
+}
+
+#modalLancamento .form-group label i {
+    font-size: 12px;
+    margin-right: 4px;
+}
+
+#modalLancamento .form-control {
+    padding: 8px 10px;
+    font-size: 13px;
+    border-radius: 8px;
+}
+
+#modalLancamento .conditional-fields {
+    background: var(--card-dark);
+    border-radius: 12px;
+    padding: 10px;
+    margin: 8px 0;
+    border: 1px dashed var(--border);
+}
+
+#modalLancamento .hidden {
+    display: none !important;
+}
+
+#modalLancamento .form-actions {
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+#modalLancamento .btn-primary.full-width,
+#modalLancamento .btn-secondary.full-width {
+    padding: 10px;
+    font-size: 14px;
+    gap: 6px;
+    border-radius: 8px;
+}
+
+/* Loading e Empty states */
+#modalLancamento .loading-state,
+#modalLancamento .empty-state {
+    min-height: 250px;
+    padding: 30px 20px;
+}
+
+#modalLancamento .loading-state i,
+#modalLancamento .empty-state i {
+    font-size: 40px;
+    margin-bottom: 12px;
+}
+
+#modalLancamento .loading-state p,
+#modalLancamento .empty-state p {
+    font-size: 14px;
+    margin-bottom: 4px;
+}
+
+#modalLancamento .empty-state small {
+    font-size: 12px;
+}
+
+/* Responsividade */
+@media (max-width: 968px) {
+    #modalLancamento .modal-columns {
+        flex-direction: column;
+        min-height: auto;
+    }
+    
+    #modalLancamento .form-column {
+        width: 100%;
+    }
+    
+    #modalLancamento .lancamentos-list {
+        max-height: 300px;
+    }
+}
+
+/* Garantir que os containers das listas estão visíveis */
+#listaPessoalContainer,
+#listaFeriadosContainer {
+    display: none !important;
+    flex: 1;
+    overflow: hidden;
+}
+
+#listaPessoalContainer.active,
+#listaFeriadosContainer.active {
+    display: flex !important;
+    flex-direction: column;
+}
+
+/* Estilo para selects no modal de lançamentos */
+#modalLancamento select.form-control {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    padding-right: 40px;
+}
+
+[data-theme="dark"] #modalLancamento select.form-control {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23cbd5e1' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+    background-color: var(--card-dark);
+}
+
+#modalLancamento select.form-control option {
+    background: var(--card);
+    color: var(--text);
+}
+
+[data-theme="dark"] #modalLancamento select.form-control option {
+    background: var(--card-dark);
+    color: var(--text);
+}
+
+[data-theme="dark"] #modalLancamento select.form-control option:hover {
+    background: var(--primary-soft);
+    color: var(--primary);
+}
