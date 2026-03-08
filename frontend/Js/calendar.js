@@ -1,8 +1,15 @@
-// calendar.js
 let mesAtual;
 let anoAtual;
 let feriados = [];
 
+// Inicializar com a data atual
+const dataAtual = new Date();
+mesAtual = dataAtual.getMonth();
+anoAtual = dataAtual.getFullYear();
+
+// EXPOR PARA O ESCOPO GLOBAL
+window.mesAtual = mesAtual;
+window.anoAtual = anoAtual;
 window.gerarCalendario = gerarCalendario;
 window.inicializarCalendario = inicializarCalendario;
 
@@ -162,7 +169,6 @@ function gerarCalendario(mes, ano) {
     }
 
     // Evento de clique
-    // Evento de clique - AGORA UNIFORME PARA TODOS OS DIAS
 cell.addEventListener("click", (e) => {
   e.stopPropagation();
   
@@ -268,48 +274,75 @@ function configurarNavegacaoCalendario() {
 window.mesAtual = mesAtual;
 window.anoAtual = anoAtual;
 
-// E atualize a função configurarNavegacaoCalendario para atualizar as variáveis globais
-function configurarNavegacaoCalendario() {
-  const prevBtn = document.getElementById("prevMonth");
-  const nextBtn = document.getElementById("nextMonth");
-  
-  if (prevBtn) {
-    const newPrevBtn = prevBtn.cloneNode(true);
-    prevBtn.parentNode.replaceChild(newPrevBtn, prevBtn);
-    
-    newPrevBtn.addEventListener("click", async () => {
-      console.log("Mês anterior");
-      mesAtual--;
-      if (mesAtual < 0) {
-        mesAtual = 11;
-        anoAtual--;
-      }
-      // 🔥 ATUALIZAR VARIÁVEIS GLOBAIS
-      window.mesAtual = mesAtual;
-      window.anoAtual = anoAtual;
-      
-      await carregarFeriados(anoAtual);
-      gerarCalendario(mesAtual, anoAtual);
-    });
-  }
+// calendar.js - Função configurarNavegacaoCalendario (substitua pela versão abaixo)
 
-  if (nextBtn) {
-    const newNextBtn = nextBtn.cloneNode(true);
-    nextBtn.parentNode.replaceChild(newNextBtn, nextBtn);
+function configurarNavegacaoCalendario() {
+    const prevBtn = document.getElementById("prevMonth");
+    const nextBtn = document.getElementById("nextMonth");
     
-    newNextBtn.addEventListener("click", async () => {
-      console.log("Próximo mês");
-      mesAtual++;
-      if (mesAtual > 11) {
-        mesAtual = 0;
-        anoAtual++;
-      }
-      // 🔥 ATUALIZAR VARIÁVEIS GLOBAIS
-      window.mesAtual = mesAtual;
-      window.anoAtual = anoAtual;
-      
-      await carregarFeriados(anoAtual);
-      gerarCalendario(mesAtual, anoAtual);
-    });
-  }
+    if (prevBtn) {
+        // Remover eventos antigos para evitar duplicação
+        const newPrevBtn = prevBtn.cloneNode(true);
+        prevBtn.parentNode.replaceChild(newPrevBtn, prevBtn);
+        
+        newPrevBtn.addEventListener("click", async () => {
+            console.log("📅 Mês anterior");
+            mesAtual--;
+            if (mesAtual < 0) {
+                mesAtual = 11;
+                anoAtual--;
+            }
+            
+            // ATUALIZAR VARIÁVEIS GLOBAIS
+            window.mesAtual = mesAtual;
+            window.anoAtual = anoAtual;
+            
+            console.log(`📅 Mês alterado para: ${mesAtual + 1}/${anoAtual}`);
+            
+            await carregarFeriados(anoAtual);
+            gerarCalendario(mesAtual, anoAtual);
+            
+            // Se o modal de lançamentos estiver aberto, recarregar as listagens
+            const modalLancamento = document.getElementById("modalLancamento");
+            if (modalLancamento && !modalLancamento.classList.contains('hidden')) {
+                console.log("🔄 Modal aberto, recarregando listagens...");
+                if (typeof carregarListagens === 'function') {
+                    await carregarListagens();
+                }
+            }
+        });
+    }
+
+    if (nextBtn) {
+        // Remover eventos antigos para evitar duplicação
+        const newNextBtn = nextBtn.cloneNode(true);
+        nextBtn.parentNode.replaceChild(newNextBtn, nextBtn);
+        
+        newNextBtn.addEventListener("click", async () => {
+            console.log("📅 Próximo mês");
+            mesAtual++;
+            if (mesAtual > 11) {
+                mesAtual = 0;
+                anoAtual++;
+            }
+            
+            // ATUALIZAR VARIÁVEIS GLOBAIS
+            window.mesAtual = mesAtual;
+            window.anoAtual = anoAtual;
+            
+            console.log(`📅 Mês alterado para: ${mesAtual + 1}/${anoAtual}`);
+            
+            await carregarFeriados(anoAtual);
+            gerarCalendario(mesAtual, anoAtual);
+            
+            // Se o modal de lançamentos estiver aberto, recarregar as listagens
+            const modalLancamento = document.getElementById("modalLancamento");
+            if (modalLancamento && !modalLancamento.classList.contains('hidden')) {
+                console.log("🔄 Modal aberto, recarregando listagens...");
+                if (typeof carregarListagens === 'function') {
+                    await carregarListagens();
+                }
+            }
+        });
+    }
 }

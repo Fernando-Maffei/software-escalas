@@ -59,7 +59,14 @@ document.addEventListener("DOMContentLoaded", async () => {
     configurarNavegacao();
     configurarModais();
     configurarObservers();
-    renderCalendario();
+    renderDashboard();
+
+
+    setTimeout(() => {
+            if (typeof window.setActiveButton === 'function') {
+                window.setActiveButton('dashboard');
+            }
+        }, 100);
 });
 
 
@@ -251,75 +258,75 @@ function abrirModalHorario(colaborador) {
 
 
 // Função para salvar ausência
-async function salvarAusencia() {
-    const colaboradorId = document.getElementById("colaboradorSelect")?.value;
-    const tipo = document.getElementById("tipoSelect")?.value;
-    const dataInicio = document.getElementById("dataInicio")?.value;
-    const dataFim = document.getElementById("dataFim")?.value;
+
+async function salvarAusencia(tipo, dataInicio, dataFim) {
+    const colaboradorId = document.getElementById("colaboradorSelect").value;
+    const periodoTipo = document.getElementById("periodoTipo").value;
+    const horaInicio = document.getElementById("horaInicio").value;
+    const horaFim = document.getElementById("horaFim").value;
     
-    console.log("Dados do formulário:", { colaboradorId, tipo, dataInicio, dataFim });
+    console.log("Preparando dados para salvar:", {
+        colaboradorId, tipo, dataInicio, dataFim, periodoTipo, horaInicio, horaFim
+    });
     
-    if (!colaboradorId || !dataInicio || !dataFim) {
-        mostrarToast("Preencha todos os campos", "error");
-        return;
+    if (!colaboradorId) {
+        throw new Error("Selecione um colaborador");
     }
     
-    // Valida se data fim é maior ou igual a data início
-    if (dataFim < dataInicio) {
-        mostrarToast("Data fim deve ser maior ou igual à data início", "error");
-        return;
+    if (periodoTipo === 'horas') {
+        if (!horaInicio || !horaFim) {
+            throw new Error("Preencha as horas de início e fim");
+        }
+        if (horaFim <= horaInicio) {
+            throw new Error("Hora fim deve ser maior que hora início");
+        }
     }
     
-    try {
-        let response;
-        const url = editandoAusenciaId 
-            ? `http://localhost:3000/api/ausencias/${editandoAusenciaId}`
-            : 'http://localhost:3000/api/ausencias';
-        
-        const metodo = editandoAusenciaId ? 'PUT' : 'POST';
-        
-        // 🔥 ENVIAR AS DATAS EXATAMENTE COMO ESTÃO NO INPUT
-        // Sem converter para Date, sem mexer no fuso horário
-        const payload = {
-            colaboradorId: parseInt(colaboradorId),
-            tipo: tipo,
-            dataInicio: dataInicio, // Exatamente "2026-02-09"
-            dataFim: dataFim         // Exatamente "2026-02-09"
-        };
-        
-        console.log("Enviando payload:", payload);
-        
+    // Preparar dados para enviar
+    const dados = {
+        colaboradorId: parseInt(colaboradorId),
+        tipo: tipo,
+        dataInicio: dataInicio,
+        dataFim: dataFim,
+        periodoTipo: periodoTipo
+    };
+    
+    if (periodoTipo === 'horas') {
+        dados.horaInicio = horaInicio;
+        dados.horaFim = horaFim;
+    }
+    
+    let response;
+    let url;
+    
+    if (editandoTipoLancamento === 'pessoal' && editandoLancamentoId) {
+        // É uma edição
+        url = `http://localhost:3000/api/ausencias/${editandoLancamentoId}`;
+        console.log("📤 Atualizando com PUT:", url, dados);
         response = await fetch(url, {
-            method: metodo,
+            method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
+            body: JSON.stringify(dados)
         });
-        
-        if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(`Erro ${response.status}: ${errorText}`);
-        }
-        
-        await carregarAusencias();
-        
-        await carregarAusenciasDoDia(dataInicio);
-        
-        cancelarEdicaoAusencia();
-        
-        mostrarToast(
-            editandoAusenciaId ? "Lançamento atualizado!" : "Lançamento salvo com sucesso!", 
-            "success"
-        );
-        
-        
-        if (document.getElementById("calendar")) {
-                gerarCalendario(mesAtual, anoAtual);
-        }
-        
-    } catch (error) {
-        console.error("Erro ao salvar ausência:", error);
-        mostrarToast(`Erro ao salvar: ${error.message}`, "error");
+    } else {
+        // É um novo lançamento
+        url = 'http://localhost:3000/api/ausencias';
+        console.log("📤 Criando com POST:", url, dados);
+        response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(dados)
+        });
     }
+    
+    const respostaText = await response.text();
+    console.log("📥 Resposta:", response.status, respostaText);
+    
+    if (!response.ok) {
+        throw new Error(`Erro ${response.status}: ${respostaText}`);
+    }
+    
+    return JSON.parse(respostaText);
 }
 
 
@@ -519,12 +526,23 @@ function carregarPagina(pagina) {
     
     if (!appContent) return;
     
+    // 🔥 NOVO: Atualiza a URL sem recarregar a página
+    window.location.hash = pagina;
+    
     // Atualiza o botão ativo na sidebar
     if (typeof window.setActiveButton === 'function') {
         window.setActiveButton(pagina);
     }
     
+    // Parar atualização automática do dashboard se estiver saindo dele
+    if (pagina !== 'dashboard' && typeof window.pararAtualizacaoAutomatica === 'function') {
+        window.pararAtualizacaoAutomatica();
+    }
+    
     switch (pagina) {
+        case "dashboard":
+            renderDashboard();
+            break;
         case "calendario":
             renderCalendario();
             break;
@@ -545,6 +563,7 @@ function carregarPagina(pagina) {
             break;
         default:
             console.log("Página não encontrada:", pagina);
+            renderDashboard(); // Fallback para dashboard
     }
 }
 
@@ -1054,25 +1073,68 @@ async function carregarColaboradores() {
     }
 }
 
+// app.js - Função carregarAusencias (já deve estar assim, mas vamos verificar)
+
 async function carregarAusencias() {
     try {
-        const res = await fetch('http://localhost:3000/api/ausencias');
-        if (!res.ok) throw new Error(`Erro ${res.status}: ${res.statusText}`);
-        const data = await res.json();
-        ausencias = Array.isArray(data) ? data : [];
+        console.log("📥 Carregando ausências do backend...");
+        const response = await fetch('http://localhost:3000/api/ausencias');
         
-        // 🔥 ATUALIZAR WINDOW
-        window.ausencias = ausencias;
+        if (!response.ok) {
+            throw new Error(`Erro ${response.status}: ${response.statusText}`);
+        }
         
-        console.log(`Ausências carregadas: ${ausencias.length}`);
-        return ausencias;
+        const data = await response.json();
+        console.log("📦 Dados brutos recebidos:", data);
+        
+        // Mapear para o formato esperado pelo frontend
+        window.ausencias = data.map(a => {
+            // Log para debug
+            console.log(`🔍 Processando ausência ID ${a.Id}:`, {
+                PeriodoTipo: a.PeriodoTipo,
+                HoraInicio: a.HoraInicio
+            });
+            
+            return {
+                // Formato com maiúsculas
+                Id: a.Id,
+                ColaboradorId: a.ColaboradorId,
+                Tipo: a.Tipo,
+                DataInicio: a.DataInicio,
+                DataFim: a.DataFim,
+                PeriodoTipo: a.PeriodoTipo || 'dia_inteiro',
+                HoraInicio: a.HoraInicio,
+                HoraFim: a.HoraFim,
+                DataCadastro: a.DataCadastro,
+                
+                // Formato com minúsculas
+                id: a.Id,
+                colaboradorId: a.ColaboradorId,
+                tipo: a.Tipo,
+                dataInicio: a.DataInicio,
+                dataFim: a.DataFim,
+                periodoTipo: a.PeriodoTipo || 'dia_inteiro',
+                horaInicio: a.HoraInicio,
+                horaFim: a.HoraFim
+            };
+        });
+        
+        console.log(`✅ Ausências carregadas e mapeadas: ${window.ausencias.length}`);
+        
+        // Verificar especificamente as com horas
+        const comHoras = window.ausencias.filter(a => a.periodoTipo === 'horas' || a.horaInicio);
+        console.log(`⏰ Ausências com horas: ${comHoras.length}`, comHoras);
+        
+        return window.ausencias;
+        
     } catch (error) {
-        console.error("Erro ao carregar ausências:", error);
-        ausencias = [];
+        console.error("❌ Erro ao carregar ausências:", error);
         window.ausencias = [];
+        mostrarToast("Erro ao carregar ausências", "error");
         return [];
     }
 }
+
 async function carregarFeriadosLocais() {
     try {
         console.log("Carregando feriados do backend...");
@@ -5307,31 +5369,61 @@ async function excluirFeriado(id) {
 
 }
 // Confirmar exclusão de feriado
-async function confirmarExclusaoFeriado(id) {
+// app.js - Verifique se a função confirmarExclusao está assim:
+
+async function confirmarExclusao() {
+    console.log("🔍 Confirmando exclusão:", { 
+        id: window.exclusaoPendenteId, 
+        tipo: window.exclusaoTipo 
+    });
+    
+    if (!window.exclusaoPendenteId) {
+        console.error("Nenhum ID pendente");
+        fecharModal('modalConfirmacao');
+        return;
+    }
+    
     try {
-        const response = await fetch(`http://localhost:3000/api/feriados/${id}`, {
+        let url;
+        if (window.exclusaoTipo === 'feriado') {
+            url = `http://localhost:3000/api/feriados/${window.exclusaoPendenteId}`;
+        } else {
+            url = `http://localhost:3000/api/ausencias/${window.exclusaoPendenteId}`;
+        }
+        
+        console.log("📤 Enviando DELETE para:", url);
+        
+        const response = await fetch(url, {
             method: 'DELETE'
         });
         
-        if (!response.ok) throw new Error("Erro ao excluir");
+        const responseText = await response.text();
+        console.log("📥 Resposta:", response.status, responseText);
         
-        await carregarFeriadosLocais();
-        await carregarListaFeriados();
-        
-        if (editandoFeriadoId === id) {
-            cancelarEdicaoFeriado();
+        if (!response.ok) {
+            throw new Error(`Erro ${response.status}: ${responseText}`);
         }
         
-        mostrarToast("Feriado excluído com sucesso!", "success");
+        // Recarregar dados
+        await atualizarTudo();
         
-        if (document.getElementById("calendar")) {
-            gerarCalendario(mesAtual, anoAtual);
-            gerarLegendaMensal();
+        // Fechar modal e resetar
+        fecharModal('modalConfirmacao');
+        window.exclusaoPendenteId = null;
+        window.exclusaoTipo = null;
+        
+        mostrarToast("Excluído com sucesso!", "success");
+        
+        // Se o modal de lançamento estiver aberto, recarregar listagens
+        const modalLancamento = document.getElementById("modalLancamento");
+        if (modalLancamento && !modalLancamento.classList.contains('hidden')) {
+            await carregarListagens();
         }
         
     } catch (error) {
-        console.error("Erro ao excluir:", error);
+        console.error("❌ Erro ao excluir:", error);
         mostrarToast(`Erro ao excluir: ${error.message}`, "error");
+        fecharModal('modalConfirmacao');
     }
 }
 
@@ -5863,7 +5955,21 @@ function configurarObservers() {
     });
 }
 
-// Chamar no DOMContentLoaded
+function getPaginaFromURL() {
+    // Pega o hash da URL, ex: #dashboard, #calendario
+    const hash = window.location.hash.substring(1); // Remove o #
+    
+    // Se não tiver hash ou for inválido, retorna dashboard
+    const paginasValidas = ['dashboard', 'calendario', 'colaboradores', 'escala', 'lancamentoPlantao', 'relatorios', 'configuracoes'];
+    
+    if (hash && paginasValidas.includes(hash)) {
+        return hash;
+    }
+    
+    return 'dashboard';
+}
+
+// Modifique o DOMContentLoaded para usar essa função
 document.addEventListener("DOMContentLoaded", async () => {
     console.log("Inicializando aplicação...");
     
@@ -5872,13 +5978,9 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     try {
         await carregarColaboradores();
-        console.log("Colaboradores carregados:", colaboradores.length);
-        
         await carregarAusencias();
-        console.log("Ausências carregadas:", ausencias.length);
-        
         await carregarFeriadosLocais();
-        console.log("Feriados locais carregados:", feriadosLocais.length);
+        await carregarPlantoes();
         
     } catch (error) {
         console.error("Erro ao carregar dados:", error);
@@ -5887,9 +5989,16 @@ document.addEventListener("DOMContentLoaded", async () => {
     
     configurarNavegacao();
     configurarModais();
-    configurarObservers(); // 🔥 NOVO
+    configurarObservers();
     
-    renderCalendario();
+    const paginaInicial = getPaginaFromURL();
+    carregarPagina(paginaInicial);
+})
+
+
+window.addEventListener('popstate', () => {
+    const pagina = getPaginaFromURL();
+    carregarPagina(pagina);
 });
 
 function testarAtualizacao() {

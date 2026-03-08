@@ -9,6 +9,16 @@ const PORT = 3000;
 app.use(cors());
 app.use(bodyParser.json());
 
+
+
+app.get('/api/test', (req, res) => {
+    res.json({ 
+        status: 'ok', 
+        message: 'API funcionando!',
+        timestamp: new Date().toISOString()
+    });
+});
+
 // Rotas existentes
 const colaboradoresRoutes = require('./routes/colaboradores');
 const ausenciasRoutes = require('./routes/ausencias');
