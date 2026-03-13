@@ -1,7 +1,5 @@
 // frontend/js/api-novo.js
 const API = {
-    // baseURL não precisa mais
-    
     // ===== COLABORADORES =====
     async getColaboradores() {
         const { data, error } = await supabaseClient
@@ -10,20 +8,35 @@ const API = {
             .order('nome')
         
         if (error) throw error
-        return data
+        
+        // MAPEAMENTO CORRETO
+        return data.map(c => ({
+            Id: c.id,
+            Nome: c.nome,
+            TrabalhoInicio: c.trabalho_inicio,
+            TrabalhoFim: c.trabalho_fim,
+            AlmocoInicio: c.almoco_inicio,
+            AlmocoFim: c.almoco_fim,
+            // Formato original (para compatibilidade)
+            id: c.id,
+            nome: c.nome,
+            trabalho_inicio: c.trabalho_inicio,
+            trabalho_fim: c.trabalho_fim,
+            almoco_inicio: c.almoco_inicio,
+            almoco_fim: c.almoco_fim
+        }))
     },
     
     async salvarColaborador(data) {
         if (data.id) {
-            // Atualizar
             const { data: result, error } = await supabaseClient
                 .from('colaboradores')
                 .update({
                     nome: data.nome,
-                    trabalho_inicio: data.trabalhoInicio,
-                    trabalho_fim: data.trabalhoFim,
-                    almoco_inicio: data.almocoInicio,
-                    almoco_fim: data.almocoFim
+                    trabalho_inicio: data.trabalhoInicio || data.trabalho_inicio,
+                    trabalho_fim: data.trabalhoFim || data.trabalho_fim,
+                    almoco_inicio: data.almocoInicio || data.almoco_inicio,
+                    almoco_fim: data.almocoFim || data.almoco_fim
                 })
                 .eq('id', data.id)
                 .select()
@@ -31,15 +44,14 @@ const API = {
             if (error) throw error
             return result[0]
         } else {
-            // Criar novo
             const { data: result, error } = await supabaseClient
                 .from('colaboradores')
                 .insert([{
                     nome: data.nome,
-                    trabalho_inicio: data.trabalhoInicio,
-                    trabalho_fim: data.trabalhoFim,
-                    almoco_inicio: data.almocoInicio,
-                    almoco_fim: data.almocoFim
+                    trabalho_inicio: data.trabalhoInicio || data.trabalho_inicio,
+                    trabalho_fim: data.trabalhoFim || data.trabalho_fim,
+                    almoco_inicio: data.almocoInicio || data.almoco_inicio,
+                    almoco_fim: data.almocoFim || data.almoco_fim
                 }])
                 .select()
             
@@ -58,7 +70,7 @@ const API = {
         return true
     },
     
-    // ===== AUSÊNCIAS =====
+    // ===== AUSÊNCIAS ===== (já está correto)
     async getAusencias() {
         const { data, error } = await supabaseClient
             .from('ausencias')
@@ -73,7 +85,6 @@ const API = {
         
         if (error) throw error
         
-        // Mapear para o formato esperado pelo app.js
         return data.map(a => ({
             Id: a.id,
             ColaboradorId: a.colaborador_id,
@@ -83,7 +94,6 @@ const API = {
             PeriodoTipo: a.periodo_tipo,
             HoraInicio: a.hora_inicio,
             HoraFim: a.hora_fim,
-            // Manter formato antigo para compatibilidade
             id: a.id,
             colaboradorId: a.colaborador_id,
             tipo: a.tipo,
@@ -107,7 +117,6 @@ const API = {
         }
         
         if (data.id) {
-            // Atualizar
             const { data: result, error } = await supabaseClient
                 .from('ausencias')
                 .update(dadosFormatados)
@@ -117,7 +126,6 @@ const API = {
             if (error) throw error
             return result[0]
         } else {
-            // Criar novo
             const { data: result, error } = await supabaseClient
                 .from('ausencias')
                 .insert([dadosFormatados])
@@ -138,7 +146,7 @@ const API = {
         return true
     },
     
-    // ===== FERIADOS =====
+    // ===== FERIADOS ===== (já está correto)
     async getFeriados() {
         const { data, error } = await supabaseClient
             .from('feriados')
@@ -147,7 +155,6 @@ const API = {
         
         if (error) throw error
         
-        // Mapear para formato esperado
         return data.map(f => ({
             Id: f.id,
             Nome: f.nome,
@@ -198,7 +205,7 @@ const API = {
         return true
     },
     
-    // ===== PLANTÕES =====
+    // ===== PLANTÕES ===== (já está correto)
     async getPlantoes() {
         const { data: plantoes, error } = await supabaseClient
             .from('plantoes')
@@ -220,7 +227,6 @@ const API = {
     },
     
     async salvarPlantao(data) {
-        // Verificar se já existe plantão para esta data
         const { data: existente } = await supabaseClient
             .from('plantoes')
             .select('id')
@@ -228,7 +234,6 @@ const API = {
             .maybeSingle()
         
         if (existente) {
-            // Atualizar existente
             await supabaseClient
                 .from('plantao_colaboradores')
                 .delete()
@@ -247,7 +252,6 @@ const API = {
             
             return { id: existente.id, dataISO: data.dataISO }
         } else {
-            // Criar novo plantão
             const { data: novoPlantao, error } = await supabaseClient
                 .from('plantoes')
                 .insert([{ data_plantao: data.dataISO }])
