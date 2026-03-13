@@ -373,18 +373,17 @@
 
 
 
-<!-- No frontend/index.html, substitua a seção de scripts por: -->
 
-<!-- Supabase CDN (OK assim) -->
+<!-- Supabase CDN -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-<!-- Seus scripts - com caminhos ABSOLUTOS corrigidos -->
-<script src="/software-escalas/frontend/js/supabase.js"></script>
-<script src="/software-escalas/frontend/js/api-novo.js"></script>
-<script src="/software-escalas/frontend/js/calendar.js"></script>
-<script src="/software-escalas/frontend/js/lancamentos.js"></script>
-<script src="/software-escalas/frontend/js/dashboard.js"></script>
-<script src="/software-escalas/frontend/js/app.js"></script>
+<!-- Seus scripts - com caminhos corrigidos (Js com J maiúsculo) -->
+<script src="/software-escalas/frontend/Js/supabase.js"></script>
+<script src="/software-escalas/frontend/Js/api-novo.js"></script>
+<script src="/software-escalas/frontend/Js/calendar.js"></script>
+<script src="/software-escalas/frontend/Js/lancamentos.js"></script>
+<script src="/software-escalas/frontend/Js/dashboard.js"></script>
+<script src="/software-escalas/frontend/Js/app.js"></script>
 
 <!-- Lucide -->
 <script src="https://unpkg.com/lucide@latest"></script>
@@ -395,7 +394,7 @@
         if (typeof lucide !== 'undefined') {
             lucide.createIcons();
         }
-        console.log('Scripts carregados com caminhos absolutos');
+        console.log('Scripts carregados com caminhos corrigidos');
     });
 </script>
 
