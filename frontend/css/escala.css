@@ -274,7 +274,7 @@
     margin: 0;
 }
 
-/* ================= RESUMO POR HORÁRIO ================= */
+/* ================= RESUMO POR HORÁRIO MELHORADO ================= */
 .resumo-container {
     background: white;
     border-radius: 24px;
@@ -311,7 +311,7 @@
 
 .resumo-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
     gap: 16px;
 }
 
@@ -336,6 +336,7 @@
     margin-bottom: 12px;
     padding-bottom: 8px;
     border-bottom: 2px dashed var(--border);
+    text-align: center;
 }
 
 .resumo-barras {
@@ -363,55 +364,120 @@
     background: linear-gradient(135deg, var(--warning) 0%, #d97706 100%);
 }
 
+.resumo-barra.folga {
+    background: #94a3b8;
+}
+
+.resumo-barra.ferias {
+    background: #3b82f6;
+}
+
+.resumo-barra.ausente {
+    background: #ef4444;
+}
+
 .resumo-barra.fora {
     background: #cbd5e1;
 }
 
 .resumo-numeros {
     display: flex;
-    justify-content: space-between;
-    font-size: 13px;
+    flex-wrap: wrap;
+    justify-content: center;
     gap: 8px;
+    margin-top: 12px;
+    padding-top: 8px;
+    border-top: 1px dashed var(--border);
 }
 
 .resumo-num {
-    display: flex;
+    display: inline-flex;
     align-items: center;
     gap: 4px;
-    padding: 4px 8px;
-    border-radius: 20px;
+    padding: 4px 10px;
+    border-radius: 30px;
     background: white;
     font-size: 12px;
+    font-weight: 500;
+    box-shadow: var(--shadow-sm);
 }
 
 .resumo-num i {
     font-size: 11px;
 }
 
-.trabalhando-num {
+.resumo-num.trabalhando-num {
+    background: var(--primary-soft);
+    color: var(--primary-dark);
+    border: 1px solid var(--primary);
+}
+
+.resumo-num.almoco-num {
+    background: var(--warning-soft);
+    color: #b45309;
+    border: 1px solid var(--warning);
+}
+
+.resumo-num.folga-num {
+    background: #f1f5f9;
+    color: #475569;
+    border: 1px solid #cbd5e1;
+}
+
+.resumo-num.ferias-num {
+    background: #dbeafe;
+    color: #1e40af;
+    border: 1px solid #3b82f6;
+}
+
+.resumo-num.ausente-num {
+    background: #fee2e2;
+    color: #b91c1c;
+    border: 1px solid #ef4444;
+}
+
+.resumo-num.fora-num {
+    background: #f1f5f9;
+    color: #64748b;
+    border: 1px solid #cbd5e1;
+}
+
+/* Tema escuro para o resumo */
+[data-theme="dark"] .resumo-num {
+    background: var(--card);
+    color: var(--text);
+    border-color: var(--border);
+}
+
+[data-theme="dark"] .resumo-num.trabalhando-num {
+    background: var(--primary-soft);
     color: var(--primary);
-    border: 1px solid var(--primary-soft);
+    border-color: var(--primary);
 }
 
-.almoco-num {
+[data-theme="dark"] .resumo-num.almoco-num {
+    background: var(--warning-soft);
     color: var(--warning);
-    border: 1px solid var(--warning-soft);
+    border-color: var(--warning);
 }
 
-.fora-num {
-    color: var(--text-lighter);
-    border: 1px solid var(--border);
+[data-theme="dark"] .resumo-num.folga-num {
+    background: #334155;
+    color: #cbd5e1;
+    border-color: #475569;
 }
 
-.resumo-empty {
-    text-align: center;
-    padding: 40px;
-    color: var(--text-light);
-    background: var(--card-dark);
-    border-radius: 16px;
-    font-size: 14px;
+[data-theme="dark"] .resumo-num.ferias-num {
+    background: #1e3a8a;
+    color: #bfdbfe;
+    border-color: #3b82f6;
 }
 
+[data-theme="dark"] .resumo-num.ausente-num {
+    background: #7f1d1d;
+    color: #fecaca;
+    border-color: #ef4444;
+}
 /* ================= LEGENDA E ESTATÍSTICAS ================= */
 .escala-footer {
     display: grid;
@@ -809,4 +875,387 @@
 
 [data-theme="dark"] .stat-value {
     color: var(--text);
+}
+
+/* ================= SELETOR DE DATA ================= */
+.data-selector {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 8px;
+    background: var(--card);
+    padding: 8px 16px;
+    border-radius: 50px;
+    border: 1px solid var(--border);
+    width: fit-content;
+}
+
+.data-selector i {
+    color: var(--primary);
+    font-size: 18px;
+}
+
+.data-selector input[type="date"] {
+    border: none;
+    background: transparent;
+    padding: 8px;
+    font-size: 14px;
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+}
+
+.data-selector button {
+    margin-left: 8px;
+}
+
+/* ================= LEGENDA DA TIMELINE ================= */
+.legenda-timeline {
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+    background: var(--card);
+    padding: 12px 20px;
+    border-radius: 50px;
+    border: 1px solid var(--border);
+}
+
+.legenda-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: var(--text-light);
+}
+
+.legenda-item .cor {
+    width: 16px;
+    height: 16px;
+    border-radius: 4px;
+}
+
+.legenda-item .cor.trabalhando {
+    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+}
+
+.legenda-item .cor.almoco {
+    background: linear-gradient(135deg, var(--warning) 0%, #d97706 100%);
+}
+
+.legenda-item .cor.folga {
+    background: #94a3b8;
+}
+
+.legenda-item .cor.ferias {
+    background: #3b82f6;
+    opacity: 0.7;
+}
+
+.legenda-item .cor.ausencia-parcial {
+    background: #ef4444;
+    opacity: 0.7;
+}
+
+.legenda-item .cor.fora {
+    background: #475569;
+    border: 2px dashed #94a3b8;
+}
+
+/* ======== NOVAS CORES PARA A TIMELINE ======== */
+.timeline-cell.folga::after {
+    content: "";
+    position: absolute;
+    inset: 6px;
+    background: #94a3b8;
+    border-radius: 12px;
+    opacity: 0.5;
+}
+
+.timeline-cell.ferias::after {
+    content: "";
+    position: absolute;
+    inset: 6px;
+    background: #3b82f6;
+    border-radius: 12px;
+    opacity: 0.7;
+}
+
+.timeline-cell.ausencia-parcial::after {
+    content: "";
+    position: absolute;
+    inset: 6px;
+    background: #ef4444;
+    border-radius: 12px;
+    opacity: 0.7;
+}
+
+/* Tooltip com informações */
+.timeline-cell[data-tooltip] {
+    position: relative;
+}
+
+.timeline-cell[data-tooltip]:hover::before {
+    content: attr(data-tooltip);
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--card);
+    color: var(--text);
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-size: 12px;
+    white-space: nowrap;
+    box-shadow: var(--shadow-lg);
+    border: 1px solid var(--border);
+    z-index: 1000;
+    margin-bottom: 8px;
+}
+
+.timeline-cell[data-tooltip]:hover::after {
+    content: '';
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    border: 6px solid transparent;
+    border-top-color: var(--card);
+    margin-bottom: -4px;
+}
+/* Adicionar no escala.css */
+.resumo-barra.folga {
+    background: #94a3b8;
+}
+
+.resumo-barra.ferias {
+    background: #3b82f6;
+}
+
+.resumo-barra.ausente {
+    background: #ef4444;
+}
+
+.folga-num {
+    color: #64748b;
+    border: 1px solid #cbd5e1;
+}
+
+.ferias-num {
+    color: #3b82f6;
+    border: 1px solid #bfdbfe;
+}
+
+.ausente-num {
+    color: #ef4444;
+    border: 1px solid #fee2e2;
+}
+
+/* ================= LINHA DE TOTAL ================= */
+.timeline-row.total-row {
+    background: linear-gradient(135deg, var(--primary-soft) 0%, var(--card) 100%);
+    border: 2px solid var(--primary);
+    margin-top: 16px;
+    position: sticky;
+    bottom: 0;
+    z-index: 10;
+}
+
+.timeline-name.total-nome {
+    background: var(--primary);
+    color: white;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.timeline-name.total-nome i {
+    color: white;
+}
+
+.total-colaboradores {
+    background: rgba(255, 255, 255, 0.2);
+    padding: 2px 8px;
+    border-radius: 20px;
+    font-size: 11px;
+    margin-left: auto;
+}
+
+.total-cell {
+    background: var(--card);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 4px;
+}
+
+.total-info {
+    display: flex;
+    gap: 6px;
+    font-size: 11px;
+    font-weight: 600;
+}
+
+.total-ocupados {
+    color: var(--primary);
+    background: var(--primary-soft);
+    padding: 2px 6px;
+    border-radius: 12px;
+}
+
+.total-ausentes {
+    color: #b45309;
+    background: #fffbeb;
+    padding: 2px 6px;
+    border-radius: 12px;
+}
+
+.total-livres {
+    color: #64748b;
+    background: #f1f5f9;
+    padding: 2px 6px;
+    border-radius: 12px;
+}
+
+/* Tema escuro */
+[data-theme="dark"] .total-row {
+    background: linear-gradient(135deg, var(--primary-soft) 0%, var(--card-dark) 100%);
+}
+
+[data-theme="dark"] .total-ocupados {
+    background: var(--primary-soft);
+    color: var(--primary);
+}
+
+[data-theme="dark"] .total-ausentes {
+    background: #422006;
+    color: #fbbf24;
+}
+
+[data-theme="dark"] .total-livres {
+    background: #1e293b;
+    color: #94a3b8;
+}
+
+/* Adicionar no escala.css */
+
+/* Ajustar grid para incluir a coluna de total */
+.timeline-header {
+    display: grid;
+    grid-template-columns: 260px 80px repeat(12, 1fr); /* Coluna extra de 80px para o total */
+}
+
+.timeline-row {
+    display: grid;
+    grid-template-columns: 260px 80px repeat(12, 1fr);
+}
+
+/* Estilo para o cabeçalho do total */
+.total-header {
+    background: var(--primary);
+    color: white !important;
+    font-weight: 700;
+}
+
+/* Célula de total de horas */
+.total-cell {
+    background: var(--card-dark);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    border-right: 2px solid var(--border);
+    position: relative;
+}
+
+.total-valor {
+    font-size: 14px;
+    color: var(--text);
+    background: var(--card);
+    padding: 4px 8px;
+    border-radius: 20px;
+    box-shadow: var(--shadow-sm);
+}
+
+.total-cell.total-zero .total-valor {
+    background: #fee2e2;
+    color: #dc2626;
+}
+
+.total-cell.total-parcial .total-valor {
+    background: #fef3c7;
+    color: #b45309;
+}
+
+/* Tooltip para o total */
+.total-cell[title] {
+    position: relative;
+    cursor: help;
+}
+
+.total-cell[title]:hover::after {
+    content: attr(title);
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--card);
+    color: var(--text);
+    padding: 6px 10px;
+    border-radius: 6px;
+    font-size: 11px;
+    white-space: nowrap;
+    box-shadow: var(--shadow-lg);
+    border: 1px solid var(--border);
+    z-index: 1000;
+    margin-bottom: 5px;
+}
+
+/* Tema escuro */
+[data-theme="dark"] .total-valor {
+    background: var(--card);
+    color: var(--text);
+}
+
+[data-theme="dark"] .total-cell.total-zero .total-valor {
+    background: #7f1d1d;
+    color: #fecaca;
+}
+
+[data-theme="dark"] .total-cell.total-parcial .total-valor {
+    background: #78350f;
+    color: #fde68a;
+}
+.total-geral {
+    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+}
+
+.total-geral-valor {
+    background: white !important;
+    color: var(--primary-dark) !important;
+    font-size: 16px !important;
+    font-weight: 800 !important;
+}
+
+[data-theme="dark"] .total-geral-valor {
+    background: var(--card) !important;
+    color: var(--primary) !important;
+}
+/* Garantir que todas as linhas usem o mesmo grid */
+.timeline-header,
+.timeline-row {
+    display: grid;
+    grid-template-columns: 260px 80px repeat(12, 1fr) !important;
+    width: 100%;
+}
+
+/* Garantir que as células do total tenham o mesmo tamanho */
+.total-cell {
+    min-width: 80px;
+    max-width: 80px;
+}
+
+/* Ajustar para quando não houver dados */
+.timeline-row:has(.empty-state) {
+    display: block;
 }

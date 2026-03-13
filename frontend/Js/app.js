@@ -1195,19 +1195,34 @@ async function carregarFeriadosLocais() {
 =========================== */
 async function renderEscalaDia() {
     await carregarColaboradores();
+    await carregarAusencias();
 
     const hoje = new Date();
-    const dataFormatada = hoje.toLocaleDateString("pt-BR", {
-        weekday: 'long',
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric'
-    });
+    const dataHoje = hoje.toISOString().split('T')[0];
+    
+    // Salvar a data atual no escopo global para a timeline
+    window.dataEscalaSelecionada = dataHoje;
 
     appContent.innerHTML = `
         <div class="page-header">
-            <h1>Escala do Dia</h1>
-            <p>${dataFormatada}</p>
+            <div>
+                <h1>Escala do Dia</h1>
+                <div class="data-selector">
+                    <i class="fas fa-calendar-alt"></i>
+                    <input type="date" id="seletorDataEscala" value="${dataHoje}" class="form-control">
+                    <button id="btnCarregarEscala" class="btn-primary">
+                        <i class="fas fa-search"></i> Ver Escala
+                    </button>
+                </div>
+            </div>
+            <div class="legenda-timeline">
+                <span class="legenda-item"><span class="cor trabalhando"></span> Trabalhando</span>
+                <span class="legenda-item"><span class="cor almoco"></span> Almoço</span>
+                <span class="legenda-item"><span class="cor folga"></span> Folga</span>
+                <span class="legenda-item"><span class="cor ferias"></span> Férias</span>
+                <span class="legenda-item"><span class="cor ausencia-parcial"></span> Ausência Parcial</span>
+                <span class="legenda-item"><span class="cor fora"></span> Fora</span>
+            </div>
         </div>
 
         <div class="escala-layout">
@@ -1228,7 +1243,7 @@ async function renderEscalaDia() {
             </div>
         </div>
 
-        <!-- RESUMO POR HORÁRIO OCUPANDO O ESPAÇO TODO -->
+        <!-- RESUMO POR HORÁRIO -->
         <div class="resumo-container" id="resumoContainer">
             <div class="resumo-header">
                 <i class="fas fa-chart-pie"></i>
@@ -1238,8 +1253,23 @@ async function renderEscalaDia() {
         </div>
     `;
 
+    // Adicionar evento ao botão e ao input
+    document.getElementById('btnCarregarEscala').addEventListener('click', () => {
+        const novaData = document.getElementById('seletorDataEscala').value;
+        if (novaData) {
+            window.dataEscalaSelecionada = novaData;
+            gerarHeaderTimeline();
+            gerarTimelineVisualComAusencias();
+            gerarResumoHorarios();
+        }
+    });
+
+    document.getElementById('seletorDataEscala').addEventListener('change', (e) => {
+        window.dataEscalaSelecionada = e.target.value;
+    });
+
     gerarHeaderTimeline();
-    gerarTimelineVisual();
+    gerarTimelineVisualComAusencias();
     gerarResumoHorarios();
     configurarSidebarEditor();
 }
@@ -1263,12 +1293,271 @@ function configurarSidebarEditor() {
     });
 }
 
+function gerarTimelineVisualComAusencias() {
+    const body = document.getElementById("timelineBody");
+    if (!body) return;
+
+    body.innerHTML = "";
+
+    if (!colaboradores || colaboradores.length === 0) {
+        body.innerHTML = '<div class="empty-state">Nenhum colaborador cadastrado</div>';
+        return;
+    }
+
+    const dataSelecionada = window.dataEscalaSelecionada || new Date().toISOString().split('T')[0];
+    const dataObj = new Date(dataSelecionada + 'T12:00:00');
+    
+    console.log(`📅 Gerando escala para: ${dataSelecionada}`);
+
+    colaboradores.forEach(c => {
+        const trabInicio = obterHoraNumerica(c.TrabalhoInicio);
+        const trabFim = obterHoraNumerica(c.TrabalhoFim);
+        const almInicio = obterHoraNumerica(c.AlmocoInicio);
+        const almFim = obterHoraNumerica(c.AlmocoFim);
+
+        // Buscar ausências do colaborador para esta data
+        const ausenciasDoDia = window.ausencias?.filter(a => {
+            if ((a.colaboradorId || a.ColaboradorId) !== c.Id) return false;
+            
+            const dataInicio = new Date(a.DataInicio || a.dataInicio);
+            const dataFim = new Date(a.DataFim || a.dataFim);
+            
+            dataInicio.setHours(0, 0, 0, 0);
+            dataFim.setHours(0, 0, 0, 0);
+            const dataComp = new Date(dataSelecionada);
+            dataComp.setHours(0, 0, 0, 0);
+            
+            return dataComp >= dataInicio && dataComp <= dataFim;
+        }) || [];
+
+        let tipoAusenciaDia = null;
+        let horasAusencia = null;
+        
+        if (ausenciasDoDia.length > 0) {
+            const ausencia = ausenciasDoDia[0];
+            tipoAusenciaDia = (ausencia.tipo || ausencia.Tipo || '').toLowerCase();
+            
+            if (ausencia.periodoTipo === 'horas' || ausencia.PeriodoTipo === 'horas') {
+                const horaInicio = ausencia.horaInicio || ausencia.HoraInicio;
+                const horaFim = ausencia.horaFim || ausencia.HoraFim;
+                
+                if (horaInicio && horaFim) {
+                    horasAusencia = {
+                        inicio: obterHoraNumerica(horaInicio),
+                        fim: obterHoraNumerica(horaFim)
+                    };
+                }
+            }
+        }
+ 
+        const horasTrabalhadas = calcularHorasTrabalhadas(c, dataSelecionada, ausenciasDoDia);
+        
+        const horasFormatadas = horasTrabalhadas % 1 === 0 
+            ? `${horasTrabalhadas}h` 
+            : `${horasTrabalhadas.toFixed(1)}h`;
+
+        const row = document.createElement("div");
+        row.classList.add("timeline-row");
+        row.setAttribute('data-colaborador-id', c.Id);
+
+        // Nome do colaborador (ocupa primeira coluna)
+        let html = `<div class="timeline-name" onclick="abrirEditorNaEscala(${c.Id})">
+            <i class="fas fa-user"></i> 
+            <span>${c.Nome || 'Sem nome'}</span>
+            <i class="fas fa-pen edit-indicator"></i>
+        </div>`;
+
+        // ===== COLUNA DE TOTAL DE HORAS =====
+        let totalClass = 'total-cell';
+        let totalTooltip = `${horasFormatadas} trabalhadas`;
+
+        if (horasTrabalhadas === 0) {
+            totalClass += ' total-zero';
+            if (tipoAusenciaDia === 'ferias') totalTooltip = 'Férias - 0h';
+            else if (tipoAusenciaDia === 'folga') totalTooltip = 'Folga - 0h';
+            else if (tipoAusenciaDia === 'ausencia') totalTooltip = 'Ausente - 0h';
+            else totalTooltip = 'Não trabalha hoje - 0h';
+        } else if (horasTrabalhadas < (trabFim - trabInicio - ((almFim - almInicio) || 0))) {
+            totalClass += ' total-parcial';
+            totalTooltip = `Parcial: ${horasFormatadas} (esperado ${(trabFim - trabInicio - ((almFim - almInicio) || 0)).toFixed(1)}h)`;
+        }
+
+        html += `<div class="timeline-cell ${totalClass}" title="${totalTooltip}">
+            <span class="total-valor">${horasFormatadas}</span>
+        </div>`;
+
+        // Gerar células para cada hora
+        for (let hora = 7; hora <= 18; hora++) {
+            let classe = "fora-expediente";
+            let tooltip = `${hora}:00 - `;
+            let status = "Fora do expediente";
+
+            if (tipoAusenciaDia === 'ferias' && !horasAusencia) {
+                classe = "ferias";
+                status = "Férias (dia inteiro)";
+            } 
+            else if (tipoAusenciaDia === 'folga' && !horasAusencia) {
+                classe = "folga";
+                status = "Folga (dia inteiro)";
+            }
+            else if (tipoAusenciaDia === 'ausencia' && !horasAusencia) {
+                classe = "folga";
+                status = "Ausente (dia inteiro)";
+            }
+            else {
+                const noTrabalho = trabInicio !== null && trabFim !== null && 
+                                  hora >= trabInicio && hora < trabFim;
+                
+                const noAlmoco = almInicio !== null && almFim !== null && 
+                                hora >= almInicio && hora < almFim;
+
+                if (horasAusencia && hora >= horasAusencia.inicio && hora < horasAusencia.fim) {
+                    classe = "ausencia-parcial";
+                    status = `Ausente (${hora}:00-${horasAusencia.fim}:00)`;
+                }
+                else if (noAlmoco) {
+                    classe = "almoco";
+                    status = "Horário de almoço";
+                }
+                else if (noTrabalho) {
+                    classe = "trabalhando";
+                    status = "Trabalhando";
+                }
+            }
+
+            tooltip += status;
+            html += `<div class="timeline-cell ${classe}" title="${tooltip}"></div>`;
+        }
+
+        row.innerHTML = html;
+        body.appendChild(row);
+    });
+
+    adicionarLinhaTotalizador();
+}
+
+// Função separada para o totalizador
+
+function adicionarLinhaTotalizador() {
+    const body = document.getElementById("timelineBody");
+    if (!body) return;
+
+    // Remover linha anterior
+    const linhaAnterior = document.getElementById('linha-total-timeline');
+    if (linhaAnterior) linhaAnterior.remove();
+
+    // Calcular totais
+    const totaisPorHora = [];
+    let totalHorasDia = 0;
+    
+    for (let hora = 7; hora <= 18; hora++) {
+        totaisPorHora.push({
+            hora: hora,
+            total: 0,
+            trabalhando: 0,
+            almoco: 0,
+            folga: 0,
+            ferias: 0,
+            ausente: 0,
+            fora: 0
+        });
+    }
+
+    // Coletar dados
+    document.querySelectorAll('.timeline-row').forEach(row => {
+        if (row.id === 'linha-total-timeline') return;
+        
+        // Total de horas do colaborador
+        const totalCell = row.querySelector('.total-cell .total-valor');
+        if (totalCell) {
+            const horasText = totalCell.textContent;
+            const horas = parseFloat(horasText.replace('h', ''));
+            if (!isNaN(horas)) {
+                totalHorasDia += horas;
+            }
+        }
+        
+        // Contagem por hora
+        const cells = row.querySelectorAll('.timeline-cell:not(.total-cell)');
+        cells.forEach((cell, index) => {
+            if (index < totaisPorHora.length) {
+                if (cell.classList.contains('trabalhando')) totaisPorHora[index].trabalhando++;
+                else if (cell.classList.contains('almoco')) totaisPorHora[index].almoco++;
+                else if (cell.classList.contains('folga')) totaisPorHora[index].folga++;
+                else if (cell.classList.contains('ferias')) totaisPorHora[index].ferias++;
+                else if (cell.classList.contains('ausencia-parcial')) totaisPorHora[index].ausente++;
+                else if (cell.classList.contains('fora-expediente')) totaisPorHora[index].fora++;
+                
+                totaisPorHora[index].total++;
+            }
+        });
+    });
+
+    // Criar linha de total
+    const totalRow = document.createElement("div");
+    totalRow.id = 'linha-total-timeline';
+    totalRow.classList.add("timeline-row", "total-row");
+
+    // Nome da linha
+    let html = `<div class="timeline-name total-nome">
+        <i class="fas fa-chart-bar"></i>
+        <span><strong>TOTAL</strong></span>
+        <span class="total-colaboradores">${colaboradores.length} colab.</span>
+    </div>`;
+
+    // Coluna de total de horas
+    const horasFormatadas = totalHorasDia % 1 === 0 
+        ? `${totalHorasDia}h` 
+        : `${totalHorasDia.toFixed(1)}h`;
+    
+    html += `<div class="timeline-cell total-cell total-geral" title="Total de horas trabalhadas no dia">
+        <span class="total-valor total-geral-valor">${horasFormatadas}</span>
+    </div>`;
+
+    // Colunas por hora
+    totaisPorHora.forEach(item => {
+        html += `
+            <div class="timeline-cell total-cell" title="${item.hora}:00">
+                <div class="total-info">
+                    <span class="total-ocupados" title="Trabalhando: ${item.trabalhando} | Almoço: ${item.almoco}">
+                        👔 ${item.trabalhando + item.almoco}
+                    </span>
+                    <span class="total-ausentes" title="Folga: ${item.folga} | Férias: ${item.ferias} | Ausente: ${item.ausente}">
+                        🌴 ${item.folga + item.ferias + item.ausente}
+                    </span>
+                    <span class="total-livres" title="Fora: ${item.fora}">
+                        ⚪ ${item.fora}
+                    </span>
+                </div>
+            </div>
+        `;
+    });
+
+    totalRow.innerHTML = html;
+    body.appendChild(totalRow);
+}
+// Adicione esta função utilitária se não existir
+function formatarHoraNumerica(horas) {
+    if (horas === null || horas === undefined) return '';
+    return `${Math.floor(horas).toString().padStart(2, '0')}:00`;
+}
+
+// app.js - Função gerarHeaderTimeline corrigida
+
 function gerarHeaderTimeline() {
     const header = document.getElementById("timelineHeader");
     if (!header) return;
 
-    header.innerHTML = '<div class="timeline-name-header">Colaborador</div>';
+    // Limpar header
+    header.innerHTML = '';
+    
+    // Coluna do colaborador
+    header.innerHTML += '<div class="timeline-name-header">Colaborador</div>';
+    
+    // Coluna de total de horas
+    header.innerHTML += '<div class="hora-header total-header" title="Total de horas trabalhadas no dia">Total</div>';
 
+    // Colunas das horas
     for (let hora = 7; hora <= 18; hora++) {
         header.innerHTML += `
             <div class="hora-header">
@@ -1276,6 +1565,75 @@ function gerarHeaderTimeline() {
             </div>
         `;
     }
+    
+    console.log("✅ Header da timeline gerado com coluna de total");
+}
+
+// app.js - Função para calcular horas trabalhadas no dia
+
+function calcularHorasTrabalhadas(colaborador, dataSelecionada, ausenciasDoDia) {
+    // Horário base do colaborador
+    const trabInicio = obterHoraNumerica(colaborador.TrabalhoInicio);
+    const trabFim = obterHoraNumerica(colaborador.TrabalhoFim);
+    const almInicio = obterHoraNumerica(colaborador.AlmocoInicio);
+    const almFim = obterHoraNumerica(colaborador.AlmocoFim);
+    
+    // Se não tem horário definido
+    if (trabInicio === null || trabFim === null) return 0;
+    
+    // Duração total do expediente (em horas)
+    let horasTrabalho = trabFim - trabInicio;
+    
+    // Subtrair almoço se existir
+    if (almInicio !== null && almFim !== null) {
+        horasTrabalho -= (almFim - almInicio);
+    }
+    
+    // Verificar ausências
+    if (ausenciasDoDia.length > 0) {
+        const ausencia = ausenciasDoDia[0];
+        const tipoAusencia = (ausencia.tipo || ausencia.Tipo || '').toLowerCase();
+        const periodoTipo = ausencia.periodoTipo || ausencia.PeriodoTipo || 'dia_inteiro';
+        
+        // Ausência dia inteiro
+        if (periodoTipo === 'dia_inteiro') {
+            return 0;
+        }
+        
+        // Ausência parcial (horas específicas)
+        if (periodoTipo === 'horas') {
+            const horaInicioAusencia = obterHoraNumerica(ausencia.horaInicio || ausencia.HoraInicio);
+            const horaFimAusencia = obterHoraNumerica(ausencia.horaFim || ausencia.HoraFim);
+            
+            if (horaInicioAusencia !== null && horaFimAusencia !== null) {
+                // Calcular interseção entre horário de trabalho e ausência
+                const inicioAusencia = Math.max(trabInicio, horaInicioAusencia);
+                const fimAusencia = Math.min(trabFim, horaFimAusencia);
+                
+                if (fimAusencia > inicioAusencia) {
+                    const horasAusentes = fimAusencia - inicioAusencia;
+                    
+                    // Ajustar se a ausência cobre parte do almoço
+                    if (almInicio !== null && almFim !== null) {
+                        const inicioAlmocoAusencia = Math.max(almInicio, horaInicioAusencia);
+                        const fimAlmocoAusencia = Math.min(almFim, horaFimAusencia);
+                        
+                        if (fimAlmocoAusencia > inicioAlmocoAusencia) {
+                            // A ausência já cobre parte do almoço, não precisa subtrair novamente
+                            horasTrabalho -= horasAusentes;
+                        } else {
+                            horasTrabalho -= horasAusentes;
+                        }
+                    } else {
+                        horasTrabalho -= horasAusentes;
+                    }
+                }
+            }
+        }
+    }
+    
+    // Garantir que não fique negativo
+    return Math.max(0, horasTrabalho);
 }
 
 function gerarTimelineVisual() {
@@ -1445,6 +1803,8 @@ function abrirEditorColaborador(id) {
     }
 }
 
+// app.js - Função salvarEditorColaborador corrigida
+
 async function salvarEditorColaborador(id) {
     const trabalhoInicio = document.getElementById(`editTrabInicio-${id}`)?.value;
     const trabalhoFim = document.getElementById(`editTrabFim-${id}`)?.value;
@@ -1466,7 +1826,13 @@ async function salvarEditorColaborador(id) {
         if (!response.ok) throw new Error("Erro ao salvar");
 
         await carregarColaboradores();
-        gerarTimelineVisual();
+        
+        // 🔥 IMPORTANTE: Regenerar o header com a coluna de total
+        gerarHeaderTimeline();
+        
+        // Gerar a timeline com as ausências
+        gerarTimelineVisualComAusencias();
+        
         gerarResumoHorarios();
         fecharEditor();
         mostrarToast("Horários salvos com sucesso!", "success");
@@ -1764,6 +2130,9 @@ function gerarResumoHorarios() {
         return;
     }
 
+    const dataSelecionada = window.dataEscalaSelecionada || new Date().toISOString().split('T')[0];
+    const dataObj = new Date(dataSelecionada + 'T12:00:00');
+
     // Cria array para contar colaboradores por hora
     const contagemPorHora = [];
 
@@ -1772,20 +2141,75 @@ function gerarResumoHorarios() {
             hora: hora,
             trabalhando: 0,
             almoco: 0,
+            folga: 0,
+            ferias: 0,
+            ausente: 0,
             fora: 0
         });
     }
 
-    // Conta colaboradores em cada hora
+    // Conta colaboradores em cada hora considerando ausências
     colaboradores.forEach(c => {
         const trabInicio = obterHoraNumerica(c.TrabalhoInicio);
         const trabFim = obterHoraNumerica(c.TrabalhoFim);
         const almInicio = obterHoraNumerica(c.AlmocoInicio);
         const almFim = obterHoraNumerica(c.AlmocoFim);
 
+        // Buscar ausências do colaborador para esta data
+        const ausenciasDoDia = window.ausencias?.filter(a => {
+            if ((a.colaboradorId || a.ColaboradorId) !== c.Id) return false;
+            
+            const dataInicio = new Date(a.DataInicio || a.dataInicio);
+            const dataFim = new Date(a.DataFim || a.dataFim);
+            
+            dataInicio.setHours(0, 0, 0, 0);
+            dataFim.setHours(0, 0, 0, 0);
+            const dataComp = new Date(dataSelecionada);
+            dataComp.setHours(0, 0, 0, 0);
+            
+            return dataComp >= dataInicio && dataComp <= dataFim;
+        }) || [];
+
+        let tipoAusenciaDia = null;
+        let horasAusencia = null;
+        
+        if (ausenciasDoDia.length > 0) {
+            const ausencia = ausenciasDoDia[0];
+            tipoAusenciaDia = (ausencia.tipo || ausencia.Tipo || '').toLowerCase();
+            
+            if (ausencia.periodoTipo === 'horas' || ausencia.PeriodoTipo === 'horas') {
+                const horaInicio = ausencia.horaInicio || ausencia.HoraInicio;
+                const horaFim = ausencia.horaFim || ausencia.HoraFim;
+                
+                if (horaInicio && horaFim) {
+                    horasAusencia = {
+                        inicio: obterHoraNumerica(horaInicio),
+                        fim: obterHoraNumerica(horaFim)
+                    };
+                }
+            }
+        }
+
         for (let hora = 7; hora <= 18; hora++) {
             const index = hora - 7;
             
+            // Verificar ausência dia inteiro
+            if (tipoAusenciaDia === 'ferias' && !horasAusencia) {
+                contagemPorHora[index].ferias++;
+                continue;
+            }
+            else if ((tipoAusenciaDia === 'folga' || tipoAusenciaDia === 'ausencia') && !horasAusencia) {
+                contagemPorHora[index].folga++;
+                continue;
+            }
+            
+            // Verificar ausência parcial
+            if (horasAusencia && hora >= horasAusencia.inicio && hora < horasAusencia.fim) {
+                contagemPorHora[index].ausente++;
+                continue;
+            }
+            
+            // Verificar horário normal
             const noAlmoco = almInicio !== null && almFim !== null && 
                             hora >= almInicio && hora < almFim;
             
@@ -1802,11 +2226,11 @@ function gerarResumoHorarios() {
         }
     });
 
-    // Gera o HTML do resumo
+    // Gerar o HTML do resumo
     let html = '';
     
     contagemPorHora.forEach(item => {
-        const total = item.trabalhando + item.almoco + item.fora;
+        const total = item.trabalhando + item.almoco + item.folga + item.ferias + item.ausente + item.fora;
         
         html += `
             <div class="resumo-card">
@@ -1815,19 +2239,19 @@ function gerarResumoHorarios() {
                     <div class="resumo-barra-container">
                         <div class="resumo-barra trabalhando" style="width: ${(item.trabalhando / total) * 100}%" title="Trabalhando: ${item.trabalhando}"></div>
                         <div class="resumo-barra almoco" style="width: ${(item.almoco / total) * 100}%" title="Almoço: ${item.almoco}"></div>
+                        <div class="resumo-barra folga" style="width: ${(item.folga / total) * 100}%" title="Folga: ${item.folga}"></div>
+                        <div class="resumo-barra ferias" style="width: ${(item.ferias / total) * 100}%" title="Férias: ${item.ferias}"></div>
+                        <div class="resumo-barra ausente" style="width: ${(item.ausente / total) * 100}%" title="Ausente: ${item.ausente}"></div>
                         <div class="resumo-barra fora" style="width: ${(item.fora / total) * 100}%" title="Fora: ${item.fora}"></div>
                     </div>
                 </div>
                 <div class="resumo-numeros">
-                    <span class="resumo-num trabalhando-num" title="Trabalhando">
-                        <i class="fas fa-briefcase"></i> ${item.trabalhando}
-                    </span>
-                    <span class="resumo-num almoco-num" title="Almoço">
-                        <i class="fas fa-utensils"></i> ${item.almoco}
-                    </span>
-                    <span class="resumo-num fora-num" title="Fora">
-                        <i class="fas fa-clock"></i> ${item.fora}
-                    </span>
+                    <span class="resumo-num trabalhando-num" title="Trabalhando"><i class="fas fa-briefcase"></i> ${item.trabalhando}</span>
+                    <span class="resumo-num almoco-num" title="Almoço"><i class="fas fa-utensils"></i> ${item.almoco}</span>
+                    <span class="resumo-num folga-num" title="Folga"><i class="fas fa-leaf"></i> ${item.folga}</span>
+                    <span class="resumo-num ferias-num" title="Férias"><i class="fas fa-umbrella-beach"></i> ${item.ferias}</span>
+                    <span class="resumo-num ausente-num" title="Ausente"><i class="fas fa-exclamation-triangle"></i> ${item.ausente}</span>
+                    <span class="resumo-num fora-num" title="Fora"><i class="fas fa-clock"></i> ${item.fora}</span>
                 </div>
             </div>
         `;
@@ -1835,6 +2259,7 @@ function gerarResumoHorarios() {
 
     resumoGrid.innerHTML = html;
 }
+
 // Função para a escala do dia (renomeada)
 function abrirEditorNaEscala(id) {
     const c = colaboradores.find(x => x.Id === id);

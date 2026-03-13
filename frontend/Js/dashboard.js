@@ -410,10 +410,10 @@ async function buscarProximosEventos() {
     // Ordenar por data
     eventos.sort((a, b) => a.data - b.data);
     
-    return eventos.slice(0, 10); // Retornar apenas os 10 primeiros
+    return eventos.slice(0, 10); 
 }
 
-// Função para gerar item de evento
+
 function gerarEventItem(evento) {
     const dia = evento.data.getDate().toString().padStart(2, '0');
     const mes = (evento.data.getMonth() + 1).toString().padStart(2, '0');

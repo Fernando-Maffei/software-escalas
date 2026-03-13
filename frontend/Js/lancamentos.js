@@ -866,8 +866,7 @@ function editarLancamento(tipo, id) {
         const periodoTipo = item.periodoTipo || item.PeriodoTipo || 'dia_inteiro';
         document.getElementById("periodoTipo").value = periodoTipo;
         document.getElementById("periodoTipo").dispatchEvent(new Event('change'));
-        
-        // ===== CORREÇÃO AQUI: Usar a MESMA função dos cards =====
+
         if (periodoTipo === 'horas') {
             // Extrair horas usando a função que já funciona nos cards
             const horaInicioFormatada = formatarHoraParaExibicao(item.horaInicio || item.HoraInicio);
