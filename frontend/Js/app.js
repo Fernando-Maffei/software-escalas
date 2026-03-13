@@ -5468,27 +5468,19 @@ function gerarHTMLCompletoPDF(dados) {
 // Carregar feriados locais do backend
 async function carregarFeriadosLocais() {
     try {
-        console.log("Carregando feriados do backend...");
-        const response = await fetch('http://localhost:3000/api/feriados');
+        console.log("📅 Carregando feriados do Supabase...");
+        const data = await API.getFeriados();
         
-        if (!response.ok) {
-            throw new Error(`Erro ${response.status}: ${response.statusText}`);
-        }
-        
-        const data = await response.json();
         feriadosLocais = Array.isArray(data) ? data : [];
-        
-        // 🔥 ATUALIZAR A VARIÁVEL GLOBAL
         window.feriadosLocais = feriadosLocais;
         
-        console.log(`Feriados locais carregados: ${feriadosLocais.length}`);
+        console.log(`✅ Feriados locais carregados: ${feriadosLocais.length}`);
         return feriadosLocais;
-        
     } catch (error) {
-        console.error("Erro ao carregar feriados locais:", error);
+        console.error("❌ Erro ao carregar feriados locais:", error);
         feriadosLocais = [];
         window.feriadosLocais = [];
-        mostrarToast("Erro ao carregar feriados do banco", "error");
+        mostrarToast("Erro ao carregar feriados", "error");
         return [];
     }
 }
