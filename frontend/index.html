@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Software de Escalas</title>
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="/software-escalas/frontend/style.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
@@ -372,16 +372,19 @@
 <div id="toastContainer" style="position: fixed; bottom: 20px; right: 20px; z-index: 9999;"></div>
 
 
-<!-- DEPOIS (adicione assim) -->
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/supabase.js"></script>
-<script src="js/api-novo.js"></script>
 
-<!-- O RESTO CONTINUA IGUAL -->
-<script src="js/calendar.js"></script>
-<script src="js/lancamentos.js"></script>
-<script src="js/dashboard.js"></script>
-<script src="js/app.js"></script>
+<!-- Scripts - com caminhos absolutos -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="/software-escalas/frontend/js/supabase.js"></script>
+<script src="/software-escalas/frontend/js/api-novo.js"></script>
+<script src="/software-escalas/frontend/js/calendar.js"></script>
+<script src="/software-escalas/frontend/js/lancamentos.js"></script>
+<script src="/software-escalas/frontend/js/dashboard.js"></script>
+<script src="/software-escalas/frontend/js/app.js"></script>
+<script src="https://unpkg.com/lucide@latest"></script>
+
+
+
 <script>
     lucide.createIcons();
     
