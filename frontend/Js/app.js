@@ -430,21 +430,22 @@ function configurarModais() {
 
 async function confirmarExclusao() {
     console.log("🔍 Confirmando exclusão:", { 
-        id: exclusaoPendenteId, 
-        tipo: exclusaoTipo 
+        id: window.exclusaoPendenteId, 
+        tipo: window.exclusaoTipo 
     });
     
-    if (!exclusaoPendenteId) {
+    if (!window.exclusaoPendenteId) {
         console.error("Nenhum ID pendente");
         fecharModal('modalConfirmacao');
         return;
     }
     
     try {
-        if (exclusaoTipo === 'feriado') {
-            await API.excluirFeriado(exclusaoPendenteId);
+        // ✅ USAR API DO SUPABASE
+        if (window.exclusaoTipo === 'feriado') {
+            await API.excluirFeriado(window.exclusaoPendenteId);
         } else {
-            await API.excluirAusencia(exclusaoPendenteId);
+            await API.excluirAusencia(window.exclusaoPendenteId);
         }
         
         // Recarregar dados
@@ -452,22 +453,20 @@ async function confirmarExclusao() {
         
         // Fechar modal e resetar
         fecharModal('modalConfirmacao');
-        exclusaoPendenteId = null;
-        exclusaoTipo = 'ausencia';
+        window.exclusaoPendenteId = null;
+        window.exclusaoTipo = null;
         
-        mostrarToast("✅ Excluído com sucesso!", "success");
+        mostrarToast("Excluído com sucesso!", "success");
         
         // Se o modal de lançamento estiver aberto, recarregar listagens
         const modalLancamento = document.getElementById("modalLancamento");
         if (modalLancamento && !modalLancamento.classList.contains('hidden')) {
-            if (typeof carregarListagens === 'function') {
-                await carregarListagens();
-            }
+            await carregarListagens();
         }
         
     } catch (error) {
         console.error("❌ Erro ao excluir:", error);
-        mostrarToast(`❌ Erro ao excluir: ${error.message}`, "error");
+        mostrarToast(`Erro ao excluir: ${error.message}`, "error");
         fecharModal('modalConfirmacao');
     }
 }
@@ -881,24 +880,21 @@ async function salvarNovoColaborador() {
     }
 
     try {
-        const metodo = editandoId ? "PUT" : "POST";
-        const url = editandoId 
-            ? `http://localhost:3000/api/colaboradores/${editandoId}`
-            : `http://localhost:3000/api/colaboradores`;
-
-        const response = await fetch(url, {
-            method: metodo,
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                nome,
-                trabalhoInicio,
-                trabalhoFim,
-                almocoInicio,
-                almocoFim
-            })
-        });
-
-        if (!response.ok) throw new Error("Erro ao salvar");
+        const dados = {
+            nome,
+            trabalhoInicio,
+            trabalhoFim,
+            almocoInicio,
+            almocoFim
+        };
+        
+        // Se estiver editando, adiciona o ID
+        if (editandoId) {
+            dados.id = editandoId;
+        }
+        
+        // Usar a API do Supabase em vez de fetch
+        await API.salvarColaborador(dados);
 
         editandoId = null;
         await carregarColaboradores();
@@ -1672,27 +1668,21 @@ async function salvarEditorColaborador(id) {
     const almocoFim = document.getElementById(`editAlmFim-${id}`)?.value;
 
     try {
-        const response = await fetch(`http://localhost:3000/api/colaboradores/${id}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                trabalhoInicio,
-                trabalhoFim,
-                almocoInicio,
-                almocoFim
-            })
-        });
-
-        if (!response.ok) throw new Error("Erro ao salvar");
+        // ✅ USAR API
+        const dados = {
+            id: id,
+            trabalhoInicio: trabalhoInicio,
+            trabalhoFim: trabalhoFim,
+            almocoInicio: almocoInicio,
+            almocoFim: almocoFim
+        };
+        
+        await API.salvarColaborador(dados);
 
         await carregarColaboradores();
         
-        // 🔥 IMPORTANTE: Regenerar o header com a coluna de total
         gerarHeaderTimeline();
-        
-        // Gerar a timeline com as ausências
         gerarTimelineVisualComAusencias();
-        
         gerarResumoHorarios();
         fecharEditor();
         mostrarToast("Horários salvos com sucesso!", "success");
@@ -2574,20 +2564,12 @@ function importarDados() {
                 
                 // Importar colaboradores
                 for (const colab of dados.colaboradores) {
-                    await fetch('http://localhost:3000/api/colaboradores', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(colab)
-                    });
+                 await API.salvarColaborador(colab);
                 }
                 
                 // Importar ausências
                 for (const aus of dados.ausencias) {
-                    await fetch('http://localhost:3000/api/ausencias', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(aus)
-                    });
+                    await API.salvarAusencia(aus);
                 }
                 
                 // Importar preferências (opcional)
@@ -2906,8 +2888,8 @@ function renderChecklistColaboradores(selecionados = []) {
     
     return html;
 }
+
 async function salvarPlantao(dataISO) {
-    // Pega os colaboradores selecionados
     const checkboxes = document.querySelectorAll('#checklistColaboradores input:checked');
     const colaboradoresSelecionados = Array.from(checkboxes).map(cb => parseInt(cb.value));
     
@@ -2917,19 +2899,16 @@ async function salvarPlantao(dataISO) {
     }
     
     try {
-        const response = await fetch('http://localhost:3000/api/plantoes', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                dataISO: dataISO,
-                colaboradores: colaboradoresSelecionados
-            })
-        });
+        // ✅ USAR API
+        const dados = {
+            dataISO: dataISO,
+            colaboradores: colaboradoresSelecionados
+        };
         
-        if (!response.ok) throw new Error("Erro ao salvar");
+        await API.salvarPlantao(dados);
         
         await carregarPlantoes();
-        renderLancamentoPlantao(); // Recarrega a tela
+        renderLancamentoPlantao();
         
         mostrarToast("Plantão salvo com sucesso!", "success");
         
@@ -2966,14 +2945,11 @@ async function excluirPlantao(dataISO) {
     if (!confirm("Tem certeza que deseja excluir este plantão?")) return;
     
     try {
-        const response = await fetch(`http://localhost:3000/api/plantoes/${dataISO}`, {
-            method: 'DELETE'
-        });
-        
-        if (!response.ok) throw new Error("Erro ao excluir");
+        // ✅ USAR API
+        await API.excluirPlantao(dataISO);
         
         await carregarPlantoes();
-        renderLancamentoPlantao(); // Recarrega a tela
+        renderLancamentoPlantao();
         
         mostrarToast("Plantão excluído com sucesso!", "success");
         
@@ -5647,7 +5623,6 @@ async function excluirFeriado(id) {
 
 }
 // Confirmar exclusão de feriado
-// app.js - Verifique se a função confirmarExclusao está assim:
 
 async function confirmarExclusao() {
     console.log("🔍 Confirmando exclusão:", { 
