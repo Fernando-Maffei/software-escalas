@@ -488,3 +488,70 @@
         max-height: 400px;
     }
 }
+
+/* ================= CORREÇÕES TELA DE FERIADOS ================= */
+#modalFeriado .modal-content {
+    max-width: 1000px;
+    width: 95%;
+    margin: 20px auto;
+    padding: 0;
+    overflow: hidden;
+    border-radius: 24px;
+}
+
+/* Melhor espaçamento no formulário */
+#modalFeriado .form-column {
+    padding: 28px;
+}
+
+/* Cards mais elegantes */
+#modalFeriado .feriado-card {
+    border-left-width: 6px;
+    transition: all 0.3s ease;
+}
+
+#modalFeriado .feriado-card:hover {
+    transform: translateY(-3px) translateX(3px);
+    box-shadow: var(--shadow-lg);
+}
+
+/* Badges mais bonitos */
+#modalFeriado .feriado-tipo-badge {
+    font-weight: 600;
+    letter-spacing: 0.3px;
+    box-shadow: var(--shadow-sm);
+}
+
+/* Animação de entrada */
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+#modalFeriado .feriado-card {
+    animation: fadeInUp 0.3s ease forwards;
+}
+
+#modalFeriado .feriado-card:nth-child(1) { animation-delay: 0.05s; }
+#modalFeriado .feriado-card:nth-child(2) { animation-delay: 0.1s; }
+#modalFeriado .feriado-card:nth-child(3) { animation-delay: 0.15s; }
+#modalFeriado .feriado-card:nth-child(4) { animation-delay: 0.2s; }
+#modalFeriado .feriado-card:nth-child(5) { animation-delay: 0.25s; }
+
+/* Responsividade melhorada */
+@media (max-width: 768px) {
+    #modalFeriado .modal-columns {
+        flex-direction: column;
+    }
+    
+    #modalFeriado .feriado-nome {
+        max-width: 100%;
+        white-space: normal;
+    }
+}

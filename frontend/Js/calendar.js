@@ -101,10 +101,17 @@ function gerarCalendario(mes, ano) {
 
     // ===== FERIADOS LOCAIS =====
     if (window.feriadosLocais && window.feriadosLocais.length > 0) {
+      // 🔥 CORREÇÃO: Comparar strings diretamente, sem usar new Date()
       const feriadoLocal = window.feriadosLocais.find(f => {
         if (!f.Data) return false;
-        const dataFeriado = new Date(f.Data);
-        const dataFeriadoStr = `${dataFeriado.getFullYear()}-${String(dataFeriado.getMonth() + 1).padStart(2, '0')}-${String(dataFeriado.getDate()).padStart(2, '0')}`;
+        
+        // Extrair a data como string (YYYY-MM-DD)
+        let dataFeriadoStr = f.Data;
+        if (dataFeriadoStr.includes('T')) {
+          dataFeriadoStr = dataFeriadoStr.split('T')[0];
+        }
+        
+        // Comparar strings diretamente
         return dataFeriadoStr === dataISO;
       });
       
@@ -127,18 +134,13 @@ function gerarCalendario(mes, ano) {
       dataAlvo.setHours(0, 0, 0, 0);
       
       const ausenciasDoDia = window.ausencias.filter(a => {
-          const dataInicioStr = a.DataInicio || a.dataInicio;
-          const dataFimStr = a.DataFim || a.dataFim;
+          const dataInicioStr = (a.DataInicio || a.dataInicio || '').split('T')[0];
+          const dataFimStr = (a.DataFim || a.dataFim || '').split('T')[0];
           
           if (!dataInicioStr || !dataFimStr) return false;
           
-          const dataInicio = new Date(dataInicioStr.split('T')[0] + 'T00:00:00');
-          const dataFim = new Date(dataFimStr.split('T')[0] + 'T00:00:00');
-          
-          dataInicio.setHours(0, 0, 0, 0);
-          dataFim.setHours(0, 0, 0, 0);
-          
-          return dataAlvo >= dataInicio && dataAlvo <= dataFim;
+          // Comparar strings (YYYY-MM-DD) - isso ignora timezone
+          return dataISO >= dataInicioStr && dataISO <= dataFimStr;
       });
 
       const colaboradoresUnicos = new Map();
@@ -169,23 +171,25 @@ function gerarCalendario(mes, ano) {
     }
 
     // Evento de clique
-cell.addEventListener("click", (e) => {
-  e.stopPropagation();
-  
-  // Verifica se é um feriado
-  const temFeriado = cell.classList.contains('holiday');
-  
-  if (temFeriado && typeof window.abrirModalLancamento === 'function') {
-    // Abre diretamente o modal na aba de feriados com a data selecionada
-    window.abrirModalLancamento('feriados', dataISO);
-  } else if (typeof window.abrirModalLancamento === 'function') {
-    // Abre na aba pessoal para os outros dias
-    window.abrirModalLancamento('pessoal', dataISO);
-  } else if (typeof window.abrirModalAusencia === 'function') {
-    // Fallback para funções antigas
-    window.abrirModalAusencia(dataISO);
-  }
-});
+    cell.addEventListener("click", (e) => {
+    e.stopPropagation();
+    
+    // Verifica se é um feriado
+    const temFeriado = cell.classList.contains('holiday');
+    
+    if (temFeriado && typeof window.abrirModalLancamento === 'function') {
+        // Abre diretamente o modal na aba de feriados com a data selecionada
+        // E PASSA true para filtrar APENAS este dia
+        window.abrirModalLancamento('feriados', dataISO, true);
+    } else if (typeof window.abrirModalLancamento === 'function') {
+        // Abre na aba pessoal para os outros dias
+        // E PASSA true para filtrar APENAS este dia
+        window.abrirModalLancamento('pessoal', dataISO, true);
+    } else if (typeof window.abrirModalAusencia === 'function') {
+        // Fallback para funções antigas
+        window.abrirModalAusencia(dataISO);
+    }
+    });
 
     calendar.appendChild(cell);
   }

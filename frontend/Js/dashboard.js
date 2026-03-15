@@ -344,91 +344,172 @@ function gerarGraficoOcupacao() {
     `;
 }
 
-// Função para buscar próximos eventos
 async function buscarProximosEventos() {
     const eventos = [];
     const hoje = new Date();
     const dataHoje = hoje.toISOString().split('T')[0];
     
-    // Buscar ausências dos próximos 7 dias
-    for (let i = 0; i < 7; i++) {
+    // Criar um mapa para agrupar eventos por tipo e colaborador
+    const eventosAgrupados = new Map(); // Chave: "colaborador-tipo"
+    
+    // Buscar ausências dos próximos 30 dias
+    for (let i = 0; i < 30; i++) {
         const data = new Date(hoje);
         data.setDate(hoje.getDate() + i);
         const dataStr = data.toISOString().split('T')[0];
         
         // Ausências
         const ausenciasDia = window.ausencias?.filter(a => {
-            const dataInicio = new Date(a.DataInicio).toISOString().split('T')[0];
-            const dataFim = new Date(a.DataFim).toISOString().split('T')[0];
-            return dataStr >= dataInicio && dataStr <= dataFim;
+            if (!a.DataInicio || !a.DataFim) return false;
+            
+            // 🔥 CORREÇÃO: Extrair apenas a parte da data (YYYY-MM-DD)
+            const dataInicioStr = (a.DataInicio || '').split('T')[0];
+            const dataFimStr = (a.DataFim || '').split('T')[0];
+            
+            return dataStr >= dataInicioStr && dataStr <= dataFimStr;
         }) || [];
         
         ausenciasDia.forEach(a => {
             const colaborador = window.colaboradores?.find(c => c.Id === (a.colaboradorId || a.ColaboradorId));
             const tipo = (a.tipo || a.Tipo || '').toLowerCase();
             
-            eventos.push({
-                data: data,
-                dataStr: dataStr,
-                titulo: colaborador?.Nome || 'Desconhecido',
-                subtitulo: tipo === 'ferias' ? 'Férias' : 
-                          tipo === 'folga' ? 'Folga' : 'Ausência',
-                tipo: tipo
-            });
+            if (!colaborador) return;
+            
+            const chave = `${colaborador.Nome}-${tipo}`;
+            
+            if (!eventosAgrupados.has(chave)) {
+                // Primeiro dia do período - usar strings, não objetos Date
+                eventosAgrupados.set(chave, {
+                    colaborador: colaborador.Nome,
+                    tipo: tipo,
+                    dataInicioStr: (a.DataInicio || '').split('T')[0],
+                    dataFimStr: (a.DataFim || '').split('T')[0],
+                    dataInicioObj: new Date((a.DataInicio || '').split('T')[0] + 'T12:00:00'),
+                    dataFimObj: new Date((a.DataFim || '').split('T')[0] + 'T12:00:00')
+                });
+            }
         });
         
-        // Feriados
+        // Feriados (não agrupar, são eventos pontuais)
         const feriadosAPI = window.feriados?.filter(f => f.date === dataStr) || [];
         feriadosAPI.forEach(f => {
             eventos.push({
-                data: data,
+                // 🔥 CORREÇÃO: Usar a string da data, não new Date()
                 dataStr: dataStr,
+                data: new Date(dataStr + 'T12:00:00'), // Meio-dia UTC
                 titulo: f.name,
                 subtitulo: 'Feriado Nacional',
-                tipo: 'feriado'
+                tipo: 'feriado',
+                isPeriodo: false
             });
         });
         
         // Feriados locais
         const feriadosLocais = window.feriadosLocais?.filter(f => {
             if (!f.Data) return false;
-            const dataFeriado = new Date(f.Data).toISOString().split('T')[0];
+            const dataFeriado = (f.Data || '').split('T')[0];
             return dataFeriado === dataStr;
         }) || [];
         
         feriadosLocais.forEach(f => {
             eventos.push({
-                data: data,
                 dataStr: dataStr,
+                data: new Date(dataStr + 'T12:00:00'), // Meio-dia UTC
                 titulo: f.Nome || f.nome || 'Feriado',
                 subtitulo: f.Tipo || f.tipo || 'Municipal',
-                tipo: 'feriado'
+                tipo: 'feriado',
+                isPeriodo: false
             });
         });
     }
     
-    // Ordenar por data
-    eventos.sort((a, b) => a.data - b.data);
+    // Converter o mapa em array de eventos
+    eventosAgrupados.forEach((valor, chave) => {
+        // 🔥 CORREÇÃO: Calcular diferença usando as strings
+        const [anoI, mesI, diaI] = valor.dataInicioStr.split('-').map(Number);
+        const [anoF, mesF, diaF] = valor.dataFimStr.split('-').map(Number);
+        
+        // Criar datas UTC para cálculo correto
+        const dataInicioUTC = Date.UTC(anoI, mesI - 1, diaI);
+        const dataFimUTC = Date.UTC(anoF, mesF - 1, diaF);
+        
+        const diffDias = Math.floor((dataFimUTC - dataInicioUTC) / (1000 * 60 * 60 * 24)) + 1;
+        
+        let titulo = valor.colaborador;
+        let subtitulo = '';
+        
+        if (diffDias > 1) {
+            // É um período
+            subtitulo = `${valor.tipo === 'ferias' ? 'Férias' : 
+                         valor.tipo === 'folga' ? 'Folga' : 'Ausência'} - 
+                         ${diffDias} dias (${formatarDataBR(valor.dataInicioStr)} a ${formatarDataBR(valor.dataFimStr)})`;
+        } else {
+            // É um dia único
+            subtitulo = valor.tipo === 'ferias' ? 'Férias' : 
+                        valor.tipo === 'folga' ? 'Folga' : 'Ausência';
+        }
+        
+        eventos.push({
+            dataStr: valor.dataInicioStr,
+            data: new Date(valor.dataInicioStr + 'T12:00:00'), // Meio-dia UTC
+            dataFim: valor.dataFimStr,
+            titulo: titulo,
+            subtitulo: subtitulo,
+            tipo: valor.tipo,
+            isPeriodo: diffDias > 1,
+            diffDias: diffDias
+        });
+    });
     
-    return eventos.slice(0, 10); 
+    // Ordenar por data (usando as strings)
+    eventos.sort((a, b) => a.dataStr.localeCompare(b.dataStr));
+    
+    return eventos.slice(0, 10); // Limitar a 10 eventos
+}
+
+// Função auxiliar para formatar data
+function formatarDataBR(dataISO) {
+    const [ano, mes, dia] = dataISO.split('-');
+    return `${dia}/${mes}`;
 }
 
 
 function gerarEventItem(evento) {
-    const dia = evento.data.getDate().toString().padStart(2, '0');
-    const mes = (evento.data.getMonth() + 1).toString().padStart(2, '0');
+    // 🔥 CORREÇÃO: Extrair dia e mês da dataStr, não do objeto Date
+    const [ano, mes, dia] = evento.dataStr.split('-');
+    
+    let badgeClass = '';
+    let badgeText = '';
+    
+    if (evento.tipo === 'ferias') {
+        badgeClass = 'ferias';
+        badgeText = 'Férias';
+    } else if (evento.tipo === 'folga') {
+        badgeClass = 'folga';
+        badgeText = 'Folga';
+    } else if (evento.tipo === 'ausencia') {
+        badgeClass = 'ausencia';
+        badgeText = 'Ausência';
+    } else if (evento.tipo === 'feriado') {
+        badgeClass = 'feriado';
+        badgeText = 'Feriado';
+    }
+    
+    // Se for um período, mostrar ícone de período
+    const periodoIcon = evento.isPeriodo ? ' <i class="fas fa-calendar-alt"></i>' : '';
     
     return `
         <div class="event-item">
             <div class="event-date">
                 <div class="event-day">${dia}</div>
                 <div class="event-month">${mes}</div>
+                ${evento.isPeriodo ? '<div class="event-period-icon"><i class="fas fa-calendar-alt"></i></div>' : ''}
             </div>
             <div class="event-info">
-                <div class="event-title">${evento.titulo}</div>
+                <div class="event-title">${evento.titulo}${periodoIcon}</div>
                 <div class="event-subtitle">${evento.subtitulo}</div>
             </div>
-            <span class="event-badge ${evento.tipo}">${evento.tipo}</span>
+            <span class="event-badge ${badgeClass}">${badgeText}</span>
         </div>
     `;
 }

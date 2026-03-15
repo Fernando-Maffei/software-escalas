@@ -419,3 +419,12 @@
     color: var(--text-light);
     margin-bottom: 30px;
 }
+.event-period-icon {
+    margin-top: 2px;
+    font-size: 10px;
+    color: var(--primary);
+}
+
+.event-period-icon i {
+    font-size: 10px;
+}

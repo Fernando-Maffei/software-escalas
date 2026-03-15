@@ -671,3 +671,9 @@
     background: var(--card-dark);
     color: var(--text);
 }
+
+.relatorio-calendario .dia-ferias .ferias-tag,
+.relatorio-calendario .dia-ferias span {
+    /* Garantir que não haja conteúdo duplicado via ::before/::after */
+    content: normal !important;
+}
