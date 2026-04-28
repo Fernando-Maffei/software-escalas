@@ -20,6 +20,10 @@
     transform: translateY(-2px);
 }
 
+.config-card-wide {
+    grid-column: 1 / -1;
+}
+
 .config-card-header {
     display: flex;
     align-items: center;
@@ -50,6 +54,171 @@
     font-size: 14px;
     margin-bottom: 20px;
     line-height: 1.5;
+}
+
+.config-status-card {
+    border-radius: 18px;
+    border: 1px solid var(--border);
+    padding: 18px 20px;
+    margin-bottom: 20px;
+    background: var(--card-dark);
+}
+
+.config-status-card.is-loading {
+    border-color: #f59e0b;
+    background: rgba(245, 158, 11, 0.1);
+}
+
+.config-status-card.is-success {
+    border-color: #10b981;
+    background: rgba(16, 185, 129, 0.12);
+}
+
+.config-status-card.is-error {
+    border-color: #ef4444;
+    background: rgba(239, 68, 68, 0.1);
+}
+
+.config-status-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 8px;
+}
+
+.config-status-header strong {
+    color: var(--text);
+    font-size: 15px;
+}
+
+.config-status-badge {
+    padding: 6px 10px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 700;
+    background: var(--primary-soft);
+    color: var(--primary);
+}
+
+.config-status-detail {
+    display: block;
+    margin-top: 8px;
+    color: var(--text-light);
+    line-height: 1.5;
+    overflow-wrap: anywhere;
+}
+
+.config-form-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 18px;
+}
+
+.form-group-full {
+    grid-column: 1 / -1;
+}
+
+.config-auth-options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-top: 10px;
+}
+
+.config-auth-option {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 14px;
+    border-radius: 14px;
+    border: 1px solid var(--border);
+    background: var(--card-dark);
+    color: var(--text);
+    font-size: 14px;
+    cursor: pointer;
+}
+
+.config-auth-option input {
+    accent-color: var(--primary);
+}
+
+.config-checkbox-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 18px;
+}
+
+.config-actions-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-top: 20px;
+}
+
+.config-actions-row .config-btn {
+    flex: 1 1 220px;
+    margin-bottom: 0;
+}
+
+.checkbox-inline {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--text);
+}
+
+.helper-text {
+    display: block;
+    margin-top: 8px;
+    color: var(--text-light);
+    font-size: 12px;
+    line-height: 1.45;
+}
+
+.config-input-mono {
+    font-family: Consolas, 'Courier New', monospace;
+}
+
+#backupDirectory[readonly] {
+    cursor: pointer;
+    caret-color: transparent;
+}
+
+#backupDirectory[readonly]:focus {
+    outline: none;
+}
+
+.config-inline-picker-btn {
+    width: auto;
+    min-width: 220px;
+    margin-top: 10px;
+    margin-bottom: 0;
+    padding-inline: 18px;
+}
+
+.config-backup-options {
+    margin-top: 14px;
+    display: grid;
+    gap: 12px;
+}
+
+.config-backup-interval {
+    display: grid;
+    gap: 8px;
+}
+
+label[for="autoBackupIntervalMinutesHidden"],
+label[for="autoBackupIntervalMinutesHidden"] + input,
+label[for="autoBackupIntervalMinutesHidden"] + input + .helper-text,
+label[for="autoBackupOnShutdownHidden"],
+label[for="autoBackupOnShutdownHidden"] + .helper-text {
+    display: none !important;
+}
+
+.form-group:has(#autoBackupIntervalMinutesHidden),
+.form-group:has(#autoBackupOnShutdownHidden) {
+    display: none !important;
 }
 
 /* ================= OPÇÕES DE TEMA ================= */
@@ -346,6 +515,10 @@ input:checked + .slider:before {
         grid-template-columns: 1fr;
     }
     
+    .config-form-grid {
+        grid-template-columns: 1fr;
+    }
+
     .config-item {
         flex-direction: column;
         align-items: flex-start;
@@ -354,6 +527,13 @@ input:checked + .slider:before {
     
     .config-select {
         width: 100%;
+    }
+
+    .config-status-header,
+    .config-actions-row,
+    .config-checkbox-row {
+        flex-direction: column;
+        align-items: stretch;
     }
 }
 

@@ -3,14 +3,17 @@
     display: flex;
     gap: 20px;
     min-height: 600px;
+    align-items: flex-start;
 }
 
 .colaboradores-container {
     flex: 1;
+    min-width: 0;
     background: white;
     border-radius: 24px;
     padding: 20px;
     box-shadow: var(--shadow-lg);
+    border: 1px solid var(--border);
 }
 
 .colaboradores-header {
@@ -67,6 +70,28 @@
     gap: 8px;
 }
 
+.banco-horas-alert {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 16px;
+    margin-bottom: 16px;
+    border-radius: 16px;
+    background: #fff7ed;
+    color: #9a3412;
+    border: 1px solid #fdba74;
+}
+
+.banco-horas-alert strong,
+.banco-horas-alert span {
+    display: block;
+}
+
+.banco-horas-alert span {
+    font-size: 13px;
+    color: #c2410c;
+}
+
 /* Cards de colaborador */
 .colaborador-card {
     background: var(--card-dark);
@@ -119,6 +144,63 @@
     gap: 12px;
 }
 
+.banco-horas-card {
+    margin-top: 14px;
+    padding: 14px;
+    border-radius: 16px;
+    background: white;
+    border: 1px solid var(--border);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.banco-horas-saldo {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.banco-horas-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    color: var(--text-light);
+}
+
+.banco-horas-saldo strong {
+    font-size: 22px;
+    line-height: 1;
+}
+
+.banco-horas-saldo.positivo strong {
+    color: #047857;
+}
+
+.banco-horas-saldo.negativo strong {
+    color: #b91c1c;
+}
+
+.banco-horas-metrics {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--text-light);
+}
+
+.banco-horas-metrics span {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.btn-banco-horas {
+    white-space: nowrap;
+}
+
 .horario-tag {
     display: inline-flex;
     align-items: center;
@@ -148,14 +230,19 @@
 
 /* ================= PAINEL EDITOR DE COLABORADORES ================= */
 #colaboradorEditor {
+    flex: 0 0 400px;
     width: 400px;
     background: white;
     border-radius: 24px;
     box-shadow: var(--shadow-xl);
+    border: 1px solid var(--border);
     overflow: hidden;
     animation: slideIn 0.3s ease;
-    position: relative;
+    position: sticky;
+    top: 24px;
+    align-self: flex-start;
     z-index: 10;
+    max-height: calc(100vh - 48px);
     display: none;
 }
 
@@ -164,7 +251,7 @@
     opacity: 1 !important;
     visibility: visible !important;
     height: auto;
-    max-height: 600px;
+    max-height: calc(100vh - 96px);
     overflow-y: auto;
 }
 
@@ -263,6 +350,128 @@
     font-weight: 500;
 }
 
+#colaboradorEditor .banco-horas-input {
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.04em;
+}
+
+#colaboradorEditor .banco-horas-editor-shell {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    padding: 16px;
+    border-radius: 18px;
+    border: 1px solid var(--border);
+    background: linear-gradient(180deg, rgba(99, 102, 241, 0.08) 0%, rgba(248, 250, 252, 0.92) 100%);
+}
+
+#colaboradorEditor .banco-horas-editor-shell.is-disabled {
+    opacity: 0.72;
+}
+
+#colaboradorEditor .banco-horas-editor-summary {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+#colaboradorEditor .banco-horas-editor-summary strong {
+    display: block;
+    margin-top: 4px;
+    font-size: 24px;
+    line-height: 1;
+}
+
+#colaboradorEditor .banco-horas-editor-summary strong.positivo {
+    color: #047857;
+}
+
+#colaboradorEditor .banco-horas-editor-summary strong.negativo {
+    color: #b91c1c;
+}
+
+#colaboradorEditor .banco-horas-current {
+    font-size: 12px;
+    color: var(--text-light);
+}
+
+#colaboradorEditor .banco-horas-editor-controls {
+    display: grid;
+    gap: 12px;
+}
+
+#colaboradorEditor .banco-horas-signal-toggle {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    padding: 6px;
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.75);
+    border: 1px solid var(--border);
+}
+
+#colaboradorEditor .banco-horas-signal-btn {
+    border: 1px solid transparent;
+    border-radius: 10px;
+    background: transparent;
+    color: var(--text-light);
+    padding: 10px 12px;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: var(--transition);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+#colaboradorEditor .banco-horas-signal-btn:hover:not(:disabled) {
+    color: var(--text);
+    background: rgba(99, 102, 241, 0.08);
+}
+
+#colaboradorEditor .banco-horas-signal-btn.is-active.is-positive {
+    background: var(--success-soft);
+    border-color: rgba(16, 185, 129, 0.18);
+    color: #047857;
+}
+
+#colaboradorEditor .banco-horas-signal-btn.is-active.is-negative {
+    background: var(--danger-soft);
+    border-color: rgba(239, 68, 68, 0.18);
+    color: #b91c1c;
+}
+
+#colaboradorEditor .banco-horas-signal-btn:disabled {
+    cursor: not-allowed;
+}
+
+#colaboradorEditor .banco-horas-time-inputs {
+    padding: 6px;
+}
+
+#colaboradorEditor .banco-horas-time-inputs input {
+    text-align: center;
+}
+
+#colaboradorEditor .banco-horas-time-inputs span {
+    min-width: 28px;
+    text-align: center;
+}
+
+#colaboradorEditor .banco-horas-input:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+}
+
+#colaboradorEditor textarea.form-control {
+    min-height: 92px;
+    resize: vertical;
+}
+
 #colaboradorEditor .editor-actions {
     display: flex;
     gap: 12px;
@@ -301,7 +510,28 @@
 
 @media (max-width: 1200px) {
     #colaboradorEditor {
+        flex-basis: 360px;
+        width: 360px;
+    }
+}
+
+@media (max-width: 980px) {
+    .colaboradores-layout {
+        flex-direction: column;
+    }
+    
+    #colaboradorEditor {
         width: 100%;
+        max-height: none;
+        position: static;
+    }
+
+    #colaboradorEditor .editor-content {
+        max-height: none;
+    }
+
+    .banco-horas-card {
+        align-items: flex-start;
     }
 }
 
@@ -340,6 +570,21 @@
     color: var(--primary);
 }
 
+[data-theme="dark"] .banco-horas-card {
+    background: var(--card-dark);
+    border-color: var(--border);
+}
+
+[data-theme="dark"] .banco-horas-alert {
+    background: rgba(251, 191, 36, 0.12);
+    color: #fde68a;
+    border-color: rgba(251, 191, 36, 0.28);
+}
+
+[data-theme="dark"] .banco-horas-alert span {
+    color: #fcd34d;
+}
+
 [data-theme="dark"] .search-box {
     background: var(--card-dark);
 }
@@ -374,6 +619,19 @@
     color: var(--text-light);
 }
 
+[data-theme="dark"] #colaboradorEditor .form-control,
+[data-theme="dark"] #colaboradorEditor textarea.form-control {
+    background: var(--card-dark);
+    color: var(--text);
+    border-color: var(--border);
+}
+
+[data-theme="dark"] #colaboradorEditor .form-control:focus,
+[data-theme="dark"] #colaboradorEditor textarea.form-control:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(129, 140, 248, 0.22);
+}
+
 [data-theme="dark"] #colaboradorEditor .time-inputs {
     background: var(--card-dark);
 }
@@ -391,6 +649,49 @@
 
 [data-theme="dark"] #colaboradorEditor .time-inputs span {
     color: var(--text-light);
+}
+
+[data-theme="dark"] #colaboradorEditor .banco-horas-editor-shell {
+    background: linear-gradient(180deg, rgba(99, 102, 241, 0.18) 0%, rgba(15, 23, 42, 0.9) 100%);
+    border-color: var(--border);
+}
+
+[data-theme="dark"] #colaboradorEditor .banco-horas-editor-summary strong.positivo {
+    color: #6ee7b7;
+}
+
+[data-theme="dark"] #colaboradorEditor .banco-horas-editor-summary strong.negativo {
+    color: #fca5a5;
+}
+
+[data-theme="dark"] #colaboradorEditor .banco-horas-current {
+    color: var(--text-light);
+}
+
+[data-theme="dark"] #colaboradorEditor .banco-horas-signal-toggle {
+    background: rgba(15, 23, 42, 0.82);
+    border-color: var(--border);
+}
+
+[data-theme="dark"] #colaboradorEditor .banco-horas-signal-btn {
+    color: var(--text-light);
+}
+
+[data-theme="dark"] #colaboradorEditor .banco-horas-signal-btn:hover:not(:disabled) {
+    background: rgba(148, 163, 184, 0.12);
+    color: var(--text);
+}
+
+[data-theme="dark"] #colaboradorEditor .banco-horas-signal-btn.is-active.is-positive {
+    background: rgba(52, 211, 153, 0.18);
+    border-color: rgba(52, 211, 153, 0.35);
+    color: #6ee7b7;
+}
+
+[data-theme="dark"] #colaboradorEditor .banco-horas-signal-btn.is-active.is-negative {
+    background: rgba(248, 113, 113, 0.18);
+    border-color: rgba(248, 113, 113, 0.35);
+    color: #fca5a5;
 }
 
 [data-theme="dark"] #colaboradorEditor .btn-secondary {
