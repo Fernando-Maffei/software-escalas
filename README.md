@@ -1,33 +1,48 @@
 # Software de Escalas
 
-Sistema completo para gestão de escalas de trabalho, colaboradores e horários.
+Sistema para gestao de escalas de trabalho, colaboradores, ausencias e plantoes.
 
 ## Funcionalidades
 
-- ✅ Cadastro de colaboradores com horários de trabalho e almoço
-- ✅ Lançamento de ausências, férias e folgas
-- ✅ Calendário mensal com feriados e eventos
-- ✅ Escala diária com timeline visual
-- ✅ Resumo por horário
-- ✅ Plantões de sábado
-- ✅ Relatórios em PDF, imagem, CSV e JSON
-- ✅ Tema claro/escuro
-- ✅ Exportação/importação de dados
+- Cadastro de colaboradores com horarios de trabalho e almoco
+- Lancamento de ausencias, ferias e folgas
+- Calendario mensal com feriados e eventos
+- Escala diaria com timeline visual
+- Resumo por horario
+- Plantoes de sabado
+- Relatorios e exportacao de dados
+- Tema claro e escuro
 
 ## Tecnologias
 
-- Frontend: HTML5, CSS3, JavaScript
-- Backend: Node.js, Express
-- Banco de Dados: SQL Server
-- Bibliotecas: jsPDF, html2canvas
+- Frontend: HTML, CSS e JavaScript
+- Backend: Node.js e Express
+- Banco de dados: SQL Server
 
-## Como executar
+## Como executar manualmente
 
-1. Clone o repositório
-2. Instale as dependências: `npm install`
-3. Configure o banco de dados
-4. Execute: `npm start`
-5. Acesse: `http://localhost:3000`
+1. Instale o Node.js 20 ou superior
+2. Abra a pasta do projeto
+3. Rode `npm install`
+4. Rode `npm start`
+5. Acesse `http://localhost:3000`
+
+## Como iniciar em outra maquina
+
+Se a ideia for subir o sistema da forma mais simples possivel em outro computador:
+
+1. Instale o Node.js 20 ou superior
+2. Copie a pasta do projeto para a outra maquina
+3. Dê duplo clique em `iniciar-servidor.bat`
+4. Na primeira execucao o script instala as dependencias automaticamente
+5. Depois disso ele sobe o servidor e abre o navegador em `http://localhost:3000`
+
+Observacoes:
+
+- O servidor fica ligado enquanto a janela do `.bat` estiver aberta
+- Para encerrar, feche a janela ou use `parar-servidor.bat`
+- Se precisar, configure a conexao com o SQL Server pela tela de configuracoes do sistema
+- Se voce ja tiver um `backend/config/database.local.json` configurado, pode copiar esse arquivo junto para evitar reconfigurar
 
 ## Autor
 
