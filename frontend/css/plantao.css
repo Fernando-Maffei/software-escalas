@@ -134,6 +134,19 @@
     box-shadow: var(--shadow-sm);
 }
 
+.colaborador-checkbox.indisponivel {
+    opacity: 0.55;
+    cursor: not-allowed;
+    background: #f8fafc;
+    border-style: dashed;
+}
+
+.colaborador-checkbox.indisponivel:hover {
+    transform: none;
+    box-shadow: none;
+    border-color: var(--border);
+}
+
 .colaborador-checkbox input[type="checkbox"] {
     width: 16px;
     height: 16px;
@@ -175,6 +188,19 @@
     margin-left: 4px;
 }
 
+.status-indisponivel {
+    display: inline-flex;
+    margin-left: 8px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: #fee2e2;
+    color: #b91c1c;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+
 .selecionados-count {
     margin-top: 8px;
     padding: 6px;
@@ -206,6 +232,19 @@
 #plantaoEditor .editor-form-group label i {
     font-size: 14px;
     color: var(--primary);
+}
+
+.plantao-time-inputs {
+    margin-top: 8px;
+}
+
+.plantao-bank-preview {
+    padding: 12px;
+    border-radius: 14px;
+    background: var(--primary-soft);
+    color: var(--primary-dark);
+    font-weight: 600;
+    border: 1px solid var(--border);
 }
 
 /* Lista de plantões lançados */
@@ -284,6 +323,27 @@
     gap: 8px;
 }
 
+.plantao-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-top: 6px;
+    font-size: 12px;
+    color: var(--text-light);
+}
+
+.plantao-meta span {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.plantao-observacao {
+    margin: 0 0 12px;
+    font-size: 13px;
+    color: var(--text-light);
+}
+
 .colaborador-tag {
     background: var(--card);
     padding: 6px 12px;
@@ -297,6 +357,11 @@
 
 .colaborador-tag i {
     color: var(--primary);
+}
+
+.colaborador-tag small {
+    font-size: 11px;
+    color: var(--text-light);
 }
 
 .sem-colaboradores {

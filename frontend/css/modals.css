@@ -969,3 +969,74 @@
         transform: scale(1);
     }
 }
+
+.checkbox-inline {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 10px 0 6px;
+    font-size: 14px;
+    color: var(--text);
+}
+
+.banco-horas-toggle input {
+    width: 16px;
+    height: 16px;
+}
+
+.helper-text {
+    display: block;
+    margin-top: 4px;
+    font-size: 12px;
+    color: var(--text-light);
+}
+
+.banco-horas-modal-content {
+    max-width: 860px;
+    width: 92%;
+}
+
+.banco-horas-extrato-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.banco-horas-movimento {
+    padding: 16px;
+    border-radius: 16px;
+    background: var(--card);
+    border: 1px solid var(--border);
+}
+
+.banco-horas-movimento header {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 8px;
+}
+
+.banco-horas-movimento header span {
+    display: block;
+    font-size: 12px;
+    color: var(--text-light);
+    margin-top: 4px;
+}
+
+.banco-horas-movimento p {
+    margin: 0;
+    color: var(--text-light);
+    font-size: 13px;
+}
+
+.banco-horas-movimento-valores {
+    text-align: right;
+}
+
+.banco-horas-movimento.credito {
+    border-left: 4px solid #10b981;
+}
+
+.banco-horas-movimento.debito {
+    border-left: 4px solid #ef4444;
+}

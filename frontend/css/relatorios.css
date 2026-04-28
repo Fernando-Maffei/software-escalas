@@ -96,6 +96,19 @@
     font-size: 14px;
 }
 
+.relatorio-escala-view {
+    display: none;
+}
+
+.relatorio-escala-view.is-active {
+    display: block;
+}
+
+.escala-detalhada-tabela td:last-child {
+    min-width: 220px;
+    white-space: normal;
+}
+
 .relatorio-actions {
     display: flex;
     gap: 10px;
@@ -161,9 +174,9 @@
 }
 
 .relatorio-conteudo {
-    padding: 24px;
-    max-height: 600px;
-    overflow-y: auto;
+    padding: 28px;
+    max-height: 780px;
+    overflow: auto;
 }
 
 /* Tabelas de relatório */
@@ -308,51 +321,151 @@
     margin-left: 5px;
 }
 
+.escala-quadro-mensal {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+}
+
+.escala-quadro-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 14px;
+    align-items: start;
+}
+
+.escala-quadro-grid-calendario {
+    align-items: stretch;
+    grid-template-columns: repeat(6, minmax(180px, 1fr));
+    min-width: 1080px;
+    grid-auto-rows: 1fr;
+}
+
+.escala-quadro-dia {
+    border: 1px solid #cfd8e3;
+    border-radius: 16px;
+    overflow: hidden;
+    background: var(--card);
+    box-shadow: 0 8px 18px rgba(15, 23, 42, 0.05);
+}
+
+.escala-quadro-grid-calendario .escala-quadro-dia {
+    height: 100%;
+}
+
+.escala-quadro-dia-placeholder {
+    border: 1px dashed #d9e2ec;
+    border-radius: 16px;
+    background: linear-gradient(180deg, rgba(239, 246, 255, 0.7) 0%, rgba(248, 250, 252, 0.85) 100%);
+    min-height: 170px;
+    opacity: 0.55;
+}
+
+.escala-quadro-dia.is-empty {
+    opacity: 0.92;
+}
+
+.escala-quadro-dia-header {
+    padding: 10px 12px;
+    background: linear-gradient(135deg, #2f4b67 0%, #44698a 100%);
+    color: #f8fafc;
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    text-align: center;
+}
+
+.escala-quadro-tabela {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+    font-size: 12px;
+}
+
+.escala-quadro-tabela th,
+.escala-quadro-tabela td {
+    border: 1px solid #d9e2ec;
+    padding: 5px 6px;
+    color: var(--text);
+}
+
+.escala-quadro-tabela th {
+    background: #edf3f8;
+    color: #1f3a52;
+    font-weight: 700;
+    text-align: center;
+}
+
+.escala-quadro-tabela td {
+    line-height: 1.3;
+    background: var(--card);
+}
+
+.escala-quadro-tabela td:nth-child(2) {
+    font-weight: 600;
+}
+
+.escala-quadro-grupo {
+    text-align: center;
+    vertical-align: middle;
+    background: #f8fbfe;
+    font-weight: 600;
+    color: #294661;
+}
+
+.escala-quadro-sem-escala {
+    text-align: center;
+    color: var(--text-light) !important;
+    font-style: italic;
+    background: var(--card-dark) !important;
+}
+
 /* Relatório calendário */
 .relatorio-calendario {
-    padding: 20px;
+    padding: 18px 12px 30px;
 }
 
 .calendario-titulo {
     text-align: center;
-    margin-bottom: 30px;
+    margin-bottom: 22px;
 }
 
 .calendario-titulo h2 {
-    font-size: 32px;
+    font-size: 42px;
     color: var(--primary);
-    margin-bottom: 5px;
+    margin-bottom: 6px;
 }
 
 .calendario-titulo h3 {
-    font-size: 24px;
+    font-size: 30px;
     color: var(--text);
-    font-weight: 600;
+    font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 2px;
+    letter-spacing: 2.5px;
 }
 
 .calendario-tabela {
     width: 100%;
     border-collapse: collapse;
+    table-layout: fixed;
     margin-bottom: 30px;
 }
 
 .calendario-tabela th {
-    padding: 12px;
+    padding: 15px 10px;
     background: var(--primary);
     color: white;
-    font-weight: 600;
-    font-size: 14px;
+    font-weight: 700;
+    font-size: 16px;
     text-align: center;
 }
 
 .calendario-tabela td {
     border: 1px solid var(--border);
     vertical-align: top;
-    height: 100px;
+    height: 186px;
     width: 14.28%;
-    padding: 8px;
+    padding: 12px 10px;
     position: relative;
 }
 
@@ -366,19 +479,18 @@
 
 .dia-numero {
     font-weight: 700;
-    font-size: 16px;
+    font-size: 24px;
     color: var(--text);
-    margin-bottom: 5px;
+    margin-bottom: 10px;
 }
 
 .dia-feriado {
-    font-size: 10px;
+    font-size: 14px;
+    line-height: 1.35;
     color: var(--danger);
-    font-weight: 600;
-    margin-bottom: 5px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    font-weight: 700;
+    margin-bottom: 10px;
+    white-space: normal;
 }
 
 .dia-folgas,
@@ -386,41 +498,77 @@
 .dia-ausencias {
     display: flex;
     flex-direction: column;
-    gap: 2px;
-    margin-top: 2px;
+    gap: 5px;
+    margin-top: 5px;
 }
 
 .folga-tag {
-    font-size: 9px;
+    font-size: 13px;
+    line-height: 1.35;
     background: var(--success-soft);
     color: var(--success);
-    padding: 2px 4px;
-    border-radius: 4px;
-    white-space: nowrap;
+    padding: 6px 8px;
+    border-radius: 6px;
+    white-space: normal;
     overflow: hidden;
-    text-overflow: ellipsis;
 }
 
 .ferias-tag {
-    font-size: 9px;
+    font-size: 13px;
+    line-height: 1.35;
     background: var(--primary-soft);
     color: var(--primary-dark);
-    padding: 2px 4px;
-    border-radius: 4px;
-    white-space: nowrap;
+    padding: 6px 8px;
+    border-radius: 6px;
+    white-space: normal;
     overflow: hidden;
-    text-overflow: ellipsis;
 }
 
 .ausencia-tag {
-    font-size: 9px;
+    font-size: 13px;
+    line-height: 1.35;
     background: var(--danger-soft);
     color: var(--danger);
-    padding: 2px 4px;
-    border-radius: 4px;
-    white-space: nowrap;
+    padding: 6px 8px;
+    border-radius: 6px;
+    white-space: normal;
     overflow: hidden;
-    text-overflow: ellipsis;
+}
+
+.mais-tag {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    align-self: flex-start;
+    min-width: 34px;
+    padding: 4px 9px;
+    border-radius: 999px;
+    background: var(--card-dark);
+    color: var(--text-light);
+    font-size: 12px;
+    font-weight: 700;
+}
+
+@media (max-width: 1400px) {
+    .escala-quadro-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .escala-quadro-grid-calendario {
+        grid-template-columns: repeat(6, minmax(170px, 1fr));
+        min-width: 1020px;
+    }
+}
+
+@media (max-width: 1100px) {
+    .escala-quadro-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .escala-quadro-grid-calendario {
+        grid-template-columns: repeat(6, minmax(160px, 1fr));
+        min-width: 960px;
+    }
 }
 
 /* Legendas */
@@ -526,14 +674,41 @@
     .calendario-resumo {
         grid-template-columns: 1fr;
     }
-    
+
     .calendario-tabela td {
-        height: 80px;
-        padding: 4px;
+        height: 132px;
+        padding: 8px 6px;
     }
     
     .dia-numero {
-        font-size: 14px;
+        font-size: 17px;
+    }
+
+    .dia-feriado {
+        font-size: 11px;
+        margin-bottom: 6px;
+    }
+
+    .folga-tag,
+    .ferias-tag,
+    .ausencia-tag {
+        font-size: 11px;
+        padding: 4px 6px;
+    }
+
+    .mais-tag {
+        min-width: 28px;
+        padding: 3px 7px;
+        font-size: 10px;
+    }
+
+    .escala-quadro-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .escala-quadro-grid-calendario {
+        grid-template-columns: repeat(6, minmax(145px, 1fr));
+        min-width: 870px;
     }
 }
 

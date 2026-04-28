@@ -1,147 +1,237 @@
 const express = require('express');
 const router = express.Router();
+
 const { sql, conectar } = require('../db');
+const { AppError } = require('../utils/errors');
+const { syncColaboradorDefaultsToEscalaDia } = require('../utils/escala');
+const { getBancoHorasCapabilities, getSchemaInfo, hasTable } = require('../utils/schema');
+const { withTransaction } = require('../utils/transactions');
+const {
+    ensurePositiveInt,
+    extractTimeString,
+    normalizeNullableTime,
+    normalizeOptionalText,
+    toSqlTime,
+    validateWorkSchedule
+} = require('../utils/validation');
 
-// Listar todos os colaboradores
-router.get('/', async (req, res) => {
-    try {
-        const pool = await conectar();
-        const result = await pool.request().query('SELECT * FROM Colaboradores ORDER BY Nome');
-        res.json(result.recordset);
-    } catch (err) {
-        console.error("Erro ao listar colaboradores:", err);
-        res.status(500).json({ error: err.message });
-    }
-});
-
-// Buscar colaborador por ID
-router.get('/:id', async (req, res) => {
-    const { id } = req.params;
-
-    try {
-        const pool = await conectar();
-        const result = await pool.request()
-            .input('id', sql.Int, id)
-            .query('SELECT * FROM Colaboradores WHERE Id = @id');
-
-        if (result.recordset.length === 0) {
-            return res.status(404).json({ error: "Colaborador não encontrado" });
-        }
-
-        res.json(result.recordset[0]);
-    } catch (err) {
-        console.error("Erro ao buscar colaborador:", err);
-        res.status(500).json({ error: err.message });
-    }
-});
-
-// Adicionar colaborador
-router.post('/', async (req, res) => {
-    const { nome, trabalhoInicio, trabalhoFim, almocoInicio, almocoFim } = req.body;
+function buildColaboradorPayload(body, fallback = {}) {
+    const nome = body.nome !== undefined
+        ? normalizeOptionalText(body.nome, 'Nome', { maxLength: 300 })
+        : normalizeOptionalText(fallback.Nome || fallback.nome, 'Nome', { maxLength: 300 });
 
     if (!nome) {
-        return res.status(400).json({ error: "Nome é obrigatório." });
+        throw new AppError(400, 'Nome é obrigatório.');
     }
 
-    try {
-        const pool = await conectar();
+    const trabalhoInicio = body.trabalhoInicio !== undefined
+        ? normalizeNullableTime(body.trabalhoInicio, 'Início do trabalho')
+        : extractTimeString(fallback.TrabalhoInicio || fallback.trabalhoInicio);
 
-        await pool.request()
-            .input('nome', sql.NVarChar(300), nome)
-            .input('trabalhoInicio', sql.Time, trabalhoInicio ? new Date(`1970-01-01T${trabalhoInicio}:00`) : null)
-            .input('trabalhoFim', sql.Time, trabalhoFim ? new Date(`1970-01-01T${trabalhoFim}:00`) : null)
-            .input('almocoInicio', sql.Time, almocoInicio ? new Date(`1970-01-01T${almocoInicio}:00`) : null)
-            .input('almocoFim', sql.Time, almocoFim ? new Date(`1970-01-01T${almocoFim}:00`) : null)
-            .query(`
-                INSERT INTO Colaboradores (Nome, TrabalhoInicio, TrabalhoFim, AlmocoInicio, AlmocoFim)
-                VALUES (@nome, @trabalhoInicio, @trabalhoFim, @almocoInicio, @almocoFim)
-            `);
+    const trabalhoFim = body.trabalhoFim !== undefined
+        ? normalizeNullableTime(body.trabalhoFim, 'Fim do trabalho')
+        : extractTimeString(fallback.TrabalhoFim || fallback.trabalhoFim);
 
-        res.json({ message: 'Colaborador adicionado com sucesso!', success: true });
-    } catch (err) {
-        console.error("ERRO SQL:", err);
-        res.status(500).json({ error: err.message });
+    const almocoInicio = body.almocoInicio !== undefined
+        ? normalizeNullableTime(body.almocoInicio, 'Início do almoço')
+        : extractTimeString(fallback.AlmocoInicio || fallback.almocoInicio);
+
+    const almocoFim = body.almocoFim !== undefined
+        ? normalizeNullableTime(body.almocoFim, 'Fim do almoço')
+        : extractTimeString(fallback.AlmocoFim || fallback.almocoFim);
+
+    validateWorkSchedule({
+        trabalhoInicio,
+        trabalhoFim,
+        almocoInicio,
+        almocoFim
+    });
+
+    return {
+        nome,
+        trabalhoInicio,
+        trabalhoFim,
+        almocoInicio,
+        almocoFim
+    };
+}
+
+async function findColaboradorById(pool, id) {
+    const result = await pool.request()
+        .input('id', sql.Int, id)
+        .query('SELECT * FROM Colaboradores WHERE Id = @id');
+
+    return result.recordset[0] || null;
+}
+
+router.get('/', async (req, res) => {
+    const pool = await conectar();
+    const request = pool.request();
+    const clauses = [];
+    const search = (req.query.search || '').trim();
+
+    if (search) {
+        request.input('search', sql.NVarChar(300), `%${search}%`);
+        clauses.push('Nome LIKE @search');
     }
+
+    const query = `
+        SELECT * FROM Colaboradores
+        ${clauses.length > 0 ? `WHERE ${clauses.join(' AND ')}` : ''}
+        ORDER BY Nome
+    `;
+
+    const result = await request.query(query);
+    res.json(result.recordset);
 });
 
-// Atualizar colaborador
+router.get('/:id', async (req, res) => {
+    const id = ensurePositiveInt(req.params.id, 'Colaborador');
+    const pool = await conectar();
+    const colaborador = await findColaboradorById(pool, id);
+
+    if (!colaborador) {
+        throw new AppError(404, 'Colaborador não encontrado.');
+    }
+
+    res.json(colaborador);
+});
+
+router.post('/', async (req, res) => {
+    const pool = await conectar();
+    const payload = buildColaboradorPayload(req.body);
+
+    const result = await pool.request()
+        .input('nome', sql.NVarChar(300), payload.nome)
+        .input('trabalhoInicio', sql.Time, toSqlTime(payload.trabalhoInicio, 'Início do trabalho'))
+        .input('trabalhoFim', sql.Time, toSqlTime(payload.trabalhoFim, 'Fim do trabalho'))
+        .input('almocoInicio', sql.Time, toSqlTime(payload.almocoInicio, 'Início do almoço'))
+        .input('almocoFim', sql.Time, toSqlTime(payload.almocoFim, 'Fim do almoço'))
+        .query(`
+            INSERT INTO Colaboradores (Nome, TrabalhoInicio, TrabalhoFim, AlmocoInicio, AlmocoFim)
+            OUTPUT INSERTED.*
+            VALUES (@nome, @trabalhoInicio, @trabalhoFim, @almocoInicio, @almocoFim)
+        `);
+
+    res.status(201).json({
+        message: 'Colaborador adicionado com sucesso!',
+        success: true,
+        data: result.recordset[0]
+    });
+});
+
 router.put('/:id', async (req, res) => {
-    const { id } = req.params;
-    const { nome, trabalhoInicio, trabalhoFim, almocoInicio, almocoFim } = req.body;
+    const id = ensurePositiveInt(req.params.id, 'Colaborador');
+    const pool = await conectar();
+    const existing = await findColaboradorById(pool, id);
+    const schema = await getSchemaInfo(pool);
 
-    try {
-        const pool = await conectar();
+    if (!existing) {
+        throw new AppError(404, 'Colaborador não encontrado.');
+    }
 
-        // Verifica se o colaborador existe
-        const checkResult = await pool.request()
+    const payload = buildColaboradorPayload(req.body, existing);
+    const saved = await withTransaction(sql, pool, async (tx) => {
+        const result = await tx.request()
             .input('id', sql.Int, id)
-            .query('SELECT * FROM Colaboradores WHERE Id = @id');
-
-        if (checkResult.recordset.length === 0) {
-            return res.status(404).json({ error: "Colaborador não encontrado" });
-        }
-
-        await pool.request()
-            .input('id', sql.Int, id)
-            .input('nome', sql.NVarChar(300), nome || null)
-            .input('trabalhoInicio', sql.Time, trabalhoInicio ? new Date(`1970-01-01T${trabalhoInicio}:00`) : null)
-            .input('trabalhoFim', sql.Time, trabalhoFim ? new Date(`1970-01-01T${trabalhoFim}:00`) : null)
-            .input('almocoInicio', sql.Time, almocoInicio ? new Date(`1970-01-01T${almocoInicio}:00`) : null)
-            .input('almocoFim', sql.Time, almocoFim ? new Date(`1970-01-01T${almocoFim}:00`) : null)
+            .input('nome', sql.NVarChar(300), payload.nome)
+            .input('trabalhoInicio', sql.Time, toSqlTime(payload.trabalhoInicio, 'Início do trabalho'))
+            .input('trabalhoFim', sql.Time, toSqlTime(payload.trabalhoFim, 'Fim do trabalho'))
+            .input('almocoInicio', sql.Time, toSqlTime(payload.almocoInicio, 'Início do almoço'))
+            .input('almocoFim', sql.Time, toSqlTime(payload.almocoFim, 'Fim do almoço'))
             .query(`
                 UPDATE Colaboradores
-                SET 
-                    Nome = COALESCE(@nome, Nome),
+                SET
+                    Nome = @nome,
                     TrabalhoInicio = @trabalhoInicio,
                     TrabalhoFim = @trabalhoFim,
                     AlmocoInicio = @almocoInicio,
                     AlmocoFim = @almocoFim
+                OUTPUT INSERTED.*
                 WHERE Id = @id
             `);
+        const colaboradorSalvo = result.recordset[0];
 
-        res.json({ message: 'Colaborador atualizado com sucesso!', success: true });
-    } catch (err) {
-        console.error("Erro ao atualizar:", err);
-        res.status(500).json({ error: err.message });
-    }
+        if (hasTable(schema, 'escala_dia')) {
+            await syncColaboradorDefaultsToEscalaDia(tx, schema, colaboradorSalvo);
+        }
+
+        return colaboradorSalvo;
+    });
+
+    res.json({
+        message: 'Colaborador atualizado com sucesso!',
+        success: true,
+        data: saved
+    });
 });
 
-// Excluir colaborador
 router.delete('/:id', async (req, res) => {
-    const { id } = req.params;
+    const id = ensurePositiveInt(req.params.id, 'Colaborador');
+    const pool = await conectar();
+    const schema = await getSchemaInfo(pool);
+    const colaborador = await findColaboradorById(pool, id);
 
-    try {
-        const pool = await conectar();
+    if (!colaborador) {
+        throw new AppError(404, 'Colaborador não encontrado.');
+    }
 
-        // Verifica se o colaborador existe
-        const checkResult = await pool.request()
-            .input('id', sql.Int, id)
-            .query('SELECT * FROM Colaboradores WHERE Id = @id');
+    const checkAusencias = await pool.request()
+        .input('colaboradorId', sql.Int, id)
+        .query('SELECT COUNT(*) AS total FROM Ausencias WHERE ColaboradorId = @colaboradorId');
 
-        if (checkResult.recordset.length === 0) {
-            return res.status(404).json({ error: "Colaborador não encontrado" });
+    if (checkAusencias.recordset[0].total > 0) {
+        throw new AppError(400, 'Não é possível excluir: colaborador possui lançamentos vinculados.');
+    }
+
+    const plantoes = await pool.request()
+        .query('SELECT id, colaboradores_ids FROM plantoes');
+
+    for (const plantao of plantoes.recordset) {
+        let colaboradoresIds = [];
+
+        try {
+            colaboradoresIds = JSON.parse(plantao.colaboradores_ids || '[]');
+        } catch (error) {
+            colaboradoresIds = [];
         }
 
-        // Verifica se existem ausências vinculadas
-        const checkAusencias = await pool.request()
-            .input('colaboradorId', sql.Int, id)
-            .query('SELECT COUNT(*) as total FROM Ausencias WHERE ColaboradorId = @colaboradorId');
-
-        if (checkAusencias.recordset[0].total > 0) {
-            return res.status(400).json({ 
-                error: "Não é possível excluir: colaborador possui lançamentos vinculados" 
-            });
+        if (!Array.isArray(colaboradoresIds) || !colaboradoresIds.includes(id)) {
+            continue;
         }
+
+        const atualizados = colaboradoresIds.filter((colaboradorId) => colaboradorId !== id);
 
         await pool.request()
-            .input('id', sql.Int, id)
-            .query('DELETE FROM Colaboradores WHERE Id = @id');
-
-        res.json({ message: 'Colaborador excluído com sucesso!', success: true });
-    } catch (err) {
-        console.error("Erro ao excluir:", err);
-        res.status(500).json({ error: err.message });
+            .input('id', sql.Int, plantao.id)
+            .input('colaboradores_ids', sql.NVarChar(sql.MAX), JSON.stringify(atualizados))
+            .query(`
+                UPDATE plantoes
+                SET colaboradores_ids = @colaboradores_ids, atualizado_em = GETDATE()
+                WHERE id = @id
+            `);
     }
+
+    if (getBancoHorasCapabilities(schema).hasMovimentosTable) {
+        await pool.request()
+            .input('colaboradorId', sql.Int, id)
+            .query('DELETE FROM BancoHorasMovimentos WHERE ColaboradorId = @colaboradorId');
+    }
+
+    if (hasTable(schema, 'escala_dia')) {
+        await pool.request()
+            .input('colaboradorId', sql.Int, id)
+            .query('DELETE FROM escala_dia WHERE colaborador_id = @colaboradorId');
+    }
+
+    await pool.request()
+        .input('id', sql.Int, id)
+        .query('DELETE FROM Colaboradores WHERE Id = @id');
+
+    res.json({
+        message: 'Colaborador excluído com sucesso!',
+        success: true
+    });
 });
 
 module.exports = router;

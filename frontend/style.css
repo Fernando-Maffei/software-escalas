@@ -1,6 +1,4 @@
 /* ================= ARQUIVO PRINCIPAL ================= */
-/* Apenas importa os módulos organizados */
-
 @import url('css/themes.css');
 @import url('css/base.css');
 @import url('css/sidebar.css');
@@ -11,6 +9,6 @@
 @import url('css/colaboradores.css');
 @import url('css/escala.css');
 @import url('css/plantao.css');
-@import url('css/relatorios.css');
-@import url('css/configuracoes.css');
+@import url('css/relatorios.css?v=20260427h');
+@import url('css/configuracoes.css?v=20260427f');
 @import url('css/dashboard.css');

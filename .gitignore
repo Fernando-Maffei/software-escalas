@@ -10,6 +10,7 @@ package-lock.json
 
 # Backend
 backend/config.js
+backend/config/*.json
 *.log
 
 # Banco de dados

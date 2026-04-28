@@ -1,105 +1,139 @@
-// dashboard.js
-// Variáveis globais para o dashboard
 let dashboardInterval = null;
+let dashboardRenderPromise = null;
 
-// Função principal para renderizar o dashboard
-async function renderDashboard() {
-    console.log("📊 Renderizando dashboard...");
-    
-    const appContent = document.getElementById("appContent");
-    
-    // Garantir que os dados estão atualizados
-    await Promise.all([
-        carregarColaboradores(),
-        carregarAusencias(),
-        carregarFeriadosLocais()
-    ]);
-    
-    // Obter dados do dia atual
-    const hoje = new Date();
-    const dataHoje = hoje.toISOString().split('T')[0];
-    
-    // Calcular métricas
-    const metricas = calcularMetricas(hoje, dataHoje);
-    
-    // Gerar alertas
-    const alertas = gerarAlertas();
-    
-    // Buscar próximos eventos
-    const proximosEventos = await buscarProximosEventos();
-    
-    appContent.innerHTML = `
-        <div class="page-header">
-            <h1><i class="fas fa-chart-line"></i> Dashboard</h1>
-            <p>${hoje.toLocaleDateString('pt-BR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
-        </div>
+window.renderDashboard = renderDashboard;
+window.pararAtualizacaoAutomatica = pararAtualizacaoAutomatica;
 
-        <!-- CARDS DE MÉTRICAS -->
-        <div class="dashboard-grid">
-            ${gerarCardMetrica('Colaboradores', metricas.totalColaboradores, 'users', 'Total ativos', metricas.ativos)}
-            ${gerarCardMetrica('Hoje', metricas.trabalhandoHoje, 'briefcase', 'Trabalhando agora', metricas.trabalhandoAgora, 'trabalhando')}
-            ${gerarCardMetrica('Ausências', metricas.ausenciasHoje, 'calendar-times', 'Férias/Folgas', metricas.feriasHoje)}
-            ${gerarCardMetrica('Plantões', metricas.proximosPlantoes, 'calendar-check', 'Próximos 30 dias', metricas.proximosPlantoes)}
-        </div>
+function toISODate(value) {
+    if (!value) {
+        return null;
+    }
 
-        <!-- ALERTAS E PROBLEMAS -->
-        <div class="alerts-section">
-            <div class="alerts-header">
-                <i class="fas fa-exclamation-triangle"></i>
-                <h3>Alertas e Atenção</h3>
-            </div>
-            <div class="alerts-list" id="alertsList">
-                ${alertas.length > 0 ? alertas.map(a => gerarAlertItem(a)).join('') : `
-                    <div class="alert-item success">
-                        <i class="fas fa-check-circle"></i>
-                        <div class="alert-content">
-                            <span class="alert-title">Tudo certo!</span>
-                            <span class="alert-description">Nenhum problema identificado</span>
-                        </div>
-                    </div>
-                `}
-            </div>
-        </div>
+    if (typeof value === 'string') {
+        return value.includes('T') ? value.split('T')[0] : value;
+    }
 
-        <!-- GRÁFICOS -->
-        <div class="charts-grid">
-            <div class="chart-card">
-                <h4><i class="fas fa-chart-bar"></i> Ausências por Tipo</h4>
-                <div id="chartAusencias" style="height: 200px;">
-                    ${gerarGraficoAusencias()}
-                </div>
-            </div>
-            <div class="chart-card">
-                <h4><i class="fas fa-clock"></i> Ocupação por Hora</h4>
-                <div id="chartOcupacao" style="height: 200px;">
-                    ${gerarGraficoOcupacao()}
-                </div>
-            </div>
-        </div>
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+        return null;
+    }
 
-        <!-- PRÓXIMOS EVENTOS -->
-        <div class="events-section">
-            <div class="events-header">
-                <i class="fas fa-calendar-alt"></i>
-                <h3>Próximos Eventos</h3>
-            </div>
-            <div class="events-list" id="eventsList">
-                ${proximosEventos.length > 0 ? proximosEventos.map(e => gerarEventItem(e)).join('') : `
-                    <div class="empty-state">
-                        <i class="fas fa-calendar-check"></i>
-                        <p>Nenhum evento próximo</p>
-                    </div>
-                `}
-            </div>
-        </div>
-    `;
-    
-    // Iniciar atualização automática a cada minuto
-    iniciarAtualizacaoAutomatica();
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
 }
 
-// Função para gerar cards de métricas
-function gerarCardMetrica(titulo, valor, icone, subtitulo, valor2, tipo = 'normal') {
+function obterHoraNumericaSegura(valor) {
+    if (typeof obterHoraNumerica === 'function') {
+        return obterHoraNumerica(valor);
+    }
+
+    if (!valor) {
+        return null;
+    }
+
+    const raw = String(valor);
+    const hora = raw.includes('T')
+        ? raw.match(/T(\d{2})/)?.[1]
+        : raw.split(':')[0];
+
+    return hora !== undefined ? Number(hora) : null;
+}
+
+function obterAusenciasNaData(dataISO) {
+    return (window.ausencias || []).filter((ausencia) => {
+        const inicio = toISODate(ausencia.DataInicio || ausencia.dataInicio);
+        const fim = toISODate(ausencia.DataFim || ausencia.dataFim);
+
+        return Boolean(inicio && fim && dataISO >= inicio && dataISO <= fim);
+    });
+}
+
+function obterAusenciaDoColaboradorNaData(colaboradorId, dataISO) {
+    return obterAusenciasNaData(dataISO).find((ausencia) => (ausencia.colaboradorId || ausencia.ColaboradorId) === colaboradorId) || null;
+}
+
+function colaboradorDisponivelNaHora(colaborador, hora, dataISO) {
+    const ausencia = obterAusenciaDoColaboradorNaData(colaborador.Id, dataISO);
+    const tipo = String(ausencia?.tipo || ausencia?.Tipo || '').toLowerCase();
+    const periodoTipo = ausencia?.periodoTipo || ausencia?.PeriodoTipo;
+
+    if (ausencia && periodoTipo !== 'horas') {
+        return false;
+    }
+
+    const trabalhoInicio = obterHoraNumericaSegura(colaborador.TrabalhoInicio);
+    const trabalhoFim = obterHoraNumericaSegura(colaborador.TrabalhoFim);
+    const almocoInicio = obterHoraNumericaSegura(colaborador.AlmocoInicio);
+    const almocoFim = obterHoraNumericaSegura(colaborador.AlmocoFim);
+
+    if (trabalhoInicio === null || trabalhoFim === null) {
+        return false;
+    }
+
+    const dentroDoTrabalho = hora >= trabalhoInicio && hora < trabalhoFim;
+    const estaNoAlmoco = almocoInicio !== null && almocoFim !== null && hora >= almocoInicio && hora < almocoFim;
+
+    if (!dentroDoTrabalho || estaNoAlmoco) {
+        return false;
+    }
+
+    if (periodoTipo === 'horas') {
+        const horaInicio = obterHoraNumericaSegura(ausencia?.horaInicio || ausencia?.HoraInicio);
+        const horaFim = obterHoraNumericaSegura(ausencia?.horaFim || ausencia?.HoraFim);
+
+        if (horaInicio !== null && horaFim !== null && hora >= horaInicio && hora < horaFim) {
+            return false;
+        }
+    }
+
+    return tipo !== 'ferias' && tipo !== 'folga' && tipo !== 'ausencia';
+}
+
+function calcularMetricas(agora, dataHoje) {
+    const colaboradores = window.colaboradores || [];
+    const ativos = colaboradores.filter((colaborador) => colaborador.TrabalhoInicio && colaborador.TrabalhoFim);
+    const ausenciasHoje = obterAusenciasNaData(dataHoje);
+    const ausentesIntegralmente = new Set(
+        ausenciasHoje
+            .filter((ausencia) => (ausencia.periodoTipo || ausencia.PeriodoTipo) !== 'horas')
+            .map((ausencia) => ausencia.colaboradorId || ausencia.ColaboradorId)
+    );
+
+    const disponibilidadeHoje = Math.max(ativos.length - ausentesIntegralmente.size, 0);
+    const trabalhandoAgora = ativos.filter((colaborador) => colaboradorDisponivelNaHora(colaborador, agora.getHours(), dataHoje)).length;
+    const feriasHoje = ausenciasHoje.filter((ausencia) => String(ausencia.tipo || ausencia.Tipo || '').toLowerCase() === 'ferias').length;
+
+    const proximosPlantoes = (window.plantoesLancados || []).filter((plantao) => {
+        const dataPlantao = toISODate(plantao.dataISO || plantao.data_plantao);
+        if (!dataPlantao) {
+            return false;
+        }
+
+        const diff = Math.floor((new Date(`${dataPlantao}T12:00:00`) - agora) / (1000 * 60 * 60 * 24));
+        return diff >= 0 && diff <= 30;
+    });
+
+    const plantaoSemEquipe = proximosPlantoes.filter((plantao) => !Array.isArray(plantao.colaboradores) || plantao.colaboradores.length === 0).length;
+    const coberturaPercentual = ativos.length > 0
+        ? Math.round((disponibilidadeHoje / ativos.length) * 100)
+        : 0;
+
+    return {
+        totalColaboradores: colaboradores.length,
+        ativos: ativos.length,
+        disponibilidadeHoje,
+        trabalhandoAgora,
+        ausenciasHoje: ausenciasHoje.length,
+        feriasHoje,
+        proximosPlantoes: proximosPlantoes.length,
+        plantaoSemEquipe,
+        coberturaPercentual
+    };
+}
+
+function gerarCardMetrica(titulo, valor, icone, subtitulo, destaque) {
     return `
         <div class="dashboard-card">
             <div class="dashboard-card-header">
@@ -108,12 +142,12 @@ function gerarCardMetrica(titulo, valor, icone, subtitulo, valor2, tipo = 'norma
             </div>
             <div class="dashboard-card-value">${valor}</div>
             <div class="dashboard-card-label">${subtitulo}</div>
-            ${valor2 !== undefined ? `
+            ${destaque ? `
                 <div class="dashboard-card-small" style="margin-top: 12px;">
-                    <i class="fas fa-${tipo === 'trabalhando' ? 'briefcase' : 'clock'}"></i>
+                    <i class="fas fa-info-circle"></i>
                     <div class="dashboard-card-small-info">
-                        <strong>${valor2}</strong>
-                        <span>${subtitulo}</span>
+                        <strong>${destaque.valor}</strong>
+                        <span>${destaque.rotulo}</span>
                     </div>
                 </div>
             ` : ''}
@@ -121,134 +155,81 @@ function gerarCardMetrica(titulo, valor, icone, subtitulo, valor2, tipo = 'norma
     `;
 }
 
-// Função para calcular métricas
-function calcularMetricas(hoje, dataHoje) {
-    const horaAtual = hoje.getHours();
-    
-    // Total de colaboradores
-    const totalColaboradores = window.colaboradores?.length || 0;
-    
-    // Colaboradores ativos (com horário definido)
-    const ativos = window.colaboradores?.filter(c => c.TrabalhoInicio && c.TrabalhoFim).length || 0;
-    
-    // Trabalhando hoje (segunda a sábado)
-    const diaSemana = hoje.getDay();
-    const trabalhandoHoje = diaSemana >= 1 && diaSemana <= 6 ? totalColaboradores : 0;
-    
-    // Trabalhando agora
-    let trabalhandoAgora = 0;
-    window.colaboradores?.forEach(c => {
-        const trabInicio = obterHoraNumerica(c.TrabalhoInicio);
-        const trabFim = obterHoraNumerica(c.TrabalhoFim);
-        if (trabInicio !== null && trabFim !== null && 
-            horaAtual >= trabInicio && horaAtual < trabFim) {
-            trabalhandoAgora++;
-        }
-    });
-    
-    // Ausências hoje
-    const ausenciasHoje = window.ausencias?.filter(a => {
-        const dataInicio = new Date(a.DataInicio).toISOString().split('T')[0];
-        const dataFim = new Date(a.DataFim).toISOString().split('T')[0];
-        return dataHoje >= dataInicio && dataHoje <= dataFim;
-    }).length || 0;
-    
-    // Férias hoje
-    const feriasHoje = window.ausencias?.filter(a => {
-        const tipo = (a.tipo || a.Tipo || '').toLowerCase();
-        const dataInicio = new Date(a.DataInicio).toISOString().split('T')[0];
-        const dataFim = new Date(a.DataFim).toISOString().split('T')[0];
-        return tipo === 'ferias' && dataHoje >= dataInicio && dataHoje <= dataFim;
-    }).length || 0;
-    
-    // Próximos plantões (próximos 30 dias)
-    const proximosPlantoes = window.plantoesLancados?.filter(p => {
-        const dataPlantao = new Date(p.dataISO);
-        const diffDias = Math.floor((dataPlantao - hoje) / (1000 * 60 * 60 * 24));
-        return diffDias >= 0 && diffDias <= 30;
-    }).length || 0;
-    
-    return {
-        totalColaboradores,
-        ativos,
-        trabalhandoHoje,
-        trabalhandoAgora,
-        ausenciasHoje,
-        feriasHoje,
-        proximosPlantoes
-    };
-}
-
-// Função para gerar alertas
-function gerarAlertas() {
+function gerarAlertas(metricas, dataHoje) {
     const alertas = [];
-    const hoje = new Date();
-    const dataHoje = hoje.toISOString().split('T')[0];
-    
-    // 1. Colaboradores sem horário definido
-    const semHorario = window.colaboradores?.filter(c => !c.TrabalhoInicio || !c.TrabalhoFim) || [];
+    const colaboradores = window.colaboradores || [];
+    const ausenciasHoje = obterAusenciasNaData(dataHoje);
+
+    const semHorario = colaboradores.filter((colaborador) => !colaborador.TrabalhoInicio || !colaborador.TrabalhoFim);
     if (semHorario.length > 0) {
         alertas.push({
             tipo: 'warning',
-            icone: 'exclamation-triangle',
-            titulo: `${semHorario.length} colaborador(es) sem horário definido`,
-            descricao: 'Configure os horários de trabalho para esses colaboradores'
+            icone: 'clock',
+            titulo: `${semHorario.length} colaborador(es) sem jornada definida`,
+            descricao: 'Preencha horários de entrada e saída para melhorar a escala.'
         });
     }
-    
-    // 2. Férias próximas (próximos 7 dias)
-    const feriasProximas = window.ausencias?.filter(a => {
-        const tipo = (a.tipo || a.Tipo || '').toLowerCase();
-        if (tipo !== 'ferias') return false;
-        
-        const dataInicio = new Date(a.DataInicio);
-        const diffDias = Math.floor((dataInicio - hoje) / (1000 * 60 * 60 * 24));
-        return diffDias >= 0 && diffDias <= 7;
-    }) || [];
-    
-    feriasProximas.forEach(f => {
-        const colaborador = window.colaboradores?.find(c => c.Id === (f.colaboradorId || f.ColaboradorId));
-        if (colaborador) {
-            alertas.push({
-                tipo: 'success',
-                icone: 'umbrella-beach',
-                titulo: `Férias próximas: ${colaborador.Nome}`,
-                descricao: `Início em ${new Date(f.DataInicio).toLocaleDateString('pt-BR')}`
-            });
-        }
-    });
-    
-    // 3. Plantão sem colaboradores
-    const plantaoSemColab = window.plantoesLancados?.filter(p => !p.colaboradores || p.colaboradores.length === 0) || [];
-    if (plantaoSemColab.length > 0) {
+
+    if (metricas.coberturaPercentual > 0 && metricas.coberturaPercentual < 60) {
         alertas.push({
             tipo: 'danger',
-            icone: 'calendar-times',
-            titulo: `${plantaoSemColab.length} plantão(ões) sem colaboradores`,
-            descricao: 'Adicione colaboradores aos plantões lançados'
+            icone: 'exclamation-triangle',
+            titulo: `Cobertura baixa hoje (${metricas.coberturaPercentual}%)`,
+            descricao: 'Há pouca gente disponível para o volume cadastrado de horários.'
         });
     }
-    
-    // 4. Conflitos de ausência (mesmo dia com múltiplas ausências)
-    const conflitos = window.ausencias?.filter(a => {
-        const dataInicio = new Date(a.DataInicio).toISOString().split('T')[0];
-        const dataFim = new Date(a.DataFim).toISOString().split('T')[0];
-        return dataHoje >= dataInicio && dataHoje <= dataFim;
-    }) || [];
-    
-    if (conflitos.length > 3) {
+
+    if (metricas.plantaoSemEquipe > 0) {
+        alertas.push({
+            tipo: 'warning',
+            icone: 'calendar-times',
+            titulo: `${metricas.plantaoSemEquipe} plantão(ões) sem equipe`,
+            descricao: 'Revise os próximos sábados para evitar lacunas de atendimento.'
+        });
+    }
+
+    if (ausenciasHoje.length >= 3) {
         alertas.push({
             tipo: 'warning',
             icone: 'users-slash',
-            titulo: `Muitas ausências hoje (${conflitos.length})`,
-            descricao: 'Verifique se a escala está adequada'
+            titulo: `${ausenciasHoje.length} ausência(s) ativa(s) hoje`,
+            descricao: 'Vale revisar a distribuição do dia para evitar sobrecarga.'
         });
     }
-    
+
+    const hoje = new Date(`${dataHoje}T12:00:00`);
+    const feriasProximas = (window.ausencias || []).filter((ausencia) => {
+        if (String(ausencia.tipo || ausencia.Tipo || '').toLowerCase() !== 'ferias') {
+            return false;
+        }
+
+        const inicio = toISODate(ausencia.DataInicio || ausencia.dataInicio);
+        if (!inicio) {
+            return false;
+        }
+
+        const diff = Math.floor((new Date(`${inicio}T12:00:00`) - hoje) / (1000 * 60 * 60 * 24));
+        return diff >= 0 && diff <= 7;
+    });
+
+    feriasProximas.slice(0, 2).forEach((ausencia) => {
+        const colaborador = colaboradores.find((item) => item.Id === (ausencia.colaboradorId || ausencia.ColaboradorId));
+
+        if (!colaborador) {
+            return;
+        }
+
+        alertas.push({
+            tipo: 'success',
+            icone: 'umbrella-beach',
+            titulo: `Férias próximas: ${colaborador.Nome}`,
+            descricao: `Início em ${new Date(`${toISODate(ausencia.DataInicio || ausencia.dataInicio)}T12:00:00`).toLocaleDateString('pt-BR')}.`
+        });
+    });
+
     return alertas;
 }
 
-// Função para gerar item de alerta
 function gerarAlertItem(alerta) {
     return `
         <div class="alert-item ${alerta.tipo}">
@@ -261,83 +242,64 @@ function gerarAlertItem(alerta) {
     `;
 }
 
-// Função para gerar gráfico de ausências (simulado com CSS)
 function gerarGraficoAusencias() {
     const tipos = {
-        ferias: window.ausencias?.filter(a => (a.tipo || a.Tipo || '').toLowerCase() === 'ferias').length || 0,
-        folga: window.ausencias?.filter(a => (a.tipo || a.Tipo || '').toLowerCase() === 'folga').length || 0,
-        ausencia: window.ausencias?.filter(a => (a.tipo || a.Tipo || '').toLowerCase() === 'ausencia').length || 0
+        ferias: 0,
+        folga: 0,
+        ausencia: 0
     };
-    
+
+    (window.ausencias || []).forEach((ausencia) => {
+        const tipo = String(ausencia.tipo || ausencia.Tipo || '').toLowerCase();
+        if (tipos[tipo] !== undefined) {
+            tipos[tipo] += 1;
+        }
+    });
+
     const total = tipos.ferias + tipos.folga + tipos.ausencia;
-    
+
     if (total === 0) {
         return '<div class="empty-state" style="min-height: 150px;">Sem dados para exibir</div>';
     }
-    
-    const porcentagens = {
-        ferias: (tipos.ferias / total) * 100,
-        folga: (tipos.folga / total) * 100,
-        ausencia: (tipos.ausencia / total) * 100
-    };
-    
+
+    const barras = [
+        { label: 'Férias', valor: tipos.ferias, cor: '#3b82f6' },
+        { label: 'Folgas', valor: tipos.folga, cor: '#10b981' },
+        { label: 'Ausências', valor: tipos.ausencia, cor: '#ef4444' }
+    ];
+
     return `
         <div style="display: flex; flex-direction: column; gap: 12px; height: 100%; justify-content: center;">
-            <div style="display: flex; align-items: center; gap: 8px;">
-                <span style="width: 80px; font-size: 12px; color: var(--text-light);">Férias</span>
-                <div style="flex: 1; height: 20px; background: var(--card-dark); border-radius: 10px; overflow: hidden;">
-                    <div style="width: ${porcentagens.ferias}%; height: 100%; background: linear-gradient(90deg, #6366f1, #818cf8);"></div>
+            ${barras.map((barra) => `
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <span style="width: 80px; font-size: 12px; color: var(--text-light);">${barra.label}</span>
+                    <div style="flex: 1; height: 20px; background: var(--card-dark); border-radius: 10px; overflow: hidden;">
+                        <div style="width: ${(barra.valor / total) * 100}%; height: 100%; background: ${barra.cor};"></div>
+                    </div>
+                    <span style="width: 40px; font-size: 12px; font-weight: 600;">${barra.valor}</span>
                 </div>
-                <span style="width: 40px; font-size: 12px; font-weight: 600;">${tipos.ferias}</span>
-            </div>
-            <div style="display: flex; align-items: center; gap: 8px;">
-                <span style="width: 80px; font-size: 12px; color: var(--text-light);">Folgas</span>
-                <div style="flex: 1; height: 20px; background: var(--card-dark); border-radius: 10px; overflow: hidden;">
-                    <div style="width: ${porcentagens.folga}%; height: 100%; background: linear-gradient(90deg, #10b981, #34d399);"></div>
-                </div>
-                <span style="width: 40px; font-size: 12px; font-weight: 600;">${tipos.folga}</span>
-            </div>
-            <div style="display: flex; align-items: center; gap: 8px;">
-                <span style="width: 80px; font-size: 12px; color: var(--text-light);">Ausências</span>
-                <div style="flex: 1; height: 20px; background: var(--card-dark); border-radius: 10px; overflow: hidden;">
-                    <div style="width: ${porcentagens.ausencia}%; height: 100%; background: linear-gradient(90deg, #ef4444, #f87171);"></div>
-                </div>
-                <span style="width: 40px; font-size: 12px; font-weight: 600;">${tipos.ausencia}</span>
-            </div>
+            `).join('')}
         </div>
     `;
 }
 
-// Função para gerar gráfico de ocupação
-function gerarGraficoOcupacao() {
+function gerarGraficoOcupacao(dataHoje) {
     const ocupacao = [];
-    
-    for (let hora = 7; hora <= 18; hora++) {
-        let contagem = 0;
-        window.colaboradores?.forEach(c => {
-            const trabInicio = obterHoraNumerica(c.TrabalhoInicio);
-            const trabFim = obterHoraNumerica(c.TrabalhoFim);
-            if (trabInicio !== null && trabFim !== null && 
-                hora >= trabInicio && hora < trabFim) {
-                contagem++;
-            }
-        });
+
+    for (let hora = 7; hora <= 18; hora += 1) {
+        const contagem = (window.colaboradores || []).filter((colaborador) => colaboradorDisponivelNaHora(colaborador, hora, dataHoje)).length;
         ocupacao.push({ hora, contagem });
     }
-    
-    const maxContagem = Math.max(...ocupacao.map(o => o.contagem));
-    
+
+    const maxContagem = Math.max(...ocupacao.map((item) => item.contagem), 1);
+
     return `
         <div style="display: flex; align-items: flex-end; gap: 8px; height: 180px; padding: 10px 0;">
-            ${ocupacao.map(o => `
+            ${ocupacao.map((item) => `
                 <div style="flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px;">
-                    <div style="width: 100%; height: ${(o.contagem / (maxContagem || 1)) * 120}px; 
-                                background: linear-gradient(0deg, #6366f1, #818cf8);
-                                border-radius: 8px 8px 0 0;
-                                transition: height 0.3s ease;">
-                    </div>
-                    <span style="font-size: 10px; color: var(--text-light);">${o.hora}h</span>
-                    <span style="font-size: 10px; font-weight: 600;">${o.contagem}</span>
+                    <div style="width: 100%; height: ${(item.contagem / maxContagem) * 120}px; background: linear-gradient(0deg, #0f766e, #14b8a6); border-radius: 8px 8px 0 0;"></div>
+                    <span style="font-size: 10px; color: var(--text-light);">${item.hora}h</span>
+                    <span style="font-size: 10px; font-weight: 600;">${item.contagem}</span>
                 </div>
             `).join('')}
         </div>
@@ -347,157 +309,96 @@ function gerarGraficoOcupacao() {
 async function buscarProximosEventos() {
     const eventos = [];
     const hoje = new Date();
-    const dataHoje = hoje.toISOString().split('T')[0];
-    
-    // Criar um mapa para agrupar eventos por tipo e colaborador
-    const eventosAgrupados = new Map(); // Chave: "colaborador-tipo"
-    
-    // Buscar ausências dos próximos 30 dias
-    for (let i = 0; i < 30; i++) {
+
+    const periodo = Array.from({ length: 30 }, (_, index) => {
         const data = new Date(hoje);
-        data.setDate(hoje.getDate() + i);
-        const dataStr = data.toISOString().split('T')[0];
-        
-        // Ausências
-        const ausenciasDia = window.ausencias?.filter(a => {
-            if (!a.DataInicio || !a.DataFim) return false;
-            
-            // 🔥 CORREÇÃO: Extrair apenas a parte da data (YYYY-MM-DD)
-            const dataInicioStr = (a.DataInicio || '').split('T')[0];
-            const dataFimStr = (a.DataFim || '').split('T')[0];
-            
-            return dataStr >= dataInicioStr && dataStr <= dataFimStr;
-        }) || [];
-        
-        ausenciasDia.forEach(a => {
-            const colaborador = window.colaboradores?.find(c => c.Id === (a.colaboradorId || a.ColaboradorId));
-            const tipo = (a.tipo || a.Tipo || '').toLowerCase();
-            
-            if (!colaborador) return;
-            
-            const chave = `${colaborador.Nome}-${tipo}`;
-            
-            if (!eventosAgrupados.has(chave)) {
-                // Primeiro dia do período - usar strings, não objetos Date
-                eventosAgrupados.set(chave, {
-                    colaborador: colaborador.Nome,
-                    tipo: tipo,
-                    dataInicioStr: (a.DataInicio || '').split('T')[0],
-                    dataFimStr: (a.DataFim || '').split('T')[0],
-                    dataInicioObj: new Date((a.DataInicio || '').split('T')[0] + 'T12:00:00'),
-                    dataFimObj: new Date((a.DataFim || '').split('T')[0] + 'T12:00:00')
-                });
-            }
-        });
-        
-        // Feriados (não agrupar, são eventos pontuais)
-        const feriadosAPI = window.feriados?.filter(f => f.date === dataStr) || [];
-        feriadosAPI.forEach(f => {
+        data.setDate(hoje.getDate() + index);
+        return toISODate(data);
+    });
+
+    periodo.forEach((dataISO) => {
+        (window.feriados || []).filter((feriado) => feriado.date === dataISO).forEach((feriado) => {
             eventos.push({
-                // 🔥 CORREÇÃO: Usar a string da data, não new Date()
-                dataStr: dataStr,
-                data: new Date(dataStr + 'T12:00:00'), // Meio-dia UTC
-                titulo: f.name,
-                subtitulo: 'Feriado Nacional',
+                dataStr: dataISO,
+                data: new Date(`${dataISO}T12:00:00`),
+                titulo: feriado.name,
+                subtitulo: 'Feriado nacional',
                 tipo: 'feriado',
                 isPeriodo: false
             });
         });
-        
-        // Feriados locais
-        const feriadosLocais = window.feriadosLocais?.filter(f => {
-            if (!f.Data) return false;
-            const dataFeriado = (f.Data || '').split('T')[0];
-            return dataFeriado === dataStr;
-        }) || [];
-        
-        feriadosLocais.forEach(f => {
+
+        (window.feriadosLocais || []).filter((feriado) => toISODate(feriado.Data || feriado.data) === dataISO).forEach((feriado) => {
             eventos.push({
-                dataStr: dataStr,
-                data: new Date(dataStr + 'T12:00:00'), // Meio-dia UTC
-                titulo: f.Nome || f.nome || 'Feriado',
-                subtitulo: f.Tipo || f.tipo || 'Municipal',
+                dataStr: dataISO,
+                data: new Date(`${dataISO}T12:00:00`),
+                titulo: feriado.Nome || feriado.nome || 'Feriado local',
+                subtitulo: feriado.Tipo || feriado.tipo || 'Municipal',
                 tipo: 'feriado',
                 isPeriodo: false
             });
-        });
-    }
-    
-    // Converter o mapa em array de eventos
-    eventosAgrupados.forEach((valor, chave) => {
-        // 🔥 CORREÇÃO: Calcular diferença usando as strings
-        const [anoI, mesI, diaI] = valor.dataInicioStr.split('-').map(Number);
-        const [anoF, mesF, diaF] = valor.dataFimStr.split('-').map(Number);
-        
-        // Criar datas UTC para cálculo correto
-        const dataInicioUTC = Date.UTC(anoI, mesI - 1, diaI);
-        const dataFimUTC = Date.UTC(anoF, mesF - 1, diaF);
-        
-        const diffDias = Math.floor((dataFimUTC - dataInicioUTC) / (1000 * 60 * 60 * 24)) + 1;
-        
-        let titulo = valor.colaborador;
-        let subtitulo = '';
-        
-        if (diffDias > 1) {
-            // É um período
-            subtitulo = `${valor.tipo === 'ferias' ? 'Férias' : 
-                         valor.tipo === 'folga' ? 'Folga' : 'Ausência'} - 
-                         ${diffDias} dias (${formatarDataBR(valor.dataInicioStr)} a ${formatarDataBR(valor.dataFimStr)})`;
-        } else {
-            // É um dia único
-            subtitulo = valor.tipo === 'ferias' ? 'Férias' : 
-                        valor.tipo === 'folga' ? 'Folga' : 'Ausência';
-        }
-        
-        eventos.push({
-            dataStr: valor.dataInicioStr,
-            data: new Date(valor.dataInicioStr + 'T12:00:00'), // Meio-dia UTC
-            dataFim: valor.dataFimStr,
-            titulo: titulo,
-            subtitulo: subtitulo,
-            tipo: valor.tipo,
-            isPeriodo: diffDias > 1,
-            diffDias: diffDias
         });
     });
-    
-    // Ordenar por data (usando as strings)
+
+    const eventosAgrupados = new Map();
+
+    (window.ausencias || []).forEach((ausencia) => {
+        const inicio = toISODate(ausencia.DataInicio || ausencia.dataInicio);
+        const fim = toISODate(ausencia.DataFim || ausencia.dataFim);
+        const tipo = String(ausencia.tipo || ausencia.Tipo || '').toLowerCase();
+        const colaborador = (window.colaboradores || []).find((item) => item.Id === (ausencia.colaboradorId || ausencia.ColaboradorId));
+
+        if (!inicio || !fim || !colaborador) {
+            return;
+        }
+
+        const dataInicio = new Date(`${inicio}T12:00:00`);
+        const diffInicio = Math.floor((dataInicio - hoje) / (1000 * 60 * 60 * 24));
+        if (diffInicio < 0 || diffInicio > 30) {
+            return;
+        }
+
+        const chave = `${colaborador.Nome}-${tipo}-${inicio}-${fim}`;
+        if (!eventosAgrupados.has(chave)) {
+            const diffDias = Math.floor((new Date(`${fim}T12:00:00`) - dataInicio) / (1000 * 60 * 60 * 24)) + 1;
+            const periodo = diffDias > 1
+                ? `${diffDias} dias (${formatarDataBR(inicio)} a ${formatarDataBR(fim)})`
+                : formatarDataBR(inicio);
+
+            eventosAgrupados.set(chave, {
+                dataStr: inicio,
+                data: dataInicio,
+                titulo: colaborador.Nome,
+                subtitulo: `${tipo === 'ferias' ? 'Férias' : tipo === 'folga' ? 'Folga' : 'Ausência'} - ${periodo}`,
+                tipo,
+                isPeriodo: diffDias > 1
+            });
+        }
+    });
+
+    eventos.push(...eventosAgrupados.values());
     eventos.sort((a, b) => a.dataStr.localeCompare(b.dataStr));
-    
-    return eventos.slice(0, 10); // Limitar a 10 eventos
+
+    return eventos.slice(0, 10);
 }
 
-// Função auxiliar para formatar data
 function formatarDataBR(dataISO) {
     const [ano, mes, dia] = dataISO.split('-');
     return `${dia}/${mes}`;
 }
 
-
 function gerarEventItem(evento) {
-    // 🔥 CORREÇÃO: Extrair dia e mês da dataStr, não do objeto Date
-    const [ano, mes, dia] = evento.dataStr.split('-');
-    
-    let badgeClass = '';
-    let badgeText = '';
-    
-    if (evento.tipo === 'ferias') {
-        badgeClass = 'ferias';
-        badgeText = 'Férias';
-    } else if (evento.tipo === 'folga') {
-        badgeClass = 'folga';
-        badgeText = 'Folga';
-    } else if (evento.tipo === 'ausencia') {
-        badgeClass = 'ausencia';
-        badgeText = 'Ausência';
-    } else if (evento.tipo === 'feriado') {
-        badgeClass = 'feriado';
-        badgeText = 'Feriado';
-    }
-    
-    // Se for um período, mostrar ícone de período
-    const periodoIcon = evento.isPeriodo ? ' <i class="fas fa-calendar-alt"></i>' : '';
-    
+    const [, mes, dia] = evento.dataStr.split('-');
+    const badgeMap = {
+        ferias: 'Férias',
+        folga: 'Folga',
+        ausencia: 'Ausência',
+        feriado: 'Feriado'
+    };
+
+    const badgeClass = evento.tipo in badgeMap ? evento.tipo : 'feriado';
+    const badgeText = badgeMap[badgeClass];
+
     return `
         <div class="event-item">
             <div class="event-date">
@@ -506,7 +407,7 @@ function gerarEventItem(evento) {
                 ${evento.isPeriodo ? '<div class="event-period-icon"><i class="fas fa-calendar-alt"></i></div>' : ''}
             </div>
             <div class="event-info">
-                <div class="event-title">${evento.titulo}${periodoIcon}</div>
+                <div class="event-title">${evento.titulo}</div>
                 <div class="event-subtitle">${evento.subtitulo}</div>
             </div>
             <span class="event-badge ${badgeClass}">${badgeText}</span>
@@ -514,27 +415,131 @@ function gerarEventItem(evento) {
     `;
 }
 
-// Função para iniciar atualização automática
+async function renderDashboardInternal() {
+    const appContent = document.getElementById('appContent');
+    if (!appContent) {
+        return;
+    }
+
+    const hoje = new Date();
+    const dataHoje = toISODate(hoje);
+
+    await Promise.all([
+        carregarColaboradores(),
+        carregarAusencias(),
+        carregarFeriadosLocais(),
+        typeof carregarPlantoes === 'function' ? carregarPlantoes() : Promise.resolve([]),
+        typeof window.carregarFeriadosNacionais === 'function'
+            ? window.carregarFeriadosNacionais(hoje.getFullYear())
+            : Promise.resolve([])
+    ]);
+
+    const metricas = calcularMetricas(hoje, dataHoje);
+    const alertas = gerarAlertas(metricas, dataHoje);
+    const proximosEventos = await buscarProximosEventos();
+
+    appContent.innerHTML = `
+        <div class="page-header">
+            <h1><i class="fas fa-chart-line"></i> Dashboard</h1>
+            <p>${hoje.toLocaleDateString('pt-BR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
+        </div>
+
+        <div class="dashboard-grid">
+            ${gerarCardMetrica('Colaboradores', metricas.totalColaboradores, 'users', 'Total cadastrados', {
+                valor: metricas.ativos,
+                rotulo: 'Com horário definido'
+            })}
+            ${gerarCardMetrica('Cobertura do dia', metricas.disponibilidadeHoje, 'user-check', 'Disponíveis hoje', {
+                valor: `${metricas.coberturaPercentual}%`,
+                rotulo: 'Capacidade estimada'
+            })}
+            ${gerarCardMetrica('Agora', metricas.trabalhandoAgora, 'briefcase', 'Trabalhando neste horário', {
+                valor: metricas.ausenciasHoje,
+                rotulo: 'Ausências ativas hoje'
+            })}
+            ${gerarCardMetrica('Plantões', metricas.proximosPlantoes, 'calendar-check', 'Próximos 30 dias', {
+                valor: metricas.plantaoSemEquipe,
+                rotulo: 'Sem equipe definida'
+            })}
+        </div>
+
+        <div class="alerts-section">
+            <div class="alerts-header">
+                <i class="fas fa-exclamation-triangle"></i>
+                <h3>Alertas e atenção</h3>
+            </div>
+            <div class="alerts-list" id="alertsList">
+                ${alertas.length > 0 ? alertas.map((alerta) => gerarAlertItem(alerta)).join('') : `
+                    <div class="alert-item success">
+                        <i class="fas fa-check-circle"></i>
+                        <div class="alert-content">
+                            <span class="alert-title">Tudo certo!</span>
+                            <span class="alert-description">Nenhum alerta relevante encontrado no momento.</span>
+                        </div>
+                    </div>
+                `}
+            </div>
+        </div>
+
+        <div class="charts-grid">
+            <div class="chart-card">
+                <h4><i class="fas fa-chart-bar"></i> Ausências por tipo</h4>
+                <div id="chartAusencias" style="height: 200px;">
+                    ${gerarGraficoAusencias()}
+                </div>
+            </div>
+            <div class="chart-card">
+                <h4><i class="fas fa-clock"></i> Cobertura por hora</h4>
+                <div id="chartOcupacao" style="height: 200px;">
+                    ${gerarGraficoOcupacao(dataHoje)}
+                </div>
+            </div>
+        </div>
+
+        <div class="events-section">
+            <div class="events-header">
+                <i class="fas fa-calendar-alt"></i>
+                <h3>Próximos eventos</h3>
+            </div>
+            <div class="events-list" id="eventsList">
+                ${proximosEventos.length > 0 ? proximosEventos.map((evento) => gerarEventItem(evento)).join('') : `
+                    <div class="empty-state">
+                        <i class="fas fa-calendar-check"></i>
+                        <p>Nenhum evento próximo</p>
+                    </div>
+                `}
+            </div>
+        </div>
+    `;
+
+    iniciarAtualizacaoAutomatica();
+}
+
+function renderDashboard() {
+    if (!dashboardRenderPromise) {
+        dashboardRenderPromise = renderDashboardInternal().finally(() => {
+            dashboardRenderPromise = null;
+        });
+    }
+
+    return dashboardRenderPromise;
+}
+
 function iniciarAtualizacaoAutomatica() {
-    // Limpar intervalo anterior se existir
     if (dashboardInterval) {
         clearInterval(dashboardInterval);
     }
-    
-    // Atualizar a cada minuto
+
     dashboardInterval = setInterval(() => {
-        console.log("🔄 Atualizando dashboard...");
-        renderDashboard();
-    }, 60000); // 60 segundos
+        if ((window.location.hash || '#dashboard') === '#dashboard') {
+            renderDashboard();
+        }
+    }, 60000);
 }
 
-// Função para parar atualização automática
 function pararAtualizacaoAutomatica() {
     if (dashboardInterval) {
         clearInterval(dashboardInterval);
         dashboardInterval = null;
     }
 }
-
-// Exportar funções
-window.renderDashboard = renderDashboard;

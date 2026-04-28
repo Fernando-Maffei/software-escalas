@@ -24,6 +24,8 @@ window.excluirFeriado = excluirFeriado;
 window.gerarRelatorioCompleto = gerarRelatorioCompleto;
 window.toggleCamposHora = toggleCamposHora;
 window.mostrarDetalhesHora = mostrarDetalhesHora;
+window.corrigirDataISO = corrigirDataISO;
+
 
 
 // Substituir as funções antigas de abrir modal
@@ -39,7 +41,54 @@ window.abrirModalFeriado = function(dataISO) {
 
 // Elemento principal onde o conteúdo será renderizado
 const appContent = document.getElementById("appContent");
+window.__appBootstrapPromise = window.__appBootstrapPromise || null;
+
+function inicializarAplicacaoUmaVez() {
+    if (window.__appBootstrapPromise) {
+        return window.__appBootstrapPromise;
+    }
+
+    window.__appBootstrapPromise = (async () => {
+        console.log("Inicializando aplicaÃ§Ã£o...");
+
+        const temaSalvo = localStorage.getItem('tema') || 'light';
+        document.documentElement.setAttribute('data-theme', temaSalvo);
+
+        try {
+            await carregarColaboradores();
+            console.log("Colaboradores carregados:", colaboradores.length);
+
+            await carregarAusencias();
+            console.log("AusÃªncias carregadas:", ausencias.length);
+
+            await carregarFeriadosLocais();
+            console.log("Feriados locais carregados:", feriadosLocais.length);
+
+            if (typeof carregarPlantoes === 'function') {
+                await carregarPlantoes();
+            }
+        } catch (error) {
+            console.error("Erro ao carregar dados:", error);
+            mostrarToast("Erro ao carregar dados do servidor", "error");
+        }
+
+        configurarNavegacao();
+        configurarModais();
+        configurarObservers();
+
+        const paginaInicial = typeof getPaginaFromURL === 'function'
+            ? getPaginaFromURL()
+            : 'dashboard';
+
+        console.log("Carregando pÃ¡gina inicial:", paginaInicial);
+        carregarPagina(paginaInicial);
+    })();
+
+    return window.__appBootstrapPromise;
+}
 document.addEventListener("DOMContentLoaded", async () => {
+    inicializarAplicacaoUmaVez();
+    return;
     console.log("Inicializando aplicação...");
     
     const temaSalvo = localStorage.getItem('tema') || 'light';
@@ -196,12 +245,10 @@ function abrirModalAusencia(dataISO = null) {
     document.getElementById("colaboradorSelect").value = "";
     document.getElementById("tipoSelect").value = "folga";
     
-    // 🔥 Preenche a data se fornecida (apenas como sugestão, usuário pode alterar)
     if (dataISO) {
-        // Se a data veio no formato ISO (YYYY-MM-DD), usa direto
+
         let dataFormatada = dataISO;
         
-        // Verifica se é uma data válida no formato ISO
         if (dataISO.includes('T')) {
             dataFormatada = dataISO.split('T')[0];
         }
@@ -259,9 +306,6 @@ function abrirModalHorario(colaborador) {
     modal.classList.add("active");
 }
 
-
-
-// Função para salvar ausência
 
 async function salvarAusencia(tipo, dataInicio, dataFim) {
     const colaboradorId = document.getElementById("colaboradorSelect").value;
@@ -350,9 +394,6 @@ function corrigirDataISO(dataStr) {
     
     return dataStr;
 }
-
-// E use em todas as funções que manipulam datas
-window.corrigirDataISO = corrigirDataISO;
 
 // Função para cancelar edição
 function cancelarEdicaoAusencia() {
@@ -591,7 +632,6 @@ function carregarPagina(pagina) {
     }
 }
 
-// Função para verificar o dia da semana
 function getDiaSemana(dataISO) {
     if (!dataISO) return new Date().getDay();
     const [ano, mes, dia] = dataISO.split('-').map(Number);
@@ -599,33 +639,37 @@ function getDiaSemana(dataISO) {
     return data.getDay(); // 0 = Domingo, 6 = Sábado
 }
 
-// Função para buscar plantão do sábado
+
 function buscarPlantaoDoDia(dataISO) {
-    if (!window.plantoesLancados || window.plantoesLancados.length === 0) {
-        console.log("Nenhum plantão lançado");
+    console.log('🔍 ===== INICIANDO BUSCA DE PLANTÃO =====');
+    console.log('📅 Data recebida:', dataISO);
+    
+    // 🔥 USAR plantoesLancados DIRETAMENTE, não window.plantoesLancados
+    if (!plantoesLancados || plantoesLancados.length === 0) {
+        console.log('❌ Nenhum plantão carregado');
         return null;
     }
     
-    console.log("📋 Plantões lançados:", window.plantoesLancados);
-    console.log("🔍 Buscando plantão para data:", dataISO);
+    console.log('📋 Total de plantões:', plantoesLancados.length);
     
-    // 🔥 CORREÇÃO: Comparar com o campo correto
-    const plantao = window.plantoesLancados.find(p => {
-        // Usar p.dataISO que criamos no mapeamento
-        const dataPlantaoStr = p.dataISO;
-        
-        // Comparar strings
-        const encontrou = dataPlantaoStr === dataISO;
-        
-        if (encontrou) {
-            console.log(`✅ Plantão encontrado para ${dataISO}:`, p);
-        }
-        
-        return encontrou;
+    const dataBusca = String(dataISO).trim().split('T')[0];
+    console.log('📅 Data de busca limpa:', dataBusca);
+    
+    const plantao = plantoesLancados.find(p => {
+        let dataPlantao = p.dataISO || p.data_plantao || '';
+        dataPlantao = String(dataPlantao).trim().split('T')[0];
+        return dataPlantao === dataBusca;
     });
     
-    return plantao ? plantao.colaboradores : null;
+    if (plantao) {
+        console.log('✅ Plantão encontrado! Colaboradores:', plantao.colaboradores);
+        return plantao.colaboradores;
+    }
+    
+    console.log('❌ Nenhum plantão encontrado para', dataBusca);
+    return null;
 }
+
 
 function gerarResumoHorariosVazio() {
     const resumoGrid = document.getElementById('resumoGrid');
@@ -752,6 +796,8 @@ function renderEditorForm(colaborador = null) {
                     <input type="time" id="editorAlmFim" value="${formatarHora(colaborador?.AlmocoFim) || ''}" class="form-control">
                 </div>
             </div>
+
+            ${buildBancoHorasEditorMarkup(colaborador)}
             
             <div class="editor-actions">
                 <button onclick="salvarColaboradorEditor(${colaboradorId})" class="btn-primary">
@@ -846,6 +892,8 @@ function abrirEditorColaboradores(id) {
                         <input type="time" id="editorAlmFim" value="${formatarHora(colaborador.AlmocoFim) || ''}" class="form-control">
                     </div>
                 </div>
+
+                ${buildBancoHorasEditorMarkup(colaborador)}
                 
                 <div class="editor-actions">
                     <button onclick="salvarColaboradorEditor(${colaborador.Id})" class="btn-primary">
@@ -888,6 +936,8 @@ function abrirEditorColaboradores(id) {
                         <input type="time" id="editorAlmFim" class="form-control">
                     </div>
                 </div>
+
+                ${buildBancoHorasEditorMarkup()}
                 
                 <div class="editor-actions">
                     <button onclick="salvarColaboradorEditor(null)" class="btn-primary">
@@ -921,6 +971,198 @@ function fecharColaboradorEditor() {
     editandoId = null;
 }
 
+function getBancoHorasResumoEditor(colaboradorId) {
+    return (window.bancoHorasResumo || []).find((item) => Number(item.colaboradorId) === Number(colaboradorId)) || null;
+}
+
+function formatarSaldoBancoHorasInput(minutos) {
+    const safe = Number.isFinite(Number(minutos)) ? Math.round(Number(minutos)) : 0;
+    const sign = safe < 0 ? '-' : '+';
+    const total = Math.abs(safe);
+    const horas = Math.floor(total / 60);
+    const restante = total % 60;
+
+    return `${sign}${String(horas).padStart(2, '0')}:${String(restante).padStart(2, '0')}`;
+}
+
+function parseSaldoBancoHorasEditorParts(value) {
+    const normalized = String(value || '').trim();
+    const match = normalized.match(/^([+-])?\s*(\d+):(\d{2})$/);
+
+    if (!match) {
+        return {
+            sign: '+',
+            hours: 0,
+            minutes: 0,
+            raw: '+00:00'
+        };
+    }
+
+    const sign = match[1] === '-' ? '-' : '+';
+    const hours = Number(match[2]) || 0;
+    const minutes = Math.min(Math.max(Number(match[3]) || 0, 0), 59);
+
+    return {
+        sign,
+        hours,
+        minutes,
+        raw: `${sign}${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`
+    };
+}
+
+function formatarSaldoBancoHorasPreview(sign, hours, minutes) {
+    const prefix = sign === '-' ? '-' : '+';
+    return `${prefix}${String(hours).padStart(2, '0')}h ${String(minutes).padStart(2, '0')}m`;
+}
+
+function atualizarPreviewBancoHorasEditor(sign, hours, minutes) {
+    const preview = document.getElementById('editorBancoHorasPreview');
+
+    if (!preview) {
+        return;
+    }
+
+    preview.textContent = formatarSaldoBancoHorasPreview(sign, hours, minutes);
+    preview.classList.toggle('negativo', sign === '-');
+    preview.classList.toggle('positivo', sign !== '-');
+}
+
+function sincronizarBancoHorasEditor() {
+    const sign = document.getElementById('editorBancoHorasSinal')?.value === '-' ? '-' : '+';
+    const hours = Math.max(Number(document.getElementById('editorBancoHorasHoras')?.value || 0), 0);
+    const minutes = Math.min(Math.max(Number(document.getElementById('editorBancoHorasMinutos')?.value || 0), 0), 59);
+
+    atualizarPreviewBancoHorasEditor(
+        sign,
+        Number.isFinite(hours) ? hours : 0,
+        Number.isFinite(minutes) ? minutes : 0
+    );
+}
+
+function alternarSinalBancoHorasEditor(sign) {
+    const safeSign = sign === '-' ? '-' : '+';
+    const signInput = document.getElementById('editorBancoHorasSinal');
+
+    if (signInput) {
+        signInput.value = safeSign;
+    }
+
+    document.querySelectorAll('[data-banco-horas-sinal]').forEach((button) => {
+        const ativo = button.dataset.bancoHorasSinal === safeSign;
+        button.classList.toggle('is-active', ativo);
+        button.classList.toggle('is-negative', ativo && safeSign === '-');
+        button.classList.toggle('is-positive', ativo && safeSign !== '-');
+    });
+
+    sincronizarBancoHorasEditor();
+}
+
+function obterSaldoBancoHorasEditorValue() {
+    const sign = document.getElementById('editorBancoHorasSinal')?.value === '-' ? '-' : '+';
+    const hoursValue = String(document.getElementById('editorBancoHorasHoras')?.value || '').trim();
+    const minutesValue = String(document.getElementById('editorBancoHorasMinutos')?.value || '').trim();
+
+    if (!/^\d+$/.test(hoursValue)) {
+        throw new Error('Informe as horas do banco de horas.');
+    }
+
+    if (!/^\d+$/.test(minutesValue)) {
+        throw new Error('Informe os minutos do banco de horas.');
+    }
+
+    const hours = Number(hoursValue);
+    const minutes = Number(minutesValue);
+
+    if (!Number.isFinite(hours) || hours < 0) {
+        throw new Error('As horas do banco de horas precisam ser um numero valido.');
+    }
+
+    if (!Number.isFinite(minutes) || minutes < 0 || minutes > 59) {
+        throw new Error('Os minutos do banco de horas precisam ficar entre 0 e 59.');
+    }
+
+    return `${sign}${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+}
+
+function buildBancoHorasEditorMarkup(colaborador = null) {
+    const resumoBancoHoras = colaborador ? getBancoHorasResumoEditor(colaborador.Id) : null;
+    const bancoHorasDisponivel = !window.bancoHorasStatus || window.bancoHorasStatus.enabled !== false;
+    const saldoBancoHoras = formatarSaldoBancoHorasInput(resumoBancoHoras?.saldoMinutos || 0);
+    const saldoAtual = parseSaldoBancoHorasEditorParts(saldoBancoHoras);
+    const helperText = bancoHorasDisponivel
+        ? 'Defina o saldo final do colaborador sem precisar digitar o formato manualmente.'
+        : 'Banco de horas indisponivel agora. O cadastro sera salvo sem alterar o saldo.';
+
+    return `
+        <div class="editor-form-group banco-horas-editor-group">
+            <label><i class="fas fa-clock"></i> Banco de horas</label>
+            <div class="banco-horas-editor-shell ${bancoHorasDisponivel ? '' : 'is-disabled'}" data-enabled="${bancoHorasDisponivel ? 'true' : 'false'}">
+                <div class="banco-horas-editor-summary">
+                    <div>
+                        <span class="banco-horas-label">Saldo final</span>
+                        <strong id="editorBancoHorasPreview" class="${saldoAtual.sign === '-' ? 'negativo' : 'positivo'}">${formatarSaldoBancoHorasPreview(saldoAtual.sign, saldoAtual.hours, saldoAtual.minutes)}</strong>
+                    </div>
+                    <small class="banco-horas-current">Atual: ${resumoBancoHoras?.saldoFormatado || '+00h 00m'}</small>
+                </div>
+
+                <div class="banco-horas-editor-controls">
+                    <div class="banco-horas-signal-toggle" role="group" aria-label="Tipo de saldo">
+                        <button
+                            type="button"
+                            class="banco-horas-signal-btn ${saldoAtual.sign === '+' ? 'is-active is-positive' : ''}"
+                            data-banco-horas-sinal="+"
+                            onclick="alternarSinalBancoHorasEditor('+')"
+                            ${bancoHorasDisponivel ? '' : 'disabled'}
+                        >
+                            <i class="fas fa-arrow-up"></i> Credito
+                        </button>
+                        <button
+                            type="button"
+                            class="banco-horas-signal-btn ${saldoAtual.sign === '-' ? 'is-active is-negative' : ''}"
+                            data-banco-horas-sinal="-"
+                            onclick="alternarSinalBancoHorasEditor('-')"
+                            ${bancoHorasDisponivel ? '' : 'disabled'}
+                        >
+                            <i class="fas fa-arrow-down"></i> Debito
+                        </button>
+                    </div>
+
+                    <div class="time-inputs banco-horas-time-inputs">
+                        <input
+                            type="number"
+                            id="editorBancoHorasHoras"
+                            value="${saldoAtual.hours}"
+                            min="0"
+                            step="1"
+                            class="form-control banco-horas-input"
+                            inputmode="numeric"
+                            oninput="sincronizarBancoHorasEditor()"
+                            ${bancoHorasDisponivel ? '' : 'disabled'}
+                        >
+                        <span>h</span>
+                        <input
+                            type="number"
+                            id="editorBancoHorasMinutos"
+                            value="${String(saldoAtual.minutes).padStart(2, '0')}"
+                            min="0"
+                            max="59"
+                            step="1"
+                            class="form-control banco-horas-input"
+                            inputmode="numeric"
+                            oninput="sincronizarBancoHorasEditor()"
+                            ${bancoHorasDisponivel ? '' : 'disabled'}
+                        >
+                        <span>min</span>
+                    </div>
+                </div>
+            </div>
+            <input type="hidden" id="editorBancoHorasSinal" value="${saldoAtual.sign}">
+            <input type="hidden" id="editorBancoHorasSaldoOriginal" value="${saldoBancoHoras}">
+            <small class="helper-text">${helperText}</small>
+        </div>
+    `;
+}
+
 async function salvarColaboradorEditor(id) {
     console.log("Salvando colaborador ID:", id);
     
@@ -929,6 +1171,15 @@ async function salvarColaboradorEditor(id) {
     const trabalhoFim = document.getElementById('editorTrabFim')?.value;
     const almocoInicio = document.getElementById('editorAlmInicio')?.value;
     const almocoFim = document.getElementById('editorAlmFim')?.value;
+    const bancoHorasSaldoInput = document.getElementById('editorBancoHorasSaldo');
+    const bancoHorasSaldo = (bancoHorasSaldoInput?.value || '').trim() || '+00:00';
+    const bancoHorasSaldoOriginal = (document.getElementById('editorBancoHorasSaldoOriginal')?.value || '').trim() || '+00:00';
+    const bancoHorasHabilitado = bancoHorasSaldoInput?.dataset?.enabled !== 'false';
+
+    if (bancoHorasHabilitado && !/^[+-]?\d+:\d{2}$/.test(bancoHorasSaldo)) {
+        mostrarToast("Saldo do banco de horas deve estar no formato +HH:MM ou -HH:MM.", "error");
+        return;
+    }
 
     if (!nome) {
         mostrarToast("Nome é obrigatório!", "error");
@@ -954,10 +1205,30 @@ async function salvarColaboradorEditor(id) {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
         });
+        const data = await response.json().catch(() => null);
 
-        if (!response.ok) throw new Error("Erro ao salvar");
+        if (!response.ok) throw new Error(data?.error || data?.message || "Erro ao salvar");
+
+        const colaboradorId = Number(data?.data?.Id || data?.Id || id);
+
+        if (
+            bancoHorasHabilitado
+            && bancoHorasSaldo !== bancoHorasSaldoOriginal
+            && Number.isFinite(colaboradorId)
+            && colaboradorId > 0
+            && window.API?.atualizarBancoHorasSaldo
+        ) {
+            await window.API.atualizarBancoHorasSaldo(colaboradorId, {
+                saldo: bancoHorasSaldo
+            });
+        }
 
         await carregarColaboradores();
+
+        if (typeof carregarBancoHorasResumo === 'function') {
+            await carregarBancoHorasResumo();
+        }
+
         renderListaColaboradores();
         fecharColaboradorEditor();
         
@@ -968,10 +1239,93 @@ async function salvarColaboradorEditor(id) {
         
     } catch (error) {
         console.error("Erro ao salvar:", error);
-        mostrarToast("Erro ao salvar colaborador", "error");
+        mostrarToast(error.message || "Erro ao salvar colaborador", "error");
     }
 }
 
+window.salvarColaboradorEditor = salvarColaboradorEditor = async function salvarColaboradorEditorAtualizado(id) {
+    console.log("Salvando colaborador ID:", id);
+
+    const nome = document.getElementById('editorNome')?.value;
+    const trabalhoInicio = document.getElementById('editorTrabInicio')?.value;
+    const trabalhoFim = document.getElementById('editorTrabFim')?.value;
+    const almocoInicio = document.getElementById('editorAlmInicio')?.value;
+    const almocoFim = document.getElementById('editorAlmFim')?.value;
+    const bancoHorasSaldoOriginal = (document.getElementById('editorBancoHorasSaldoOriginal')?.value || '').trim() || '+00:00';
+    const bancoHorasHabilitado = document.querySelector('.banco-horas-editor-shell')?.dataset?.enabled !== 'false';
+    let bancoHorasSaldo = bancoHorasSaldoOriginal;
+
+    if (!nome) {
+        mostrarToast("Nome e obrigatorio!", "error");
+        return;
+    }
+
+    if (bancoHorasHabilitado) {
+        try {
+            bancoHorasSaldo = obterSaldoBancoHorasEditorValue();
+        } catch (error) {
+            mostrarToast(error.message || "Revise o saldo do banco de horas.", "error");
+            return;
+        }
+    }
+
+    try {
+        const metodo = id ? "PUT" : "POST";
+        const url = id
+            ? `http://localhost:3000/api/colaboradores/${id}`
+            : `http://localhost:3000/api/colaboradores`;
+
+        const payload = {
+            nome,
+            trabalhoInicio,
+            trabalhoFim,
+            almocoInicio,
+            almocoFim
+        };
+
+        const response = await fetch(url, {
+            method: metodo,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        const data = await response.json().catch(() => null);
+
+        if (!response.ok) {
+            throw new Error(data?.error || data?.message || "Erro ao salvar");
+        }
+
+        const colaboradorId = Number(data?.data?.Id || data?.Id || id);
+
+        if (
+            bancoHorasHabilitado
+            && bancoHorasSaldo !== bancoHorasSaldoOriginal
+            && Number.isFinite(colaboradorId)
+            && colaboradorId > 0
+            && window.API?.atualizarBancoHorasSaldo
+        ) {
+            await window.API.atualizarBancoHorasSaldo(colaboradorId, {
+                saldo: bancoHorasSaldo
+            });
+        }
+
+        await carregarColaboradores();
+
+        if (typeof carregarBancoHorasResumo === 'function') {
+            await carregarBancoHorasResumo();
+        }
+
+        renderListaColaboradores();
+        fecharColaboradorEditor();
+
+        mostrarToast(
+            id ? "Colaborador atualizado!" : "Colaborador salvo com sucesso!",
+            "success"
+        );
+    } catch (error) {
+        console.error("Erro ao salvar:", error);
+        mostrarToast(error.message || "Erro ao salvar colaborador", "error");
+    }
+};
 
 function filtrarColaboradores(termo) {
     if (!termo) {
@@ -1950,6 +2304,8 @@ function abrirEditorColaborador(id) {
                         <input type="time" id="editorAlmFim" value="${formatarHora(colaborador.AlmocoFim) || ''}" class="form-control">
                     </div>
                 </div>
+
+                ${buildBancoHorasEditorMarkup(colaborador)}
                 
                 <div class="editor-actions">
                     <button onclick="salvarColaboradorEditor(${colaborador.Id})" class="btn-primary">
@@ -1992,6 +2348,8 @@ function abrirEditorColaborador(id) {
                         <input type="time" id="editorAlmFim" class="form-control">
                     </div>
                 </div>
+
+                ${buildBancoHorasEditorMarkup()}
                 
                 <div class="editor-actions">
                     <button onclick="salvarColaboradorEditor(null)" class="btn-primary">
@@ -2163,17 +2521,30 @@ function renderCalendario() {
 =========================== */
 function formatarHora(hora) {
     if (!hora) return "";
-    
-    if (hora.includes("T")) {
-        const date = new Date(hora);
-        if (isNaN(date.getTime())) return "";
-        const h = String(date.getHours()).padStart(2, "0");
-        const m = String(date.getMinutes()).padStart(2, "0");
+
+    if (hora instanceof Date && !isNaN(hora.getTime())) {
+        const isTimeOnlyDate = hora.getUTCFullYear() === 1970
+            && hora.getUTCMonth() === 0
+            && hora.getUTCDate() === 1;
+        const h = String(isTimeOnlyDate ? hora.getUTCHours() : hora.getHours()).padStart(2, "0");
+        const m = String(isTimeOnlyDate ? hora.getUTCMinutes() : hora.getMinutes()).padStart(2, "0");
         return `${h}:${m}`;
     }
 
-    if (hora.includes(":")) {
-        return hora.substring(0, 5);
+    const raw = String(hora).trim();
+
+    if (!raw) {
+        return "";
+    }
+
+    const isoMatch = raw.match(/T(\d{2}:\d{2})(?::\d{2}(?:\.\d+)?)?/);
+    if (isoMatch) {
+        return isoMatch[1];
+    }
+
+    const timeMatch = raw.match(/^(\d{2}:\d{2})(?::\d{2})?$/);
+    if (timeMatch) {
+        return timeMatch[1];
     }
 
     return "";
@@ -2779,6 +3150,231 @@ function renderConfiguracoes() {
             </div>
 
             <!-- CARD DE AÇÕES -->
+            <div class="config-card config-card-wide">
+                <div class="config-card-header">
+                    <i class="fas fa-database"></i>
+                    <h2>Configuração do Banco de Dados</h2>
+                </div>
+
+                <div class="config-card-body">
+                    <p class="config-description">
+                        Configure a conexão local com o SQL Server, teste a comunicação e verifique as tabelas necessárias da aplicação.
+                    </p>
+
+                    <div id="configuracaoBancoStatus" class="config-status-card is-neutral">
+                        <div class="config-status-header">
+                            <strong>Status da conexão</strong>
+                            <span id="configuracaoBancoStatusBadge" class="config-status-badge">Não testado</span>
+                        </div>
+                        <p id="configuracaoBancoStatusTexto">Carregando a configuração salva no backend...</p>
+                        <small id="configuracaoBancoStatusDetalhe" class="config-status-detail"></small>
+                    </div>
+
+                    <div id="configuracaoBancoForm" class="config-form-grid">
+                        <div class="form-group">
+                            <label for="dbHost">Servidor / Host</label>
+                            <input type="text" id="dbHost" class="form-control" placeholder="Ex: localhost">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="dbPort">Porta</label>
+                            <input type="number" id="dbPort" class="form-control" placeholder="1433" min="1" max="65535">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="dbInstance">Instancia</label>
+                            <input type="text" id="dbInstance" class="form-control" placeholder="Ex: SQLEXPRESS">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="dbDatabase">Banco de dados</label>
+                            <input type="text" id="dbDatabase" class="form-control" placeholder="Ex: SoftwareEscalas">
+                        </div>
+
+                        <div class="form-group form-group-full">
+                            <label>Autenticação</label>
+                            <div class="config-auth-options">
+                                <label class="config-auth-option">
+                                    <input type="radio" name="dbAuthenticationType" value="sql" checked>
+                                    <span>SQL Server Authentication</span>
+                                </label>
+                                <label class="config-auth-option">
+                                    <input type="radio" name="dbAuthenticationType" value="windows" id="dbAuthWindows">
+                                    <span>Windows Authentication</span>
+                                </label>
+                            </div>
+                            <small id="dbAuthHint" class="helper-text">
+                                Use SQL Server Authentication nesta versão do projeto para garantir compatibilidade imediata.
+                            </small>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="dbUser">Usuário</label>
+                            <input type="text" id="dbUser" class="form-control" placeholder="Usuário do SQL Server">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="dbPassword">Senha</label>
+                            <input type="password" id="dbPassword" class="form-control" placeholder="Senha do SQL Server">
+                            <small id="dbPasswordHint" class="helper-text">
+                                A senha salva nunca é exibida no frontend.
+                            </small>
+                        </div>
+
+                        <div class="form-group form-group-full">
+                            <div class="config-checkbox-row">
+                                <label class="checkbox-inline">
+                                    <input type="checkbox" id="dbEncrypt" checked>
+                                    <span>Usar conexão criptografada</span>
+                                </label>
+                                <label class="checkbox-inline">
+                                    <input type="checkbox" id="dbTrustCertificate" checked>
+                                    <span>Confiar no certificado do servidor</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="form-group" hidden>
+                            <label class="checkbox-inline" for="autoBackupEnabledHidden">
+                                <input type="checkbox" id="autoBackupEnabledHidden">
+                                Ativar backup automático periódico
+                            </label>
+                            <small class="helper-text">
+                                Gera um novo arquivo JSON automaticamente no intervalo configurado abaixo.
+                            </small>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="autoBackupIntervalMinutesHidden">Intervalo automático (minutos)</label>
+                            <input
+                                type="number"
+                                id="autoBackupIntervalMinutesHidden"
+                                class="form-control"
+                                min="15"
+                                step="15"
+                                value="180"
+                            >
+                            <small class="helper-text">
+                                Exemplo: 60 para uma vez por hora.
+                            </small>
+                        </div>
+
+                        <div class="form-group form-group-full">
+                            <label class="checkbox-inline" for="autoBackupOnShutdownHidden">
+                                <input type="checkbox" id="autoBackupOnShutdownHidden">
+                                Fazer backup antes de encerrar o servidor
+                            </label>
+                            <small class="helper-text">
+                                Quando o servidor for fechado normalmente, ele tenta gerar um backup extra na pasta configurada.
+                            </small>
+                        </div>
+                    </div>
+
+                    <div class="config-actions-row">
+                        <button class="config-btn" id="testarConfiguracaoBancoBtn" type="button">
+                            <i class="fas fa-vial"></i>
+                            Testar Conexão
+                        </button>
+
+                        <button class="config-btn" id="salvarConfiguracaoBancoBtn" type="button">
+                            <i class="fas fa-save"></i>
+                            Salvar Configuração
+                        </button>
+
+                        <button class="config-btn" id="verificarTabelasBancoBtn" type="button">
+                            <i class="fas fa-table"></i>
+                            Criar / Verificar Tabelas
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="config-card config-card-wide">
+                <div class="config-card-header">
+                    <i class="fas fa-cloud-upload-alt"></i>
+                    <h2>Backup Local do Banco</h2>
+                </div>
+
+                <div class="config-card-body">
+                    <p class="config-description">
+                        Defina uma pasta local para gerar backups completos do banco em formato JSON.
+                        Você pode usar uma pasta sincronizada com OneDrive, Google Drive ou outro serviço de nuvem.
+                    </p>
+
+                    <div id="configuracaoBackupStatus" class="config-status-card is-neutral">
+                        <div class="config-status-header">
+                            <strong>Status do backup</strong>
+                            <span id="configuracaoBackupStatusBadge" class="config-status-badge">Não configurado</span>
+                        </div>
+                        <p id="configuracaoBackupStatusTexto">Informe a pasta de backup para começar.</p>
+                        <small id="configuracaoBackupStatusDetalhe" class="config-status-detail"></small>
+                    </div>
+
+                    <div id="configuracaoBackupForm" class="config-form-grid">
+                        <div class="form-group form-group-full">
+                            <label for="backupDirectory">Pasta de backup</label>
+                            <input
+                                type="text"
+                                id="backupDirectory"
+                                class="form-control config-input-mono"
+                                placeholder="Ex: C:\\Users\\Fernando\\OneDrive\\Backups\\Escalas"
+                                readonly
+                                title="Clique para selecionar a pasta no Windows"
+                            >
+                            <button class="config-btn config-inline-picker-btn" id="selecionarDiretorioBackupBtn" type="button">
+                                <i class="fas fa-folder-open"></i>
+                                Selecionar pasta
+                            </button>
+                            <div class="config-backup-options">
+                                <label class="checkbox-inline" for="autoBackupEnabled">
+                                    <input type="checkbox" id="autoBackupEnabled">
+                                    Ativar backup automatico periodico
+                                </label>
+                                <small class="helper-text">
+                                    Gera um novo arquivo JSON automaticamente no intervalo configurado abaixo.
+                                </small>
+                                <div class="config-backup-interval">
+                                    <label for="autoBackupIntervalMinutes">Intervalo automatico (minutos)</label>
+                                    <input
+                                        type="number"
+                                        id="autoBackupIntervalMinutes"
+                                        class="form-control"
+                                        min="15"
+                                        step="15"
+                                        value="180"
+                                    >
+                                    <small class="helper-text">
+                                        Exemplo: 60 para uma vez por hora.
+                                    </small>
+                                </div>
+                                <label class="checkbox-inline" for="autoBackupOnShutdown">
+                                    <input type="checkbox" id="autoBackupOnShutdown">
+                                    Fazer backup antes de encerrar o servidor
+                                </label>
+                                <small class="helper-text">
+                                    Quando o servidor for fechado normalmente, ele tenta gerar um backup extra na pasta configurada.
+                                </small>
+                            </div>
+                            <small class="helper-text">
+                                Use um caminho absoluto. Se a pasta não existir, o sistema tentará criá-la automaticamente.
+                            </small>
+                        </div>
+                    </div>
+
+                    <div class="config-actions-row">
+                        <button class="config-btn" id="salvarConfiguracaoBackupBtn" type="button">
+                            <i class="fas fa-folder-plus"></i>
+                            Salvar Backup
+                        </button>
+
+                        <button class="config-btn" id="gerarBackupSistemaBtn" type="button">
+                            <i class="fas fa-shield-alt"></i>
+                            Gerar Backup Agora
+                        </button>
+                    </div>
+                </div>
+            </div>
+
             <div class="config-card">
                 <div class="config-card-header">
                     <i class="fas fa-tools"></i>
@@ -2824,6 +3420,14 @@ function renderConfiguracoes() {
     document.getElementById('primeiroDiaSemana').addEventListener('change', salvarPreferencias);
     document.getElementById('formatoHora').addEventListener('change', salvarPreferencias);
     document.getElementById('notificacoes').addEventListener('change', salvarPreferencias);
+
+    if (typeof window.inicializarConfiguracaoBancoTela === 'function') {
+        window.inicializarConfiguracaoBancoTela();
+    }
+
+    if (typeof window.inicializarBackupSistemaTela === 'function') {
+        window.inicializarBackupSistemaTela();
+    }
 }
 
 // Função para mudar o tema
@@ -2983,6 +3587,88 @@ function importarDados() {
     input.click();
     document.body.removeChild(input);
 }
+
+function aplicarPreferenciasImportadas(preferencias = {}) {
+    if (!preferencias || typeof preferencias !== 'object') {
+        return;
+    }
+
+    if (preferencias.tema) {
+        localStorage.setItem('tema', preferencias.tema);
+        document.documentElement.setAttribute('data-theme', preferencias.tema);
+    }
+
+    if (preferencias.primeiroDiaSemana !== undefined) {
+        localStorage.setItem('primeiroDiaSemana', String(preferencias.primeiroDiaSemana));
+    }
+
+    if (preferencias.formatoHora !== undefined) {
+        localStorage.setItem('formatoHora', String(preferencias.formatoHora));
+    }
+
+    if (preferencias.notificacoes !== undefined) {
+        localStorage.setItem('notificacoes', String(preferencias.notificacoes));
+    }
+}
+
+importarDados = function importarDadosAtualizado() {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json';
+    input.style.display = 'none';
+
+    input.onchange = async (e) => {
+        const file = e.target.files[0];
+
+        if (!file) {
+            return;
+        }
+
+        const reader = new FileReader();
+
+        reader.onload = async (event) => {
+            try {
+                const dados = JSON.parse(event.target.result);
+                const isLegacyBackup = Array.isArray(dados?.colaboradores) && Array.isArray(dados?.ausencias);
+                const isSystemBackup = Boolean(dados?.data && typeof dados.data === 'object');
+                const hasTableSnapshot = ['Colaboradores', 'Ausencias', 'Feriados', 'plantoes', 'BancoHorasMovimentos', 'escala_dia']
+                    .some((tableName) => Array.isArray(dados?.[tableName]));
+
+                if (!isLegacyBackup && !isSystemBackup && !hasTableSnapshot) {
+                    throw new Error('Arquivo invalido. Use um backup JSON gerado pelo sistema.');
+                }
+
+                if (!confirm('A importacao ira substituir todos os dados atuais. Deseja continuar?')) {
+                    return;
+                }
+
+                mostrarToast('Importando backup...', 'warning');
+
+                const response = await window.API.restaurarBackupSistema({
+                    fileName: file.name,
+                    backupData: dados
+                });
+
+                aplicarPreferenciasImportadas(response?.preferences || dados?.preferencias || {});
+
+                mostrarToast('Backup importado com sucesso! Recarregando a tela...', 'success');
+
+                setTimeout(() => {
+                    window.location.reload();
+                }, 900);
+            } catch (error) {
+                console.error('Erro ao importar:', error);
+                mostrarToast(error.message || 'Erro ao importar arquivo', 'error');
+            }
+        };
+
+        reader.readAsText(file);
+    };
+
+    document.body.appendChild(input);
+    input.click();
+    document.body.removeChild(input);
+};
 
 function resetarSistema() {
     // Modal de confirmação mais seguro
@@ -3377,39 +4063,21 @@ function fecharPlantaoEditor() {
 async function carregarPlantoes() {
     try {
         const res = await fetch('http://localhost:3000/api/plantoes');
-        if (!res.ok) throw new Error("Erro na requisição");
         const data = await res.json();
         
-        console.log("📦 Dados brutos dos plantões:", data);
+        plantoesLancados = data.map(p => ({
+            ...p,
+            dataISO: p.data_plantao.split('T')[0],
+            colaboradores: p.colaboradores || []
+        }));
         
-        // 🔥 MAPEAMENTO CORRETO - backend envia 'data_plantao'
-        plantoesLancados = data.map(p => {
-            // Extrair a data corretamente
-            let dataISO = p.dataISO;
-            
-            // Se não tiver dataISO, usar data_plantao
-            if (!dataISO && p.data_plantao) {
-                // Se for objeto Date, converter para string
-                if (p.data_plantao instanceof Date) {
-                    dataISO = p.data_plantao.toISOString().split('T')[0];
-                } else {
-                    // Se for string, extrair a parte da data
-                    dataISO = p.data_plantao.split('T')[0];
-                }
-            }
-            
-            return {
-                ...p,
-                dataISO: dataISO, // Garantir que tem dataISO
-                colaboradores: p.colaboradores || [] // Garantir que é array
-            };
-        });
+        window.plantoesLancados = plantoesLancados; // 🔥 ATUALIZAR O WINDOW
         
-        console.log("✅ Plantões carregados e mapeados:", plantoesLancados);
-        
+        console.log("✅ Plantões carregados:", plantoesLancados);
     } catch (error) {
-        console.error("Erro ao carregar plantões:", error);
+        console.error("Erro:", error);
         plantoesLancados = [];
+        window.plantoesLancados = [];
     }
 }
 
@@ -6742,6 +7410,8 @@ function configurarModais() {
 
 // Atualizar carregamento inicial
 document.addEventListener("DOMContentLoaded", async () => {
+    inicializarAplicacaoUmaVez();
+    return;
     console.log("Inicializando aplicação...");
     
     const temaSalvo = localStorage.getItem('tema') || 'light';
@@ -6891,6 +7561,8 @@ function getPaginaFromURL() {
 
 // Modifique o DOMContentLoaded para usar essa função
 document.addEventListener("DOMContentLoaded", async () => {
+    inicializarAplicacaoUmaVez();
+    return;
     console.log("Inicializando aplicação...");
     
     const temaSalvo = localStorage.getItem('tema') || 'light';

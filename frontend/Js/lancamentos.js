@@ -16,9 +16,24 @@ if (typeof API === 'undefined') {
 let editandoLancamentoId = null;
 let editandoTipoLancamento = null; 
 
+function inicializarLancamentosUmaVez() {
+    if (window.__lancamentosBootstrapDone) {
+        return;
+    }
+
+    window.__lancamentosBootstrapDone = true;
+    console.log("Inicializando eventos das abas no DOMContentLoaded");
+
+    setTimeout(() => {
+        configurarEventosAbas();
+        configurarAbas();
+    }, 500);
+}
+
 // Garantir que os eventos são configurados quando a página carrega
 document.addEventListener('DOMContentLoaded', function() {
-    console.log("Inicializando eventos das abas no DOMContentLoaded");
+    inicializarLancamentosUmaVez();
+    return;
     setTimeout(configurarEventosAbas, 500); // Pequeno delay para garantir que o DOM está pronto
 });
 
@@ -537,7 +552,8 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
 
 
 document.addEventListener('DOMContentLoaded', function() {
-    configurarAbas();
+    inicializarLancamentosUmaVez();
+    return;
 });
 
 // ================= CONFIGURAÇÃO DAS ABAS =================
@@ -802,25 +818,25 @@ function formatarHoraParaExibicao(hora) {
     if (!hora) return '';
     
     try {
-        let horaStr = String(hora);
+        if (hora instanceof Date && !isNaN(hora.getTime())) {
+            const isTimeOnlyDate = hora.getUTCFullYear() === 1970
+                && hora.getUTCMonth() === 0
+                && hora.getUTCDate() === 1;
+            const horas = String(isTimeOnlyDate ? hora.getUTCHours() : hora.getHours()).padStart(2, '0');
+            const minutos = String(isTimeOnlyDate ? hora.getUTCMinutes() : hora.getMinutes()).padStart(2, '0');
+            return `${horas}:${minutos}`;
+        }
+
+        const horaStr = String(hora).trim();
         
         // Se vier no formato ISO (ex: 2025-03-06T13:00:00.000Z)
-        if (horaStr.includes('T')) {
-            const data = new Date(horaStr);
-            if (!isNaN(data.getTime())) {
-                const horas = data.getHours().toString().padStart(2, '0');
-                const minutos = data.getMinutes().toString().padStart(2, '0');
-                return `${horas}:${minutos}`;
-            }
-            
-            // Fallback: extrair direto da string
-            const match = horaStr.match(/T(\d{2}:\d{2})/);
-            if (match) return match[1];
-        }
+        const matchIso = horaStr.match(/T(\d{2}:\d{2})(?::\d{2}(?:\.\d+)?)?/);
+        if (matchIso) return matchIso[1];
         
         // Se já estiver no formato HH:mm:ss
-        if (horaStr.includes(':')) {
-            return horaStr.substring(0, 5);
+        const matchTime = horaStr.match(/^(\d{2}:\d{2})(?::\d{2})?$/);
+        if (matchTime) {
+            return matchTime[1];
         }
         
         return horaStr;
@@ -1631,6 +1647,5 @@ window.debugFeriados = debugFeriados;
 
 // Inicializar configurações quando o DOM estiver pronto
 document.addEventListener('DOMContentLoaded', function() {
-    console.log("lancamentos.js: DOM carregado");
-
+    inicializarLancamentosUmaVez();
 });
