@@ -317,7 +317,7 @@ async function createSystemBackup(pool, options = {}) {
     const payload = {
         metadata: {
             system: 'Software de Escalas',
-            version: '1.0.0',
+            version: '1.1.0 BETA',
             generatedAt: generatedAt.toISOString(),
             generatedBy: options.generatedBy || 'backup-local-manual',
             database: options.databaseInfo || {},

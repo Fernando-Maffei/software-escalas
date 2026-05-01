@@ -334,6 +334,152 @@
     justify-content: center;
 }
 
+.escala-range-shell {
+    display: grid;
+    gap: 14px;
+}
+
+.escala-range-card {
+    padding: 14px;
+    border-radius: 16px;
+    background: linear-gradient(180deg, rgba(99, 102, 241, 0.08) 0%, rgba(15, 23, 42, 0.02) 100%);
+    border: 1px solid rgba(99, 102, 241, 0.14);
+}
+
+.escala-range-card-header {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-bottom: 12px;
+}
+
+.escala-range-card-header strong {
+    font-size: 14px;
+    color: var(--text);
+}
+
+.escala-range-card-header span,
+.escala-range-helper {
+    font-size: 12px;
+    color: var(--text-light);
+    line-height: 1.45;
+}
+
+.escala-range-editor {
+    display: grid;
+    gap: 10px;
+}
+
+.escala-range-head,
+.escala-range-axis,
+.escala-range-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.escala-range-head span {
+    font-size: 12px;
+    color: var(--text-light);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
+
+.escala-range-head strong {
+    font-size: 14px;
+    color: var(--text);
+}
+
+.escala-range-axis span {
+    font-size: 11px;
+    color: var(--text-lighter);
+}
+
+.escala-range-track {
+    position: relative;
+    height: 16px;
+    border-radius: 999px;
+    background: rgba(148, 163, 184, 0.2);
+    overflow: visible;
+    cursor: grab;
+}
+
+.escala-range-track.is-work {
+    background: rgba(34, 197, 94, 0.14);
+}
+
+.escala-range-track.is-lunch {
+    background: rgba(245, 158, 11, 0.16);
+}
+
+.escala-range-selection {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    border-radius: 999px;
+    cursor: grab;
+    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.16);
+}
+
+.escala-range-selection.is-work {
+    background: linear-gradient(90deg, #10b981 0%, #34d399 100%);
+}
+
+.escala-range-selection.is-lunch {
+    background: linear-gradient(90deg, #f59e0b 0%, #fbbf24 100%);
+}
+
+.escala-range-handle {
+    position: absolute;
+    top: 50%;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    border: 3px solid #fff;
+    background: #0f172a;
+    transform: translateY(-50%);
+    box-shadow: 0 6px 18px rgba(15, 23, 42, 0.28);
+    cursor: ew-resize;
+}
+
+.escala-range-handle.start {
+    left: -8px;
+}
+
+.escala-range-handle.end {
+    right: -8px;
+}
+
+.escala-range-placeholder,
+.escala-range-disabled {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 14px;
+    border-radius: 14px;
+    background: var(--card-dark);
+    color: var(--text-light);
+    font-size: 12px;
+    line-height: 1.45;
+}
+
+.escala-range-placeholder i,
+.escala-range-disabled i {
+    color: var(--primary);
+}
+
+.escala-range-actions {
+    margin-top: 10px;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+}
+
+.escala-range-actions .btn-secondary {
+    min-width: 0;
+    padding: 10px 12px;
+}
+
 /* Estado vazio */
 .editor-empty {
     height: 100%;
@@ -1051,6 +1197,7 @@
     display: flex;
     align-items: center;
     gap: 12px;
+    flex-wrap: wrap;
     margin-top: 8px;
     background: var(--card);
     padding: 8px 16px;
@@ -1075,7 +1222,12 @@
 }
 
 .data-selector button {
-    margin-left: 8px;
+    margin-left: 0;
+}
+
+.data-selector .btn-secondary.is-disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
 }
 
 /* ================= LEGENDA DA TIMELINE ================= */
@@ -1115,6 +1267,10 @@
     background: #94a3b8;
 }
 
+.legenda-item .cor.ausencia {
+    background: #ef4444;
+}
+
 .legenda-item .cor.ferias {
     background: #3b82f6;
     opacity: 0.7;
@@ -1138,6 +1294,15 @@
     background: #94a3b8;
     border-radius: 12px;
     opacity: 0.5;
+}
+
+.timeline-cell.ausencia::after {
+    content: "";
+    position: absolute;
+    inset: 6px;
+    background: #ef4444;
+    border-radius: 12px;
+    opacity: 0.75;
 }
 
 .timeline-cell.ferias::after {
@@ -1652,4 +1817,1096 @@
     font-size: 11px;
     font-weight: 600;
     margin-left: 8px;
+}
+
+/* ================= CONTROLES DA ESCALA ================= */
+.escala-toolbar {
+    display: grid;
+    gap: 12px;
+    margin-top: 12px;
+}
+
+.escala-view-controls {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.escala-select-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    border-radius: 14px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    color: var(--text-light);
+}
+
+.escala-select-chip span {
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
+
+.escala-select-chip select {
+    min-width: 220px;
+}
+
+.escala-hint-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 14px;
+    border-radius: 14px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    color: var(--text-light);
+    font-size: 12px;
+}
+
+.escala-hint-chip i {
+    color: var(--primary);
+}
+
+@media (max-width: 768px) {
+    .escala-view-controls {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .escala-select-chip {
+        justify-content: space-between;
+    }
+
+    .escala-select-chip select {
+        min-width: 0;
+        width: 100%;
+    }
+}
+
+/* ================= VISUAL NOVO DA ESCALA ================= */
+.escala-page {
+    padding: 8px 0 0;
+}
+
+.escala-header {
+    margin-bottom: 24px;
+}
+
+.escala-header h1 {
+    margin: 0;
+    font-size: 30px;
+    font-weight: 800;
+    letter-spacing: -0.04em;
+    color: #f8fafc;
+}
+
+.escala-header p {
+    margin: 8px 0 0;
+    color: #94a3b8;
+    font-size: 15px;
+}
+
+.escala-page .escala-toolbar {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 18px;
+    margin-bottom: 18px;
+}
+
+.escala-page .toolbar-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.escala-page .data-selector {
+    margin-top: 0;
+    width: auto;
+    padding: 0;
+    background: transparent;
+    border: none;
+}
+
+.escala-page .data-selector > i {
+    display: none;
+}
+
+.escala-page .escala-date-shell {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 188px;
+    height: 50px;
+    padding: 0 14px;
+    border-radius: 12px;
+    border: 1px solid rgba(148, 163, 184, 0.18);
+    background: rgba(15, 23, 42, 0.72);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.02);
+    cursor: pointer;
+}
+
+.escala-page .escala-date-shell:focus-within {
+    border-color: rgba(124, 124, 255, 0.7);
+    box-shadow: 0 0 25px rgba(124, 124, 255, 0.18);
+}
+
+.escala-page .escala-date-shell > i,
+.escala-page .escala-date-chevron {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.escala-page .escala-date-shell > i {
+    color: #8b8cff;
+    font-size: 14px;
+}
+
+.escala-page .escala-date-chevron {
+    margin-left: auto;
+    color: #7c8aa8;
+    pointer-events: none;
+    font-size: 12px;
+}
+
+.escala-page .date-input,
+.escala-page .toolbar-actions .btn-primary,
+.escala-page .toolbar-actions .btn-secondary {
+    height: 50px;
+    border-radius: 12px;
+    border: 1px solid rgba(148, 163, 184, 0.18);
+    background: rgba(15, 23, 42, 0.72);
+    color: #f8fafc;
+    padding: 0 18px;
+    font-size: 14px;
+    font-weight: 700;
+    transition: 0.2s ease;
+}
+
+.escala-page .date-input {
+    min-width: 240px;
+}
+
+.escala-page .escala-date-shell .date-input {
+    min-width: 0;
+    width: 100%;
+    height: 100%;
+    border: none;
+    background: transparent;
+    box-shadow: none;
+    padding: 0;
+    color: #f8fafc;
+    font-size: 15px;
+    font-weight: 700;
+    appearance: none;
+    -webkit-appearance: none;
+    cursor: pointer;
+}
+
+.escala-page .escala-date-shell .date-input:focus {
+    box-shadow: none;
+    border: none;
+}
+
+.escala-page .escala-date-shell .date-input::-webkit-calendar-picker-indicator {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    cursor: pointer;
+}
+
+.escala-page .date-input:focus {
+    border-color: rgba(124, 124, 255, 0.7);
+    box-shadow: 0 0 25px rgba(124, 124, 255, 0.35);
+}
+
+.escala-page .toolbar-actions .btn-primary,
+.escala-page .toolbar-actions .btn-secondary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-width: 170px;
+}
+
+.escala-page .toolbar-actions .btn-primary {
+    background: linear-gradient(135deg, #8b8cff, #5b5ff0);
+    border-color: rgba(124, 124, 255, 0.55);
+    box-shadow: 0 14px 30px rgba(92, 92, 255, 0.32);
+}
+
+.escala-page .toolbar-actions .btn-primary:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 18px 38px rgba(92, 92, 255, 0.42);
+}
+
+.escala-page .toolbar-actions .btn-secondary:hover {
+    border-color: rgba(124, 124, 255, 0.5);
+    background: rgba(30, 41, 59, 0.8);
+}
+
+.escala-page .toolbar-actions .btn-day-nav {
+    min-width: 50px;
+    width: 50px;
+    padding: 0;
+    flex-shrink: 0;
+}
+
+.escala-page .toolbar-actions .btn-day-nav i {
+    font-size: 14px;
+}
+
+.escala-page .legenda {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 12px 16px;
+    border: 1px solid rgba(148, 163, 184, 0.18);
+    border-radius: 12px;
+    background: rgba(15, 23, 42, 0.7);
+    backdrop-filter: blur(12px);
+    flex-wrap: wrap;
+}
+
+.escala-page .legenda-timeline {
+    padding: 12px 16px;
+    background: rgba(15, 23, 42, 0.7);
+    border: 1px solid rgba(148, 163, 184, 0.18);
+}
+
+.escala-page .legenda-item {
+    gap: 7px;
+    color: #dbeafe;
+    font-size: 13px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.escala-page .legenda-item .cor {
+    width: 13px;
+    height: 13px;
+    border-radius: 4px;
+}
+
+.escala-page .legenda-item .cor.trabalhando {
+    background: #7175f5;
+}
+
+.escala-page .legenda-item .cor.almoco {
+    background: #f59e0b;
+}
+
+.escala-page .legenda-item .cor.folga {
+    background: #94a3b8;
+}
+
+.escala-page .legenda-item .cor.ferias {
+    background: #2563eb;
+}
+
+.escala-page .legenda-item .cor.ausencia {
+    background: #ef4444;
+}
+
+.escala-page .legenda-item .cor.ausencia-parcial {
+    background: #b83b64;
+}
+
+.escala-page .legenda-item .cor.fora {
+    background: transparent;
+    border: 1px dashed #94a3b8;
+}
+
+.escala-page .escala-card {
+    background: linear-gradient(180deg, rgba(30, 41, 59, 0.94), rgba(15, 23, 42, 0.96));
+    border: 1px solid rgba(148, 163, 184, 0.18);
+    border-radius: 18px;
+    box-shadow: 0 18px 50px rgba(0, 0, 0, 0.35);
+    overflow: hidden;
+    flex: 1;
+    min-width: 0;
+}
+
+.escala-page .escala-main-card {
+    min-width: 0;
+}
+
+.escala-page .escala-layout {
+    gap: 16px;
+    align-items: flex-start;
+}
+
+.escala-page .escala-scroll {
+    overflow-x: hidden;
+    padding: 14px;
+}
+
+.escala-page .escala-scroll::-webkit-scrollbar {
+    height: 10px;
+}
+
+.escala-page .escala-scroll::-webkit-scrollbar-track {
+    background: rgba(15, 23, 42, 0.7);
+}
+
+.escala-page .escala-scroll::-webkit-scrollbar-thumb {
+    background: rgba(124, 124, 255, 0.45);
+    border-radius: 999px;
+}
+
+.escala-page .timeline-container {
+    background: transparent;
+    box-shadow: none;
+    padding: 0;
+    overflow: visible;
+    min-width: 0;
+    width: 100%;
+}
+
+.escala-page .timeline-header,
+.escala-page .timeline-row {
+    display: grid;
+    grid-template-columns: minmax(170px, 220px) minmax(68px, 82px) repeat(12, minmax(0, 1fr));
+}
+
+.escala-page .timeline-header {
+    margin-bottom: 14px;
+    border-radius: 14px;
+    overflow: hidden;
+    background: rgba(15, 23, 42, 0.72);
+    border: 1px solid rgba(148, 163, 184, 0.18);
+}
+
+.escala-page .timeline-header div {
+    height: 54px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 8px;
+    border-right: 1px solid rgba(148, 163, 184, 0.18);
+    border-bottom: none;
+    color: #bfdbfe;
+    font-size: 12px;
+    font-weight: 800;
+}
+
+.escala-page .timeline-header .timeline-name-header {
+    justify-content: flex-start;
+    padding-left: 18px;
+}
+
+.escala-page .timeline-header .total-header {
+    color: #c4b5fd;
+}
+
+.escala-page .timeline-row {
+    margin-bottom: 0;
+    border-radius: 0;
+    overflow: visible;
+    background: transparent;
+    border: none;
+    transition: none;
+}
+
+.escala-page .timeline-row:hover {
+    transform: none;
+    box-shadow: none;
+}
+
+.escala-page .timeline-row > div {
+    min-height: 54px;
+    border-right: 1px solid rgba(148, 163, 184, 0.18);
+    border-bottom: 1px solid rgba(148, 163, 184, 0.13);
+    background: rgba(15, 23, 42, 0.48);
+}
+
+.escala-page .timeline-row:hover > div {
+    background: rgba(15, 23, 42, 0.48);
+}
+
+.escala-page .timeline-row.is-selected > div {
+    background: rgba(36, 51, 80, 0.92);
+}
+
+.escala-page .timeline-name {
+    min-width: 0;
+    padding: 0 14px;
+    align-items: center;
+    gap: 10px;
+    font-weight: 800;
+    color: #f8fafc;
+    background: rgba(15, 23, 42, 0.48);
+    border-right: 1px solid rgba(148, 163, 184, 0.18);
+    cursor: pointer;
+    transition: none;
+}
+
+.escala-page .timeline-name > span:first-of-type {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 13px;
+}
+
+.escala-page .timeline-name:hover {
+    background: rgba(15, 23, 42, 0.48);
+    color: #f8fafc;
+}
+
+.escala-page .timeline-row:not(.total-row):not(.mensagem-row) .timeline-name > i:first-child {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    background: linear-gradient(135deg, rgba(124, 124, 255, 0.45), rgba(91, 95, 240, 0.18));
+    color: #a5b4fc;
+    font-size: 13px;
+    flex-shrink: 0;
+}
+
+.escala-page .timeline-name .edit-indicator {
+    margin-left: auto;
+    flex-shrink: 0;
+}
+
+.escala-page .timeline-cell {
+    height: auto;
+    min-height: 54px;
+    padding: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(15, 23, 42, 0.48);
+    border-right: 1px solid rgba(148, 163, 184, 0.18);
+    transition: none;
+}
+
+.escala-page .timeline-cell:hover {
+    background: rgba(15, 23, 42, 0.48);
+}
+
+.escala-page .timeline-row.is-selected:hover > div,
+.escala-page .timeline-row.is-selected .timeline-name:hover,
+.escala-page .timeline-row.is-selected .timeline-cell:hover {
+    background: rgba(36, 51, 80, 0.92);
+}
+
+.escala-page .timeline-cell::after,
+.escala-page .timeline-cell::before {
+    pointer-events: none;
+}
+
+.escala-page .timeline-cell.trabalhando::after,
+.escala-page .timeline-cell.almoco::after,
+.escala-page .timeline-cell.folga::after,
+.escala-page .timeline-cell.ferias::after,
+.escala-page .timeline-cell.ausencia::after,
+.escala-page .timeline-cell.ausencia-parcial::after,
+.escala-page .timeline-cell.fora-expediente::before {
+    position: absolute;
+    left: 6px;
+    right: 6px;
+}
+
+.escala-page .timeline-cell.trabalhando::after {
+    content: "";
+    top: 10px;
+    bottom: 10px;
+    background: linear-gradient(180deg, #818cf8, #6366f1);
+    border-radius: 9px;
+    box-shadow: 0 8px 18px rgba(99, 102, 241, 0.28);
+}
+
+.escala-page .timeline-cell.almoco::after {
+    content: "";
+    top: 10px;
+    bottom: 10px;
+    background: linear-gradient(180deg, #fbbf24, #f59e0b);
+    border-radius: 9px;
+    box-shadow: 0 8px 18px rgba(245, 158, 11, 0.25);
+}
+
+.escala-page .timeline-cell.folga::after {
+    content: "";
+    top: 10px;
+    bottom: 10px;
+    background: linear-gradient(180deg, #cbd5e1, #94a3b8);
+    border-radius: 9px;
+    opacity: 0.92;
+}
+
+.escala-page .timeline-cell.ferias::after {
+    content: "";
+    top: 10px;
+    bottom: 10px;
+    background: linear-gradient(180deg, #3b82f6, #2563eb);
+    border-radius: 9px;
+}
+
+.escala-page .timeline-cell.ausencia::after {
+    content: "";
+    top: 10px;
+    bottom: 10px;
+    background: linear-gradient(180deg, #fb7185, #ef4444);
+    border-radius: 9px;
+}
+
+.escala-page .timeline-cell.ausencia-parcial::after {
+    content: "";
+    top: 10px;
+    bottom: 10px;
+    background: linear-gradient(180deg, #db2777, #9f1239);
+    border-radius: 9px;
+}
+
+.escala-page .timeline-cell.fora-expediente {
+    background: rgba(15, 23, 42, 0.48);
+}
+
+.escala-page .timeline-cell.fora-expediente::before {
+    content: "—";
+    top: 50%;
+    transform: translateY(-50%);
+    color: #94a3b8;
+    font-size: 20px;
+    font-weight: 700;
+    text-align: center;
+}
+
+.escala-page .total-cell {
+    padding: 8px 6px;
+}
+
+.escala-page .total-cell .total-valor {
+    min-width: 58px;
+    height: 32px;
+    padding: 0 8px;
+    border-radius: 8px;
+    background: rgba(15, 23, 42, 0.86);
+    border: 1px solid rgba(148, 163, 184, 0.22);
+    display: grid;
+    place-items: center;
+    color: #f8fafc;
+    font-weight: 800;
+    font-size: 13px;
+    box-shadow: inset 0 0 18px rgba(124, 124, 255, 0.08);
+}
+
+.escala-page .timeline-row.total-row > div {
+    min-height: 58px;
+    background: rgba(15, 23, 42, 0.65);
+}
+
+.escala-page .timeline-row.total-row .timeline-name.total-nome {
+    background: linear-gradient(135deg, #8b8cff, #5b5ff0) !important;
+    color: white;
+    font-weight: 900;
+    letter-spacing: 0.02em;
+    justify-content: flex-start;
+    padding-left: 24px;
+}
+
+.escala-page .timeline-row.total-row .timeline-name.total-nome i {
+    color: white;
+}
+
+.escala-page .timeline-row.total-row .total-cell:first-of-type {
+    background: rgba(15, 23, 42, 0.55);
+}
+
+.escala-page .timeline-row.total-row .timeline-cell.total-cell .total-valor {
+    min-width: 32px;
+    width: auto;
+    height: 32px;
+    border-radius: 999px;
+    background: rgba(124, 124, 255, 0.18);
+    border: 1px solid rgba(124, 124, 255, 0.25);
+    color: #dbeafe;
+    box-shadow: none;
+}
+
+.escala-page .timeline-row.mensagem-row > div {
+    background: rgba(15, 23, 42, 0.48);
+}
+
+.escala-page .sidebarEditor,
+.escala-page .editor-sidebar {
+    align-self: flex-start;
+}
+
+.escala-page .editor-sidebar {
+    width: clamp(312px, 22vw, 352px);
+    border: 1px solid rgba(148, 163, 184, 0.18);
+    background:
+        linear-gradient(180deg, rgba(33, 46, 72, 0.96) 0%, rgba(22, 32, 52, 0.98) 100%);
+    box-shadow: 0 22px 50px rgba(3, 7, 18, 0.34);
+}
+
+.escala-page .editor-sidebar.collapsed {
+    width: 42px;
+    min-width: 42px;
+}
+
+.escala-page .editor-sidebar.collapsed .editor-toggle {
+    left: 0;
+}
+
+.escala-page .editor-content {
+    max-height: 720px;
+    padding: 18px 16px 20px;
+}
+
+.escala-page .editor-content h3 {
+    margin-bottom: 16px;
+    padding-bottom: 14px;
+    font-size: 17px;
+    border-bottom: 1px solid rgba(148, 163, 184, 0.18);
+}
+
+.escala-page .editor-colaborador {
+    display: grid;
+    gap: 16px;
+}
+
+.escala-page .editor-header {
+    margin-bottom: 0;
+    padding: 14px;
+    border-radius: 16px;
+    border: 1px solid rgba(124, 124, 255, 0.16);
+    background: linear-gradient(135deg, rgba(124, 124, 255, 0.12) 0%, rgba(15, 23, 42, 0.12) 100%);
+}
+
+.escala-page .editor-header h4 {
+    color: #f8fafc;
+    font-size: 17px;
+}
+
+.escala-page .editor-header small {
+    display: block;
+    margin-top: 6px;
+    color: #9fb0cf;
+    font-size: 12px;
+    line-height: 1.5;
+}
+
+.escala-page .btn-close-editor {
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+    flex-shrink: 0;
+}
+
+.escala-page .editor-form-group {
+    margin-bottom: 0;
+}
+
+.escala-page .editor-form-group label,
+.escala-page .editor-period-header label {
+    margin-bottom: 10px;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    color: #8ea3c8;
+}
+
+.escala-page .editor-sidebar .form-control,
+.escala-page .time-inputs input {
+    min-height: 48px;
+    border: 1px solid rgba(148, 163, 184, 0.2);
+    background: rgba(15, 23, 42, 0.76);
+    color: #f8fafc;
+}
+
+.escala-page .editor-sidebar textarea.form-control {
+    min-height: 104px;
+    resize: vertical;
+}
+
+.escala-page .editor-sidebar .form-control::placeholder {
+    color: #7f8da8;
+}
+
+.escala-page .editor-sidebar .form-control:focus,
+.escala-page .time-inputs input:focus {
+    border-color: rgba(124, 124, 255, 0.62);
+    box-shadow: 0 0 0 4px rgba(124, 124, 255, 0.14);
+}
+
+.escala-page .time-inputs {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    gap: 10px;
+    padding: 10px;
+    border-radius: 14px;
+    border: 1px solid rgba(148, 163, 184, 0.14);
+    background: rgba(8, 15, 30, 0.3);
+}
+
+.escala-page .time-inputs span {
+    align-self: center;
+    color: #b9c5da;
+    font-size: 13px;
+    font-weight: 700;
+    text-transform: lowercase;
+}
+
+.escala-page .helper-text {
+    margin-top: 2px;
+    color: #9aaccc;
+    font-size: 12px;
+    line-height: 1.55;
+}
+
+.escala-page .editor-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    margin-top: 0;
+    padding-top: 0;
+    border-top: none;
+}
+
+.escala-page .editor-actions .btn-primary,
+.escala-page .editor-actions .btn-secondary {
+    min-height: 54px;
+    width: 100%;
+    padding: 0 14px;
+    justify-content: center;
+    font-size: 13px;
+    line-height: 1.2;
+    white-space: nowrap;
+}
+
+.escala-page .editor-actions .btn-primary i,
+.escala-page .editor-actions .btn-secondary i {
+    font-size: 13px;
+}
+
+.escala-page .editor-actions-single {
+    grid-template-columns: 1fr;
+}
+
+.escala-page .editor-period-panel {
+    display: grid;
+    gap: 12px;
+    padding: 16px;
+    border-radius: 18px;
+    border: 1px solid rgba(148, 163, 184, 0.14);
+    background: linear-gradient(180deg, rgba(18, 27, 45, 0.72) 0%, rgba(11, 18, 33, 0.32) 100%);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.02);
+}
+
+.escala-page .editor-period-header {
+    display: grid;
+    gap: 6px;
+    padding-bottom: 12px;
+    border-bottom: 1px dashed rgba(148, 163, 184, 0.18);
+}
+
+.escala-page .editor-period-header label {
+    margin-bottom: 0;
+}
+
+.escala-page .editor-period-header small {
+    color: #9aaccc;
+    font-size: 12px;
+    line-height: 1.5;
+}
+
+.escala-page .time-inputs-period {
+    margin-top: 0;
+}
+
+.escala-page .editor-empty {
+    min-height: 320px;
+    border: 1px dashed rgba(148, 163, 184, 0.18);
+    background: rgba(15, 23, 42, 0.42);
+}
+
+@media (max-width: 1500px) {
+    .escala-page .timeline-header,
+    .escala-page .timeline-row {
+        grid-template-columns: minmax(150px, 190px) minmax(62px, 72px) repeat(12, minmax(0, 1fr));
+    }
+
+    .escala-page .timeline-name {
+        padding: 0 12px;
+        gap: 8px;
+    }
+
+    .escala-page .timeline-name > span:first-of-type {
+        font-size: 12px;
+    }
+
+    .escala-page .timeline-header div {
+        font-size: 11px;
+    }
+
+    .escala-page .timeline-cell.fora-expediente::before {
+        font-size: 16px;
+    }
+}
+
+@media (max-width: 1200px) {
+    .escala-page .escala-toolbar {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .escala-page .legenda {
+        width: 100%;
+        overflow-x: auto;
+    }
+
+    .escala-page .escala-layout {
+        flex-direction: column;
+    }
+
+    .escala-page .editor-sidebar {
+        width: 100%;
+    }
+
+    .escala-page .editor-sidebar.collapsed {
+        width: 100%;
+        min-width: 100%;
+        max-height: 56px;
+        overflow: hidden;
+    }
+
+    .escala-page .editor-sidebar.collapsed .editor-toggle {
+        left: auto;
+        right: 0;
+        border-radius: 12px 0 0 12px;
+    }
+
+    .escala-page .editor-content {
+        max-height: none;
+    }
+}
+
+@media (max-width: 768px) {
+    .escala-page {
+        padding-top: 0;
+    }
+
+    .escala-page .escala-header h1 {
+        font-size: 24px;
+    }
+
+    .escala-page .toolbar-actions {
+        width: 100%;
+        flex-direction: column;
+    }
+
+    .escala-page .date-input,
+    .escala-page .toolbar-actions .btn-primary,
+    .escala-page .toolbar-actions .btn-secondary {
+        width: 100%;
+    }
+
+    .escala-page .escala-date-shell {
+        width: 100%;
+    }
+
+    .escala-page .editor-actions {
+        grid-template-columns: 1fr;
+    }
+
+    .escala-page .time-inputs {
+        grid-template-columns: 1fr;
+    }
+
+    .escala-page .time-inputs span {
+        justify-self: center;
+    }
+}
+
+/* ================= AJUSTES DO TEMA CLARO ================= */
+:root:not([data-theme="dark"]) .escala-page .escala-header h1 {
+    color: var(--text);
+}
+
+:root:not([data-theme="dark"]) .escala-page .escala-header p {
+    color: var(--text-light);
+}
+
+:root:not([data-theme="dark"]) .escala-page .escala-date-shell {
+    border-color: var(--border);
+    background: rgba(255, 255, 255, 0.96);
+    box-shadow: var(--shadow-sm);
+}
+
+:root:not([data-theme="dark"]) .escala-page .escala-date-shell > i {
+    color: var(--primary);
+}
+
+:root:not([data-theme="dark"]) .escala-page .escala-date-chevron {
+    color: var(--text-lighter);
+}
+
+:root:not([data-theme="dark"]) .escala-page .date-input,
+:root:not([data-theme="dark"]) .escala-page .escala-date-shell .date-input,
+:root:not([data-theme="dark"]) .escala-page .toolbar-actions .btn-secondary {
+    background: var(--card);
+    color: var(--text);
+    border-color: var(--border);
+}
+
+:root:not([data-theme="dark"]) .escala-page .toolbar-actions .btn-secondary:hover {
+    background: #f8fafc;
+}
+
+:root:not([data-theme="dark"]) .escala-page .toolbar-actions .btn-day-nav {
+    background: var(--card);
+}
+
+:root:not([data-theme="dark"]) .escala-page .legenda,
+:root:not([data-theme="dark"]) .escala-page .legenda-timeline {
+    background: rgba(255, 255, 255, 0.95);
+    border-color: var(--border);
+    box-shadow: var(--shadow-sm);
+}
+
+:root:not([data-theme="dark"]) .escala-page .legenda-item {
+    color: var(--text-secondary);
+}
+
+:root:not([data-theme="dark"]) .escala-page .escala-card {
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 250, 252, 0.98));
+    border-color: var(--border);
+    box-shadow: var(--shadow-xl);
+}
+
+:root:not([data-theme="dark"]) .escala-page .escala-scroll::-webkit-scrollbar-track {
+    background: rgba(226, 232, 240, 0.95);
+}
+
+:root:not([data-theme="dark"]) .escala-page .escala-scroll::-webkit-scrollbar-thumb {
+    background: rgba(99, 102, 241, 0.32);
+}
+
+:root:not([data-theme="dark"]) .escala-page .timeline-header {
+    background: #f8fafc;
+    border-color: var(--border);
+}
+
+:root:not([data-theme="dark"]) .escala-page .timeline-header div {
+    color: #334155;
+    border-right-color: rgba(226, 232, 240, 0.95);
+}
+
+:root:not([data-theme="dark"]) .escala-page .timeline-header .total-header {
+    color: var(--primary-dark);
+}
+
+:root:not([data-theme="dark"]) .escala-page .timeline-row > div,
+:root:not([data-theme="dark"]) .escala-page .timeline-name,
+:root:not([data-theme="dark"]) .escala-page .timeline-cell,
+:root:not([data-theme="dark"]) .escala-page .timeline-cell.fora-expediente,
+:root:not([data-theme="dark"]) .escala-page .timeline-row.mensagem-row > div {
+    background: rgba(255, 255, 255, 0.96);
+    border-right-color: rgba(226, 232, 240, 0.95);
+    border-bottom-color: rgba(226, 232, 240, 0.92);
+}
+
+:root:not([data-theme="dark"]) .escala-page .timeline-row:hover > div,
+:root:not([data-theme="dark"]) .escala-page .timeline-name:hover,
+:root:not([data-theme="dark"]) .escala-page .timeline-cell:hover {
+    background: rgba(255, 255, 255, 0.96);
+    color: var(--text);
+}
+
+:root:not([data-theme="dark"]) .escala-page .timeline-row.is-selected > div,
+:root:not([data-theme="dark"]) .escala-page .timeline-row.is-selected:hover > div,
+:root:not([data-theme="dark"]) .escala-page .timeline-row.is-selected .timeline-name:hover,
+:root:not([data-theme="dark"]) .escala-page .timeline-row.is-selected .timeline-cell:hover {
+    background: rgba(224, 231, 255, 0.54);
+}
+
+:root:not([data-theme="dark"]) .escala-page .timeline-name {
+    color: var(--text);
+}
+
+:root:not([data-theme="dark"]) .escala-page .timeline-cell.fora-expediente::before {
+    color: var(--text-lighter);
+}
+
+:root:not([data-theme="dark"]) .escala-page .total-cell .total-valor {
+    background: rgba(241, 245, 249, 0.95);
+    border-color: var(--border);
+    color: var(--text);
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.65);
+}
+
+:root:not([data-theme="dark"]) .escala-page .timeline-row.total-row > div {
+    background: rgba(248, 250, 252, 0.98);
+}
+
+:root:not([data-theme="dark"]) .escala-page .timeline-row.total-row .total-cell:first-of-type {
+    background: rgba(241, 245, 249, 0.98);
+}
+
+:root:not([data-theme="dark"]) .escala-page .timeline-row.total-row .timeline-cell.total-cell .total-valor {
+    background: rgba(99, 102, 241, 0.12);
+    border-color: rgba(99, 102, 241, 0.2);
+    color: var(--primary-dark);
+}
+
+:root:not([data-theme="dark"]) .escala-page .editor-sidebar {
+    border-color: var(--border);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.99), rgba(248, 250, 252, 0.98));
+    box-shadow: 0 22px 50px rgba(15, 23, 42, 0.12);
+}
+
+:root:not([data-theme="dark"]) .escala-page .editor-content h3,
+:root:not([data-theme="dark"]) .escala-page .editor-header h4 {
+    color: var(--text);
+}
+
+:root:not([data-theme="dark"]) .escala-page .editor-content h3 {
+    border-bottom-color: var(--border);
+}
+
+:root:not([data-theme="dark"]) .escala-page .editor-header {
+    border-color: rgba(99, 102, 241, 0.12);
+    background: linear-gradient(135deg, rgba(99, 102, 241, 0.08) 0%, rgba(224, 231, 255, 0.38) 100%);
+}
+
+:root:not([data-theme="dark"]) .escala-page .editor-header small,
+:root:not([data-theme="dark"]) .escala-page .editor-form-group label,
+:root:not([data-theme="dark"]) .escala-page .editor-period-header label,
+:root:not([data-theme="dark"]) .escala-page .editor-period-header small,
+:root:not([data-theme="dark"]) .escala-page .helper-text,
+:root:not([data-theme="dark"]) .escala-page .time-inputs span {
+    color: var(--text-light);
+}
+
+:root:not([data-theme="dark"]) .escala-page .editor-sidebar .form-control,
+:root:not([data-theme="dark"]) .escala-page .time-inputs input {
+    background: rgba(255, 255, 255, 0.98);
+    color: var(--text);
+    border-color: var(--border);
+}
+
+:root:not([data-theme="dark"]) .escala-page .editor-sidebar .form-control::placeholder {
+    color: var(--text-lighter);
+}
+
+:root:not([data-theme="dark"]) .escala-page .time-inputs,
+:root:not([data-theme="dark"]) .escala-page .editor-period-panel,
+:root:not([data-theme="dark"]) .escala-page .editor-empty {
+    background: rgba(248, 250, 252, 0.92);
+    border-color: var(--border);
 }
