@@ -28,7 +28,43 @@ const DIA_SEMANA_LABELS = [
 ];
 
 function normalizeEscalaTipo(value, fieldName = 'Tipo') {
-    return normalizeEnum(value, fieldName, ESCALA_TIPOS, { defaultValue: 'normal' });
+    if (value === undefined || value === null || String(value).trim() === '') {
+        return 'normal';
+    }
+
+    const normalized = String(value)
+        .trim()
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[\s-]+/g, '_')
+        .replace(/_+/g, '_');
+
+    if (normalized.startsWith('plantao')) {
+        return 'plantao';
+    }
+
+    if (normalized.startsWith('folga')) {
+        return 'folga';
+    }
+
+    if (normalized.startsWith('ferias')) {
+        return 'ferias';
+    }
+
+    if (normalized.startsWith('ausencia')) {
+        return 'ausencia';
+    }
+
+    if (normalized.startsWith('ajuste')) {
+        return 'ajuste';
+    }
+
+    if (normalized === 'normal') {
+        return 'normal';
+    }
+
+    throw new AppError(400, `${fieldName} invalido.`);
 }
 
 function getDayOfWeek(dataISO) {

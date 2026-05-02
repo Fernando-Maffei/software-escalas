@@ -29,6 +29,16 @@ function normalizeOptionalText(value, fieldName, options = {}) {
     return normalized;
 }
 
+function canonicalizeEnumValue(value) {
+    return String(value)
+        .trim()
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[\s-]+/g, '_')
+        .replace(/_+/g, '_');
+}
+
 function normalizeEnum(value, fieldName, allowedValues, options = {}) {
     const { defaultValue = null } = options;
 
@@ -40,13 +50,14 @@ function normalizeEnum(value, fieldName, allowedValues, options = {}) {
         throw new AppError(400, `${fieldName} e obrigatorio.`);
     }
 
-    const normalized = String(value).trim().toLowerCase();
+    const normalized = canonicalizeEnumValue(value);
+    const matchedValue = allowedValues.find((allowedValue) => canonicalizeEnumValue(allowedValue) === normalized);
 
-    if (!allowedValues.includes(normalized)) {
+    if (!matchedValue) {
         throw new AppError(400, `${fieldName} invalido.`);
     }
 
-    return normalized;
+    return matchedValue;
 }
 
 function normalizeIsoDate(value, fieldName = 'Data') {

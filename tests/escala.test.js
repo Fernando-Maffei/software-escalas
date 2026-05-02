@@ -50,6 +50,29 @@ module.exports = [
         }
     },
     {
+        name: 'createAusenciaEscalaRecord normalizes accented leave types from legacy data',
+        run() {
+            const colaborador = {
+                Id: 2,
+                Nome: 'Julia',
+                TrabalhoInicio: '08:00:00',
+                TrabalhoFim: '17:00:00',
+                AlmocoInicio: '12:00:00',
+                AlmocoFim: '13:00:00'
+            };
+            const ausencia = {
+                Id: 100,
+                Tipo: 'Aus\u00EAncia',
+                PeriodoTipo: 'dia_inteiro'
+            };
+            const record = createAusenciaEscalaRecord(colaborador, ausencia, '2026-05-03');
+
+            assert.equal(record.tipo, 'ausencia');
+            assert.equal(record.origemTipo, 'ausencia');
+            assert.equal(record.origemId, 100);
+        }
+    },
+    {
         name: 'createPlantaoEscalaRecord preserves shift hours and source metadata',
         run() {
             const colaborador = {
