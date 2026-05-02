@@ -1,22 +1,33 @@
 {
   "name": "app-de-escalas",
-  "version": "1.0.0",
-  "description": "",
-  "main": "backend/server.js",
+  "version": "1.1.0-beta",
+  "description": "Sistema desktop e web para gestao de escalas de trabalho.",
+  "productName": "App de Escalas",
+  "main": "electron/main.js",
   "scripts": {
     "start": "node backend/server.js",
     "dev": "node backend/server.js",
+    "desktop:start": "electron-forge start",
+    "desktop:package": "electron-forge package",
+    "desktop:make": "electron-forge make --platform=win32",
+    "desktop:release": "node scripts/release-desktop.js",
     "test": "node tests/run-tests.js",
-    "smoke": "node --check backend/server.js && node --check backend/routes/colaboradores.js && node --check backend/routes/ausencias.js && node --check backend/routes/escala.js && node --check backend/routes/feriados.js && node --check backend/routes/plantoes.js && node --check backend/routes/banco-horas.js && node --check backend/routes/configuracao-banco.js && node --check backend/utils/bancoHoras.js && node --check backend/utils/backup-config.js && node --check backend/utils/backup-scheduler.js && node --check backend/utils/backup-service.js && node --check backend/utils/escala.js && node --check backend/utils/schema.js && node --check backend/utils/transactions.js && node --check frontend/Js/api.js && node --check frontend/Js/app.js && node --check frontend/Js/calendar.js && node --check frontend/Js/dashboard.js && node --check frontend/Js/escala-report-utils.js && node --check frontend/Js/lancamentos.js && node --check frontend/Js/runtime-fixes.js"
+    "smoke": "node --check backend/server.js && node --check backend/routes/colaboradores.js && node --check backend/routes/ausencias.js && node --check backend/routes/escala.js && node --check backend/routes/feriados.js && node --check backend/routes/plantoes.js && node --check backend/routes/banco-horas.js && node --check backend/routes/configuracao-banco.js && node --check backend/utils/app-paths.js && node --check backend/utils/bancoHoras.js && node --check backend/utils/backup-config.js && node --check backend/utils/backup-scheduler.js && node --check backend/utils/backup-service.js && node --check backend/utils/database-config.js && node --check backend/utils/escala.js && node --check backend/utils/schema.js && node --check backend/utils/transactions.js && node --check electron/launcher-config.js && node --check electron/main.js && node --check electron/preload.js && node --check forge.config.js && node --check scripts/release-desktop.js && node --check frontend/Js/api.js && node --check frontend/Js/app.js && node --check frontend/Js/calendar.js && node --check frontend/Js/dashboard.js && node --check frontend/Js/escala-report-utils.js && node --check frontend/Js/lancamentos.js && node --check frontend/Js/runtime-fixes.js"
   },
   "keywords": [],
-  "author": "",
+  "author": "Fernando Maffei",
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
     "body-parser": "^2.2.2",
     "cors": "^2.8.6",
+    "electron-squirrel-startup": "^1.0.1",
     "express": "^5.2.1",
     "mssql": "^12.2.0"
+  },
+  "devDependencies": {
+    "@electron-forge/cli": "^7.11.1",
+    "@electron-forge/maker-squirrel": "^7.11.1",
+    "electron": "^41.3.0"
   }
 }

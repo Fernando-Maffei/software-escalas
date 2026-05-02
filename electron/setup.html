@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Configuracao Inicial</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #08111f;
+      --bg-soft: #10233b;
+      --panel: rgba(8, 17, 31, 0.88);
+      --panel-soft: rgba(15, 31, 52, 0.88);
+      --line: rgba(148, 163, 184, 0.18);
+      --accent: #38bdf8;
+      --accent-soft: rgba(56, 189, 248, 0.14);
+      --text: #f8fafc;
+      --muted: #94a3b8;
+      --danger: #f87171;
+      --success: #34d399;
+      --shadow: 0 28px 60px rgba(0, 0, 0, 0.35);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Segoe UI", Arial, sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at top right, rgba(56, 189, 248, 0.18), transparent 26%),
+        radial-gradient(circle at bottom left, rgba(14, 165, 233, 0.16), transparent 24%),
+        linear-gradient(160deg, var(--bg) 0%, #0b1628 52%, #11213a 100%);
+    }
+
+    .shell {
+      width: min(760px, calc(100vw - 40px));
+      margin: 22px auto;
+      padding: 28px;
+      border-radius: 28px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      box-shadow: var(--shadow);
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 14px;
+      border-radius: 999px;
+      background: var(--accent-soft);
+      color: #e0f2fe;
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    h1 {
+      margin: 18px 0 10px;
+      font-size: 34px;
+      line-height: 1.08;
+    }
+
+    .lead {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.6;
+      max-width: 62ch;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+      margin-top: 24px;
+    }
+
+    .mode-card {
+      position: relative;
+      border-radius: 22px;
+      border: 1px solid var(--line);
+      background: var(--panel-soft);
+      padding: 18px;
+      cursor: pointer;
+      transition: transform 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease;
+      min-height: 190px;
+    }
+
+    .mode-card:hover {
+      transform: translateY(-2px);
+      border-color: rgba(56, 189, 248, 0.45);
+      box-shadow: 0 18px 34px rgba(0, 0, 0, 0.2);
+    }
+
+    .mode-card.active {
+      border-color: rgba(56, 189, 248, 0.8);
+      box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.4) inset;
+      background: linear-gradient(180deg, rgba(56, 189, 248, 0.14), rgba(15, 31, 52, 0.92));
+    }
+
+    .mode-card input {
+      position: absolute;
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .mode-card strong {
+      display: block;
+      font-size: 18px;
+      margin-bottom: 10px;
+    }
+
+    .mode-card p {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.55;
+      font-size: 14px;
+    }
+
+    .panel {
+      margin-top: 22px;
+      padding: 22px;
+      border-radius: 24px;
+      border: 1px solid var(--line);
+      background: rgba(15, 31, 52, 0.74);
+    }
+
+    .panel h2 {
+      margin: 0 0 10px;
+      font-size: 20px;
+    }
+
+    .panel-copy {
+      color: var(--muted);
+      line-height: 1.55;
+      margin-bottom: 18px;
+    }
+
+    .field-grid {
+      display: grid;
+      gap: 16px;
+    }
+
+    .field-grid.two {
+      grid-template-columns: minmax(0, 1fr) 180px;
+      align-items: end;
+    }
+
+    .field {
+      display: grid;
+      gap: 8px;
+    }
+
+    label {
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    input[type="text"],
+    input[type="number"] {
+      width: 100%;
+      border: 1px solid rgba(148, 163, 184, 0.24);
+      background: rgba(8, 17, 31, 0.78);
+      color: var(--text);
+      border-radius: 14px;
+      padding: 14px 15px;
+      font-size: 14px;
+      outline: none;
+    }
+
+    input:focus {
+      border-color: rgba(56, 189, 248, 0.78);
+      box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.12);
+    }
+
+    .helper {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    .actions {
+      display: flex;
+      gap: 12px;
+      justify-content: flex-end;
+      margin-top: 22px;
+    }
+
+    button {
+      border: none;
+      border-radius: 14px;
+      padding: 14px 18px;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: transform 0.16s ease, filter 0.16s ease;
+    }
+
+    button:hover {
+      transform: translateY(-1px);
+      filter: brightness(1.04);
+    }
+
+    .btn-secondary {
+      background: rgba(15, 31, 52, 0.9);
+      color: var(--text);
+      border: 1px solid var(--line);
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #38bdf8, #0ea5e9);
+      color: #082032;
+    }
+
+    .status {
+      margin-top: 18px;
+      min-height: 22px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    .status.is-error {
+      color: var(--danger);
+    }
+
+    .status.is-success {
+      color: var(--success);
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    @media (max-width: 720px) {
+      .shell {
+        width: calc(100vw - 24px);
+        margin: 12px auto;
+        padding: 20px;
+      }
+
+      .grid,
+      .field-grid.two {
+        grid-template-columns: 1fr;
+      }
+
+      h1 {
+        font-size: 28px;
+      }
+
+      .actions {
+        flex-direction: column;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <div class="eyebrow" id="eyebrow">App de Escalas</div>
+    <h1>Como esta instalacao vai funcionar?</h1>
+    <p class="lead">
+      Escolha como este computador deve abrir o sistema. Se quiser o modelo com uma maquina principal e outras se conectando pela rede, use os modos <strong>Servidor da rede</strong> e <strong>Cliente da rede</strong>.
+    </p>
+
+    <section class="grid" id="modeGrid">
+      <label class="mode-card" data-mode-card="standalone">
+        <input type="radio" name="mode" value="standalone" checked>
+        <strong>Nesta maquina</strong>
+        <p>O app abre e usa o proprio servidor interno apenas neste computador.</p>
+      </label>
+
+      <label class="mode-card" data-mode-card="server">
+        <input type="radio" name="mode" value="server">
+        <strong>Servidor da rede</strong>
+        <p>Esta maquina hospeda o sistema para outras da mesma rede local se conectarem.</p>
+      </label>
+
+      <label class="mode-card" data-mode-card="client">
+        <input type="radio" name="mode" value="client">
+        <strong>Cliente da rede</strong>
+        <p>Este computador nao sobe servidor local. Ele se conecta a outra maquina que esta hospedando o sistema.</p>
+      </label>
+    </section>
+
+    <section class="panel" id="localPanel">
+      <h2>Dados desta instalacao</h2>
+      <p class="panel-copy">
+        Escolha uma pasta para guardar as configuracoes locais do sistema. No modo servidor, esta pasta pode ficar no disco C desta maquina. Se voce quiser padronizar backups e configuracoes, tambem pode compartilhar essa pasta no Windows depois.
+      </p>
+
+      <div class="field-grid two">
+        <div class="field">
+          <label for="dataDirectory">Pasta de dados</label>
+          <input type="text" id="dataDirectory" placeholder="Ex: C:\\App de Escalas\\dados">
+          <span class="helper">Use um caminho local. O aplicativo cria a pasta automaticamente se ela ainda nao existir.</span>
+        </div>
+
+        <button type="button" class="btn-secondary" id="browseDataDirectoryBtn">Selecionar pasta</button>
+      </div>
+
+      <div class="field-grid hidden" id="serverPortField">
+        <div class="field">
+          <label for="serverPort">Porta do servidor</label>
+          <input type="number" id="serverPort" min="1" max="65535" step="1" placeholder="3000">
+          <span class="helper">Use a mesma porta em todas as maquinas clientes. O padrao recomendado e 3000.</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel hidden" id="clientPanel">
+      <h2>Conexao com a maquina servidora</h2>
+      <p class="panel-copy">
+        Informe o endereco da maquina que vai hospedar o sistema. Exemplo: <strong>http://192.168.0.10:3000</strong>. Se a outra maquina estiver na mesma rede, os dois computadores usam o mesmo servidor.
+      </p>
+
+      <div class="field-grid">
+        <div class="field">
+          <label for="serverUrl">Endereco do servidor</label>
+          <input type="text" id="serverUrl" placeholder="http://192.168.0.10:3000">
+          <span class="helper">Voce pode informar IP, nome da maquina ou URL completa. O aplicativo normaliza isso automaticamente.</span>
+        </div>
+      </div>
+    </section>
+
+    <div class="status" id="statusText"></div>
+
+    <div class="actions">
+      <button type="button" class="btn-secondary" id="closeBtn">Fechar</button>
+      <button type="button" class="btn-primary" id="saveBtn">Salvar e continuar</button>
+    </div>
+  </main>
+
+  <script>
+    const state = {
+      isFirstRun: true,
+      config: null
+    };
+
+    const statusText = document.getElementById('statusText');
+    const localPanel = document.getElementById('localPanel');
+    const clientPanel = document.getElementById('clientPanel');
+    const serverPortField = document.getElementById('serverPortField');
+    const dataDirectoryInput = document.getElementById('dataDirectory');
+    const serverPortInput = document.getElementById('serverPort');
+    const serverUrlInput = document.getElementById('serverUrl');
+    const closeBtn = document.getElementById('closeBtn');
+
+    function setStatus(message, variant = '') {
+      statusText.textContent = message || '';
+      statusText.className = variant ? `status is-${variant}` : 'status';
+    }
+
+    function getSelectedMode() {
+      const checked = document.querySelector('input[name="mode"]:checked');
+      return checked ? checked.value : 'standalone';
+    }
+
+    function updateModeCards() {
+      const selectedMode = getSelectedMode();
+      document.querySelectorAll('[data-mode-card]').forEach((element) => {
+        element.classList.toggle('active', element.dataset.modeCard === selectedMode);
+      });
+    }
+
+    function updateModePanels() {
+      const selectedMode = getSelectedMode();
+      updateModeCards();
+
+      localPanel.classList.toggle('hidden', selectedMode === 'client');
+      clientPanel.classList.toggle('hidden', selectedMode !== 'client');
+      serverPortField.classList.toggle('hidden', selectedMode !== 'server');
+    }
+
+    function fillForm(context) {
+      state.isFirstRun = Boolean(context.isFirstRun);
+      state.config = context.config || {};
+
+      const mode = state.config.mode || 'standalone';
+      const modeInput = document.querySelector(`input[name="mode"][value="${mode}"]`);
+
+      if (modeInput) {
+        modeInput.checked = true;
+      }
+
+      dataDirectoryInput.value = state.config.dataDirectory || context.defaultLocalDataDirectory || '';
+      serverPortInput.value = String(state.config.serverPort || 3000);
+      serverUrlInput.value = state.config.serverUrl || '';
+      document.getElementById('eyebrow').textContent = `App de Escalas v${context.appVersion}`;
+      closeBtn.textContent = state.isFirstRun ? 'Cancelar' : 'Fechar';
+
+      updateModePanels();
+      setStatus(state.isFirstRun
+        ? 'Escolha o modo desejado e salve para abrir o aplicativo.'
+        : 'Revise as informacoes abaixo e salve para aplicar o novo modo de acesso.');
+    }
+
+    async function browseDirectory() {
+      setStatus('Abrindo seletor de pasta...');
+
+      try {
+        const response = await window.desktopSetup.browseDirectory(dataDirectoryInput.value);
+
+        if (response && !response.canceled && response.directory) {
+          dataDirectoryInput.value = response.directory;
+          setStatus(`Pasta selecionada: ${response.directory}`, 'success');
+          return;
+        }
+
+        setStatus('Selecao de pasta cancelada.');
+      } catch (error) {
+        setStatus(error.message || 'Nao foi possivel abrir o seletor de pasta.', 'error');
+      }
+    }
+
+    async function saveConfiguration() {
+      const payload = {
+        mode: getSelectedMode(),
+        dataDirectory: dataDirectoryInput.value,
+        serverPort: serverPortInput.value,
+        serverUrl: serverUrlInput.value
+      };
+
+      setStatus('Salvando configuracao...');
+
+      try {
+        await window.desktopSetup.save(payload);
+        setStatus('Configuracao salva. Abrindo o aplicativo...', 'success');
+      } catch (error) {
+        setStatus(error.message || 'Nao foi possivel salvar a configuracao.', 'error');
+      }
+    }
+
+    document.querySelectorAll('input[name="mode"]').forEach((input) => {
+      input.addEventListener('change', updateModePanels);
+    });
+
+    document.getElementById('browseDataDirectoryBtn').addEventListener('click', async () => {
+      await browseDirectory();
+    });
+
+    document.getElementById('saveBtn').addEventListener('click', async () => {
+      await saveConfiguration();
+    });
+
+    closeBtn.addEventListener('click', () => {
+      window.close();
+    });
+
+    window.addEventListener('DOMContentLoaded', async () => {
+      try {
+        const context = await window.desktopSetup.getContext();
+        fillForm(context);
+      } catch (error) {
+        setStatus(error.message || 'Nao foi possivel carregar a configuracao inicial.', 'error');
+      }
+    });
+  </script>
+</body>
+</html>

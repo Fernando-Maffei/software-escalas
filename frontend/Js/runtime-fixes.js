@@ -1,3 +1,70 @@
+(function initRuntimeNormalizationHelpers(root) {
+    if (root.__runtimeNormalizationHelpersLoaded) {
+        return;
+    }
+
+    root.__runtimeNormalizationHelpersLoaded = true;
+
+    root.normalizeRuntimeToken = function normalizeRuntimeToken(value) {
+        return String(value || '')
+            .trim()
+            .toLowerCase()
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .replace(/[\s-]+/g, '_')
+            .replace(/_+/g, '_');
+    };
+
+    root.normalizeRuntimeAusenciaTipo = function normalizeRuntimeAusenciaTipo(value) {
+        const token = root.normalizeRuntimeToken(value);
+
+        if (token.startsWith('ferias')) {
+            return 'ferias';
+        }
+
+        if (token.startsWith('folga')) {
+            return 'folga';
+        }
+
+        if (token.startsWith('ausencia')) {
+            return 'ausencia';
+        }
+
+        return 'ausencia';
+    };
+
+    root.normalizeRuntimePeriodoTipo = function normalizeRuntimePeriodoTipo(value) {
+        const token = root.normalizeRuntimeToken(value);
+        return token === 'horas' ? 'horas' : 'dia_inteiro';
+    };
+
+    root.normalizeRuntimeEscalaTipo = function normalizeRuntimeEscalaTipo(value) {
+        const token = root.normalizeRuntimeToken(value);
+
+        if (token.startsWith('plantao')) {
+            return 'plantao';
+        }
+
+        if (token.startsWith('folga')) {
+            return 'folga';
+        }
+
+        if (token.startsWith('ferias')) {
+            return 'ferias';
+        }
+
+        if (token.startsWith('ausencia')) {
+            return 'ausencia';
+        }
+
+        if (token.startsWith('ajuste')) {
+            return 'ajuste';
+        }
+
+        return 'normal';
+    };
+}(window));
+
 (function () {
     if (window.__runtimeFixesLoaded) {
         return;
@@ -63,24 +130,29 @@
     }
 
     function mapAusencia(item) {
+        const tipo = window.normalizeRuntimeAusenciaTipo(item.Tipo || item.tipo);
+        const periodoTipo = window.normalizeRuntimePeriodoTipo(item.PeriodoTipo || item.periodoTipo || 'dia_inteiro');
+
         return {
             Id: item.Id,
             ColaboradorId: item.ColaboradorId,
-            Tipo: item.Tipo,
+            Tipo: tipo,
             DataInicio: item.DataInicio,
             DataFim: item.DataFim,
             DataCadastro: item.DataCadastro,
-            PeriodoTipo: item.PeriodoTipo || 'dia_inteiro',
+            PeriodoTipo: periodoTipo,
             HoraInicio: item.HoraInicio,
             HoraFim: item.HoraFim,
             id: item.Id,
             colaboradorId: item.ColaboradorId,
-            tipo: item.Tipo,
+            tipo,
             dataInicio: item.DataInicio,
             dataFim: item.DataFim,
-            periodoTipo: item.PeriodoTipo || 'dia_inteiro',
+            periodoTipo,
             horaInicio: item.HoraInicio,
-            horaFim: item.HoraFim
+            horaFim: item.HoraFim,
+            observacao: item.Observacao || item.observacao || null,
+            Observacao: item.Observacao || item.observacao || null
         };
     }
 
@@ -90,7 +162,10 @@
         return {
             ...item,
             dataISO,
-            colaboradores: Array.isArray(item.colaboradores) ? item.colaboradores : []
+            colaboradores: Array.isArray(item.colaboradores) ? item.colaboradores : [],
+            horaInicio: item.horaInicio || item.hora_inicio || null,
+            horaFim: item.horaFim || item.hora_fim || null,
+            observacao: item.observacao || null
         };
     }
 
@@ -293,23 +368,17 @@
                 typeof carregarPlantoes === 'function' ? carregarPlantoes() : Promise.resolve([])
             ]);
 
-            if (document.getElementById('calendar') && typeof gerarCalendario === 'function') {
-                const mes = window.mesAtual ?? new Date().getMonth();
-                const ano = window.anoAtual ?? new Date().getFullYear();
-                gerarCalendario(mes, ano);
-            }
-
             const modalLancamento = document.getElementById('modalLancamento');
             if (modalLancamento && !modalLancamento.classList.contains('hidden')) {
-                if (window.modalFiltroData && window.modalDataSelecionada && typeof carregarListagensComFiltro === 'function') {
-                    await carregarListagensComFiltro(window.modalDataSelecionada, true);
+                if (window.modalDataSelecionada && typeof carregarListagensComFiltro === 'function') {
+                    await carregarListagensComFiltro(window.modalDataSelecionada, window.modalFiltroData !== false);
                 } else if (typeof carregarListagens === 'function') {
                     await carregarListagens();
                 }
             }
 
-            if ((window.location.hash || '#dashboard') === '#dashboard' && typeof renderDashboard === 'function') {
-                await renderDashboard();
+            if (typeof window.__refreshVisibleViews === 'function') {
+                await window.__refreshVisibleViews(options);
             }
 
             if (!silent && typeof mostrarToast === 'function') {
@@ -3199,6 +3268,126 @@
         }).join('');
     };
 
+    const PLANTAO_SABADOS_ANTERIORES = 8;
+    const PLANTAO_SABADOS_POSTERIORES = 10;
+    const PLANTAO_SABADOS_PASSO = 8;
+    const PLANTAO_MESES_LABELS = ['JAN', 'FEV', 'MAR', 'ABR', 'MAI', 'JUN', 'JUL', 'AGO', 'SET', 'OUT', 'NOV', 'DEZ'];
+
+    function criarDataLocalPlantao(dataISO) {
+        const [ano, mes, dia] = String(dataISO || '').split('-').map(Number);
+
+        if (!ano || !mes || !dia) {
+            return new Date();
+        }
+
+        return new Date(ano, mes - 1, dia, 12, 0, 0, 0);
+    }
+
+    function formatarDataPlantaoCard(dataISO) {
+        const [ano, mes, dia] = String(dataISO || '').split('-');
+        return ano && mes && dia ? `${dia}/${mes}/${ano}` : '--';
+    }
+
+    function formatarMesPlantaoCard(dataISO) {
+        const [, mes] = String(dataISO || '').split('-').map(Number);
+        return PLANTAO_MESES_LABELS[mes - 1] || '--';
+    }
+
+    function ajustarAncoraSabadoPlantao(referenciaISO) {
+        const data = criarDataLocalPlantao(obterDataISO(referenciaISO) || obterDataISO(new Date()));
+
+        while (data.getDay() !== 6) {
+            data.setDate(data.getDate() + 1);
+        }
+
+        return obterDataISO(data);
+    }
+
+    function obterAncoraSabadoPlantao() {
+        if (!window.__plantaoSabadoAncoraISO) {
+            window.__plantaoSabadoAncoraISO = ajustarAncoraSabadoPlantao(new Date());
+        }
+
+        return window.__plantaoSabadoAncoraISO;
+    }
+
+    function definirAncoraSabadoPlantao(referenciaISO) {
+        window.__plantaoSabadoAncoraISO = ajustarAncoraSabadoPlantao(referenciaISO);
+        return window.__plantaoSabadoAncoraISO;
+    }
+
+    function mudarPaginaSabadosPlantao(passosEmSemanas) {
+        const data = criarDataLocalPlantao(obterAncoraSabadoPlantao());
+        data.setDate(data.getDate() + (Number(passosEmSemanas) || 0) * 7);
+        definirAncoraSabadoPlantao(obterDataISO(data));
+    }
+
+    function construirSabadosVisiveisPlantao() {
+        const hojeISO = obterDataISO(new Date());
+        const dataAncora = criarDataLocalPlantao(obterAncoraSabadoPlantao());
+        const dataFoco = obterDataISO(window.__plantaoDataFocoISO || '');
+        const sabados = [];
+
+        for (let deslocamento = PLANTAO_SABADOS_ANTERIORES * -1; deslocamento <= PLANTAO_SABADOS_POSTERIORES; deslocamento += 1) {
+            const data = new Date(dataAncora);
+            data.setDate(data.getDate() + (deslocamento * 7));
+
+            const dataISO = obterDataISO(data);
+            const plantao = (window.plantoesLancados || []).find((item) => item.dataISO === dataISO) || null;
+
+            sabados.push({
+                dataISO,
+                formatada: formatarDataPlantaoCard(dataISO),
+                dia: String(data.getDate()).padStart(2, '0'),
+                mes: formatarMesPlantaoCard(dataISO),
+                ano: data.getFullYear(),
+                plantao,
+                temPlantao: Boolean(plantao),
+                isPast: dataISO < hojeISO,
+                isToday: dataISO === hojeISO,
+                isActive: dataFoco === dataISO
+            });
+        }
+
+        return sabados;
+    }
+
+    function renderSabadosPlantaoHistorico(items) {
+        return items.map((sabado) => `
+            <button
+                type="button"
+                class="sabado-card ${sabado.temPlantao ? 'lancado' : ''} ${sabado.isPast ? 'passado' : ''} ${sabado.isToday ? 'hoje' : ''} ${sabado.isActive ? 'is-active' : ''}"
+                data-plantao-sabado="${sabado.dataISO}"
+                title="${escapeHtml(sabado.formatada)}${sabado.temPlantao ? ' - Plantao ja lancado' : ''}"
+            >
+                <div class="sabado-card-badges">
+                    ${sabado.temPlantao ? '<span class="badge-plantao">Lancado</span>' : ''}
+                    ${sabado.isPast ? '<span class="badge-historico">Historico</span>' : ''}
+                </div>
+                <div class="sabado-dia">${escapeHtml(sabado.dia)}</div>
+                <div class="sabado-mes">${escapeHtml(sabado.mes)}</div>
+                <div class="sabado-ano">${escapeHtml(String(sabado.ano))}</div>
+                <div class="sabado-status">${sabado.temPlantao ? 'Clique para editar' : 'Clique para lancar'}</div>
+            </button>
+        `).join('');
+    }
+
+    function atualizarSabadoSelecionadoPlantao(dataISO) {
+        document.querySelectorAll('[data-plantao-sabado]').forEach((element) => {
+            element.classList.toggle('is-active', element.getAttribute('data-plantao-sabado') === dataISO);
+        });
+    }
+
+    function atualizarResumoPlantaoNaTela() {
+        const container = document.getElementById('listaPlantoesLancados');
+
+        if (!container || typeof renderPlantoesLancados !== 'function') {
+            return;
+        }
+
+        container.innerHTML = renderPlantoesLancados();
+    }
+
     if (typeof renderPlantoesLancados === 'function') {
         window.renderPlantoesLancados = renderPlantoesLancados = function renderPlantoesLancadosAvancado() {
             if (!window.plantoesLancados || window.plantoesLancados.length === 0) {
@@ -3235,7 +3424,138 @@
         };
     }
 
+    window.carregarPlantoesLancadosNaTela = carregarPlantoesLancadosNaTela = function carregarPlantoesLancadosNaTelaAtualizado() {
+        atualizarResumoPlantaoNaTela();
+    };
+
+    window.renderLancamentoPlantao = renderLancamentoPlantao = async function renderLancamentoPlantaoAtualizado() {
+        const appContent = document.getElementById('appContent');
+
+        if (!appContent) {
+            return;
+        }
+
+        await Promise.allSettled([
+            typeof carregarColaboradores === 'function' ? carregarColaboradores() : Promise.resolve([]),
+            typeof carregarAusencias === 'function' ? carregarAusencias() : Promise.resolve([]),
+            typeof carregarPlantoes === 'function' ? carregarPlantoes() : Promise.resolve([]),
+            typeof carregarBancoHorasResumo === 'function' ? carregarBancoHorasResumo() : Promise.resolve(null)
+        ]);
+
+        const dataFoco = obterDataISO(window.__plantaoDataFocoISO || getPlantaoEditorState()?.dataISO || '');
+        definirAncoraSabadoPlantao(dataFoco || obterAncoraSabadoPlantao());
+
+        const sabados = construirSabadosVisiveisPlantao();
+        const primeiraData = sabados[0]?.formatada || '--';
+        const ultimaData = sabados[sabados.length - 1]?.formatada || '--';
+
+        appContent.innerHTML = `
+            <div class="page-header">
+                <div>
+                    <h1><i class="fas fa-calendar-plus"></i> Plantoes de Sabado</h1>
+                    <p>Consulte sabados anteriores e futuros, abra um plantao existente para editar e mantenha o mesmo registro atualizado.</p>
+                </div>
+            </div>
+
+            <div class="plantao-layout">
+                <div class="sabados-container">
+                    <div class="sabados-header">
+                        <div>
+                            <h3><i class="fas fa-calendar-day"></i> Sabados disponiveis</h3>
+                            <p class="sabados-subtitle">Janela atual: ${escapeHtml(primeiraData)} ate ${escapeHtml(ultimaData)}</p>
+                        </div>
+                        <div class="sabados-nav">
+                            <button type="button" class="btn-secondary" id="plantaoAnteriorBtn">
+                                <i class="fas fa-arrow-left"></i> Anteriores
+                            </button>
+                            <button type="button" class="btn-secondary" id="plantaoHojeBtn">
+                                <i class="fas fa-bullseye"></i> Atual
+                            </button>
+                            <button type="button" class="btn-secondary" id="plantaoProximoBtn">
+                                Proximos <i class="fas fa-arrow-right"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="sabados-grid" id="listaSabados">
+                        ${renderSabadosPlantaoHistorico(sabados)}
+                    </div>
+                </div>
+
+                <div id="plantaoEditor" class="editor-sidebar" style="display: none;">
+                    <div class="editor-content">
+                        <div class="editor-header">
+                            <h3><i class="fas fa-clock"></i> <span id="plantaoDataTitle">Selecione um sabado</span></h3>
+                            <button onclick="fecharPlantaoEditor()" class="btn-close-editor">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                        <div id="plantaoEditorContent" class="editor-form">
+                            <div class="editor-empty">
+                                <i class="fas fa-hand-pointer"></i>
+                                <p>Escolha um sabado para abrir o plantao, revisar a equipe e salvar sem duplicar o lancamento.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="plantoes-lancados-container">
+                <div class="plantoes-lancados-header">
+                    <div>
+                        <h3><i class="fas fa-list"></i> Plantoes lancados</h3>
+                        <p class="sabados-subtitle">Edite sabados anteriores diretamente por esta lista quando preferir.</p>
+                    </div>
+                </div>
+                <div id="listaPlantoesLancados" class="plantoes-grid">
+                    ${renderPlantoesLancados()}
+                </div>
+            </div>
+        `;
+
+        document.getElementById('plantaoAnteriorBtn')?.addEventListener('click', () => {
+            mudarPaginaSabadosPlantao(PLANTAO_SABADOS_PASSO * -1);
+            window.__plantaoDataFocoISO = null;
+            renderLancamentoPlantao();
+        });
+
+        document.getElementById('plantaoHojeBtn')?.addEventListener('click', () => {
+            definirAncoraSabadoPlantao(new Date());
+            window.__plantaoDataFocoISO = null;
+            renderLancamentoPlantao();
+        });
+
+        document.getElementById('plantaoProximoBtn')?.addEventListener('click', () => {
+            mudarPaginaSabadosPlantao(PLANTAO_SABADOS_PASSO);
+            window.__plantaoDataFocoISO = null;
+            renderLancamentoPlantao();
+        });
+
+        document.querySelectorAll('[data-plantao-sabado]').forEach((element) => {
+            element.addEventListener('click', () => {
+                const dataISO = element.getAttribute('data-plantao-sabado');
+                window.abrirEditorPlantao(dataISO, formatarDataPlantaoCard(dataISO));
+            });
+        });
+
+        if (dataFoco) {
+            await window.abrirEditorPlantao(dataFoco, formatarDataPlantaoCard(dataFoco));
+        } else {
+            const editorPanel = document.getElementById('plantaoEditor');
+
+            setPlantaoEditorState(null);
+
+            if (editorPanel) {
+                editorPanel.style.display = 'none';
+            }
+        }
+    };
+
     window.abrirEditorPlantao = abrirEditorPlantao = async function abrirEditorPlantaoAvancado(dataISO, dataFormatada) {
+        window.__plantaoDataFocoISO = dataISO;
+        definirAncoraSabadoPlantao(dataISO);
+        atualizarSabadoSelecionadoPlantao(dataISO);
+
         const existente = (window.plantoesLancados || []).find((item) => item.dataISO === dataISO);
         const state = setPlantaoEditorState({
             dataISO,
@@ -3250,6 +3570,29 @@
         renderPlantaoEditor(state);
         await carregarDisponibilidadePlantao(state);
         renderPlantaoEditor(state);
+        atualizarSabadoSelecionadoPlantao(dataISO);
+    };
+
+    window.fecharPlantaoEditor = fecharPlantaoEditor = function fecharPlantaoEditorAtualizado() {
+        const editorPanel = document.getElementById('plantaoEditor');
+        const editorContent = document.getElementById('plantaoEditorContent');
+
+        window.__plantaoDataFocoISO = null;
+        setPlantaoEditorState(null);
+        atualizarSabadoSelecionadoPlantao(null);
+
+        if (editorContent) {
+            editorContent.innerHTML = `
+                <div class="editor-empty">
+                    <i class="fas fa-hand-pointer"></i>
+                    <p>Escolha um sabado para abrir o plantao, revisar a equipe e salvar sem duplicar o lancamento.</p>
+                </div>
+            `;
+        }
+
+        if (editorPanel) {
+            editorPanel.style.display = 'none';
+        }
     };
 
     window.salvarPlantao = salvarPlantao = async function salvarPlantaoAvancado(dataISO) {
@@ -3275,6 +3618,7 @@
         }
 
         try {
+            window.__plantaoDataFocoISO = dataISO;
             await window.API.salvarPlantao({
                 dataISO,
                 horaInicio,
@@ -3283,18 +3627,7 @@
                 colaboradores: selecionados
             });
 
-            await Promise.allSettled([
-                carregarPlantoes(),
-                carregarBancoHorasResumo()
-            ]);
-
-            if (typeof renderLancamentoPlantao === 'function') {
-                renderLancamentoPlantao();
-            }
-
-            if (isColaboradoresScreenVisible() && typeof renderListaColaboradores === 'function') {
-                renderListaColaboradores();
-            }
+            await atualizarTudo({ silent: true, source: 'plantao' });
 
             mostrarToast('Plantao salvo com sucesso!', 'success');
         } catch (error) {
@@ -3308,19 +3641,9 @@
         }
 
         try {
+            window.__plantaoDataFocoISO = dataISO;
             await window.API.excluirPlantao(dataISO);
-            await Promise.allSettled([
-                carregarPlantoes(),
-                carregarBancoHorasResumo()
-            ]);
-
-            if (typeof renderLancamentoPlantao === 'function') {
-                renderLancamentoPlantao();
-            }
-
-            if (isColaboradoresScreenVisible() && typeof renderListaColaboradores === 'function') {
-                renderListaColaboradores();
-            }
+            await atualizarTudo({ silent: true, source: 'plantao' });
 
             mostrarToast('Plantao excluido com sucesso!', 'success');
         } catch (error) {
@@ -3475,6 +3798,10 @@
 
     const HORA_INICIAL = 7;
     const HORA_FINAL = 18;
+    const ESCALA_EDITOR_MINUTO_INICIAL = 6 * 60;
+    const ESCALA_EDITOR_MINUTO_FINAL = 22 * 60;
+    const ESCALA_EDITOR_PASSO_MINUTOS = 15;
+    const ESCALA_EDITOR_ALMOCO_PADRAO_MINUTOS = 60;
     const DIA_LABELS = ['Domingo', 'Segunda', 'Terca', 'Quarta', 'Quinta', 'Sexta', 'Sabado'];
     const TIPO_LABELS = {
         normal: 'Normal',
@@ -3604,6 +3931,29 @@
 
         const [hours, minutes] = formatted.split(':').map(Number);
         return (hours * 60) + minutes;
+    }
+
+    function formatMinutesToTimeEscala(totalMinutes) {
+        if (!Number.isFinite(totalMinutes)) {
+            return '';
+        }
+
+        const safeMinutes = Math.max(0, Math.min(23 * 60 + 59, Math.round(totalMinutes)));
+        const hours = String(Math.floor(safeMinutes / 60)).padStart(2, '0');
+        const minutes = String(safeMinutes % 60).padStart(2, '0');
+        return `${hours}:${minutes}`;
+    }
+
+    function clampMinutesEscala(value, min, max) {
+        return Math.max(min, Math.min(max, value));
+    }
+
+    function roundMinutesEscala(value, step = ESCALA_EDITOR_PASSO_MINUTOS) {
+        if (!Number.isFinite(value)) {
+            return value;
+        }
+
+        return Math.round(value / step) * step;
     }
 
     function formatDurationEscala(totalMinutes) {
@@ -3829,6 +4179,61 @@
         return state;
     }
 
+    function getScaleSortModeEscala() {
+        return window.__escalaSortMode || 'alpha';
+    }
+
+    function setScaleSortModeEscala(value) {
+        const allowedModes = ['alpha', 'work_start', 'lunch_start', 'lunch_end'];
+        const normalized = allowedModes.includes(String(value || '').trim()) ? value : 'alpha';
+        window.__escalaSortMode = normalized;
+
+        const select = document.getElementById('escalaSortMode');
+        if (select && select.value !== normalized) {
+            select.value = normalized;
+        }
+
+        return normalized;
+    }
+
+    function getSortableMinutesEscala(value) {
+        const minutes = getTimeMinutesEscala(value);
+        return minutes === null ? Number.POSITIVE_INFINITY : minutes;
+    }
+
+    function compareScaleRecordsEscala(first, second) {
+        const sortMode = getScaleSortModeEscala();
+        const nameA = String(first.colaboradorNome || '').toLowerCase();
+        const nameB = String(second.colaboradorNome || '').toLowerCase();
+
+        if (sortMode === 'work_start') {
+            const diff = getSortableMinutesEscala(first.horaInicio) - getSortableMinutesEscala(second.horaInicio);
+            return diff || nameA.localeCompare(nameB);
+        }
+
+        if (sortMode === 'lunch_start') {
+            const diff = getSortableMinutesEscala(first.almocoInicio) - getSortableMinutesEscala(second.almocoInicio);
+            if (diff) {
+                return diff;
+            }
+
+            const workDiff = getSortableMinutesEscala(first.horaInicio) - getSortableMinutesEscala(second.horaInicio);
+            return workDiff || nameA.localeCompare(nameB);
+        }
+
+        if (sortMode === 'lunch_end') {
+            const diff = getSortableMinutesEscala(first.almocoFim) - getSortableMinutesEscala(second.almocoFim);
+            if (diff) {
+                return diff;
+            }
+
+            const workDiff = getSortableMinutesEscala(first.horaInicio) - getSortableMinutesEscala(second.horaInicio);
+            return workDiff || nameA.localeCompare(nameB);
+        }
+
+        return nameA.localeCompare(nameB);
+    }
+
     function isFullDayOffEscala(record) {
         return ['folga', 'ferias', 'ausencia'].includes(String(record?.tipo || '').toLowerCase())
             && !getPartialAbsenceEscala(record.colaboradorId, record.dataISO);
@@ -3880,7 +4285,7 @@
     }
 
     function getCellStateEscala(record, hour) {
-        const tipo = String(record.tipo || '').toLowerCase();
+        const tipo = window.normalizeRuntimeEscalaTipo(record.tipo || '');
         const start = getTimeMinutesEscala(record.horaInicio);
         const end = getTimeMinutesEscala(record.horaFim);
         const lunchStart = getTimeMinutesEscala(record.almocoInicio);
@@ -3895,8 +4300,12 @@
             return { className: 'ferias', status: 'Ferias' };
         }
 
-        if ((tipo === 'folga' || tipo === 'ausencia') && !partialAbsence) {
-            return { className: 'folga', status: tipo === 'folga' ? 'Folga' : 'Ausencia' };
+        if (tipo === 'folga' && !partialAbsence) {
+            return { className: 'folga', status: 'Folga' };
+        }
+
+        if (tipo === 'ausencia' && !partialAbsence) {
+            return { className: 'ausencia', status: 'Ausencia' };
         }
 
         if (start === null || end === null || currentHourStart < start || currentHourStart >= end) {
@@ -4014,7 +4423,7 @@
                     counters.almoco += 1;
                 } else if (state === 'ferias') {
                     counters.ferias += 1;
-                } else if (state === 'ausencia-parcial') {
+                } else if (state === 'ausencia-parcial' || state === 'ausencia') {
                     counters.ausente += 1;
                 } else if (state === 'folga') {
                     counters.folga += 1;
@@ -4095,6 +4504,62 @@
         `;
     }
 
+    function renderInlineScaleEditorRowEscala(record) {
+        const row = document.createElement('div');
+        const workRange = formatTimeRangeEscala(record.horaInicio, record.horaFim);
+        const lunchRange = formatTimeRangeEscala(record.almocoInicio, record.almocoFim);
+
+        row.className = 'timeline-row timeline-inline-editor-row';
+        row.innerHTML = `
+            <div class="timeline-name timeline-inline-editor-name">
+                <i class="fas fa-up-down-left-right"></i>
+                <div class="timeline-inline-labels">
+                    <strong>Ajuste rapido</strong>
+                    <small>${escapeHtmlEscala(record.colaboradorNome || 'Colaborador')}</small>
+                </div>
+            </div>
+            <div class="timeline-cell timeline-inline-editor-cell" style="grid-column: 2 / -1;">
+                <div class="timeline-inline-panel">
+                    <div class="timeline-inline-head">
+                        <div>
+                            <strong>${escapeHtmlEscala(formatDatePtBrEscala(record.dataISO))} • ${escapeHtmlEscala(getDayLabelEscala(record.dataISO))}</strong>
+                            <span>Clique na faixa e arraste para reposicionar a jornada ou o almoco.</span>
+                        </div>
+                        <div class="timeline-inline-summary">
+                            <span class="timeline-pill work">
+                                <i class="fas fa-briefcase"></i>
+                                ${escapeHtmlEscala(workRange)}
+                            </span>
+                            <span class="timeline-pill lunch">
+                                <i class="fas fa-utensils"></i>
+                                ${escapeHtmlEscala(lunchRange)}
+                            </span>
+                        </div>
+                    </div>
+
+                    <div class="escala-inline-hidden-inputs" aria-hidden="true">
+                        <input type="time" id="escalaHoraInicio-${record.colaboradorId}" value="${escapeHtmlEscala(formatTimeInputEscala(record.horaInicio))}">
+                        <input type="time" id="escalaHoraFim-${record.colaboradorId}" value="${escapeHtmlEscala(formatTimeInputEscala(record.horaFim))}">
+                        <input type="time" id="escalaAlmocoInicio-${record.colaboradorId}" value="${escapeHtmlEscala(formatTimeInputEscala(record.almocoInicio))}">
+                        <input type="time" id="escalaAlmocoFim-${record.colaboradorId}" value="${escapeHtmlEscala(formatTimeInputEscala(record.almocoFim))}">
+                        <textarea id="escalaObservacao-${record.colaboradorId}">${escapeHtmlEscala(record.observacao || '')}</textarea>
+                    </div>
+
+                    <div class="timeline-inline-actions">
+                        <button type="button" onclick="salvarEscalaDia(${record.colaboradorId})" class="btn-primary">
+                            <i class="fas fa-save"></i> Salvar ajuste
+                        </button>
+                        <button type="button" onclick="fecharEditor()" class="btn-secondary">
+                            <i class="fas fa-times"></i> Fechar
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        return row;
+    }
+
     function renderScaleRowsEscala(state) {
         const body = document.getElementById('timelineBody');
 
@@ -4102,11 +4567,8 @@
             return;
         }
 
-        const items = [...(state.items || [])].sort((first, second) => {
-            const nameA = String(first.colaboradorNome || '').toLowerCase();
-            const nameB = String(second.colaboradorNome || '').toLowerCase();
-            return nameA.localeCompare(nameB);
-        });
+        const items = [...(state.items || [])].sort(compareScaleRecordsEscala);
+        const selectedColaboradorId = Number(window.__escalaEditorColaboradorId || 0);
 
         body.innerHTML = '';
 
@@ -4122,7 +4584,8 @@
             const row = document.createElement('div');
             const type = String(record.tipo || '').toLowerCase();
             const typeLabel = TIPO_LABELS[type] || 'Escala';
-            row.className = `timeline-row${type === 'plantao' ? ' plantao-row' : ''}`;
+            const isSelected = Number(record.colaboradorId) === selectedColaboradorId;
+            row.className = `timeline-row${type === 'plantao' ? ' plantao-row' : ''}${isSelected ? ' is-selected' : ''}`;
 
             row.innerHTML = `
                 <div class="timeline-name" data-colaborador-id="${record.colaboradorId}">
@@ -4132,19 +4595,24 @@
                     ${type !== 'normal' && type !== 'plantao' ? `<small class="escala-dia-tipo">${escapeHtmlEscala(typeLabel)}</small>` : ''}
                     <i class="fas fa-pen edit-indicator"></i>
                 </div>
-                <div class="timeline-cell total-cell" title="${escapeHtmlEscala(totalLabel)}">
+                <div class="timeline-cell total-cell">
                     <span class="total-valor">${escapeHtmlEscala(totalLabel)}</span>
                 </div>
                 ${Array.from({ length: (HORA_FINAL - HORA_INICIAL) + 1 }, (_, index) => {
                     const hour = HORA_INICIAL + index;
                     const cellState = getCellStateEscala(record, hour);
-                    const tooltip = `${String(hour).padStart(2, '0')}:00 - ${cellState.status}`;
-                    return `<div class="timeline-cell ${cellState.className}" data-tooltip="${escapeHtmlEscala(tooltip)}" title="${escapeHtmlEscala(tooltip)}"></div>`;
+                    return `<div class="timeline-cell ${cellState.className}"></div>`;
                 }).join('')}
             `;
 
             row.querySelector('.timeline-name')?.addEventListener('click', () => {
                 abrirEditorNaEscala(record.colaboradorId);
+            });
+
+            row.querySelectorAll('.timeline-cell:not(.total-cell)').forEach((cell) => {
+                cell.addEventListener('click', () => {
+                    abrirEditorNaEscala(record.colaboradorId);
+                });
             });
 
             body.appendChild(row);
@@ -4153,6 +4621,335 @@
         renderTotalRowEscala(items);
         renderScaleSummaryEscala(items);
     }
+
+    function getScaleEditorRecordEscala(colaboradorId) {
+        return (getCurrentScaleState().items || []).find((item) => Number(item.colaboradorId) === Number(colaboradorId)) || null;
+    }
+
+    function getScaleEditorTimeValueEscala(inputId, fallbackValue = null) {
+        const input = document.getElementById(inputId);
+        const currentValue = input?.value || fallbackValue;
+        return getTimeMinutesEscala(currentValue);
+    }
+
+    function getScaleEditorWorkBoundsEscala(colaboradorId) {
+        const record = getScaleEditorRecordEscala(colaboradorId);
+        const workStart = getScaleEditorTimeValueEscala(`escalaHoraInicio-${colaboradorId}`, record?.horaInicio);
+        const workEnd = getScaleEditorTimeValueEscala(`escalaHoraFim-${colaboradorId}`, record?.horaFim);
+
+        if (workStart === null || workEnd === null || workEnd <= workStart) {
+            return {
+                min: ESCALA_EDITOR_MINUTO_INICIAL,
+                max: ESCALA_EDITOR_MINUTO_FINAL,
+                isValid: false
+            };
+        }
+
+        return {
+            min: workStart,
+            max: workEnd,
+            isValid: true
+        };
+    }
+
+    function buildDefaultLunchRangeEscala(colaboradorId) {
+        const workBounds = getScaleEditorWorkBoundsEscala(colaboradorId);
+        const min = workBounds.isValid ? workBounds.min : 12 * 60;
+        const max = workBounds.isValid ? workBounds.max : 18 * 60;
+        const span = Math.max(max - min, ESCALA_EDITOR_ALMOCO_PADRAO_MINUTOS);
+        const duration = Math.min(ESCALA_EDITOR_ALMOCO_PADRAO_MINUTOS, span);
+        const center = min + Math.floor(span / 2);
+        let start = roundMinutesEscala(center - Math.floor(duration / 2));
+        start = clampMinutesEscala(start, min, Math.max(min, max - duration));
+        const end = clampMinutesEscala(start + duration, start + ESCALA_EDITOR_PASSO_MINUTOS, max);
+
+        return {
+            start,
+            end
+        };
+    }
+
+    function setScaleRangeInputsEscala(startInputId, endInputId, startMinutes, endMinutes) {
+        const startInput = document.getElementById(startInputId);
+        const endInput = document.getElementById(endInputId);
+
+        if (startInput) {
+            startInput.value = formatMinutesToTimeEscala(startMinutes);
+        }
+
+        if (endInput) {
+            endInput.value = formatMinutesToTimeEscala(endMinutes);
+        }
+    }
+
+    function buildScaleDragTrackConfigEscala(colaboradorId, kind) {
+        const record = getScaleEditorRecordEscala(colaboradorId);
+        const isLunch = kind === 'lunch';
+        const startInputId = isLunch
+            ? `escalaAlmocoInicio-${colaboradorId}`
+            : `escalaHoraInicio-${colaboradorId}`;
+        const endInputId = isLunch
+            ? `escalaAlmocoFim-${colaboradorId}`
+            : `escalaHoraFim-${colaboradorId}`;
+        let currentStart = getScaleEditorTimeValueEscala(startInputId, isLunch ? record?.almocoInicio : record?.horaInicio);
+        let currentEnd = getScaleEditorTimeValueEscala(endInputId, isLunch ? record?.almocoFim : record?.horaFim);
+        const workBounds = getScaleEditorWorkBoundsEscala(colaboradorId);
+        const bounds = isLunch
+            ? {
+                min: workBounds.isValid ? workBounds.min : ESCALA_EDITOR_MINUTO_INICIAL,
+                max: workBounds.isValid ? workBounds.max : ESCALA_EDITOR_MINUTO_FINAL,
+                isValid: workBounds.isValid
+            }
+                : {
+                    min: ESCALA_EDITOR_MINUTO_INICIAL,
+                    max: ESCALA_EDITOR_MINUTO_FINAL,
+                    isValid: true
+                };
+
+        if (Number.isFinite(currentStart) && Number.isFinite(currentEnd) && bounds.max > bounds.min) {
+            currentStart = clampMinutesEscala(currentStart, bounds.min, bounds.max - ESCALA_EDITOR_PASSO_MINUTOS);
+            currentEnd = clampMinutesEscala(currentEnd, currentStart + ESCALA_EDITOR_PASSO_MINUTOS, bounds.max);
+
+            if (currentEnd <= currentStart) {
+                currentEnd = clampMinutesEscala(currentStart + ESCALA_EDITOR_PASSO_MINUTOS, currentStart + ESCALA_EDITOR_PASSO_MINUTOS, bounds.max);
+            }
+
+            setScaleRangeInputsEscala(startInputId, endInputId, currentStart, currentEnd);
+        }
+
+        return {
+            kind,
+            colaboradorId,
+            startInputId,
+            endInputId,
+            startMinutes: currentStart,
+            endMinutes: currentEnd,
+            minMinutes: bounds.min,
+            maxMinutes: bounds.max,
+            isValidBounds: bounds.isValid,
+            accentClass: isLunch ? 'is-lunch' : 'is-work',
+            label: isLunch ? 'Almoco' : 'Jornada',
+            emptyMessage: isLunch
+                ? 'Sem almoco definido. Crie a faixa abaixo e depois arraste.'
+                : 'Informe inicio e fim da jornada para liberar o arraste.'
+        };
+    }
+
+    function renderScaleDragTrackEscala(shell, config) {
+        if (!shell) {
+            return;
+        }
+
+        const hasRange = Number.isFinite(config.startMinutes)
+            && Number.isFinite(config.endMinutes)
+            && config.endMinutes > config.startMinutes
+            && config.maxMinutes > config.minMinutes;
+
+        shell.dataset.kind = config.kind;
+        shell.dataset.startInputId = config.startInputId;
+        shell.dataset.endInputId = config.endInputId;
+        shell.dataset.colaboradorId = String(config.colaboradorId);
+
+        if (!hasRange) {
+            shell.innerHTML = `
+                <div class="escala-range-placeholder">
+                    <i class="fas fa-up-down-left-right"></i>
+                    <span>${escapeHtmlEscala(config.emptyMessage)}</span>
+                </div>
+            `;
+            return;
+        }
+
+        const span = config.maxMinutes - config.minMinutes;
+        const left = ((config.startMinutes - config.minMinutes) / span) * 100;
+        const width = ((config.endMinutes - config.startMinutes) / span) * 100;
+        const middleLabel = formatTimeRangeEscala(
+            formatMinutesToTimeEscala(config.startMinutes),
+            formatMinutesToTimeEscala(config.endMinutes)
+        );
+
+        shell.innerHTML = `
+            <div class="escala-range-head">
+                <span>${escapeHtmlEscala(config.label)}</span>
+                <strong>${escapeHtmlEscala(middleLabel)}</strong>
+            </div>
+            <div class="escala-range-axis">
+                <span>${escapeHtmlEscala(formatMinutesToTimeEscala(config.minMinutes))}</span>
+                <span>${escapeHtmlEscala(formatMinutesToTimeEscala(config.minMinutes + Math.round(span / 2)))}</span>
+                <span>${escapeHtmlEscala(formatMinutesToTimeEscala(config.maxMinutes))}</span>
+            </div>
+            <div class="escala-range-track ${config.accentClass}" data-track-role="track">
+                <div class="escala-range-selection ${config.accentClass}" data-track-role="selection" style="left: ${left}%; width: ${width}%;">
+                    <button type="button" class="escala-range-handle start" data-track-role="start" aria-label="Arrastar inicio"></button>
+                    <button type="button" class="escala-range-handle end" data-track-role="end" aria-label="Arrastar fim"></button>
+                </div>
+            </div>
+            <div class="escala-range-helper">
+                Arraste as extremidades para ajustar o horario ou a faixa inteira para mover o bloco.
+            </div>
+        `;
+
+        bindScaleDragTrackEscala(shell, config);
+    }
+
+    function bindScaleDragTrackEscala(shell, config) {
+        const track = shell.querySelector('[data-track-role="track"]');
+        const selection = shell.querySelector('[data-track-role="selection"]');
+        const startHandle = shell.querySelector('[data-track-role="start"]');
+        const endHandle = shell.querySelector('[data-track-role="end"]');
+        const startInput = document.getElementById(config.startInputId);
+        const endInput = document.getElementById(config.endInputId);
+
+        if (!track || !selection || !startHandle || !endHandle || !startInput || !endInput) {
+            return;
+        }
+
+        const minimumDuration = ESCALA_EDITOR_PASSO_MINUTOS;
+
+        const getPointerMinutes = (clientX) => {
+            const rect = track.getBoundingClientRect();
+            if (rect.width <= 0) {
+                return config.startMinutes;
+            }
+
+            const ratio = clampMinutesEscala((clientX - rect.left) / rect.width, 0, 1);
+            const absolute = config.minMinutes + ((config.maxMinutes - config.minMinutes) * ratio);
+            return roundMinutesEscala(absolute);
+        };
+
+        const updateRange = (startMinutes, endMinutes) => {
+            setScaleRangeInputsEscala(config.startInputId, config.endInputId, startMinutes, endMinutes);
+
+            const span = config.maxMinutes - config.minMinutes;
+            const left = ((startMinutes - config.minMinutes) / span) * 100;
+            const width = ((endMinutes - startMinutes) / span) * 100;
+
+            selection.style.left = `${left}%`;
+            selection.style.width = `${width}%`;
+
+            const label = shell.querySelector('.escala-range-head strong');
+            if (label) {
+                label.textContent = formatTimeRangeEscala(
+                    formatMinutesToTimeEscala(startMinutes),
+                    formatMinutesToTimeEscala(endMinutes)
+                );
+            }
+        };
+
+        const beginDrag = (mode, event) => {
+            event.preventDefault();
+
+            const initialStart = getTimeMinutesEscala(startInput.value);
+            const initialEnd = getTimeMinutesEscala(endInput.value);
+
+            if (initialStart === null || initialEnd === null) {
+                return;
+            }
+
+            const duration = initialEnd - initialStart;
+            const pointerState = {
+                mode,
+                startPointerMinutes: getPointerMinutes(event.clientX),
+                initialStart,
+                initialEnd,
+                duration
+            };
+
+            const move = (moveEvent) => {
+                let nextStart = pointerState.initialStart;
+                let nextEnd = pointerState.initialEnd;
+
+                if (pointerState.mode === 'move') {
+                    const currentPointerMinutes = getPointerMinutes(moveEvent.clientX);
+                    const delta = currentPointerMinutes - pointerState.startPointerMinutes;
+                    nextStart = clampMinutesEscala(pointerState.initialStart + delta, config.minMinutes, config.maxMinutes - duration);
+                    nextStart = roundMinutesEscala(nextStart);
+                    nextEnd = nextStart + duration;
+                } else if (pointerState.mode === 'start') {
+                    nextStart = clampMinutesEscala(getPointerMinutes(moveEvent.clientX), config.minMinutes, pointerState.initialEnd - minimumDuration);
+                    nextStart = roundMinutesEscala(nextStart);
+                } else {
+                    nextEnd = clampMinutesEscala(getPointerMinutes(moveEvent.clientX), pointerState.initialStart + minimumDuration, config.maxMinutes);
+                    nextEnd = roundMinutesEscala(nextEnd);
+                }
+
+                if (nextEnd <= nextStart) {
+                    nextEnd = nextStart + minimumDuration;
+                }
+
+                updateRange(nextStart, nextEnd);
+            };
+
+            const stop = () => {
+                window.removeEventListener('pointermove', move);
+                window.removeEventListener('pointerup', stop);
+                syncScaleDragEditorEscala(config.colaboradorId);
+            };
+
+            window.addEventListener('pointermove', move);
+            window.addEventListener('pointerup', stop, { once: true });
+        };
+
+        selection.addEventListener('pointerdown', (event) => {
+            if (event.target === startHandle || event.target === endHandle) {
+                return;
+            }
+
+            beginDrag('move', event);
+        });
+
+        startHandle.addEventListener('pointerdown', (event) => beginDrag('start', event));
+        endHandle.addEventListener('pointerdown', (event) => beginDrag('end', event));
+    }
+
+    function syncScaleDragEditorEscala(colaboradorId) {
+        const workShell = document.getElementById(`escalaRangeWork-${colaboradorId}`);
+        const lunchShell = document.getElementById(`escalaRangeLunch-${colaboradorId}`);
+
+        renderScaleDragTrackEscala(workShell, buildScaleDragTrackConfigEscala(colaboradorId, 'work'));
+        renderScaleDragTrackEscala(lunchShell, buildScaleDragTrackConfigEscala(colaboradorId, 'lunch'));
+    }
+
+    function bindScaleEditorInputsEscala(colaboradorId) {
+        [
+            `escalaHoraInicio-${colaboradorId}`,
+            `escalaHoraFim-${colaboradorId}`,
+            `escalaAlmocoInicio-${colaboradorId}`,
+            `escalaAlmocoFim-${colaboradorId}`
+        ].forEach((inputId) => {
+            const input = document.getElementById(inputId);
+
+            if (!input || input.dataset.scaleDragBound === 'true') {
+                return;
+            }
+
+            input.dataset.scaleDragBound = 'true';
+            input.addEventListener('input', () => {
+                syncScaleDragEditorEscala(colaboradorId);
+            });
+        });
+    }
+
+    window.criarFaixaAlmocoEscala = criarFaixaAlmocoEscala = function criarFaixaAlmocoEscalaAtualizada(colaboradorId) {
+        const defaults = buildDefaultLunchRangeEscala(colaboradorId);
+        setScaleRangeInputsEscala(`escalaAlmocoInicio-${colaboradorId}`, `escalaAlmocoFim-${colaboradorId}`, defaults.start, defaults.end);
+        syncScaleDragEditorEscala(colaboradorId);
+    };
+
+    window.limparFaixaAlmocoEscala = limparFaixaAlmocoEscala = function limparFaixaAlmocoEscalaAtualizada(colaboradorId) {
+        const startInput = document.getElementById(`escalaAlmocoInicio-${colaboradorId}`);
+        const endInput = document.getElementById(`escalaAlmocoFim-${colaboradorId}`);
+
+        if (startInput) {
+            startInput.value = '';
+        }
+
+        if (endInput) {
+            endInput.value = '';
+        }
+
+        syncScaleDragEditorEscala(colaboradorId);
+    };
 
     function renderScaleEditorEscala(record) {
         const sidebar = document.getElementById('sidebarEditor');
@@ -4206,7 +5003,7 @@
                     <textarea id="escalaObservacao-${record.colaboradorId}" class="form-control" rows="3" placeholder="Detalhes deste dia">${escapeHtmlEscala(record.observacao || '')}</textarea>
                 </div>
 
-                <div class="editor-actions">
+                <div class="editor-actions editor-actions-main">
                     <button onclick="salvarEscalaDia(${record.colaboradorId})" class="btn-primary">
                         <i class="fas fa-save"></i> Salvar dia
                     </button>
@@ -4215,28 +5012,35 @@
                     </button>
                 </div>
 
-                <div class="editor-form-group" style="margin-top: 20px; padding-top: 20px; border-top: 1px dashed var(--border);">
-                    <label><i class="fas fa-calendar-alt"></i> Almoco por periodo</label>
-                    <div class="time-inputs">
+                <div class="editor-period-panel">
+                    <div class="editor-period-header">
+                        <label><i class="fas fa-calendar-alt"></i> Almoco por periodo</label>
+                        <small>Aplique o mesmo intervalo de almoco em varios dias de uma vez.</small>
+                    </div>
+
+                    <div class="time-inputs time-inputs-period">
                         <input type="time" id="escalaPeriodoAlmocoInicio-${record.colaboradorId}" value="" class="form-control">
                         <span>ate</span>
                         <input type="time" id="escalaPeriodoAlmocoFim-${record.colaboradorId}" value="" class="form-control">
                     </div>
-                    <div class="time-inputs" style="margin-top: 12px;">
+
+                    <div class="time-inputs time-inputs-period">
                         <input type="date" id="escalaPeriodoInicio-${record.colaboradorId}" value="" class="form-control">
                         <span>ate</span>
                         <input type="date" id="escalaPeriodoFim-${record.colaboradorId}" value="" class="form-control">
                     </div>
-                    <small class="helper-text">Preencha apenas quando quiser aplicar um almoco em lote. Em branco, esse bloco nao interfere na escala.</small>
-                </div>
 
-                <div class="editor-actions">
-                    <button onclick="aplicarAlmocoPeriodoEscala(${record.colaboradorId})" class="btn-secondary">
-                        <i class="fas fa-utensils"></i> Aplicar almoco no periodo
-                    </button>
+                    <small class="helper-text">Preencha apenas quando quiser aplicar um almoco em lote. Em branco, esse bloco nao interfere na escala.</small>
+
+                    <div class="editor-actions editor-actions-single">
+                        <button onclick="aplicarAlmocoPeriodoEscala(${record.colaboradorId})" class="btn-secondary">
+                            <i class="fas fa-utensils"></i> Aplicar almoco no periodo
+                        </button>
+                    </div>
                 </div>
             </div>
         `;
+
     }
 
     async function carregarEscalaDiaEscala(dataISO) {
@@ -4282,6 +5086,9 @@
     window.fecharEditor = fecharEditor = function fecharEditorEscala() {
         const content = document.getElementById('editorContent');
 
+        window.__escalaEditorColaboradorId = null;
+        renderScaleRowsEscala(getCurrentScaleState());
+
         if (!content) {
             return;
         }
@@ -4305,26 +5112,25 @@
             return;
         }
 
+        window.__escalaEditorColaboradorId = Number(colaboradorId);
+        renderScaleRowsEscala(state);
         renderScaleEditorEscala(record);
     };
 
     window.salvarEscalaDia = salvarEscalaDia = async function salvarEscalaDiaAtualizada(colaboradorId) {
         const state = getCurrentScaleState();
+        const currentRecord = (state.items || []).find((item) => Number(item.colaboradorId) === Number(colaboradorId)) || {};
         const payload = {
-            horaInicio: document.getElementById(`escalaHoraInicio-${colaboradorId}`)?.value || null,
-            horaFim: document.getElementById(`escalaHoraFim-${colaboradorId}`)?.value || null,
-            almocoInicio: document.getElementById(`escalaAlmocoInicio-${colaboradorId}`)?.value || null,
-            almocoFim: document.getElementById(`escalaAlmocoFim-${colaboradorId}`)?.value || null,
-            observacao: document.getElementById(`escalaObservacao-${colaboradorId}`)?.value || null
+            horaInicio: document.getElementById(`escalaHoraInicio-${colaboradorId}`)?.value || currentRecord.horaInicio || null,
+            horaFim: document.getElementById(`escalaHoraFim-${colaboradorId}`)?.value || currentRecord.horaFim || null,
+            almocoInicio: document.getElementById(`escalaAlmocoInicio-${colaboradorId}`)?.value || currentRecord.almocoInicio || null,
+            almocoFim: document.getElementById(`escalaAlmocoFim-${colaboradorId}`)?.value || currentRecord.almocoFim || null,
+            observacao: document.getElementById(`escalaObservacao-${colaboradorId}`)?.value ?? currentRecord.observacao ?? null
         };
 
         try {
             await window.API.salvarEscalaDia(state.dataISO, colaboradorId, payload);
-            await Promise.allSettled([
-                typeof carregarAusencias === 'function' ? carregarAusencias() : Promise.resolve([]),
-                typeof carregarPlantoes === 'function' ? carregarPlantoes() : Promise.resolve([])
-            ]);
-            await carregarEscalaDiaEscala(state.dataISO);
+            await atualizarTudo({ silent: true, source: 'escala' });
             abrirEditorNaEscala(colaboradorId);
 
             if (typeof mostrarToast === 'function') {
@@ -4356,7 +5162,7 @@
 
         try {
             await window.API.aplicarAlmocoPeriodo(payload);
-            await carregarEscalaDiaEscala(state.dataISO);
+            await atualizarTudo({ silent: true, source: 'escala' });
             abrirEditorNaEscala(colaboradorId);
 
             if (typeof mostrarToast === 'function') {
@@ -4369,6 +5175,67 @@
         }
     };
 
+    function obterDataSelecionadaEscala() {
+        return document.getElementById('seletorDataEscala')?.value || getCurrentScaleState()?.dataISO || toISODateEscala(new Date());
+    }
+
+    function shiftIsoDateEscala(dataISO, deltaDays) {
+        const normalized = toISODateEscala(dataISO) || toISODateEscala(new Date());
+        const [year, month, day] = normalized.split('-').map(Number);
+        const nextDate = new Date(year, month - 1, day);
+        nextDate.setDate(nextDate.getDate() + Number(deltaDays || 0));
+        return toISODateEscala(nextDate);
+    }
+
+    async function carregarEscalaSelecionadaEscala(dataISO) {
+        const normalized = toISODateEscala(dataISO) || toISODateEscala(new Date());
+        window.dataEscalaSelecionada = normalized;
+        await carregarEscalaDiaEscala(normalized);
+        atualizarAcoesCabecalhoEscala();
+    }
+
+    function atualizarAcoesCabecalhoEscala() {
+        const botaoPlantao = document.getElementById('btnAbrirPlantaoEscala');
+        const dataISO = obterDataSelecionadaEscala();
+        const isSaturday = getIsoDayOfWeekEscala(dataISO) === 6;
+
+        if (!botaoPlantao) {
+            return;
+        }
+
+        botaoPlantao.disabled = !isSaturday;
+        botaoPlantao.title = isSaturday
+            ? 'Abrir o plantao do sabado selecionado'
+            : 'Selecione um sabado para abrir o plantao';
+        botaoPlantao.classList.toggle('is-disabled', !isSaturday);
+    }
+
+    function abrirLancamentoPessoalEscala() {
+        const dataISO = obterDataSelecionadaEscala();
+
+        if (typeof window.abrirModalLancamento === 'function') {
+            window.abrirModalLancamento('pessoal', dataISO, true);
+        }
+    }
+
+    function abrirPlantaoDaEscala() {
+        const dataISO = obterDataSelecionadaEscala();
+
+        if (getIsoDayOfWeekEscala(dataISO) !== 6) {
+            if (typeof mostrarToast === 'function') {
+                mostrarToast('Selecione um sabado para abrir o plantao.', 'warning');
+            }
+            return;
+        }
+
+        window.__plantaoSabadoAncoraISO = dataISO;
+        window.__plantaoDataFocoISO = dataISO;
+
+        if (typeof carregarPagina === 'function') {
+            carregarPagina('lancamentoPlantao');
+        }
+    }
+
     window.renderEscalaDia = renderEscalaDia = async function renderEscalaDiaAtualizada() {
         const appContent = document.getElementById('appContent');
 
@@ -4376,7 +5243,7 @@
             return;
         }
 
-        const todayISO = toISODateEscala(new Date());
+        const todayISO = toISODateEscala(window.dataEscalaSelecionada || new Date());
 
         await Promise.allSettled([
             typeof carregarColaboradores === 'function' ? carregarColaboradores() : Promise.resolve([]),
@@ -4385,78 +5252,278 @@
         ]);
 
         appContent.innerHTML = `
-            <div class="page-header">
-                <div>
+            <div class="escala-page">
+                <div class="escala-header">
                     <h1>Escala do Dia</h1>
-                    <div class="data-selector">
-                        <i class="fas fa-calendar-alt"></i>
-                        <input type="date" id="seletorDataEscala" value="${escapeHtmlEscala(todayISO)}" class="form-control">
-                        <button id="btnCarregarEscala" class="btn-primary">
-                            <i class="fas fa-search"></i> Ver escala
+                    <p>Visualize e gerencie a escala de trabalhos do dia selecionado.</p>
+                </div>
+
+                <div class="escala-toolbar">
+                    <div class="toolbar-actions data-selector">
+                        <button id="btnDiaAnteriorEscala" class="btn-secondary btn-day-nav" type="button" title="Dia anterior" aria-label="Dia anterior">
+                            <i class="fas fa-chevron-left"></i>
+                        </button>
+                        <label class="escala-date-shell" for="seletorDataEscala">
+                            <i class="fas fa-calendar-alt"></i>
+                            <input type="date" id="seletorDataEscala" value="${escapeHtmlEscala(todayISO)}" class="form-control date-input">
+                            <span class="escala-date-chevron">
+                                <i class="fas fa-chevron-down"></i>
+                            </span>
+                        </label>
+                        <button id="btnDiaProximoEscala" class="btn-secondary btn-day-nav" type="button" title="Próximo dia" aria-label="Próximo dia">
+                            <i class="fas fa-chevron-right"></i>
+                        </button>
+                        <button id="btnNovoLancamentoEscala" class="btn-secondary">
+                            <i class="fas fa-plus"></i> Novo lancamento
+                        </button>
+                        <button id="btnAbrirPlantaoEscala" class="btn-secondary">
+                            <i class="fas fa-calendar-check"></i> Abrir plantao
                         </button>
                     </div>
-                </div>
-                <div class="legenda-timeline">
-                    <span class="legenda-item"><span class="cor trabalhando"></span> Trabalhando</span>
-                    <span class="legenda-item"><span class="cor almoco"></span> Almoco</span>
-                    <span class="legenda-item"><span class="cor folga"></span> Folga</span>
-                    <span class="legenda-item"><span class="cor ferias"></span> Ferias</span>
-                    <span class="legenda-item"><span class="cor ausencia-parcial"></span> Ausencia parcial</span>
-                    <span class="legenda-item"><span class="cor fora"></span> Fora</span>
-                </div>
-            </div>
 
-            <div class="escala-layout">
-                <div class="timeline-container">
-                    <div class="timeline-header" id="timelineHeader"></div>
-                    <div id="timelineBody" class="timeline-body"></div>
-                </div>
-
-                <div id="sidebarEditor" class="editor-sidebar collapsed">
-                    <div class="editor-toggle" id="toggleEditor">
-                        <i class="fas fa-chevron-left" id="toggleIcon"></i>
+                    <div class="legenda-timeline legenda">
+                        <span class="legenda-item"><span class="cor trabalhando"></span> Trabalhando</span>
+                        <span class="legenda-item"><span class="cor almoco"></span> Almoco</span>
+                        <span class="legenda-item"><span class="cor folga"></span> Folga</span>
+                        <span class="legenda-item"><span class="cor ferias"></span> Ferias</span>
+                        <span class="legenda-item"><span class="cor ausencia"></span> Ausencia</span>
+                        <span class="legenda-item"><span class="cor ausencia-parcial"></span> Ausencia parcial</span>
+                        <span class="legenda-item"><span class="cor fora"></span> Fora</span>
                     </div>
-                    <div class="editor-content">
-                        <h3><i class="fas fa-clock"></i> Ajustes da escala</h3>
-                        <div id="editorContent" class="editor-form">
-                            <div class="editor-empty">
-                                <i class="fas fa-arrow-left"></i>
-                                <p>Clique no nome de um colaborador para editar o dia ou aplicar almoco por periodo.</p>
+                </div>
+
+                <div class="escala-view-controls">
+                    <label class="escala-select-chip" for="escalaSortMode">
+                        <span>Organizar</span>
+                        <select id="escalaSortMode" class="form-control">
+                            <option value="alpha">Por nome</option>
+                            <option value="work_start">Por inicio da jornada</option>
+                            <option value="lunch_start">Por inicio do almoco</option>
+                            <option value="lunch_end">Por fim do almoco</option>
+                        </select>
+                    </label>
+                    <div class="escala-hint-chip">
+                        <i class="fas fa-hand-pointer"></i>
+                        <span>Clique em um colaborador para editar na barra lateral.</span>
+                    </div>
+                </div>
+
+                <div class="escala-layout">
+                    <div class="escala-card escala-main-card">
+                        <div class="escala-scroll">
+                            <div class="timeline-container">
+                                <div class="timeline-header" id="timelineHeader"></div>
+                                <div id="timelineBody" class="timeline-body"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="sidebarEditor" class="editor-sidebar collapsed">
+                        <div class="editor-toggle" id="toggleEditor">
+                            <i class="fas fa-chevron-left" id="toggleIcon"></i>
+                        </div>
+                        <div class="editor-content">
+                            <h3><i class="fas fa-clock"></i> Ajustes da escala</h3>
+                            <div id="editorContent" class="editor-form">
+                                <div class="editor-empty">
+                                    <i class="fas fa-arrow-left"></i>
+                                    <p>Clique no nome de um colaborador para editar o dia ou aplicar almoco por periodo.</p>
+                                </div>
                             </div>
                         </div>
                     </div>
                 </div>
-            </div>
 
-            <div class="resumo-container" id="resumoContainer">
-                <div class="resumo-header">
-                    <i class="fas fa-chart-pie"></i>
-                    <h4>Resumo por horario</h4>
+                <div class="resumo-container" id="resumoContainer">
+                    <div class="resumo-header">
+                        <i class="fas fa-chart-pie"></i>
+                        <h4>Resumo por horario</h4>
+                    </div>
+                    <div class="resumo-grid" id="resumoGrid"></div>
                 </div>
-                <div class="resumo-grid" id="resumoGrid"></div>
             </div>
         `;
 
         ensureScaleSidebarToggleEscala();
+        atualizarAcoesCabecalhoEscala();
 
-        document.getElementById('btnCarregarEscala')?.addEventListener('click', async () => {
-            const selectedDate = document.getElementById('seletorDataEscala')?.value;
-            await carregarEscalaDiaEscala(selectedDate);
+        document.getElementById('btnDiaAnteriorEscala')?.addEventListener('click', async () => {
+            const nextDate = shiftIsoDateEscala(obterDataSelecionadaEscala(), -1);
+            await carregarEscalaSelecionadaEscala(nextDate);
+        });
+
+        document.getElementById('btnDiaProximoEscala')?.addEventListener('click', async () => {
+            const nextDate = shiftIsoDateEscala(obterDataSelecionadaEscala(), 1);
+            await carregarEscalaSelecionadaEscala(nextDate);
         });
 
         document.getElementById('seletorDataEscala')?.addEventListener('change', async (event) => {
-            window.dataEscalaSelecionada = event.target.value;
-            await carregarEscalaDiaEscala(event.target.value);
+            await carregarEscalaSelecionadaEscala(event.target.value);
         });
 
+        document.getElementById('btnNovoLancamentoEscala')?.addEventListener('click', abrirLancamentoPessoalEscala);
+        document.getElementById('btnAbrirPlantaoEscala')?.addEventListener('click', abrirPlantaoDaEscala);
+        document.getElementById('escalaSortMode')?.addEventListener('change', (event) => {
+            setScaleSortModeEscala(event.target.value);
+            renderScaleRowsEscala(getCurrentScaleState());
+        });
+        setScaleSortModeEscala(getScaleSortModeEscala());
+
         try {
-            await carregarEscalaDiaEscala(todayISO);
+            await carregarEscalaSelecionadaEscala(todayISO);
         } catch (error) {
             renderScaleHeaderEscala();
             renderScaleEmptyMessageEscala(todayISO);
             if (typeof mostrarToast === 'function') {
                 mostrarToast(`Erro ao carregar escala: ${error.message}`, 'error');
             }
+        }
+    };
+
+    function getCurrentPageKeyEscala() {
+        const hash = (window.location.hash || '#dashboard').replace(/^#/, '').trim();
+        return hash || 'dashboard';
+    }
+
+    async function refreshEscalaViewEscala() {
+        if (!document.getElementById('timelineBody')) {
+            return;
+        }
+
+        const selectedDate = obterDataSelecionadaEscala();
+        await carregarEscalaDiaEscala(selectedDate);
+        atualizarAcoesCabecalhoEscala();
+
+        if (window.__escalaEditorColaboradorId) {
+            abrirEditorNaEscala(window.__escalaEditorColaboradorId);
+        }
+    }
+
+    function refreshColaboradoresViewEscala() {
+        if (!isColaboradoresScreenVisible() || typeof renderListaColaboradores !== 'function') {
+            return;
+        }
+
+        const termoBusca = document.getElementById('searchColaborador')?.value?.trim()?.toLowerCase() || '';
+        const lista = termoBusca
+            ? (window.colaboradores || []).filter((item) => item.Nome?.toLowerCase().includes(termoBusca))
+            : (window.colaboradores || []);
+
+        renderListaColaboradores(lista);
+    }
+
+    function captureRelatoriosStateEscala() {
+        const visualization = document.getElementById('relatorioVisualizacao');
+        const title = document.getElementById('relatorioTitulo')?.innerText || '';
+
+        return {
+            reportVisible: Boolean(visualization && visualization.style.display !== 'none'),
+            reportTitle: title,
+            escalaMode: document.getElementById('relatorioEscalaModo')?.value || RELATORIO_ESCALA_MODOS.QUADRO_MENSAL,
+            escalaMes: document.getElementById('relatorioEscalaMes')?.value || '',
+            escalaAno: document.getElementById('relatorioEscalaAno')?.value || '',
+            escalaDataInicio: document.getElementById('relatorioEscalaDataInicio')?.value || '',
+            escalaDataFim: document.getElementById('relatorioEscalaDataFim')?.value || '',
+            escalaColaborador: document.getElementById('relatorioEscalaColaborador')?.value || '',
+            escalaTipo: document.getElementById('relatorioEscalaTipo')?.value || '',
+            plantaoDataInicio: document.getElementById('relatorioPlantaoDataInicio')?.value || '',
+            plantaoDataFim: document.getElementById('relatorioPlantaoDataFim')?.value || '',
+            plantaoColaborador: document.getElementById('relatorioPlantaoColaborador')?.value || '',
+            plantaoStatus: document.getElementById('relatorioPlantaoStatus')?.value || 'todos'
+        };
+    }
+
+    function restoreRelatoriosStateEscala(snapshot) {
+        const setValue = (id, value) => {
+            const element = document.getElementById(id);
+            if (element && value !== undefined) {
+                element.value = value;
+            }
+        };
+
+        setValue('relatorioEscalaModo', snapshot.escalaMode);
+        if (typeof toggleEscalaReportModeFilters === 'function') {
+            toggleEscalaReportModeFilters();
+        }
+
+        setValue('relatorioEscalaMes', snapshot.escalaMes);
+        setValue('relatorioEscalaAno', snapshot.escalaAno);
+        setValue('relatorioEscalaDataInicio', snapshot.escalaDataInicio);
+        setValue('relatorioEscalaDataFim', snapshot.escalaDataFim);
+        setValue('relatorioEscalaColaborador', snapshot.escalaColaborador);
+        setValue('relatorioEscalaTipo', snapshot.escalaTipo);
+        setValue('relatorioPlantaoDataInicio', snapshot.plantaoDataInicio);
+        setValue('relatorioPlantaoDataFim', snapshot.plantaoDataFim);
+        setValue('relatorioPlantaoColaborador', snapshot.plantaoColaborador);
+        setValue('relatorioPlantaoStatus', snapshot.plantaoStatus);
+    }
+
+    async function refreshRelatoriosViewEscala() {
+        if (!document.querySelector('.relatorios-grid')) {
+            return;
+        }
+
+        const snapshot = captureRelatoriosStateEscala();
+
+        if (!snapshot.reportVisible || typeof renderRelatorios !== 'function') {
+            return;
+        }
+
+        await renderRelatorios();
+        restoreRelatoriosStateEscala(snapshot);
+
+        const reportKey = window.normalizeRuntimeToken(snapshot.reportTitle);
+
+        if (reportKey.includes('plantao') && typeof gerarRelatorioPlantoes === 'function') {
+            await gerarRelatorioPlantoes();
+            return;
+        }
+
+        if (reportKey.includes('escala') && typeof gerarRelatorioEscala === 'function') {
+            await gerarRelatorioEscala();
+            return;
+        }
+
+        if ((reportKey.includes('mensal') || reportKey.includes('completo')) && typeof gerarRelatorioCompleto === 'function') {
+            await gerarRelatorioCompleto();
+        }
+    }
+
+    window.__refreshVisibleViews = async function refreshVisibleViewsEscala(options = {}) {
+        if (document.getElementById('calendar') && typeof gerarCalendario === 'function') {
+            const mes = window.mesAtual ?? new Date().getMonth();
+            const ano = window.anoAtual ?? new Date().getFullYear();
+            gerarCalendario(mes, ano);
+        }
+
+        if (typeof gerarLegendaMensal === 'function') {
+            gerarLegendaMensal();
+        }
+
+        const currentPage = getCurrentPageKeyEscala();
+
+        if (currentPage === 'dashboard' && typeof renderDashboard === 'function') {
+            await renderDashboard();
+            return;
+        }
+
+        if (currentPage === 'escala') {
+            await refreshEscalaViewEscala();
+            return;
+        }
+
+        if (currentPage === 'lancamentoPlantao' && typeof renderLancamentoPlantao === 'function') {
+            await renderLancamentoPlantao();
+            return;
+        }
+
+        if (currentPage === 'colaboradores') {
+            refreshColaboradoresViewEscala();
+            return;
+        }
+
+        if (currentPage === 'relatorios') {
+            await refreshRelatoriosViewEscala();
         }
     };
 
@@ -4498,6 +5565,23 @@
             `;
         }
 
+        const normalizedItems = items.map((item) => ({
+            ...item,
+            tipo: window.normalizeRuntimeEscalaTipo(item.tipo || item.Tipo || 'normal')
+        }));
+        const colaboradoresUnicos = new Set(normalizedItems.map((item) => String(item.colaboradorId || item.colaboradorNome || ''))).size;
+        const resumo = normalizedItems.reduce((accumulator, item) => {
+            accumulator[item.tipo] = (accumulator[item.tipo] || 0) + 1;
+            return accumulator;
+        }, {
+            normal: 0,
+            plantao: 0,
+            folga: 0,
+            ferias: 0,
+            ausencia: 0,
+            ajuste: 0
+        });
+
         return `
             <div class="relatorio-tabela-container">
                 <div class="relatorio-total">
@@ -4505,6 +5589,36 @@
                     ate
                     <strong>${escapeHtmlEscala(formatDatePtBrEscala(filters.dataFim))}</strong>
                     • Registros: <strong>${items.length}</strong>
+                </div>
+                <div class="resumo-cards" style="margin-bottom: 18px;">
+                    <div class="resumo-card-estatistica">
+                        <i class="fas fa-list-check"></i>
+                        <div>
+                            <strong>${normalizedItems.length}</strong>
+                            <span>Registros retornados</span>
+                        </div>
+                    </div>
+                    <div class="resumo-card-estatistica">
+                        <i class="fas fa-users"></i>
+                        <div>
+                            <strong>${colaboradoresUnicos}</strong>
+                            <span>Colaboradores no periodo</span>
+                        </div>
+                    </div>
+                    <div class="resumo-card-estatistica">
+                        <i class="fas fa-calendar-check"></i>
+                        <div>
+                            <strong>${resumo.plantao}</strong>
+                            <span>Plantoes</span>
+                        </div>
+                    </div>
+                    <div class="resumo-card-estatistica">
+                        <i class="fas fa-user-clock"></i>
+                        <div>
+                            <strong>${resumo.ausencia + resumo.folga + resumo.ferias}</strong>
+                            <span>Ausencias, folgas e ferias</span>
+                        </div>
+                    </div>
                 </div>
                 <table class="relatorio-tabela escala-detalhada-tabela">
                     <thead>
@@ -4520,7 +5634,7 @@
                         </tr>
                     </thead>
                     <tbody>
-                        ${items.map((item) => `
+                        ${normalizedItems.map((item) => `
                             <tr>
                                 <td><strong>${escapeHtmlEscala(formatDatePtBrEscala(item.dataISO))}</strong></td>
                                 <td>${escapeHtmlEscala(item.diaSemana || getDayLabelEscala(item.dataISO))}</td>
@@ -4528,7 +5642,7 @@
                                 <td>${escapeHtmlEscala(item.horaInicio || '--')}</td>
                                 <td>${escapeHtmlEscala(item.horaFim || '--')}</td>
                                 <td>${escapeHtmlEscala(item.almoco || '--')}</td>
-                                <td><span class="evento-tipo">${escapeHtmlEscala(TIPO_LABELS[item.tipo] || item.tipo || '--')}</span></td>
+                                <td><span class="evento-tipo badge-${escapeHtmlEscala(item.tipo)}">${escapeHtmlEscala(TIPO_LABELS[item.tipo] || item.tipo || '--')}</span></td>
                                 <td>${escapeHtmlEscala(item.observacao || '--')}</td>
                             </tr>
                         `).join('')}
@@ -5245,33 +6359,196 @@
         }
     };
 
-    window.renderRelatorioPlantoes = renderRelatorioPlantoes = function renderRelatorioPlantoesSeguro(items) {
+    function buildPlantaoColaboradorOptions(selectedId = '') {
+        return `
+            <option value="">Todos os colaboradores</option>
+            ${(window.colaboradores || []).map((item) => `
+                <option value="${item.Id}" ${String(selectedId) === String(item.Id) ? 'selected' : ''}>
+                    ${escapeHtmlEscala(item.Nome)}
+                </option>
+            `).join('')}
+        `;
+    }
+
+    function getPlantaoDurationMinutesReport(plantao) {
+        const directMinutes = Number(plantao?.duracaoMinutos);
+
+        if (Number.isFinite(directMinutes) && directMinutes > 0) {
+            return directMinutes;
+        }
+
+        const start = getTimeMinutesEscala(plantao?.horaInicio);
+        const end = getTimeMinutesEscala(plantao?.horaFim);
+
+        if (start === null || end === null || end <= start) {
+            return 0;
+        }
+
+        return end - start;
+    }
+
+    function getPlantaoDurationLabelReport(plantao) {
+        const minutes = getPlantaoDurationMinutesReport(plantao);
+        return minutes > 0 ? formatDurationEscala(minutes) : '--';
+    }
+
+    function buildPlantaoReportSummary(items) {
+        const uniqueCollaborators = new Set();
+        let totalMinutes = 0;
+        let totalCreditMinutes = 0;
+
+        items.forEach((plantao) => {
+            const colaboradoresCount = Array.isArray(plantao.colaboradores) ? plantao.colaboradores.length : 0;
+            const durationMinutes = getPlantaoDurationMinutesReport(plantao);
+
+            (plantao.colaboradores || []).forEach((id) => uniqueCollaborators.add(Number(id)));
+            totalMinutes += durationMinutes;
+            totalCreditMinutes += durationMinutes * Math.max(colaboradoresCount, 0);
+        });
+
+        return {
+            totalPlantoes: items.length,
+            totalColaboradores: uniqueCollaborators.size,
+            horasProgramadas: formatDurationEscala(totalMinutes || 0),
+            horasCreditadas: formatDurationEscala(totalCreditMinutes || 0)
+        };
+    }
+
+    window.gerarRelatorioPlantoes = gerarRelatorioPlantoes = async function gerarRelatorioPlantoesAtualizado() {
+        const dataInicio = document.getElementById('relatorioPlantaoDataInicio')?.value;
+        const dataFim = document.getElementById('relatorioPlantaoDataFim')?.value;
+        const colaboradorId = document.getElementById('relatorioPlantaoColaborador')?.value || '';
+        const status = document.getElementById('relatorioPlantaoStatus')?.value || 'todos';
+
+        if (!dataInicio || !dataFim) {
+            if (typeof mostrarToast === 'function') {
+                mostrarToast('Informe a data inicial e final do relatorio de plantoes.', 'error');
+            }
+            return;
+        }
+
+        try {
+            const payload = await window.API.getPlantoes({
+                from: dataInicio,
+                to: dataFim
+            });
+            const items = (Array.isArray(payload) ? payload : [])
+                .map((item) => ({
+                    ...item,
+                    dataISO: toISODateEscala(item.dataISO || item.data_plantao),
+                    colaboradores: Array.isArray(item.colaboradores) ? item.colaboradores : [],
+                    horaInicio: item.horaInicio || item.hora_inicio || null,
+                    horaFim: item.horaFim || item.hora_fim || null,
+                    observacao: item.observacao || null,
+                    duracaoMinutos: Number(item.duracaoMinutos || 0) || null,
+                    duracaoFormatada: item.duracaoFormatada || null
+                }))
+                .filter((plantao) => {
+                    if (colaboradorId && !(plantao.colaboradores || []).some((id) => Number(id) === Number(colaboradorId))) {
+                        return false;
+                    }
+
+                    if (status === 'com_equipe') {
+                        return (plantao.colaboradores || []).length > 0;
+                    }
+
+                    if (status === 'sem_equipe') {
+                        return (plantao.colaboradores || []).length === 0;
+                    }
+
+                    return true;
+                });
+
+            document.getElementById('relatorioTitulo').innerText = `Relatorio de Plantoes â€¢ ${formatDatePtBrEscala(dataInicio)} ate ${formatDatePtBrEscala(dataFim)}`;
+            document.getElementById('relatorioConteudo').innerHTML = renderRelatorioPlantoes(items, {
+                dataInicio,
+                dataFim,
+                colaboradorId,
+                status
+            });
+            document.getElementById('relatorioVisualizacao').style.display = 'block';
+        } catch (error) {
+            if (typeof mostrarToast === 'function') {
+                mostrarToast(`Erro ao gerar relatorio de plantoes: ${error.message}`, 'error');
+            }
+        }
+    };
+
+    window.renderRelatorioPlantoes = renderRelatorioPlantoes = function renderRelatorioPlantoesSeguro(items, filters = {}) {
         if (!items.length) {
             return '<div class="empty-state">Nenhum plantao encontrado no periodo</div>';
         }
 
+        const summary = buildPlantaoReportSummary(items);
+
         return `
             <div class="relatorio-tabela-container">
-                <h4>Plantoes lancados</h4>
+                <div class="relatorio-total">
+                    Periodo: <strong>${escapeHtmlEscala(formatDatePtBrEscala(filters.dataInicio || items[items.length - 1]?.dataISO))}</strong>
+                    ate
+                    <strong>${escapeHtmlEscala(formatDatePtBrEscala(filters.dataFim || items[0]?.dataISO))}</strong>
+                </div>
+                <div class="resumo-cards" style="margin-bottom: 18px;">
+                    <div class="resumo-card-estatistica">
+                        <i class="fas fa-calendar-check"></i>
+                        <div>
+                            <strong>${summary.totalPlantoes}</strong>
+                            <span>Plantoes no periodo</span>
+                        </div>
+                    </div>
+                    <div class="resumo-card-estatistica">
+                        <i class="fas fa-users"></i>
+                        <div>
+                            <strong>${summary.totalColaboradores}</strong>
+                            <span>Colaboradores envolvidos</span>
+                        </div>
+                    </div>
+                    <div class="resumo-card-estatistica">
+                        <i class="fas fa-clock"></i>
+                        <div>
+                            <strong>${escapeHtmlEscala(summary.horasProgramadas)}</strong>
+                            <span>Horas programadas</span>
+                        </div>
+                    </div>
+                    <div class="resumo-card-estatistica">
+                        <i class="fas fa-wallet"></i>
+                        <div>
+                            <strong>${escapeHtmlEscala(summary.horasCreditadas)}</strong>
+                            <span>Credito total da equipe</span>
+                        </div>
+                    </div>
+                </div>
                 <table class="relatorio-tabela">
                     <thead>
                         <tr>
                             <th>Data</th>
                             <th>Horario</th>
+                            <th>Status</th>
                             <th>Colaboradores</th>
+                            <th>Observacao</th>
+                            <th>Credito</th>
                         </tr>
                     </thead>
                     <tbody>
-                        ${[...items].sort((first, second) => String(second.dataISO).localeCompare(String(first.dataISO))).map((plantao) => `
-                            <tr>
-                                <td><strong>${escapeHtmlEscala(formatDatePtBrEscala(plantao.dataISO))}</strong></td>
-                                <td>${escapeHtmlEscala(formatTimeRangeEscala(plantao.horaInicio, plantao.horaFim))}</td>
-                                <td>${escapeHtmlEscala((plantao.colaboradores || []).map((id) => {
-                                    const colaborador = (window.colaboradores || []).find((item) => Number(item.Id) === Number(id));
-                                    return colaborador?.Nome || 'Desconhecido';
-                                }).join(', ') || '--')}</td>
-                            </tr>
-                        `).join('')}
+                        ${[...items].sort((first, second) => String(second.dataISO).localeCompare(String(first.dataISO))).map((plantao) => {
+                            const colaboradores = (plantao.colaboradores || []).map((id) => {
+                                const colaborador = (window.colaboradores || []).find((item) => Number(item.Id) === Number(id));
+                                return colaborador?.Nome || 'Desconhecido';
+                            });
+                            const statusLabel = colaboradores.length > 0 ? 'Equipe definida' : 'Sem equipe';
+                            const statusClass = colaboradores.length > 0 ? 'badge-folga' : 'badge-ausencia';
+
+                            return `
+                                <tr>
+                                    <td><strong>${escapeHtmlEscala(formatDatePtBrEscala(plantao.dataISO))}</strong></td>
+                                    <td>${escapeHtmlEscala(formatTimeRangeEscala(plantao.horaInicio, plantao.horaFim))}</td>
+                                    <td><span class="evento-tipo ${statusClass}">${escapeHtmlEscala(statusLabel)}</span></td>
+                                    <td>${escapeHtmlEscala(colaboradores.join(', ') || '--')}</td>
+                                    <td>${escapeHtmlEscala(plantao.observacao || '--')}</td>
+                                    <td>${escapeHtmlEscala(plantao.duracaoFormatada || getPlantaoDurationLabelReport(plantao))}</td>
+                                </tr>
+                            `;
+                        }).join('')}
                     </tbody>
                 </table>
             </div>
@@ -5404,20 +6681,34 @@
                     </div>
                     <div class="relatorio-card-body">
                         <p class="relatorio-descricao">
-                            Consulta rapida dos plantoes lancados por periodo.
+                            Consulte plantoes por periodo, colaborador e status da equipe.
                         </p>
                         <div class="relatorio-filtros">
                             <div class="filtro-group">
-                                <label><i class="fas fa-calendar"></i> Mes inicial/final</label>
+                                <label><i class="fas fa-calendar"></i> Periodo</label>
                                 <div class="periodo-selector">
-                                    <input type="month" id="relatorioPlantaoInicio" class="form-control" value="${monthBounds.start.slice(0, 7)}">
+                                    <input type="date" id="relatorioPlantaoDataInicio" class="form-control" value="${monthBounds.start}">
                                     <span>ate</span>
-                                    <input type="month" id="relatorioPlantaoFim" class="form-control" value="${monthBounds.end.slice(0, 7)}">
+                                    <input type="date" id="relatorioPlantaoDataFim" class="form-control" value="${monthBounds.end}">
                                 </div>
+                            </div>
+                            <div class="filtro-group">
+                                <label><i class="fas fa-user"></i> Colaborador</label>
+                                <select id="relatorioPlantaoColaborador" class="form-control">
+                                    ${buildPlantaoColaboradorOptions()}
+                                </select>
+                            </div>
+                            <div class="filtro-group">
+                                <label><i class="fas fa-filter"></i> Status</label>
+                                <select id="relatorioPlantaoStatus" class="form-control">
+                                    <option value="todos">Todos</option>
+                                    <option value="com_equipe">Com equipe</option>
+                                    <option value="sem_equipe">Sem equipe</option>
+                                </select>
                             </div>
                         </div>
                         <div class="relatorio-actions">
-                            <button onclick="gerarRelatorioPlantoes()" class="btn-secondary">
+                            <button onclick="gerarRelatorioPlantoes()" class="btn-primary">
                                 <i class="fas fa-file-alt"></i> Visualizar
                             </button>
                         </div>

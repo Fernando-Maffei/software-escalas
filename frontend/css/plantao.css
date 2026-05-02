@@ -35,6 +35,19 @@
     color: var(--primary);
 }
 
+.sabados-subtitle {
+    margin-top: 6px;
+    color: var(--text-light);
+    font-size: 13px;
+}
+
+.sabados-nav {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
 .sabados-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
@@ -50,6 +63,9 @@
     transition: var(--transition);
     border: 2px solid transparent;
     position: relative;
+    overflow: hidden;
+    width: 100%;
+    font: inherit;
 }
 
 .sabado-card:hover {
@@ -58,9 +74,31 @@
     border-color: var(--primary);
 }
 
+.sabado-card.passado {
+    background: linear-gradient(180deg, #f8fafc 0%, var(--card-dark) 100%);
+}
+
 .sabado-card.lancado {
     background: var(--primary-soft);
     border-color: var(--primary);
+}
+
+.sabado-card.hoje {
+    box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.18);
+}
+
+.sabado-card.is-active {
+    border-color: var(--primary);
+    transform: translateY(-4px);
+    box-shadow: var(--shadow-lg);
+}
+
+.sabado-card-badges {
+    display: flex;
+    justify-content: space-between;
+    gap: 6px;
+    min-height: 20px;
+    margin-bottom: 8px;
 }
 
 .sabado-dia {
@@ -82,6 +120,12 @@
     color: var(--text-lighter);
 }
 
+.sabado-status {
+    margin-top: 10px;
+    font-size: 11px;
+    color: var(--text-light);
+}
+
 .badge-plantao {
     position: absolute;
     top: -5px;
@@ -92,6 +136,26 @@
     padding: 2px 6px;
     border-radius: 20px;
     font-weight: 600;
+}
+
+.sabado-card .badge-plantao {
+    position: static;
+    background: #0f766e;
+    font-size: 9px;
+    padding: 3px 8px;
+}
+
+.badge-historico {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 3px 8px;
+    border-radius: 999px;
+    background: #e2e8f0;
+    color: #475569;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.3px;
 }
 
 /* Painel editor */
@@ -399,11 +463,26 @@
     #plantaoEditor {
         width: 100%;
     }
+
+    .sabados-header {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 14px;
+    }
 }
 
 @media (max-width: 768px) {
     .sabados-grid {
         grid-template-columns: repeat(3, 1fr);
+    }
+
+    .sabados-nav {
+        width: 100%;
+    }
+
+    .sabados-nav .btn-secondary {
+        flex: 1;
+        justify-content: center;
     }
 }
 
@@ -431,6 +510,10 @@
     border-color: var(--border);
 }
 
+[data-theme="dark"] .sabado-card.passado {
+    background: linear-gradient(180deg, rgba(30, 41, 59, 0.9) 0%, var(--card-dark) 100%);
+}
+
 [data-theme="dark"] .sabado-card:hover {
     border-color: var(--primary);
     background: var(--card);
@@ -451,6 +534,11 @@
 
 [data-theme="dark"] .sabado-ano {
     color: var(--text-lighter);
+}
+
+[data-theme="dark"] .badge-historico {
+    background: #334155;
+    color: #cbd5e1;
 }
 
 /* Painel editor no tema escuro */

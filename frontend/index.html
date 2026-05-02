@@ -3,8 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Software de Escalas</title>
-  <link rel="stylesheet" href="style.css?v=20260427h">
+  <title>Central de Escalas</title>
+  <link rel="icon" type="image/png" href="assets/branding/central-escalas-logo.png">
+  <link rel="stylesheet" href="style.css?v=20260501i">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
@@ -20,9 +21,12 @@
     <aside class="sidebar" id="mainSidebar">
       <div class="sidebar-header">
         <div class="logo-container">
-          <i class="fas fa-calendar-check"></i>
+          <img src="assets/branding/central-escalas-logo.png" alt="Central de Escalas" class="logo-image">
         </div>
-        <span class="sidebar-title">Escalas</span>
+        <div class="sidebar-brand-copy">
+          <span class="sidebar-title">Central de Escalas</span>
+          <span class="sidebar-subtitle">Painel operacional</span>
+        </div>
       </div>
 
       <button class="sidebar-btn" data-page="dashboard">
@@ -93,30 +97,9 @@
       
       <div class="sidebar-spacer"></div>
       
-      <!-- FOOTER DA SIDEBAR -->
-      <div class="sidebar-footer">
-        <div class="user-profile">
-          <div class="user-avatar">
-            <i class="fas fa-user-astronaut"></i>
-          </div>
-          <div class="user-info">
-            <span class="user-name">Fernando</span>
-            <span class="user-role">Administrador</span>
-          </div>
-        </div>
-        <div class="user-actions">
-          <button class="icon-btn" title="Configurações">
-            <i class="fas fa-sliders-h"></i>
-          </button>
-          <button class="icon-btn" title="Sair">
-            <i class="fas fa-sign-out-alt"></i>
-          </button>
-        </div>
-      </div>
-      
       <div class="version-badge">
         <i class="fas fa-code-branch"></i>
-        <span>v1.0.0</span>
+        <span>v1.1.0 BETA</span>
       </div>
     </aside>
 
@@ -199,10 +182,10 @@
                                 Tipo
                             </label>
                             <select id="tipoLancamento" class="form-control">
-                                <option value="folga">🌸 Folga</option>
-                                <option value="ausencia">⚠️ Ausência</option>
-                                <option value="ferias">🏖️ Férias</option>
-                                <option value="feriado">🏛️ Feriado</option>
+                                <option value="folga">Folga</option>
+                                <option value="ausencia">Ausência</option>
+                                <option value="ferias">Férias</option>
+                                <option value="feriado">Feriado</option>
                             </select>
                         </div>
 
@@ -222,12 +205,12 @@
                                 <label>
                                     <i class="fas fa-clock"></i>
                                     Tipo de Período
-                                </label>
-                                <select id="periodoTipo" class="form-control">
-                                    <option value="dia_inteiro">📅 Dia inteiro</option>
-                                    <option value="horas">⏰ Horas específicas</option>
-                                </select>
-                            </div>
+                            </label>
+                            <select id="periodoTipo" class="form-control">
+                                    <option value="dia_inteiro">Dia inteiro</option>
+                                    <option value="horas">Horas específicas</option>
+                            </select>
+                        </div>
                         </div>
 
                         <!-- Campos para Feriado -->
@@ -236,12 +219,12 @@
                                 <label>
                                     <i class="fas fa-map-marker-alt"></i>
                                     Abrangência
-                                </label>
-                                <select id="feriadoTipo" class="form-control">
-                                    <option value="municipal">🏛️ Municipal</option>
-                                    <option value="estadual">🏛️ Estadual</option>
-                                </select>
-                            </div>
+                            </label>
+                            <select id="feriadoTipo" class="form-control">
+                                    <option value="municipal">Municipal</option>
+                                    <option value="estadual">Estadual</option>
+                            </select>
+                        </div>
                         </div>
 
                         <!-- Datas -->
@@ -411,10 +394,10 @@
 <script src="Js/api.js"></script>
 <script src="Js/calendar.js"></script>
 <script src="Js/dashboard.js"></script>
-<script src="Js/app.js?v=20260427h"></script>
-<script src="Js/lancamentos.js"></script>
+<script src="Js/app.js?v=20260501j"></script>
+<script src="Js/lancamentos.js?v=20260501j"></script>
 <script src="Js/escala-report-utils.js?v=20260427h"></script>
-<script src="Js/runtime-fixes.js?v=20260427h"></script>
+<script src="Js/runtime-fixes.js?v=20260501j"></script>
 <script src="https://unpkg.com/lucide@latest"></script>
 
 <script>

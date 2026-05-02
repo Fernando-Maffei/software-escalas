@@ -43,6 +43,52 @@ window.abrirModalFeriado = function(dataISO) {
 const appContent = document.getElementById("appContent");
 window.__appBootstrapPromise = window.__appBootstrapPromise || null;
 
+function getApiBaseUrl() {
+    if (window.API?.baseURL) {
+        return window.API.baseURL;
+    }
+
+    const origin = window.location.origin && window.location.origin !== 'null'
+        ? window.location.origin
+        : 'http://localhost:3000';
+
+    return `${origin.replace(/\/$/, '')}/api`;
+}
+
+function apiUrl(path = '') {
+    const normalizedPath = String(path || '');
+
+    if (!normalizedPath || normalizedPath === '/') {
+        return getApiBaseUrl();
+    }
+
+    return normalizedPath.startsWith('/')
+        ? `${getApiBaseUrl()}${normalizedPath}`
+        : `${getApiBaseUrl()}/${normalizedPath}`;
+}
+
+function normalizeLegacyApiUrl(url) {
+    if (typeof url !== 'string') {
+        return url;
+    }
+
+    if (!url.startsWith('http://localhost:3000/api')) {
+        return url;
+    }
+
+    const suffix = url.slice('http://localhost:3000/api'.length);
+    return suffix ? `${getApiBaseUrl()}${suffix}` : getApiBaseUrl();
+}
+
+const nativeFetch = window.fetch.bind(window);
+window.fetch = function fetchWithDynamicApiHost(input, init) {
+    if (typeof input === 'string') {
+        return nativeFetch(normalizeLegacyApiUrl(input), init);
+    }
+
+    return nativeFetch(input, init);
+};
+
 function inicializarAplicacaoUmaVez() {
     if (window.__appBootstrapPromise) {
         return window.__appBootstrapPromise;
@@ -1697,10 +1743,13 @@ async function renderEscalaDia() {
             <div>
                 <h1>Escala do Dia</h1>
                 <div class="data-selector">
+                    <button id="btnDiaAnteriorEscala" class="btn-secondary btn-day-nav" type="button" title="Dia anterior" aria-label="Dia anterior">
+                        <i class="fas fa-chevron-left"></i>
+                    </button>
                     <i class="fas fa-calendar-alt"></i>
                     <input type="date" id="seletorDataEscala" value="${dataHoje}" class="form-control">
-                    <button id="btnCarregarEscala" class="btn-primary">
-                        <i class="fas fa-search"></i> Ver Escala
+                    <button id="btnDiaProximoEscala" class="btn-secondary btn-day-nav" type="button" title="Próximo dia" aria-label="Próximo dia">
+                        <i class="fas fa-chevron-right"></i>
                     </button>
                 </div>
             </div>
@@ -1743,21 +1792,39 @@ async function renderEscalaDia() {
     `;
 
     // Adicionar evento ao botão e ao input
-    document.getElementById('btnCarregarEscala').addEventListener('click', async () => {
-        const novaData = document.getElementById('seletorDataEscala').value;
-        if (novaData) {
-            window.dataEscalaSelecionada = novaData;
-            gerarHeaderTimeline();
-            gerarTimelineVisualComAusencias();
+    const atualizarEscalaSelecionada = () => {
+        gerarHeaderTimeline();
+        gerarTimelineVisualComAusencias();
+    };
+
+    const mudarDiaEscala = (delta) => {
+        const input = document.getElementById('seletorDataEscala');
+        if (!input?.value) {
+            return;
         }
+
+        const dataBase = new Date(`${input.value}T12:00:00`);
+        dataBase.setDate(dataBase.getDate() + delta);
+        const novaData = dataBase.toISOString().split('T')[0];
+        input.value = novaData;
+        window.dataEscalaSelecionada = novaData;
+        atualizarEscalaSelecionada();
+    };
+
+    document.getElementById('btnDiaAnteriorEscala')?.addEventListener('click', () => {
+        mudarDiaEscala(-1);
+    });
+
+    document.getElementById('btnDiaProximoEscala')?.addEventListener('click', () => {
+        mudarDiaEscala(1);
     });
 
     document.getElementById('seletorDataEscala').addEventListener('change', (e) => {
         window.dataEscalaSelecionada = e.target.value;
+        atualizarEscalaSelecionada();
     });
 
-    gerarHeaderTimeline();
-    gerarTimelineVisualComAusencias();
+    atualizarEscalaSelecionada();
     configurarSidebarEditor();
 }
 function configurarSidebarEditor() {
@@ -3129,7 +3196,7 @@ function renderConfiguracoes() {
                     <div class="sobre-info">
                         <i class="fas fa-calendar-check sobre-icon"></i>
                         <h3>Software de Escalas</h3>
-                        <p class="versao">Versão 1.0.0</p>
+                        <p class="versao">Versão 1.1.0 BETA</p>
                         <p class="descricao">
                             Sistema completo para gestão de escalas de trabalho, 
                             colaboradores e horários.
@@ -3150,7 +3217,7 @@ function renderConfiguracoes() {
             </div>
 
             <!-- CARD DE AÇÕES -->
-            <div class="config-card config-card-wide">
+            <div class="config-card config-card-half">
                 <div class="config-card-header">
                     <i class="fas fa-database"></i>
                     <h2>Configuração do Banco de Dados</h2>
@@ -3289,7 +3356,7 @@ function renderConfiguracoes() {
                 </div>
             </div>
 
-            <div class="config-card config-card-wide">
+            <div class="config-card config-card-half">
                 <div class="config-card-header">
                     <i class="fas fa-cloud-upload-alt"></i>
                     <h2>Backup Local do Banco</h2>
@@ -3375,13 +3442,18 @@ function renderConfiguracoes() {
                 </div>
             </div>
 
-            <div class="config-card">
+            <div class="config-card config-card-tools">
                 <div class="config-card-header">
                     <i class="fas fa-tools"></i>
                     <h2>Ferramentas</h2>
                 </div>
                 
                 <div class="config-card-body">
+                    <button class="config-btn" onclick="atualizarTudo()">
+                        <i class="fas fa-rotate-right"></i>
+                        Atualizar Dados
+                    </button>
+
                     <button class="config-btn" onclick="exportarDados()">
                         <i class="fas fa-download"></i>
                         Exportar Dados
@@ -3471,7 +3543,7 @@ function exportarDados() {
                 notificacoes: localStorage.getItem('notificacoes') === 'true'
             },
             metadata: {
-                versao: '1.0.0',
+                versao: '1.1.0 BETA',
                 dataExportacao: new Date().toISOString(),
                 sistema: 'Software de Escalas'
             }

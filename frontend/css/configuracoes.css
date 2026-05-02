@@ -1,18 +1,22 @@
 /* ================= CONFIGURAÇÕES ================= */
 .configuracoes-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
-    gap: 24px;
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    gap: 20px;
     margin-top: 24px;
+    align-items: start;
+    grid-auto-flow: row dense;
 }
 
 .config-card {
-    background: var(--card);
+    grid-column: span 4;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.02), rgba(15, 23, 42, 0.04)), var(--card);
     border-radius: 24px;
     box-shadow: var(--shadow-lg);
     overflow: hidden;
     border: 1px solid var(--border);
     transition: var(--transition);
+    min-height: 100%;
 }
 
 .config-card:hover {
@@ -21,16 +25,24 @@
 }
 
 .config-card-wide {
-    grid-column: 1 / -1;
+    grid-column: span 8;
+}
+
+.config-card-half {
+    grid-column: span 6;
+}
+
+.config-card-tools {
+    grid-column: span 12;
 }
 
 .config-card-header {
     display: flex;
     align-items: center;
     gap: 12px;
-    padding: 20px 24px;
-    background: linear-gradient(135deg, var(--primary-soft) 0%, transparent 100%);
-    border-bottom: 2px solid var(--border);
+    padding: 22px 24px 18px;
+    background: linear-gradient(135deg, rgba(99, 102, 241, 0.14) 0%, rgba(99, 102, 241, 0.04) 42%, transparent 100%);
+    border-bottom: 1px solid rgba(148, 163, 184, 0.14);
 }
 
 .config-card-header i {
@@ -47,13 +59,54 @@
 
 .config-card-body {
     padding: 24px;
+    display: grid;
+    gap: 18px;
+}
+
+.config-card-half .config-card-body {
+    padding: 20px;
+    gap: 16px;
+}
+
+.config-card-half .config-description {
+    max-width: none;
+}
+
+.config-card-half .config-status-card {
+    margin-bottom: 16px;
+    padding: 16px 18px;
+}
+
+.config-card-half .config-form-grid {
+    grid-template-columns: 1fr;
+    gap: 14px;
+}
+
+.config-card-half .config-actions-row .config-btn {
+    flex: 1 1 100%;
+}
+
+.config-card-half .config-inline-picker-btn {
+    min-width: 0;
+    width: 100%;
+}
+
+.config-card-tools .config-card-body {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 14px;
+}
+
+.config-card-tools .config-btn {
+    width: 100%;
+    margin-bottom: 0;
 }
 
 .config-description {
     color: var(--text-light);
     font-size: 14px;
-    margin-bottom: 20px;
+    margin-bottom: 0;
     line-height: 1.5;
+    max-width: 72ch;
 }
 
 .config-status-card {
@@ -153,7 +206,7 @@
     display: flex;
     flex-wrap: wrap;
     gap: 12px;
-    margin-top: 20px;
+    margin-top: 4px;
 }
 
 .config-actions-row .config-btn {
@@ -226,7 +279,7 @@ label[for="autoBackupOnShutdownHidden"] + .helper-text {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 16px;
-    margin-top: 16px;
+    margin-top: 0;
 }
 
 .tema-opcao {
@@ -304,8 +357,9 @@ label[for="autoBackupOnShutdownHidden"] + .helper-text {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 16px 0;
-    border-bottom: 1px solid var(--border);
+    gap: 18px;
+    padding: 18px 0;
+    border-bottom: 1px solid rgba(148, 163, 184, 0.12);
 }
 
 .config-item:last-child {
@@ -314,20 +368,21 @@ label[for="autoBackupOnShutdownHidden"] + .helper-text {
 
 .config-item-info {
     display: flex;
-    align-items: center;
-    gap: 12px;
+    align-items: flex-start;
+    gap: 14px;
 }
 
 .config-item-info i {
-    width: 32px;
-    height: 32px;
-    background: var(--primary-soft);
-    border-radius: 10px;
+    width: 38px;
+    height: 38px;
+    background: linear-gradient(135deg, rgba(99, 102, 241, 0.18), rgba(99, 102, 241, 0.08));
+    border-radius: 12px;
     display: flex;
     align-items: center;
     justify-content: center;
     color: var(--primary);
     font-size: 16px;
+    flex-shrink: 0;
 }
 
 .config-item-info div {
@@ -347,9 +402,10 @@ label[for="autoBackupOnShutdownHidden"] + .helper-text {
 }
 
 .config-select {
-    padding: 8px 12px;
-    border-radius: 10px;
-    border: 2px solid var(--border);
+    min-width: 210px;
+    padding: 10px 14px;
+    border-radius: 12px;
+    border: 1px solid var(--border);
     background: var(--card);
     color: var(--text);
     font-size: 14px;
@@ -412,9 +468,9 @@ input:checked + .slider:before {
 /* ================= SOBRE ================= */
 .sobre-info {
     text-align: center;
-    margin-bottom: 24px;
-    padding-bottom: 24px;
-    border-bottom: 2px solid var(--border);
+    margin-bottom: 6px;
+    padding: 10px 0 24px;
+    border-bottom: 1px solid rgba(148, 163, 184, 0.14);
 }
 
 .sobre-icon {
@@ -483,7 +539,7 @@ input:checked + .slider:before {
     align-items: center;
     justify-content: center;
     gap: 8px;
-    margin-bottom: 12px;
+    margin-bottom: 0;
     border: 2px solid transparent;
 }
 
@@ -509,10 +565,30 @@ input:checked + .slider:before {
     color: white;
 }
 
+@media (max-width: 1280px) {
+    .config-card,
+    .config-card-half,
+    .config-card-wide,
+    .config-card-tools {
+        grid-column: span 6;
+    }
+
+    .config-card-tools .config-card-body {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
 /* Responsividade */
 @media (max-width: 768px) {
     .configuracoes-grid {
         grid-template-columns: 1fr;
+    }
+
+    .config-card,
+    .config-card-half,
+    .config-card-wide,
+    .config-card-tools {
+        grid-column: auto;
     }
     
     .config-form-grid {
@@ -534,6 +610,10 @@ input:checked + .slider:before {
     .config-checkbox-row {
         flex-direction: column;
         align-items: stretch;
+    }
+
+    .config-card-tools .config-card-body {
+        grid-template-columns: 1fr;
     }
 }
 
