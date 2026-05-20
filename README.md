@@ -45,8 +45,9 @@ O aplicativo desktop:
 1. Instale o Node.js 20 ou superior
 2. Abra a pasta do projeto
 3. Rode `npm install`
-4. Rode `npm run desktop:make`
-5. Pegue o instalador em `out/make/squirrel.windows/x64/AppDeEscalasSetup.exe`
+4. Rode `npm run desktop:make -- --arch=x64` para gerar apenas 64 bits
+5. Ou rode `npm run desktop:release` para gerar os instaladores `x64`, `x86` e `arm64`
+6. Pegue os arquivos finais em `out/installers`
 
 Fluxo esperado para atualizacoes:
 
@@ -64,14 +65,20 @@ Quando voce fizer melhorias no sistema e quiser mandar um novo instalador:
 3. Gere a nova versao com um destes caminhos:
 4. `npm run desktop:release -- 1.0.1`
 5. ou de duplo clique em `gerar-instalador.bat`
-6. Envie o arquivo `out/make/squirrel.windows/x64/AppDeEscalasSetup.exe`
+6. Envie o arquivo correto para a maquina do cliente em `out/installers`
 
 O script de release:
 
 - atualiza a versao do projeto quando voce informar uma nova
 - roda a checagem de sintaxe
 - roda os testes
-- gera o novo instalador do Windows
+- gera os instaladores do Windows para `x64`, `x86` e `arm64`
+
+Sugestao de envio por arquitetura:
+
+- `x64`: maioria dos PCs com Windows 64 bits
+- `x86`: maquinas antigas com Windows 32 bits
+- `arm64`: computadores Windows ARM
 
 Sugestao simples de versionamento:
 

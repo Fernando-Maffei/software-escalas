@@ -6,7 +6,7 @@ Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 
 $projectRoot = Split-Path -Parent $PSScriptRoot
-$installerPath = Join-Path $projectRoot 'out\make\squirrel.windows\x64\AppDeEscalasSetup.exe'
+$installerOutputDirectory = Join-Path $projectRoot 'out\installers'
 $stdoutLogPath = Join-Path ([System.IO.Path]::GetTempPath()) ("app-escalas-release-" + [System.Guid]::NewGuid().ToString('N') + ".log")
 $stderrLogPath = Join-Path ([System.IO.Path]::GetTempPath()) ("app-escalas-release-" + [System.Guid]::NewGuid().ToString('N') + ".err.log")
 
@@ -33,7 +33,7 @@ $subtitleLabel = New-Object System.Windows.Forms.Label
 $subtitleLabel.Location = New-Object System.Drawing.Point(28, 62)
 $subtitleLabel.Size = New-Object System.Drawing.Size(840, 46)
 $subtitleLabel.ForeColor = [System.Drawing.Color]::FromArgb(173, 189, 208)
-$subtitleLabel.Text = 'A janela acompanha validacoes, testes e a criacao do instalador. Quando terminar, o resultado aparece aqui na tela.'
+$subtitleLabel.Text = 'A janela acompanha validacoes, testes e a criacao dos instaladores. Quando terminar, o resultado aparece aqui na tela.'
 $form.Controls.Add($subtitleLabel)
 
 $statusLabel = New-Object System.Windows.Forms.Label
@@ -61,7 +61,7 @@ $phaseList = New-Object System.Windows.Forms.Label
 $phaseList.Location = New-Object System.Drawing.Point(30, 238)
 $phaseList.Size = New-Object System.Drawing.Size(840, 56)
 $phaseList.ForeColor = [System.Drawing.Color]::FromArgb(173, 189, 208)
-$phaseList.Text = "Etapas previstas:`r`n1. Validacoes e smoke test  2. Testes do projeto  3. Empacotamento e geracao do AppDeEscalasSetup.exe"
+$phaseList.Text = "Etapas previstas:`r`n1. Validacoes e smoke test  2. Testes do projeto  3. Empacotamento para x64, x86 e arm64"
 $form.Controls.Add($phaseList)
 
 $logTextBox = New-Object System.Windows.Forms.TextBox
@@ -85,14 +85,14 @@ $form.Controls.Add($resultLabel)
 $openFolderButton = New-Object System.Windows.Forms.Button
 $openFolderButton.Location = New-Object System.Drawing.Point(466, 628)
 $openFolderButton.Size = New-Object System.Drawing.Size(190, 34)
-$openFolderButton.Text = 'Abrir pasta do setup'
+$openFolderButton.Text = 'Abrir pasta dos instaladores'
 $openFolderButton.Enabled = $false
 $form.Controls.Add($openFolderButton)
 
 $openInstallerButton = New-Object System.Windows.Forms.Button
 $openInstallerButton.Location = New-Object System.Drawing.Point(662, 628)
 $openInstallerButton.Size = New-Object System.Drawing.Size(208, 34)
-$openInstallerButton.Text = 'Mostrar AppDeEscalasSetup.exe'
+$openInstallerButton.Text = 'Selecionar primeiro instalador'
 $openInstallerButton.Enabled = $false
 $form.Controls.Add($openInstallerButton)
 
@@ -149,9 +149,9 @@ function Read-NewFileChunk {
 function Update-PhaseStatus {
     $logText = $logTextBox.Text
 
-    if ($logText -match 'Gerando instalador desktop') {
-        $statusLabel.Text = 'Empacotando e gerando o instalador...'
-        $detailLabel.Text = 'Esta etapa cria o executavel final do setup.'
+    if ($logText -match 'Gerando instaladores desktop') {
+        $statusLabel.Text = 'Empacotando e gerando os instaladores...'
+        $detailLabel.Text = 'Esta etapa cria os executaveis finais para x64, x86 e arm64.'
         return
     }
 
@@ -171,16 +171,23 @@ function Finish-Success {
     $script:completed = $true
     $progressBar.Style = 'Blocks'
     $progressBar.Value = 100
-    $statusLabel.Text = 'Setup gerado com sucesso.'
-    $detailLabel.Text = 'A compilacao terminou sem erros e o instalador ja esta pronto para uso.'
+    $statusLabel.Text = 'Instaladores gerados com sucesso.'
+    $detailLabel.Text = 'A compilacao terminou sem erros e os instaladores ja estao prontos para uso.'
     $statusLabel.ForeColor = [System.Drawing.Color]::FromArgb(52, 211, 153)
 
-    if (Test-Path -LiteralPath $installerPath) {
-        $resultLabel.Text = "Arquivo final: $installerPath"
+    $generatedInstallers = @()
+
+    if (Test-Path -LiteralPath $installerOutputDirectory) {
+        $generatedInstallers = Get-ChildItem -LiteralPath $installerOutputDirectory -Filter 'AppDeEscalasSetup-*.exe' |
+            Sort-Object LastWriteTime -Descending
+    }
+
+    if ($generatedInstallers.Count -gt 0) {
+        $resultLabel.Text = "Arquivos finais: " + (($generatedInstallers | Select-Object -ExpandProperty Name) -join ' | ')
         $openFolderButton.Enabled = $true
         $openInstallerButton.Enabled = $true
     } else {
-        $resultLabel.Text = 'O processo terminou, mas o arquivo final nao foi encontrado no caminho esperado.'
+        $resultLabel.Text = 'O processo terminou, mas os instaladores nao foram encontrados na pasta consolidada.'
     }
 }
 
@@ -195,7 +202,7 @@ function Finish-Error {
     $statusLabel.Text = 'A geracao do setup terminou com erro.'
     $detailLabel.Text = "Revise o log abaixo. Codigo de saida: $ExitCode"
     $statusLabel.ForeColor = [System.Drawing.Color]::FromArgb(248, 113, 113)
-    $resultLabel.Text = 'O instalador nao foi gerado. Corrija o erro e rode novamente.'
+    $resultLabel.Text = 'Os instaladores nao foram gerados. Corrija o erro e rode novamente.'
 }
 
 $timer = New-Object System.Windows.Forms.Timer
@@ -241,14 +248,20 @@ $closeButton.Add_Click({
 })
 
 $openFolderButton.Add_Click({
-    if (Test-Path -LiteralPath (Split-Path -Parent $installerPath)) {
-        Start-Process explorer.exe -ArgumentList (Split-Path -Parent $installerPath) | Out-Null
+    if (Test-Path -LiteralPath $installerOutputDirectory) {
+        Start-Process explorer.exe -ArgumentList $installerOutputDirectory | Out-Null
     }
 })
 
 $openInstallerButton.Add_Click({
-    if (Test-Path -LiteralPath $installerPath) {
-        Start-Process explorer.exe -ArgumentList "/select,`"$installerPath`"" | Out-Null
+    if (Test-Path -LiteralPath $installerOutputDirectory) {
+        $firstInstaller = Get-ChildItem -LiteralPath $installerOutputDirectory -Filter 'AppDeEscalasSetup-*.exe' |
+            Sort-Object LastWriteTime -Descending |
+            Select-Object -First 1
+
+        if ($firstInstaller) {
+            Start-Process explorer.exe -ArgumentList "/select,`"$($firstInstaller.FullName)`"" | Out-Null
+        }
     }
 })
 

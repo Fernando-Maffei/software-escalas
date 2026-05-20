@@ -5,14 +5,15 @@ const { spawnSync } = require('child_process');
 const projectRoot = path.join(__dirname, '..');
 const packageJsonPath = path.join(projectRoot, 'package.json');
 const packageLockPath = path.join(projectRoot, 'package-lock.json');
-const installerOutputPath = path.join(
-    projectRoot,
-    'out',
-    'make',
-    'squirrel.windows',
-    'x64',
-    'AppDeEscalasSetup.exe'
-);
+const forgeOutputBaseDirectory = path.join(projectRoot, 'out', 'make', 'squirrel.windows');
+const installersOutputDirectory = path.join(projectRoot, 'out', 'installers');
+const supportedArchitectures = Object.freeze(['x64', 'ia32', 'arm64']);
+const defaultArchitectures = Object.freeze(['x64', 'ia32', 'arm64']);
+const architectureLabels = Object.freeze({
+    x64: 'x64',
+    ia32: 'x86',
+    arm64: 'arm64'
+});
 
 function readJson(filePath) {
     return JSON.parse(fs.readFileSync(filePath, 'utf8'));
@@ -62,8 +63,109 @@ function runCommand(command, args) {
     }
 }
 
+function parseArguments(argv) {
+    let requestedVersion = '';
+    let architectures = [...defaultArchitectures];
+
+    argv.forEach((argument) => {
+        const normalized = String(argument || '').trim();
+
+        if (!normalized) {
+            return;
+        }
+
+        if (normalized.startsWith('--archs=')) {
+            const rawArchitectures = normalized.slice('--archs='.length);
+            architectures = normalizeArchitectures(rawArchitectures.split(','));
+            return;
+        }
+
+        if (!requestedVersion) {
+            requestedVersion = normalized;
+        }
+    });
+
+    return {
+        requestedVersion,
+        architectures
+    };
+}
+
+function normalizeArchitectures(values) {
+    const uniqueValues = [...new Set(
+        (values || [])
+            .map((value) => String(value || '').trim().toLowerCase())
+            .filter(Boolean)
+    )];
+
+    if (uniqueValues.length === 0) {
+        return [...defaultArchitectures];
+    }
+
+    const invalidArchitectures = uniqueValues.filter((value) => !supportedArchitectures.includes(value));
+
+    if (invalidArchitectures.length > 0) {
+        console.error(
+            `Arquitetura invalida: ${invalidArchitectures.join(', ')}. `
+            + `Use apenas: ${supportedArchitectures.join(', ')}.`
+        );
+        process.exit(1);
+    }
+
+    return uniqueValues;
+}
+
+function ensureDirectory(directoryPath) {
+    fs.mkdirSync(directoryPath, { recursive: true });
+    return directoryPath;
+}
+
+function getForgeInstallerPath(arch) {
+    return path.join(forgeOutputBaseDirectory, arch, 'AppDeEscalasSetup.exe');
+}
+
+function buildInstallerFileName(version, arch) {
+    const architectureLabel = architectureLabels[arch] || arch;
+    return `AppDeEscalasSetup-${version}-${architectureLabel}.exe`;
+}
+
+function copyInstallerArtifact(version, arch) {
+    const sourcePath = getForgeInstallerPath(arch);
+
+    if (!fs.existsSync(sourcePath)) {
+        console.error(`O instalador da arquitetura ${arch} nao foi encontrado em: ${sourcePath}`);
+        process.exit(1);
+    }
+
+    ensureDirectory(installersOutputDirectory);
+    const fileName = buildInstallerFileName(version, arch);
+    const destinationPath = path.join(installersOutputDirectory, fileName);
+
+    fs.copyFileSync(sourcePath, destinationPath);
+
+    return {
+        arch,
+        fileName,
+        sourcePath,
+        destinationPath
+    };
+}
+
+function buildInstallers(version, architectures) {
+    const results = [];
+
+    architectures.forEach((arch, index) => {
+        console.log('');
+        console.log(`[${index + 1}/${architectures.length}] Gerando instalador para ${arch}...`);
+        runCommand('npm.cmd', ['run', 'desktop:make', '--', `--arch=${arch}`]);
+        results.push(copyInstallerArtifact(version, arch));
+    });
+
+    return results;
+}
+
 function main() {
-    const requestedVersion = process.argv[2] ? String(process.argv[2]).trim() : '';
+    const { requestedVersion, architectures } = parseArguments(process.argv.slice(2));
     const currentPackage = readJson(packageJsonPath);
     const currentVersion = currentPackage.version;
     const targetVersion = requestedVersion || currentVersion;
@@ -80,16 +182,22 @@ function main() {
         console.log(`Mantendo versao atual: ${currentVersion}`);
     }
 
+    console.log(`Arquiteturas selecionadas: ${architectures.join(', ')}`);
     console.log('Executando validacoes...');
     runCommand('npm.cmd', ['run', 'smoke']);
     runCommand('npm.cmd', ['test']);
 
-    console.log('Gerando instalador desktop...');
-    runCommand('npm.cmd', ['run', 'desktop:make']);
+    console.log('Gerando instaladores desktop...');
+    const artifacts = buildInstallers(targetVersion, architectures);
 
     console.log('');
     console.log(`Versao pronta: ${targetVersion}`);
-    console.log(`Instalador gerado em: ${installerOutputPath}`);
+    console.log(`Pasta consolidada dos instaladores: ${installersOutputDirectory}`);
+    console.log('Arquivos finais:');
+
+    artifacts.forEach((artifact) => {
+        console.log(`- ${artifact.destinationPath}`);
+    });
 }
 
 main();
