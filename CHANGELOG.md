@@ -2,6 +2,23 @@
 
 Todas as alteracoes relevantes deste projeto serao documentadas neste arquivo.
 
+## [1.2.1] - 2026-05-31
+
+### Adicionado
+- Diagnostico de comunicacao em rede em Configuracoes > Ferramentas.
+- Endpoint `/api/network/status` para validar servidor, banco, URLs de acesso e cliente conectado.
+- Modo servidor em segundo plano no Windows por tarefa agendada.
+- Endereco recomendado por nome da maquina, usando porta padrao `4450`.
+
+### Alterado
+- Porta padrao do servidor de rede alterada para `4450`.
+- Cliente desktop aceita nome da maquina como endereco do servidor e completa a porta padrao automaticamente.
+- Chamadas antigas para `localhost:3000` passam a ser normalizadas pela base dinamica da API.
+
+### Corrigido
+- Reduzida a dependencia de IP fixo para acesso entre maquinas na mesma rede.
+- Mensagem mais clara quando a porta do servidor ja esta em uso.
+
 ## [1.2.0] - 2026-05-31
 
 ### Adicionado

@@ -22,12 +22,59 @@ const jornadaSemanalRoutes = require('./routes/jornada-semanal');
 const configuracaoBancoRoutes = require('./routes/configuracao-banco');
 
 const DEFAULT_HOST = '0.0.0.0';
-const DEFAULT_PORT = 3000;
+const DEFAULT_PORT = 4450;
+const CORS_ORIGINS_ENV = 'CORS_ORIGINS';
 
 const app = express();
 const frontendPath = path.join(__dirname, '..', 'frontend');
 
 let activeController = null;
+
+function normalizeCorsOrigin(value) {
+    const raw = String(value || '').trim();
+
+    if (!raw) {
+        return null;
+    }
+
+    try {
+        const url = new URL(raw.includes('://') ? raw : `http://${raw}`);
+        return url.origin;
+    } catch (error) {
+        return null;
+    }
+}
+
+function parseCorsOrigins(value) {
+    return new Set(
+        String(value || '')
+            .split(',')
+            .map(normalizeCorsOrigin)
+            .filter(Boolean)
+    );
+}
+
+const configuredCorsOrigins = parseCorsOrigins(process.env[CORS_ORIGINS_ENV]);
+
+function getCorsStatus() {
+    return {
+        mode: configuredCorsOrigins.size > 0 ? 'restricted' : 'open',
+        allowedOrigins: [...configuredCorsOrigins]
+    };
+}
+
+function createCorsOptions() {
+    return {
+        origin(origin, callback) {
+            if (!origin || configuredCorsOrigins.size === 0 || configuredCorsOrigins.has(origin)) {
+                callback(null, true);
+                return;
+            }
+
+            callback(new AppError(403, 'Origem nao autorizada para acessar a API.'));
+        }
+    };
+}
 
 function getServerAccessUrls(host, port, options = {}) {
     const urls = new Set();
@@ -45,6 +92,11 @@ function getServerAccessUrls(host, port, options = {}) {
     }
 
     urls.add(`http://localhost:${port}`);
+
+    const machineName = os.hostname();
+    if (machineName) {
+        urls.add(`http://${machineName}:${port}`);
+    }
 
     if (!includeNetworkUrls) {
         return [...urls];
@@ -108,8 +160,58 @@ function getControllerUrl(controller) {
     return `http://localhost:${port}`;
 }
 
+function getClientIp(req) {
+    const forwardedFor = String(req.headers['x-forwarded-for'] || '').split(',')[0].trim();
+    const rawIp = forwardedFor || req.socket?.remoteAddress || req.ip || '';
+    return String(rawIp).replace(/^::ffff:/, '');
+}
+
+async function getDatabaseHealth() {
+    try {
+        const pool = await conectar();
+        await pool.request().query('SELECT 1 AS status');
+
+        return {
+            status: 'connected'
+        };
+    } catch (error) {
+        return {
+            status: 'unavailable',
+            message: error.message || 'Nao foi possivel conectar ao banco.'
+        };
+    }
+}
+
+function getNetworkStatusPayload(req) {
+    const port = activeController
+        ? getControllerPort(activeController)
+        : normalizePort(process.env.PORT ?? DEFAULT_PORT);
+    const host = activeController?.host || process.env.HOST || DEFAULT_HOST;
+    const urls = getServerAccessUrls(host, port, {
+        includeNetworkUrls: true
+    });
+
+    return {
+        status: 'ok',
+        timestamp: new Date().toISOString(),
+        server: {
+            host,
+            port,
+            primaryUrl: activeController?.url || `http://localhost:${port}`,
+            urls
+        },
+        request: {
+            host: req.get('host') || null,
+            origin: req.get('origin') || null,
+            clientIp: getClientIp(req),
+            protocol: req.protocol
+        },
+        cors: getCorsStatus()
+    };
+}
+
 app.disable('x-powered-by');
-app.use(cors());
+app.use(cors(createCorsOptions()));
 app.use(express.json({ limit: '25mb' }));
 app.use(express.static(frontendPath));
 
@@ -126,6 +228,15 @@ app.get('/api/health', async (req, res, next) => {
     } catch (error) {
         next(error);
     }
+});
+
+app.get('/api/network/status', async (req, res) => {
+    const database = await getDatabaseHealth();
+
+    res.json({
+        ...getNetworkStatusPayload(req),
+        database
+    });
 });
 
 app.get('/api/test', (req, res) => {
@@ -210,6 +321,7 @@ function start(options = {}) {
         });
         console.log('Rotas disponiveis:');
         console.log('- GET  /api/health');
+        console.log('- GET  /api/network/status');
         console.log('- GET  /api/colaboradores');
         console.log('- GET  /api/setores');
         console.log('- GET  /api/ausencias');
@@ -248,6 +360,10 @@ function start(options = {}) {
 
     controller.server.once('error', (error) => {
         activeController = null;
+
+        if (error.code === 'EADDRINUSE') {
+            console.error(`A porta ${runtimeOptions.port} ja esta em uso. Feche o outro servidor ou escolha outra porta.`);
+        }
 
         if (!readySettled) {
             readySettled = true;

@@ -6,7 +6,7 @@ const DEPLOYMENT_MODES = Object.freeze({
     CLIENT: 'client'
 });
 
-const DEFAULT_SERVER_PORT = 3000;
+const DEFAULT_SERVER_PORT = 4450;
 
 function normalizeTrimmedString(value) {
     if (value === undefined || value === null) {
@@ -56,17 +56,23 @@ function normalizeDirectoryPath(value) {
     return path.resolve(normalized);
 }
 
-function normalizeServerUrl(value) {
+function normalizeServerUrl(value, options = {}) {
     const normalized = normalizeTrimmedString(value);
 
     if (!normalized) {
         return '';
     }
 
+    const defaultPort = normalizePort(options.defaultPort, DEFAULT_SERVER_PORT);
     const withProtocol = /^https?:\/\//i.test(normalized)
         ? normalized
         : `http://${normalized}`;
     const parsedUrl = new URL(withProtocol);
+
+    if (!parsedUrl.port) {
+        parsedUrl.port = String(defaultPort);
+    }
+
     const normalizedPath = parsedUrl.pathname.replace(/\/+$/, '');
     const basePath = normalizedPath === '/' || normalizedPath === '/api'
         ? ''

@@ -1,5 +1,7 @@
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
+const { spawnSync } = require('child_process');
 
 const { app, BrowserWindow, Menu, dialog, ipcMain, shell } = require('electron');
 
@@ -8,6 +10,7 @@ const {
     DEPLOYMENT_MODES,
     buildDefaultLocalDataDirectory,
     normalizeLauncherConfig,
+    normalizePort,
     normalizeTrimmedString
 } = require('./launcher-config');
 
@@ -21,11 +24,27 @@ const WINDOW_ICON_PATH = path.join(__dirname, 'assets', 'app-icon.png');
 const PRELOAD_PATH = path.join(__dirname, 'preload.js');
 const SETUP_HTML_PATH = path.join(__dirname, 'setup.html');
 const LAUNCHER_CONFIG_NAME = 'launcher.local.json';
+const BACKGROUND_SERVER_TASK_NAME = 'CentralDeEscalasServidor';
+const BACKGROUND_SERVER_TASK_LABEL = 'Central de Escalas - Servidor';
+
+function hasCliFlag(name) {
+    const normalizedName = String(name || '').replace(/^--?/, '');
+    return process.argv.some((argument) => argument === `--${normalizedName}`);
+}
+
+function getCliValue(name) {
+    const normalizedName = String(name || '').replace(/^--?/, '');
+    const prefix = `--${normalizedName}=`;
+    const argument = process.argv.find((item) => String(item || '').startsWith(prefix));
+    return argument ? argument.slice(prefix.length) : '';
+}
+
+const isBackgroundServerMode = hasCliFlag('background-server') || hasCliFlag('server-only');
 
 app.setName(APP_NAME);
 app.setAppUserModelId(APP_ID);
 
-const hasSingleInstanceLock = app.requestSingleInstanceLock();
+const hasSingleInstanceLock = isBackgroundServerMode || app.requestSingleInstanceLock();
 
 if (!hasSingleInstanceLock) {
     app.quit();
@@ -125,6 +144,203 @@ function buildInstallerOutputDirectory() {
 
 function getDataDirectoryToOpen() {
     return currentDataDirectory || userDataDirectory;
+}
+
+function quoteWindowsArgument(value) {
+    return `"${String(value || '').replace(/"/g, '\\"')}"`;
+}
+
+function runWindowsCommand(command, args) {
+    const result = spawnSync(command, args, {
+        encoding: 'utf8',
+        windowsHide: true
+    });
+
+    return {
+        ok: result.status === 0,
+        status: result.status,
+        stdout: result.stdout || '',
+        stderr: result.stderr || '',
+        error: result.error?.message || ''
+    };
+}
+
+function getBackgroundServerPort() {
+    const cliPort = normalizePort(getCliValue('server-port'), 0);
+
+    if (cliPort) {
+        return cliPort;
+    }
+
+    const configuredPort = normalizePort(currentLauncherConfig?.serverPort || readLauncherConfig()?.serverPort, 0);
+
+    if (configuredPort && configuredPort !== 3000) {
+        return configuredPort;
+    }
+
+    return DEFAULT_SERVER_PORT;
+}
+
+function getBackgroundServerHost() {
+    return normalizeTrimmedString(getCliValue('server-host')) || '0.0.0.0';
+}
+
+function buildBackgroundServerLaunchParts() {
+    const port = getBackgroundServerPort();
+    const host = '0.0.0.0';
+    const serverArgs = [
+        '--background-server',
+        `--server-host=${host}`,
+        `--server-port=${port}`
+    ];
+
+    if (app.isPackaged) {
+        return {
+            executablePath: process.execPath,
+            args: serverArgs,
+            port,
+            host
+        };
+    }
+
+    return {
+        executablePath: process.execPath,
+        args: [app.getAppPath(), ...serverArgs],
+        port,
+        host
+    };
+}
+
+function buildBackgroundServerTaskCommand() {
+    const launchParts = buildBackgroundServerLaunchParts();
+    return [
+        quoteWindowsArgument(launchParts.executablePath),
+        ...launchParts.args.map(quoteWindowsArgument)
+    ].join(' ');
+}
+
+function buildBackgroundServerStatusPayload(extra = {}) {
+    const launchParts = buildBackgroundServerLaunchParts();
+    const machineName = os.hostname();
+
+    return {
+        available: process.platform === 'win32',
+        taskName: BACKGROUND_SERVER_TASK_NAME,
+        label: BACKGROUND_SERVER_TASK_LABEL,
+        installed: false,
+        machineName,
+        port: launchParts.port,
+        host: launchParts.host,
+        recommendedUrl: machineName ? `http://${machineName}:${launchParts.port}` : `http://localhost:${launchParts.port}`,
+        command: buildBackgroundServerTaskCommand(),
+        ...extra
+    };
+}
+
+function queryBackgroundServerTask() {
+    if (process.platform !== 'win32') {
+        return buildBackgroundServerStatusPayload({
+            available: false,
+            message: 'Recurso disponivel apenas no Windows.'
+        });
+    }
+
+    const result = runWindowsCommand('schtasks.exe', [
+        '/Query',
+        '/TN',
+        BACKGROUND_SERVER_TASK_NAME,
+        '/FO',
+        'LIST',
+        '/V'
+    ]);
+
+    return buildBackgroundServerStatusPayload({
+        installed: result.ok,
+        rawStatus: result.stdout,
+        message: result.ok
+            ? 'Servidor em segundo plano configurado.'
+            : 'Servidor em segundo plano ainda nao instalado.'
+    });
+}
+
+function assertBackgroundServerAvailable() {
+    if (process.platform !== 'win32') {
+        throw new Error('O servidor em segundo plano esta disponivel apenas no Windows.');
+    }
+}
+
+function installBackgroundServerTask() {
+    assertBackgroundServerAvailable();
+
+    const command = buildBackgroundServerTaskCommand();
+    const result = runWindowsCommand('schtasks.exe', [
+        '/Create',
+        '/TN',
+        BACKGROUND_SERVER_TASK_NAME,
+        '/TR',
+        command,
+        '/SC',
+        'ONLOGON',
+        '/RL',
+        'LIMITED',
+        '/F'
+    ]);
+
+    if (!result.ok) {
+        throw new Error(result.stderr || result.stdout || result.error || 'Nao foi possivel criar a tarefa em segundo plano.');
+    }
+
+    return queryBackgroundServerTask();
+}
+
+function uninstallBackgroundServerTask() {
+    assertBackgroundServerAvailable();
+    runWindowsCommand('schtasks.exe', ['/End', '/TN', BACKGROUND_SERVER_TASK_NAME]);
+
+    const result = runWindowsCommand('schtasks.exe', [
+        '/Delete',
+        '/TN',
+        BACKGROUND_SERVER_TASK_NAME,
+        '/F'
+    ]);
+
+    if (!result.ok && !/cannot find|nao.*encontr/i.test(`${result.stdout} ${result.stderr}`)) {
+        throw new Error(result.stderr || result.stdout || result.error || 'Nao foi possivel remover a tarefa em segundo plano.');
+    }
+
+    return queryBackgroundServerTask();
+}
+
+function startBackgroundServerTask() {
+    assertBackgroundServerAvailable();
+
+    const result = runWindowsCommand('schtasks.exe', [
+        '/Run',
+        '/TN',
+        BACKGROUND_SERVER_TASK_NAME
+    ]);
+
+    if (!result.ok) {
+        throw new Error(result.stderr || result.stdout || result.error || 'Nao foi possivel iniciar a tarefa em segundo plano.');
+    }
+
+    return queryBackgroundServerTask();
+}
+
+function stopBackgroundServerTask() {
+    assertBackgroundServerAvailable();
+
+    const result = runWindowsCommand('schtasks.exe', [
+        '/End',
+        '/TN',
+        BACKGROUND_SERVER_TASK_NAME
+    ]);
+
+    if (!result.ok && !/not currently running|nao.*exec/i.test(`${result.stdout} ${result.stderr}`)) {
+        throw new Error(result.stderr || result.stdout || result.error || 'Nao foi possivel parar a tarefa em segundo plano.');
+    }
+
+    return queryBackgroundServerTask();
 }
 
 function focusMainWindow() {
@@ -423,6 +639,7 @@ async function createSplashWindow(payload) {
         title: APP_NAME,
         icon: fs.existsSync(WINDOW_ICON_PATH) ? WINDOW_ICON_PATH : undefined,
         webPreferences: {
+            preload: PRELOAD_PATH,
             contextIsolation: true,
             nodeIntegration: false
         }
@@ -620,6 +837,37 @@ async function resolveLaunchTarget(launcherConfig, launchNotice) {
     };
 }
 
+async function startBackgroundServerOnly() {
+    currentLauncherConfig = readLauncherConfig() || normalizeLauncherConfig({
+        mode: DEPLOYMENT_MODES.SERVER,
+        dataDirectory: buildDefaultLocalDataDirectory(),
+        serverPort: getBackgroundServerPort()
+    }, {
+        allowIncomplete: true,
+        defaultLocalDataDirectory: buildDefaultLocalDataDirectory()
+    });
+
+    const dataDirectory = currentLauncherConfig.dataDirectory || buildDefaultLocalDataDirectory();
+    fs.mkdirSync(dataDirectory, { recursive: true });
+    process.env.APP_DE_ESCALAS_DATA_DIR = dataDirectory;
+    currentDataDirectory = dataDirectory;
+
+    const { start } = require('../backend/server');
+
+    serverController = start({
+        host: getBackgroundServerHost(),
+        port: getBackgroundServerPort(),
+        installSignalHandlers: false,
+        logNetworkUrls: true
+    });
+
+    currentServerInfo = await serverController.ready;
+    currentLaunchTargetUrl = currentServerInfo.url;
+
+    console.log(`${BACKGROUND_SERVER_TASK_LABEL} iniciado em segundo plano.`);
+    console.log(`Endereco recomendado para clientes: http://${os.hostname()}:${currentServerInfo.port}`);
+}
+
 function createMainWindow(targetUrl) {
     mainWindow = new BrowserWindow({
         width: 1440,
@@ -774,6 +1022,26 @@ ipcMain.handle('desktop-setup:save', async (_event, payload) => {
     return { success: true };
 });
 
+ipcMain.handle('background-server:status', async () => {
+    return queryBackgroundServerTask();
+});
+
+ipcMain.handle('background-server:install', async () => {
+    return installBackgroundServerTask();
+});
+
+ipcMain.handle('background-server:uninstall', async () => {
+    return uninstallBackgroundServerTask();
+});
+
+ipcMain.handle('background-server:start', async () => {
+    return startBackgroundServerTask();
+});
+
+ipcMain.handle('background-server:stop', async () => {
+    return stopBackgroundServerTask();
+});
+
 if (hasSingleInstanceLock) {
     app.on('second-instance', () => {
         focusMainWindow();
@@ -781,6 +1049,18 @@ if (hasSingleInstanceLock) {
 }
 
 app.whenReady().then(async () => {
+    if (isBackgroundServerMode) {
+        try {
+            await startBackgroundServerOnly();
+        } catch (error) {
+            console.error('Falha ao iniciar o servidor em segundo plano.');
+            console.error(error);
+            app.exit(1);
+        }
+
+        return;
+    }
+
     createApplicationMenu();
 
     try {
@@ -843,6 +1123,10 @@ app.on('activate', () => {
 });
 
 app.on('window-all-closed', () => {
+    if (isBackgroundServerMode) {
+        return;
+    }
+
     if (process.platform !== 'darwin') {
         app.quit();
     }

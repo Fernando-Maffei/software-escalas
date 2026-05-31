@@ -25,7 +25,7 @@ Sistema para gestao de escalas de trabalho, colaboradores, ausencias e plantoes.
 2. Abra a pasta do projeto
 3. Rode `npm install`
 4. Rode `npm start`
-5. Acesse `http://localhost:3000`
+5. Acesse `http://localhost:4450`
 
 ## Como abrir no modo desktop durante o desenvolvimento
 
@@ -96,7 +96,7 @@ Se a ideia for subir o sistema da forma mais simples possivel em outro computado
 2. Copie a pasta do projeto para a outra maquina
 3. Dê duplo clique em `iniciar-servidor.bat`
 4. Na primeira execucao o script instala as dependencias automaticamente
-5. Depois disso ele sobe o servidor e abre o navegador em `http://localhost:3000`
+5. Depois disso ele sobe o servidor e abre o navegador em `http://localhost:4450`
 
 Observacoes:
 

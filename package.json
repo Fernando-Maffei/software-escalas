@@ -1,6 +1,6 @@
 {
   "name": "app-de-escalas",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "Sistema desktop e web para gestao de escalas de trabalho.",
   "productName": "App de Escalas",
   "main": "electron/main.js",

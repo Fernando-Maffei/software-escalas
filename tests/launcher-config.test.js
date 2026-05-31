@@ -1,6 +1,7 @@
 const assert = require('node:assert/strict');
 
 const {
+    DEFAULT_SERVER_PORT,
     DEPLOYMENT_MODES,
     buildDefaultLocalDataDirectory,
     normalizeLauncherConfig,
@@ -12,6 +13,12 @@ module.exports = [
         name: 'normalizeServerUrl adds http protocol when only the host is informed',
         run() {
             assert.equal(normalizeServerUrl('192.168.0.15:3000'), 'http://192.168.0.15:3000');
+        }
+    },
+    {
+        name: 'normalizeServerUrl uses the default server port when only machine name is informed',
+        run() {
+            assert.equal(normalizeServerUrl('CENTRAL-ESCALAS'), `http://central-escalas:${DEFAULT_SERVER_PORT}`);
         }
     },
     {

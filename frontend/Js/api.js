@@ -1,15 +1,67 @@
+const LEGACY_API_URL_PATTERN = /^http:\/\/(?:localhost|127\.0\.0\.1):3000\/api(?=\/|$|\?)/i;
+
+function getRuntimeApiBaseUrl() {
+    if (window.__API_BASE_URL) {
+        const explicitBase = String(window.__API_BASE_URL).replace(/\/$/, '');
+        return explicitBase.endsWith('/api') ? explicitBase : `${explicitBase}/api`;
+    }
+
+    const origin = window.location.origin && window.location.origin !== 'null'
+        ? window.location.origin
+        : 'http://localhost:4450';
+
+    return `${origin.replace(/\/$/, '')}/api`;
+}
+
+function normalizeApiUrl(input) {
+    if (typeof input !== 'string') {
+        return input;
+    }
+
+    return input.replace(LEGACY_API_URL_PATTERN, getRuntimeApiBaseUrl());
+}
+
+function normalizeFetchInput(input) {
+    if (typeof input === 'string') {
+        return normalizeApiUrl(input);
+    }
+
+    if (typeof URL !== 'undefined' && input instanceof URL) {
+        const normalized = normalizeApiUrl(input.href);
+        return normalized === input.href ? input : new URL(normalized);
+    }
+
+    if (typeof Request !== 'undefined' && input instanceof Request) {
+        const normalized = normalizeApiUrl(input.url);
+        return normalized === input.url ? input : new Request(normalized, input);
+    }
+
+    return input;
+}
+
+function installApiFetchNormalizer() {
+    if (window.__API_FETCH_NORMALIZER_INSTALLED__ || typeof window.fetch !== 'function') {
+        return;
+    }
+
+    const nativeFetch = window.fetch.bind(window);
+
+    window.fetch = function fetchWithDynamicApiHost(input, init) {
+        return nativeFetch(normalizeFetchInput(input), init);
+    };
+
+    window.__API_FETCH_NORMALIZER_INSTALLED__ = true;
+    window.normalizeLegacyApiUrl = normalizeApiUrl;
+}
+
+installApiFetchNormalizer();
+
 const API = {
     get baseURL() {
-        if (window.__API_BASE_URL) {
-            return window.__API_BASE_URL;
-        }
-
-        const origin = window.location.origin && window.location.origin !== 'null'
-            ? window.location.origin
-            : 'http://localhost:3000';
-
-        return `${origin.replace(/\/$/, '')}/api`;
+        return getRuntimeApiBaseUrl();
     },
+
+    normalizeUrl: normalizeApiUrl,
 
     toQuery(params = {}) {
         const searchParams = new URLSearchParams();
@@ -86,6 +138,7 @@ const API = {
     },
 
     health: () => API.get('/health'),
+    getNetworkStatus: () => API.get('/network/status'),
 
     getColaboradores: (params = {}) => API.get('/colaboradores', params),
     getSetores: (params = {}) => API.get('/setores', params),

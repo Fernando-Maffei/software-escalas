@@ -306,8 +306,8 @@
       <div class="field-grid hidden" id="serverPortField">
         <div class="field">
           <label for="serverPort">Porta do servidor</label>
-          <input type="number" id="serverPort" min="1" max="65535" step="1" placeholder="3000">
-          <span class="helper">Use a mesma porta em todas as maquinas clientes. O padrao recomendado e 3000.</span>
+          <input type="number" id="serverPort" min="1" max="65535" step="1" placeholder="4450">
+          <span class="helper">Use a mesma porta em todas as maquinas clientes. O padrao recomendado e 4450.</span>
         </div>
       </div>
     </section>
@@ -315,14 +315,14 @@
     <section class="panel hidden" id="clientPanel">
       <h2>Conexao com a maquina servidora</h2>
       <p class="panel-copy">
-        Informe o endereco da maquina que vai hospedar o sistema. Exemplo: <strong>http://192.168.0.10:3000</strong>. Se a outra maquina estiver na mesma rede, os dois computadores usam o mesmo servidor.
+        Informe o endereco da maquina que vai hospedar o sistema. Exemplo: <strong>http://CENTRAL-ESCALAS:4450</strong>. Se a outra maquina estiver na mesma rede, os dois computadores usam o mesmo servidor.
       </p>
 
       <div class="field-grid">
         <div class="field">
           <label for="serverUrl">Endereco do servidor</label>
-          <input type="text" id="serverUrl" placeholder="http://192.168.0.10:3000">
-          <span class="helper">Voce pode informar IP, nome da maquina ou URL completa. O aplicativo normaliza isso automaticamente.</span>
+          <input type="text" id="serverUrl" placeholder="http://CENTRAL-ESCALAS:4450">
+          <span class="helper">Voce pode informar o nome da maquina, IP ou URL completa. Se informar apenas o nome, o aplicativo usa a porta 4450 automaticamente.</span>
         </div>
       </div>
     </section>
@@ -388,7 +388,7 @@
       }
 
       dataDirectoryInput.value = state.config.dataDirectory || context.defaultLocalDataDirectory || '';
-      serverPortInput.value = String(state.config.serverPort || 3000);
+      serverPortInput.value = String(state.config.serverPort || 4450);
       serverUrlInput.value = state.config.serverUrl || '';
       document.getElementById('eyebrow').textContent = `App de Escalas v${context.appVersion}`;
       closeBtn.textContent = state.isFirstRun ? 'Cancelar' : 'Fechar';

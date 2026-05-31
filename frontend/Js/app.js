@@ -123,7 +123,7 @@ function getApiBaseUrl() {
 
     const origin = window.location.origin && window.location.origin !== 'null'
         ? window.location.origin
-        : 'http://localhost:3000';
+        : 'http://localhost:4450';
 
     return `${origin.replace(/\/$/, '')}/api`;
 }
@@ -396,14 +396,280 @@ function inicializarSecoesConfiguracoes() {
     ativarSecaoConfiguracoes(getSecaoConfiguracoesAtual());
 }
 
-const nativeFetch = window.fetch.bind(window);
-window.fetch = function fetchWithDynamicApiHost(input, init) {
-    if (typeof input === 'string') {
-        return nativeFetch(normalizeLegacyApiUrl(input), init);
+function escapeNetworkText(value) {
+    return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
+function definirStatusComunicacaoRede(variant, message, detail = '') {
+    const card = document.getElementById('configNetworkStatus');
+    const badge = document.getElementById('configNetworkStatusBadge');
+    const text = document.getElementById('configNetworkStatusTexto');
+    const detailNode = document.getElementById('configNetworkStatusDetalhe');
+
+    if (!card || !badge || !text || !detailNode) {
+        return;
     }
 
-    return nativeFetch(input, init);
-};
+    card.className = `config-status-card is-${variant}`;
+    badge.textContent = variant === 'success'
+        ? 'Online'
+        : variant === 'error'
+            ? 'Falha'
+            : variant === 'loading'
+                ? 'Testando'
+                : 'Aguardando';
+    text.textContent = message;
+    detailNode.textContent = detail;
+}
+
+function renderizarUrlsComunicacaoRede(payload = {}) {
+    const list = document.getElementById('configNetworkUrls');
+
+    if (!list) {
+        return;
+    }
+
+    const urls = Array.isArray(payload.server?.urls)
+        ? payload.server.urls
+        : [window.location.origin].filter(Boolean);
+
+    list.innerHTML = urls.map((url) => `
+        <div class="network-url-item">
+            <i class="fas fa-link"></i>
+            <code>${escapeNetworkText(url)}</code>
+        </div>
+    `).join('');
+}
+
+async function testarComunicacaoRede(options = {}) {
+    const startedAt = performance.now();
+
+    definirStatusComunicacaoRede(
+        'loading',
+        'Testando comunicacao com o servidor...',
+        `Base atual da API: ${window.API?.baseURL || getApiBaseUrl()}`
+    );
+
+    try {
+        const payload = await window.API.getNetworkStatus();
+        const latency = Math.max(1, Math.round(performance.now() - startedAt));
+        const dbStatus = payload.database?.status === 'connected'
+            ? 'banco conectado'
+            : 'banco indisponivel';
+        const corsText = payload.cors?.mode === 'restricted'
+            ? 'CORS restrito por configuracao'
+            : 'CORS aberto para compatibilidade local';
+
+        renderizarUrlsComunicacaoRede(payload);
+        definirStatusComunicacaoRede(
+            'success',
+            `Servidor respondeu em ${latency} ms; ${dbStatus}.`,
+            `${corsText}. Cliente detectado: ${payload.request?.clientIp || 'nao informado'}.`
+        );
+
+        if (options.showToast !== false) {
+            mostrarToast('Comunicacao com o servidor validada.', 'success');
+        }
+
+        return payload;
+    } catch (error) {
+        definirStatusComunicacaoRede(
+            'error',
+            'Nao foi possivel comunicar com o servidor.',
+            error.message || 'Confira se o servidor esta aberto e se o notebook esta na mesma rede.'
+        );
+
+        if (options.showToast !== false) {
+            mostrarToast('Falha ao testar comunicacao com o servidor.', 'error');
+        }
+
+        return null;
+    }
+}
+
+function inicializarDiagnosticoRede() {
+    const testarBtn = document.getElementById('testarComunicacaoRedeBtn');
+    const copiarBtn = document.getElementById('copiarUrlRedeBtn');
+
+    testarBtn?.addEventListener('click', () => testarComunicacaoRede());
+    copiarBtn?.addEventListener('click', async () => {
+        const url = window.location.origin && window.location.origin !== 'null'
+            ? window.location.origin
+            : (window.API?.baseURL || getApiBaseUrl()).replace(/\/api$/, '');
+
+        try {
+            if (!navigator.clipboard?.writeText) {
+                throw new Error('Clipboard indisponivel');
+            }
+
+            await navigator.clipboard.writeText(url);
+            mostrarToast('URL copiada para testar no notebook.', 'success');
+        } catch (error) {
+            mostrarToast(`URL para teste: ${url}`, 'info');
+        }
+    });
+
+    renderizarUrlsComunicacaoRede({
+        server: {
+            urls: [window.location.origin].filter(Boolean)
+        }
+    });
+
+    testarComunicacaoRede({ showToast: false });
+}
+
+function definirStatusServidorSegundoPlano(variant, message, detail = '') {
+    const card = document.getElementById('backgroundServerStatus');
+    const badge = document.getElementById('backgroundServerStatusBadge');
+    const text = document.getElementById('backgroundServerStatusTexto');
+    const detailNode = document.getElementById('backgroundServerStatusDetalhe');
+
+    if (!card || !badge || !text || !detailNode) {
+        return;
+    }
+
+    card.className = `config-status-card is-${variant}`;
+    badge.textContent = variant === 'success'
+        ? 'Configurado'
+        : variant === 'error'
+            ? 'Falha'
+            : variant === 'loading'
+                ? 'Processando'
+                : 'Pendente';
+    text.textContent = message;
+    detailNode.textContent = detail;
+}
+
+function renderizarServidorSegundoPlanoStatus(status = {}) {
+    const panel = document.getElementById('backgroundServerPanel');
+    const urlNode = document.getElementById('backgroundServerRecommendedUrl');
+    const commandNode = document.getElementById('backgroundServerCommand');
+
+    if (!panel) {
+        return;
+    }
+
+    if (!window.desktopBackgroundServer || status.available === false) {
+        panel.classList.add('is-hidden');
+        return;
+    }
+
+    panel.classList.remove('is-hidden');
+
+    if (urlNode) {
+        urlNode.textContent = status.recommendedUrl || '';
+    }
+
+    if (commandNode) {
+        commandNode.textContent = status.command || '';
+    }
+
+    if (status.installed) {
+        definirStatusServidorSegundoPlano(
+            'success',
+            'Servidor em segundo plano configurado para iniciar com o Windows.',
+            `Nome da maquina: ${status.machineName || 'nao informado'}; porta: ${status.port || '4450'}.`
+        );
+        return;
+    }
+
+    definirStatusServidorSegundoPlano(
+        'neutral',
+        'Servidor em segundo plano ainda nao configurado.',
+        'Instale a inicializacao automatica nesta maquina servidora para os clientes acessarem sem abrir a tela.'
+    );
+}
+
+async function carregarServidorSegundoPlanoStatus() {
+    if (!window.desktopBackgroundServer) {
+        renderizarServidorSegundoPlanoStatus({ available: false });
+        return null;
+    }
+
+    try {
+        const status = await window.desktopBackgroundServer.status();
+        renderizarServidorSegundoPlanoStatus(status);
+        return status;
+    } catch (error) {
+        definirStatusServidorSegundoPlano(
+            'error',
+            'Nao foi possivel consultar a inicializacao em segundo plano.',
+            error.message || ''
+        );
+        return null;
+    }
+}
+
+async function executarAcaoServidorSegundoPlano(action) {
+    if (!window.desktopBackgroundServer?.[action]) {
+        mostrarToast('Recurso disponivel apenas no aplicativo desktop.', 'warning');
+        return;
+    }
+
+    const labels = {
+        install: 'Instalando inicializacao em segundo plano...',
+        start: 'Iniciando servidor em segundo plano...',
+        stop: 'Parando servidor em segundo plano...',
+        uninstall: 'Removendo inicializacao em segundo plano...'
+    };
+
+    definirStatusServidorSegundoPlano('loading', labels[action] || 'Processando...', '');
+
+    try {
+        const status = await window.desktopBackgroundServer[action]();
+        renderizarServidorSegundoPlanoStatus(status);
+        mostrarToast('Acao concluida.', 'success');
+    } catch (error) {
+        definirStatusServidorSegundoPlano(
+            'error',
+            'Nao foi possivel executar a acao solicitada.',
+            error.message || ''
+        );
+        mostrarToast(error.message || 'Erro ao configurar servidor em segundo plano.', 'error');
+    }
+}
+
+function inicializarServidorSegundoPlano() {
+    const panel = document.getElementById('backgroundServerPanel');
+
+    if (!panel) {
+        return;
+    }
+
+    if (!window.desktopBackgroundServer) {
+        panel.classList.add('is-hidden');
+        return;
+    }
+
+    document.getElementById('instalarServidorSegundoPlanoBtn')?.addEventListener('click', () => executarAcaoServidorSegundoPlano('install'));
+    document.getElementById('iniciarServidorSegundoPlanoBtn')?.addEventListener('click', () => executarAcaoServidorSegundoPlano('start'));
+    document.getElementById('pararServidorSegundoPlanoBtn')?.addEventListener('click', () => executarAcaoServidorSegundoPlano('stop'));
+    document.getElementById('removerServidorSegundoPlanoBtn')?.addEventListener('click', () => executarAcaoServidorSegundoPlano('uninstall'));
+
+    carregarServidorSegundoPlanoStatus();
+}
+
+window.testarComunicacaoRede = testarComunicacaoRede;
+
+if (!window.__API_FETCH_NORMALIZER_INSTALLED__ && typeof window.fetch === 'function') {
+    const nativeFetch = window.fetch.bind(window);
+
+    window.fetch = function fetchWithDynamicApiHost(input, init) {
+        if (typeof input === 'string') {
+            return nativeFetch(normalizeLegacyApiUrl(input), init);
+        }
+
+        return nativeFetch(input, init);
+    };
+
+    window.__API_FETCH_NORMALIZER_INSTALLED__ = true;
+    window.normalizeLegacyApiUrl = normalizeLegacyApiUrl;
+}
 
 function inicializarAplicacaoUmaVez() {
     if (window.__appBootstrapPromise) {
@@ -3848,6 +4114,96 @@ function renderConfiguracoes() {
                 </div>
             </div>
 
+            <div class="config-card config-network-card" data-config-section="ferramentas">
+                <div class="config-card-header">
+                    <i class="fas fa-network-wired"></i>
+                    <h2>Comunicacao em Rede</h2>
+                </div>
+
+                <div class="config-card-body">
+                    <p class="config-description">
+                        Use este teste para validar se esta maquina esta comunicando com o servidor que atende os outros dispositivos.
+                    </p>
+
+                    <div id="configNetworkStatus" class="config-status-card is-neutral">
+                        <div class="config-status-header">
+                            <strong>Status da comunicacao</strong>
+                            <span id="configNetworkStatusBadge" class="config-status-badge">Aguardando</span>
+                        </div>
+                        <p id="configNetworkStatusTexto">Clique em testar para validar a API.</p>
+                        <small id="configNetworkStatusDetalhe" class="config-status-detail">
+                            Base atual da API: ${escapeNetworkText(window.API?.baseURL || getApiBaseUrl())}
+                        </small>
+                    </div>
+
+                    <div class="network-url-panel">
+                        <strong>Enderecos para testar no notebook</strong>
+                        <div id="configNetworkUrls" class="network-url-list"></div>
+                    </div>
+
+                    <div class="background-server-panel is-hidden" id="backgroundServerPanel">
+                        <div id="backgroundServerStatus" class="config-status-card is-neutral">
+                            <div class="config-status-header">
+                                <strong>Servidor em segundo plano</strong>
+                                <span id="backgroundServerStatusBadge" class="config-status-badge">Pendente</span>
+                            </div>
+                            <p id="backgroundServerStatusTexto">Consultando configuracao do Windows...</p>
+                            <small id="backgroundServerStatusDetalhe" class="config-status-detail"></small>
+                        </div>
+
+                        <div class="network-url-panel">
+                            <strong>Endereco recomendado para clientes</strong>
+                            <div class="network-url-item">
+                                <i class="fas fa-desktop"></i>
+                                <code id="backgroundServerRecommendedUrl"></code>
+                            </div>
+                            <small class="helper-text">
+                                Use esse endereco no notebook cliente. Ele usa o nome da maquina em vez do IP.
+                            </small>
+                        </div>
+
+                        <details class="background-server-details">
+                            <summary>Detalhes tecnicos da inicializacao</summary>
+                            <code id="backgroundServerCommand"></code>
+                        </details>
+
+                        <div class="config-actions-row">
+                            <button class="config-btn" id="instalarServidorSegundoPlanoBtn" type="button">
+                                <i class="fas fa-toggle-on"></i>
+                                Instalar inicio automatico
+                            </button>
+
+                            <button class="config-btn" id="iniciarServidorSegundoPlanoBtn" type="button">
+                                <i class="fas fa-play"></i>
+                                Iniciar agora
+                            </button>
+
+                            <button class="config-btn" id="pararServidorSegundoPlanoBtn" type="button">
+                                <i class="fas fa-stop"></i>
+                                Parar
+                            </button>
+
+                            <button class="config-btn config-btn-danger" id="removerServidorSegundoPlanoBtn" type="button">
+                                <i class="fas fa-trash-alt"></i>
+                                Remover inicio automatico
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="config-actions-row">
+                        <button class="config-btn" id="testarComunicacaoRedeBtn" type="button">
+                            <i class="fas fa-signal"></i>
+                            Testar Comunicacao
+                        </button>
+
+                        <button class="config-btn" id="copiarUrlRedeBtn" type="button">
+                            <i class="fas fa-copy"></i>
+                            Copiar URL atual
+                        </button>
+                    </div>
+                </div>
+            </div>
+
             <div class="config-card config-card-tools" data-config-section="ferramentas">
                 <div class="config-card-header">
                     <i class="fas fa-tools"></i>
@@ -3909,6 +4265,9 @@ function renderConfiguracoes() {
     if (typeof window.inicializarBackupSistemaTela === 'function') {
         window.inicializarBackupSistemaTela();
     }
+
+    inicializarDiagnosticoRede();
+    inicializarServidorSegundoPlano();
 }
 
 // Função para mudar o tema
