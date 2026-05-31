@@ -86,6 +86,8 @@ Sugestao simples de versionamento:
 - `1.1.0` para nova funcionalidade
 - `2.0.0` para mudanca grande ou quebra de fluxo
 
+Versao atual: `1.2.0`. O historico de alteracoes fica em `CHANGELOG.md`.
+
 ## Como iniciar em outra maquina
 
 Se a ideia for subir o sistema da forma mais simples possivel em outro computador:

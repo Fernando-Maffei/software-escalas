@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Central de Escalas</title>
   <link rel="icon" type="image/png" href="assets/branding/central-escalas-logo.png">
-  <link rel="stylesheet" href="style.css?v=20260501i">
+  <link rel="stylesheet" href="style.css?v=20260531b">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
@@ -13,10 +13,8 @@
 </head>
 <body>
 
-<!-- Toast Container - DEVE ESTAR ANTES DO CONTEÚDO -->
 <div id="toastContainer" style="position: fixed; bottom: 20px; right: 20px; z-index: 9999;"></div>
 
-<!-- CONTEÚDO PRINCIPAL - DEVE ESTAR ANTES DOS SCRIPTS -->
 <div class="container">
     <aside class="sidebar" id="mainSidebar">
       <div class="sidebar-header">
@@ -28,6 +26,9 @@
           <span class="sidebar-subtitle">Painel operacional</span>
         </div>
       </div>
+      <button id="toggleMainSidebar" class="sidebar-main-toggle" type="button" title="Recolher menu">
+        <i class="fas fa-bars"></i>
+        </button>
 
       <button class="sidebar-btn" data-page="dashboard">
         <div class="btn-content">
@@ -99,7 +100,7 @@
       
       <div class="version-badge">
         <i class="fas fa-code-branch"></i>
-        <span>v1.1.0 BETA</span>
+        <span>v1.2.0</span>
       </div>
     </aside>
 
@@ -322,7 +323,6 @@
 </div>
 
 <!-- MODAL DE CONFIRMAÇÃO -->
-<!-- MODAL DE CONFIRMAÇÃO -->
 <div id="modalConfirmacao" class="modal hidden">
     <div class="modal-content">
         <div class="modal-header">
@@ -390,14 +390,13 @@
     </div>
 </div>
 
-<!-- SCRIPTS - DEVEM VIR POR ÚLTIMO -->
 <script src="Js/api.js"></script>
 <script src="Js/calendar.js"></script>
 <script src="Js/dashboard.js"></script>
 <script src="Js/app.js?v=20260501j"></script>
 <script src="Js/lancamentos.js?v=20260501j"></script>
-<script src="Js/escala-report-utils.js?v=20260427h"></script>
-<script src="Js/runtime-fixes.js?v=20260501j"></script>
+<script src="Js/escala-report-utils.js?v=20260531b"></script>
+<script src="Js/runtime-fixes.js?v=20260531f"></script>
 <script src="https://unpkg.com/lucide@latest"></script>
 
 <script>
@@ -456,6 +455,52 @@
             };
         });
     })();
+</script>
+
+<script>
+  (function () {
+    document.addEventListener('DOMContentLoaded', function () {
+      const toggleBtn = document.getElementById('toggleMainSidebar');
+
+      if (!toggleBtn) return;
+
+      document.body.classList.add('sidebar-no-transition');
+
+      const estadoSalvo = localStorage.getItem('mainSidebarCollapsed');
+
+      if (estadoSalvo === 'true') {
+        document.body.classList.add('main-sidebar-collapsed');
+        toggleBtn.title = 'Expandir menu';
+      } else {
+        document.body.classList.remove('main-sidebar-collapsed');
+        toggleBtn.title = 'Recolher menu';
+      }
+
+      setTimeout(function () {
+        document.body.classList.remove('sidebar-no-transition');
+      }, 100);
+
+      toggleBtn.addEventListener('click', function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+
+        document.body.classList.add('sidebar-is-animating');
+
+        const vaiRecolher = !document.body.classList.contains('main-sidebar-collapsed');
+
+        document.body.classList.toggle('main-sidebar-collapsed', vaiRecolher);
+
+        localStorage.setItem('mainSidebarCollapsed', vaiRecolher ? 'true' : 'false');
+
+        toggleBtn.title = vaiRecolher ? 'Expandir menu' : 'Recolher menu';
+
+        setTimeout(function () {
+          document.body.classList.remove('sidebar-is-animating');
+          window.dispatchEvent(new Event('resize'));
+        }, 340);
+      });
+    });
+  })();
 </script>
 
 </body>

@@ -1,5 +1,6 @@
 let ausencias = [];
 let colaboradores = [];
+let setores = [];
 let editandoId = null;
 let editandoAusenciaId = null;
 let plantoesLancados = [];
@@ -18,6 +19,7 @@ window.atualizarTudo = atualizarTudo;
 window.testarAtualizacao = testarAtualizacao;
 window.ausencias = ausencias;
 window.colaboradores = colaboradores;
+window.setores = setores;
 window.feriadosLocais = feriadosLocais;
 window.editarFeriado = editarFeriado;
 window.excluirFeriado = excluirFeriado;
@@ -25,6 +27,77 @@ window.gerarRelatorioCompleto = gerarRelatorioCompleto;
 window.toggleCamposHora = toggleCamposHora;
 window.mostrarDetalhesHora = mostrarDetalhesHora;
 window.corrigirDataISO = corrigirDataISO;
+window.carregarSetores = carregarSetores;
+
+const ESCALA_CORES_STORAGE_KEY = 'escalaCoresPersonalizadas';
+const ESCALA_CORES_PADRAO = [
+    {
+        key: 'trabalhando',
+        label: 'Trabalhando',
+        description: 'Faixa de trabalho normal',
+        icon: 'briefcase',
+        color: '#818cf8',
+        cssVar: '--escala-status-trabalhando',
+        strongVar: '--escala-status-trabalhando-strong'
+    },
+    {
+        key: 'almoco',
+        label: 'Almoco',
+        description: 'Intervalo de almoco',
+        icon: 'utensils',
+        color: '#f59e0b',
+        cssVar: '--escala-status-almoco',
+        strongVar: '--escala-status-almoco-strong'
+    },
+    {
+        key: 'folga',
+        label: 'Folga',
+        description: 'Dia de folga',
+        icon: 'bed',
+        color: '#94a3b8',
+        cssVar: '--escala-status-folga',
+        strongVar: '--escala-status-folga-strong'
+    },
+    {
+        key: 'ferias',
+        label: 'Ferias',
+        description: 'Periodo de ferias',
+        icon: 'umbrella-beach',
+        color: '#2563eb',
+        cssVar: '--escala-status-ferias',
+        strongVar: '--escala-status-ferias-strong'
+    },
+    {
+        key: 'ausencia',
+        label: 'Ausencia',
+        description: 'Ausencia integral',
+        icon: 'user-slash',
+        color: '#ef4444',
+        cssVar: '--escala-status-ausencia',
+        strongVar: '--escala-status-ausencia-strong'
+    },
+    {
+        key: 'ausenciaParcial',
+        label: 'Ausencia parcial',
+        description: 'Bloqueio por horas',
+        icon: 'clock',
+        color: '#b83b64',
+        cssVar: '--escala-status-ausencia-parcial',
+        strongVar: '--escala-status-ausencia-parcial-strong'
+    },
+    {
+        key: 'fora',
+        label: 'Fora',
+        description: 'Fora do horario',
+        icon: 'ban',
+        color: '#94a3b8',
+        cssVar: '--escala-status-fora',
+        strongVar: '--escala-status-fora-strong'
+    }
+];
+
+window.ESCALA_CORES_PADRAO = ESCALA_CORES_PADRAO;
+window.aplicarCoresEscala = aplicarCoresEscala;
 
 
 
@@ -78,6 +151,249 @@ function normalizeLegacyApiUrl(url) {
 
     const suffix = url.slice('http://localhost:3000/api'.length);
     return suffix ? `${getApiBaseUrl()}${suffix}` : getApiBaseUrl();
+}
+
+function normalizarCorHex(value, fallback = '#818cf8') {
+    const raw = String(value || '').trim();
+
+    if (/^#[0-9a-fA-F]{6}$/.test(raw)) {
+        return raw.toLowerCase();
+    }
+
+    if (/^#[0-9a-fA-F]{3}$/.test(raw)) {
+        return `#${raw.slice(1).split('').map((char) => char + char).join('')}`.toLowerCase();
+    }
+
+    return fallback;
+}
+
+function ajustarCorHex(hex, percent = -18) {
+    const normalized = normalizarCorHex(hex);
+    const value = normalized.replace('#', '');
+    const channels = [0, 2, 4].map((index) => parseInt(value.slice(index, index + 2), 16));
+    const adjusted = channels.map((channel) => {
+        const next = percent < 0
+            ? channel + ((channel * percent) / 100)
+            : channel + (((255 - channel) * percent) / 100);
+
+        return Math.max(0, Math.min(255, Math.round(next)));
+    });
+
+    return `#${adjusted.map((channel) => channel.toString(16).padStart(2, '0')).join('')}`;
+}
+
+function getCoresEscalaPadrao() {
+    return ESCALA_CORES_PADRAO.reduce((acc, item) => {
+        acc[item.key] = item.color;
+        return acc;
+    }, {});
+}
+
+function carregarCoresEscala() {
+    let salvas = {};
+
+    try {
+        salvas = JSON.parse(localStorage.getItem(ESCALA_CORES_STORAGE_KEY) || '{}') || {};
+    } catch (error) {
+        salvas = {};
+    }
+
+    return ESCALA_CORES_PADRAO.reduce((acc, item) => {
+        acc[item.key] = normalizarCorHex(salvas[item.key], item.color);
+        return acc;
+    }, {});
+}
+
+function aplicarCoresEscala(cores = carregarCoresEscala()) {
+    const root = document.documentElement;
+
+    ESCALA_CORES_PADRAO.forEach((item) => {
+        const color = normalizarCorHex(cores[item.key], item.color);
+        root.style.setProperty(item.cssVar, color);
+
+        if (item.strongVar) {
+            root.style.setProperty(item.strongVar, ajustarCorHex(color, -18));
+        }
+    });
+}
+
+function gerarConfiguracaoCoresEscalaHtml() {
+    const cores = carregarCoresEscala();
+
+    return ESCALA_CORES_PADRAO.map((item) => `
+        <label class="escala-color-option" for="escalaCor_${item.key}">
+            <span class="escala-color-icon" style="--escala-color-preview: ${cores[item.key]};">
+                <i class="fas fa-${item.icon}"></i>
+            </span>
+            <span class="escala-color-text">
+                <strong>${item.label}</strong>
+                <small>${item.description}</small>
+            </span>
+            <input
+                type="color"
+                id="escalaCor_${item.key}"
+                class="escala-color-input"
+                value="${cores[item.key]}"
+                data-escala-color-key="${item.key}"
+                aria-label="Cor de ${item.label}"
+            >
+        </label>
+    `).join('');
+}
+
+function atualizarInputsCoresEscala(cores = carregarCoresEscala()) {
+    ESCALA_CORES_PADRAO.forEach((item) => {
+        const input = document.getElementById(`escalaCor_${item.key}`);
+        const preview = input?.closest('.escala-color-option')?.querySelector('.escala-color-icon');
+        const color = normalizarCorHex(cores[item.key], item.color);
+
+        if (input) {
+            input.value = color;
+        }
+
+        if (preview) {
+            preview.style.setProperty('--escala-color-preview', color);
+        }
+    });
+}
+
+function salvarCoresEscala() {
+    const cores = {};
+
+    ESCALA_CORES_PADRAO.forEach((item) => {
+        const input = document.getElementById(`escalaCor_${item.key}`);
+        cores[item.key] = normalizarCorHex(input?.value, item.color);
+    });
+
+    localStorage.setItem(ESCALA_CORES_STORAGE_KEY, JSON.stringify(cores));
+    aplicarCoresEscala(cores);
+    atualizarInputsCoresEscala(cores);
+    mostrarToast('Cores da escala salvas!', 'success');
+}
+
+function resetarCoresEscala() {
+    localStorage.removeItem(ESCALA_CORES_STORAGE_KEY);
+    const coresPadrao = getCoresEscalaPadrao();
+
+    aplicarCoresEscala(coresPadrao);
+    atualizarInputsCoresEscala(coresPadrao);
+    mostrarToast('Cores padrao restauradas!', 'success');
+}
+
+function inicializarPersonalizacaoEscala() {
+    const inputs = document.querySelectorAll('[data-escala-color-key]');
+
+    inputs.forEach((input) => {
+        input.addEventListener('input', () => {
+            const cores = carregarCoresEscala();
+
+            inputs.forEach((currentInput) => {
+                const key = currentInput.getAttribute('data-escala-color-key');
+                cores[key] = normalizarCorHex(currentInput.value, cores[key]);
+            });
+
+            aplicarCoresEscala(cores);
+            atualizarInputsCoresEscala(cores);
+        });
+    });
+
+    document.getElementById('salvarCoresEscalaBtn')?.addEventListener('click', salvarCoresEscala);
+    document.getElementById('resetarCoresEscalaBtn')?.addEventListener('click', resetarCoresEscala);
+    atualizarInputsCoresEscala();
+}
+
+aplicarCoresEscala();
+
+const CONFIGURACOES_SECOES = [
+    {
+        id: 'personalizacao',
+        label: 'Personalizacao',
+        icon: 'palette',
+        description: 'Tema e cores'
+    },
+    {
+        id: 'operacao',
+        label: 'Operacao',
+        icon: 'sliders-h',
+        description: 'Preferencias gerais'
+    },
+    {
+        id: 'banco',
+        label: 'Conexao banco',
+        icon: 'database',
+        description: 'SQL Server e tabelas'
+    },
+    {
+        id: 'backup',
+        label: 'Backup',
+        icon: 'cloud-upload-alt',
+        description: 'Pasta e rotina local'
+    },
+    {
+        id: 'ferramentas',
+        label: 'Ferramentas',
+        icon: 'tools',
+        description: 'Importar e exportar'
+    },
+    {
+        id: 'sobre',
+        label: 'Sobre',
+        icon: 'info-circle',
+        description: 'Versao do sistema'
+    }
+];
+
+const CONFIGURACOES_SECAO_STORAGE_KEY = 'configuracoesSecaoAtual';
+
+function gerarMenuConfiguracoesHtml() {
+    const secaoAtual = getSecaoConfiguracoesAtual();
+
+    return CONFIGURACOES_SECOES.map((secao) => `
+        <button
+            type="button"
+            class="config-section-btn ${secao.id === secaoAtual ? 'is-active' : ''}"
+            data-config-tab="${secao.id}"
+        >
+            <i class="fas fa-${secao.icon}"></i>
+            <span>
+                <strong>${secao.label}</strong>
+                <small>${secao.description}</small>
+            </span>
+        </button>
+    `).join('');
+}
+
+function getSecaoConfiguracoesAtual() {
+    const saved = localStorage.getItem(CONFIGURACOES_SECAO_STORAGE_KEY);
+    return CONFIGURACOES_SECOES.some((secao) => secao.id === saved)
+        ? saved
+        : 'personalizacao';
+}
+
+function ativarSecaoConfiguracoes(secaoId) {
+    const nextSection = CONFIGURACOES_SECOES.some((secao) => secao.id === secaoId)
+        ? secaoId
+        : 'personalizacao';
+
+    localStorage.setItem(CONFIGURACOES_SECAO_STORAGE_KEY, nextSection);
+
+    document.querySelectorAll('[data-config-tab]').forEach((button) => {
+        button.classList.toggle('is-active', button.getAttribute('data-config-tab') === nextSection);
+    });
+
+    document.querySelectorAll('[data-config-section]').forEach((card) => {
+        card.classList.toggle('is-hidden', card.getAttribute('data-config-section') !== nextSection);
+    });
+}
+
+function inicializarSecoesConfiguracoes() {
+    document.querySelectorAll('[data-config-tab]').forEach((button) => {
+        button.addEventListener('click', () => {
+            ativarSecaoConfiguracoes(button.getAttribute('data-config-tab'));
+        });
+    });
+
+    ativarSecaoConfiguracoes(getSecaoConfiguracoesAtual());
 }
 
 const nativeFetch = window.fetch.bind(window);
@@ -735,7 +1051,7 @@ function gerarResumoHorariosVazio() {
 =========================== */
 function renderColaboradores() {
     appContent.innerHTML = `
-        <div class="page-header">
+        <div class="page-header colaboradores-page-header">
             <h1>Colaboradores</h1>
             <button id="btnNovoColaborador" class="btn-primary">
                 <i class="fas fa-plus"></i> Novo Colaborador
@@ -1607,6 +1923,63 @@ async function carregarColaboradores() {
     }
 }
 
+async function carregarSetores() {
+    try {
+        const res = await fetch(`${getApiBaseUrl()}/setores`);
+        if (!res.ok) throw new Error(`Erro ${res.status}: ${res.statusText}`);
+        const data = await res.json();
+        setores = Array.isArray(data) ? data : [];
+        window.setores = setores;
+        return setores;
+    } catch (error) {
+        console.error("Erro ao carregar setores:", error);
+        setores = [];
+        window.setores = [];
+        return [];
+    }
+}
+
+function buildSetorOptionsHtml(selectedId = null) {
+    const currentSetores = Array.isArray(window.setores) ? window.setores : [];
+
+    return [
+        '<option value="">Selecione...</option>',
+        ...currentSetores.map((setor) => `
+            <option value="${setor.id}" ${Number(selectedId) === Number(setor.id) ? 'selected' : ''}>${setor.nome}</option>
+        `)
+    ].join('');
+}
+
+async function adicionarSetorRapido() {
+    const nome = window.prompt('Nome do novo setor:');
+
+    if (!nome || !String(nome).trim()) {
+        return;
+    }
+
+    try {
+        await window.API.salvarSetor({ nome });
+        await carregarSetores();
+
+        const select = document.getElementById('editorSetorId');
+        const setorCriado = (window.setores || []).find((item) => item.nome.toLowerCase() === String(nome).trim().toLowerCase());
+
+        if (select) {
+            select.innerHTML = buildSetorOptionsHtml(setorCriado?.id || null);
+
+            if (setorCriado?.id) {
+                select.value = String(setorCriado.id);
+            }
+        }
+
+        mostrarToast('Setor salvo com sucesso!', 'success');
+    } catch (error) {
+        mostrarToast(error.message || 'Erro ao salvar setor.', 'error');
+    }
+}
+
+window.adicionarSetorRapido = adicionarSetorRapido;
+
 // app.js - Função carregarAusencias (já deve estar assim, mas vamos verificar)
 
 async function carregarAusencias() {
@@ -2440,7 +2813,6 @@ function abrirEditorColaborador(id) {
     }
 }
 
-// app.js - Função salvarEditorColaborador corrigida
 
 async function salvarEditorColaborador(id) {
     const trabalhoInicio = document.getElementById(`editTrabInicio-${id}`)?.value;
@@ -3091,9 +3463,14 @@ function renderConfiguracoes() {
             <p>Personalize sua experiência no sistema</p>
         </div>
 
+        <div class="configuracoes-shell">
+            <nav class="config-section-menu" aria-label="Secoes de configuracao">
+                ${gerarMenuConfiguracoesHtml()}
+            </nav>
+
         <div class="configuracoes-grid">
             <!-- CARD DE TEMA -->
-            <div class="config-card">
+            <div class="config-card" data-config-section="personalizacao">
                 <div class="config-card-header">
                     <i class="fas fa-palette"></i>
                     <h2>Aparência</h2>
@@ -3133,7 +3510,36 @@ function renderConfiguracoes() {
             </div>
 
             <!-- CARD DE PREFERÊNCIAS -->
-            <div class="config-card">
+            <div class="config-card config-card-wide" data-config-section="personalizacao">
+                <div class="config-card-header">
+                    <i class="fas fa-fill-drip"></i>
+                    <h2>Personalizacao da escala</h2>
+                </div>
+
+                <div class="config-card-body">
+                    <p class="config-description">
+                        Escolha as cores exibidas na tela de escala do dia. As alteracoes ficam salvas neste computador.
+                    </p>
+
+                    <div class="escala-color-grid">
+                        ${gerarConfiguracaoCoresEscalaHtml()}
+                    </div>
+
+                    <div class="config-actions-row">
+                        <button class="config-btn" id="salvarCoresEscalaBtn" type="button">
+                            <i class="fas fa-save"></i>
+                            Salvar cores
+                        </button>
+
+                        <button class="config-btn" id="resetarCoresEscalaBtn" type="button">
+                            <i class="fas fa-rotate-left"></i>
+                            Restaurar padrao
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="config-card" data-config-section="operacao">
                 <div class="config-card-header">
                     <i class="fas fa-sliders-h"></i>
                     <h2>Preferências</h2>
@@ -3186,7 +3592,7 @@ function renderConfiguracoes() {
             </div>
 
             <!-- CARD SOBRE O SISTEMA -->
-            <div class="config-card">
+            <div class="config-card" data-config-section="sobre">
                 <div class="config-card-header">
                     <i class="fas fa-info-circle"></i>
                     <h2>Sobre</h2>
@@ -3196,7 +3602,7 @@ function renderConfiguracoes() {
                     <div class="sobre-info">
                         <i class="fas fa-calendar-check sobre-icon"></i>
                         <h3>Software de Escalas</h3>
-                        <p class="versao">Versão 1.1.0 BETA</p>
+                        <p class="versao">Versão 1.2.0</p>
                         <p class="descricao">
                             Sistema completo para gestão de escalas de trabalho, 
                             colaboradores e horários.
@@ -3217,7 +3623,7 @@ function renderConfiguracoes() {
             </div>
 
             <!-- CARD DE AÇÕES -->
-            <div class="config-card config-card-half">
+            <div class="config-card config-card-half" data-config-section="banco">
                 <div class="config-card-header">
                     <i class="fas fa-database"></i>
                     <h2>Configuração do Banco de Dados</h2>
@@ -3356,7 +3762,7 @@ function renderConfiguracoes() {
                 </div>
             </div>
 
-            <div class="config-card config-card-half">
+            <div class="config-card config-card-half" data-config-section="backup">
                 <div class="config-card-header">
                     <i class="fas fa-cloud-upload-alt"></i>
                     <h2>Backup Local do Banco</h2>
@@ -3442,7 +3848,7 @@ function renderConfiguracoes() {
                 </div>
             </div>
 
-            <div class="config-card config-card-tools">
+            <div class="config-card config-card-tools" data-config-section="ferramentas">
                 <div class="config-card-header">
                     <i class="fas fa-tools"></i>
                     <h2>Ferramentas</h2>
@@ -3471,6 +3877,7 @@ function renderConfiguracoes() {
                 </div>
             </div>
         </div>
+        </div>
     `;
 
     // Adiciona eventos para as opções de tema
@@ -3487,6 +3894,8 @@ function renderConfiguracoes() {
 
     // Carrega preferências salvas
     carregarPreferencias();
+    inicializarSecoesConfiguracoes();
+    inicializarPersonalizacaoEscala();
     
     // Eventos para salvar preferências
     document.getElementById('primeiroDiaSemana').addEventListener('change', salvarPreferencias);
@@ -3543,7 +3952,7 @@ function exportarDados() {
                 notificacoes: localStorage.getItem('notificacoes') === 'true'
             },
             metadata: {
-                versao: '1.1.0 BETA',
+                versao: '1.2.0',
                 dataExportacao: new Date().toISOString(),
                 sistema: 'Software de Escalas'
             }

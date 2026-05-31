@@ -37,6 +37,52 @@ function extrairDataISO(valor) {
     return formatarDataISO(data.getFullYear(), data.getMonth(), data.getDate());
 }
 
+function ensureCalendarDatePicker() {
+    let input = document.getElementById('calendarMonthPicker');
+
+    if (input) {
+        return input;
+    }
+
+    const monthNav = document.querySelector('.month-nav');
+
+    if (!monthNav) {
+        return null;
+    }
+
+    input = document.createElement('input');
+    input.type = 'date';
+    input.id = 'calendarMonthPicker';
+    input.className = 'calendar-month-picker';
+    input.setAttribute('aria-hidden', 'true');
+    input.tabIndex = -1;
+
+    input.addEventListener('change', async () => {
+        const valor = input.value;
+
+        if (!valor) {
+            return;
+        }
+
+        const [anoSelecionado, mesSelecionado] = valor.split('-').map(Number);
+
+        if (!anoSelecionado || !mesSelecionado) {
+            return;
+        }
+
+        mesAtual = mesSelecionado - 1;
+        anoAtual = anoSelecionado;
+        window.mesAtual = mesAtual;
+        window.anoAtual = anoAtual;
+
+        await carregarFeriados(anoAtual);
+        gerarCalendario(mesAtual, anoAtual);
+    });
+
+    monthNav.appendChild(input);
+    return input;
+}
+
 async function carregarFeriados(ano) {
     if (cacheFeriadosPorAno.has(ano)) {
         feriados = cacheFeriadosPorAno.get(ano);
@@ -88,13 +134,27 @@ function gerarCalendario(mes, ano) {
             year: 'numeric'
         }).replace(/^\w/, (char) => char.toUpperCase());
 
+        const datePicker = ensureCalendarDatePicker();
+        if (datePicker) {
+            datePicker.value = formatarDataISO(ano, mes, 1);
+        }
+
         monthTitle.style.cursor = 'pointer';
-        monthTitle.title = 'Clique para navegar entre meses';
+        monthTitle.title = 'Clique para selecionar uma data';
         monthTitle.onclick = (event) => {
             event.stopPropagation();
+            const picker = ensureCalendarDatePicker();
 
-            if (typeof abrirSeletorMes === 'function') {
-                abrirSeletorMes();
+            if (!picker) {
+                return;
+            }
+
+            picker.value = formatarDataISO(ano, mes, 1);
+
+            if (typeof picker.showPicker === 'function') {
+                picker.showPicker();
+            } else {
+                picker.click();
             }
         };
     }

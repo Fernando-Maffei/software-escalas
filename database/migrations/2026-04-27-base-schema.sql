@@ -77,9 +77,12 @@ GO
 
 IF NOT EXISTS (
     SELECT 1
-    FROM sys.default_constraints
-    WHERE parent_object_id = OBJECT_ID('dbo.Feriados')
-      AND name = 'DF_Feriados_Tipo'
+    FROM sys.default_constraints dc
+    INNER JOIN sys.columns c
+        ON c.object_id = dc.parent_object_id
+       AND c.column_id = dc.parent_column_id
+    WHERE dc.parent_object_id = OBJECT_ID('dbo.Feriados')
+      AND c.name = 'Tipo'
 )
 BEGIN
     ALTER TABLE dbo.Feriados
@@ -175,9 +178,12 @@ GO
 
 IF NOT EXISTS (
     SELECT 1
-    FROM sys.default_constraints
-    WHERE parent_object_id = OBJECT_ID('dbo.Ausencias')
-      AND name = 'DF_Ausencias_DataCadastro'
+    FROM sys.default_constraints dc
+    INNER JOIN sys.columns c
+        ON c.object_id = dc.parent_object_id
+       AND c.column_id = dc.parent_column_id
+    WHERE dc.parent_object_id = OBJECT_ID('dbo.Ausencias')
+      AND c.name = 'DataCadastro'
 )
 BEGIN
     ALTER TABLE dbo.Ausencias
@@ -187,9 +193,12 @@ GO
 
 IF NOT EXISTS (
     SELECT 1
-    FROM sys.default_constraints
-    WHERE parent_object_id = OBJECT_ID('dbo.Ausencias')
-      AND name = 'DF_Ausencias_PeriodoTipo'
+    FROM sys.default_constraints dc
+    INNER JOIN sys.columns c
+        ON c.object_id = dc.parent_object_id
+       AND c.column_id = dc.parent_column_id
+    WHERE dc.parent_object_id = OBJECT_ID('dbo.Ausencias')
+      AND c.name = 'PeriodoTipo'
 )
 BEGIN
     ALTER TABLE dbo.Ausencias
@@ -297,9 +306,12 @@ GO
 
 IF NOT EXISTS (
     SELECT 1
-    FROM sys.default_constraints
-    WHERE parent_object_id = OBJECT_ID('dbo.plantoes')
-      AND name = 'DF_plantoes_colaboradores'
+    FROM sys.default_constraints dc
+    INNER JOIN sys.columns c
+        ON c.object_id = dc.parent_object_id
+       AND c.column_id = dc.parent_column_id
+    WHERE dc.parent_object_id = OBJECT_ID('dbo.plantoes')
+      AND c.name = 'colaboradores_ids'
 )
 BEGIN
     ALTER TABLE dbo.plantoes
@@ -309,9 +321,12 @@ GO
 
 IF NOT EXISTS (
     SELECT 1
-    FROM sys.default_constraints
-    WHERE parent_object_id = OBJECT_ID('dbo.plantoes')
-      AND name = 'DF_plantoes_criado_em'
+    FROM sys.default_constraints dc
+    INNER JOIN sys.columns c
+        ON c.object_id = dc.parent_object_id
+       AND c.column_id = dc.parent_column_id
+    WHERE dc.parent_object_id = OBJECT_ID('dbo.plantoes')
+      AND c.name = 'criado_em'
 )
 BEGIN
     ALTER TABLE dbo.plantoes
@@ -321,9 +336,12 @@ GO
 
 IF NOT EXISTS (
     SELECT 1
-    FROM sys.default_constraints
-    WHERE parent_object_id = OBJECT_ID('dbo.plantoes')
-      AND name = 'DF_plantoes_atualizado_em'
+    FROM sys.default_constraints dc
+    INNER JOIN sys.columns c
+        ON c.object_id = dc.parent_object_id
+       AND c.column_id = dc.parent_column_id
+    WHERE dc.parent_object_id = OBJECT_ID('dbo.plantoes')
+      AND c.name = 'atualizado_em'
 )
 BEGIN
     ALTER TABLE dbo.plantoes

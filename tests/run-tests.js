@@ -3,6 +3,7 @@ const suites = [
     ...require('./validation.test.js'),
     ...require('./plantoes.test.js'),
     ...require('./bancoHoras.test.js'),
+    ...require('./jornadaSemanal.test.js'),
     ...require('./escala.test.js'),
     ...require('./backup.test.js')
 ];

@@ -162,6 +162,7 @@
         return {
             ...item,
             dataISO,
+            tipoPlantao: item.tipoPlantao || item.tipo_plantao || null,
             colaboradores: Array.isArray(item.colaboradores) ? item.colaboradores : [],
             horaInicio: item.horaInicio || item.hora_inicio || null,
             horaFim: item.horaFim || item.hora_fim || null,
@@ -188,6 +189,28 @@
             });
         };
     }
+
+    window.carregarSetores = carregarSetores = function carregarSetoresComCache() {
+        return withInFlight('setores', async () => {
+            let lista = [];
+
+            try {
+                const data = await window.API.getSetores();
+                lista = Array.isArray(data) ? data : [];
+            } catch (error) {
+                lista = [];
+            }
+
+            try {
+                setores = lista;
+            } catch (error) {
+                // ignore
+            }
+
+            window.setores = lista;
+            return lista;
+        });
+    };
 
     window.carregarAusencias = carregarAusencias = function carregarAusenciasComCache() {
         return withInFlight('ausencias', async () => {
@@ -363,6 +386,7 @@
         try {
             await Promise.allSettled([
                 carregarColaboradores(),
+                typeof carregarSetores === 'function' ? carregarSetores() : Promise.resolve([]),
                 carregarAusencias(),
                 carregarFeriadosLocais(),
                 typeof carregarPlantoes === 'function' ? carregarPlantoes() : Promise.resolve([])
@@ -2099,11 +2123,11 @@
 
         container.setAttribute('data-relatorio-pdf', 'true');
         container.style.position = 'fixed';
-        container.style.left = '0';
+        container.style.left = '-100000px';
         container.style.top = '0';
         container.style.width = `${containerWidth}px`;
         container.style.background = '#ffffff';
-        container.style.transform = 'translate3d(-250vw, 0, 0)';
+        container.style.transform = 'none';
         container.style.transformOrigin = 'top left';
         container.style.pointerEvents = 'none';
         container.style.contain = 'layout paint style';
@@ -2159,20 +2183,266 @@
         const minHeight = Math.max(Number(options.minHeight) || 1200, 1000);
         const configuredScale = Number(options.scale);
         const deviceScale = Number(window.devicePixelRatio) || 1;
-        const renderScale = Number.isFinite(configuredScale) && configuredScale > 0
+        const desiredScale = Number.isFinite(configuredScale) && configuredScale > 0
             ? Math.max(configuredScale, 1)
             : Math.max(Math.min(deviceScale * 1.5, 3), 2.2);
+        const sourceWidth = Math.max(Number(elemento.scrollWidth) || minWidth, 1);
+        const sourceHeight = Math.max(Number(elemento.scrollHeight) || minHeight, 1);
+        const maxCanvasSide = Math.max(Number(options.maxCanvasSide) || 12000, 4000);
+        const maxCanvasPixels = Math.max(Number(options.maxCanvasPixels) || 24000000, 6000000);
+        const scaleBySide = Math.min(maxCanvasSide / sourceWidth, maxCanvasSide / sourceHeight);
+        const scaleByPixels = Math.sqrt(maxCanvasPixels / Math.max(sourceWidth * sourceHeight, 1));
+        const renderScale = Math.max(Math.min(desiredScale, scaleBySide, scaleByPixels), 1);
 
-        return html2canvas(elemento, {
+        const canvas = await html2canvas(elemento, {
             scale: renderScale,
             backgroundColor: '#ffffff',
             logging: false,
             useCORS: true,
-            width: elemento.scrollWidth,
-            height: elemento.scrollHeight,
-            windowWidth: Math.max(elemento.scrollWidth, minWidth),
-            windowHeight: Math.max(elemento.scrollHeight, minHeight)
+            width: sourceWidth,
+            height: sourceHeight,
+            windowWidth: Math.max(sourceWidth, minWidth),
+            windowHeight: Math.max(sourceHeight, minHeight)
         });
+
+        canvas.__pdfSourceWidth = sourceWidth;
+        canvas.__pdfSourceHeight = sourceHeight;
+        canvas.__pdfRenderScale = renderScale;
+
+        return canvas;
+    }
+
+    const PDF_PAGE_SIZES_MM = [
+        { name: 'a4', width: 210, height: 297 },
+        { name: 'a3', width: 297, height: 420 },
+        { name: 'a2', width: 420, height: 594 },
+        { name: 'a1', width: 594, height: 841 },
+        { name: 'a0', width: 841, height: 1189 }
+    ];
+
+    function resolvePdfOneSheetLayout(canvas, options = {}) {
+        const margin = Math.max(Number(options.marginMm) || 6, 0);
+        const preferLandscape = options.preferLandscape !== false;
+        const minScale = Math.max(Number(options.minScaleMmPerPixel) || 0.075, 0.03);
+        const sourceWidth = Math.max(Number(options.sourceWidth || canvas.__pdfSourceWidth || canvas.width), 1);
+        const sourceHeight = Math.max(Number(options.sourceHeight || canvas.__pdfSourceHeight || canvas.height), 1);
+        const orientations = preferLandscape
+            ? ['landscape', 'portrait']
+            : ['portrait', 'landscape'];
+
+        for (const size of PDF_PAGE_SIZES_MM) {
+            for (const orientation of orientations) {
+                const pageWidth = orientation === 'landscape' ? size.height : size.width;
+                const pageHeight = orientation === 'landscape' ? size.width : size.height;
+                const usableWidth = pageWidth - (margin * 2);
+                const usableHeight = pageHeight - (margin * 2);
+                const scale = Math.min(usableWidth / sourceWidth, usableHeight / sourceHeight);
+
+                if (scale >= minScale) {
+                    return {
+                        format: size.name,
+                        orientation,
+                        pageWidth,
+                        pageHeight,
+                        margin,
+                        sourceWidth,
+                        sourceHeight,
+                        scale
+                    };
+                }
+            }
+        }
+
+        const rawWidth = (sourceWidth * minScale) + (margin * 2);
+        const rawHeight = (sourceHeight * minScale) + (margin * 2);
+        const orientation = rawWidth >= rawHeight ? 'landscape' : 'portrait';
+        const pageWidth = rawWidth;
+        const pageHeight = rawHeight;
+        const scale = Math.min(
+            (pageWidth - (margin * 2)) / sourceWidth,
+            (pageHeight - (margin * 2)) / sourceHeight
+        );
+
+        return {
+            format: [pageWidth, pageHeight],
+            orientation,
+            pageWidth,
+            pageHeight,
+            margin,
+            sourceWidth,
+            sourceHeight,
+            scale
+        };
+    }
+
+    function getPdfCanvasImagePayload(canvas, options = {}) {
+        const requestedFormat = String(options.imageFormat || '').trim().toUpperCase();
+        const format = requestedFormat === 'PNG' ? 'PNG' : 'JPEG';
+
+        if (format === 'PNG') {
+            return {
+                data: canvas.toDataURL('image/png'),
+                format,
+                compression: 'MEDIUM'
+            };
+        }
+
+        const quality = Math.min(Math.max(Number(options.imageQuality) || 0.94, 0.75), 0.98);
+
+        return {
+            data: canvas.toDataURL('image/jpeg', quality),
+            format,
+            compression: 'FAST'
+        };
+    }
+
+    function criarPdfUmaFolhaComCanvas(canvas, options = {}) {
+        const layout = resolvePdfOneSheetLayout(canvas, options);
+        const pdf = new window.jspdf.jsPDF({
+            orientation: layout.orientation,
+            unit: 'mm',
+            format: layout.format,
+            compress: true
+        });
+        const larguraRender = layout.sourceWidth * layout.scale;
+        const alturaRender = layout.sourceHeight * layout.scale;
+        const posicaoX = (layout.pageWidth - larguraRender) / 2;
+        const posicaoY = (layout.pageHeight - alturaRender) / 2;
+        const imagePayload = getPdfCanvasImagePayload(canvas, options);
+
+        pdf.addImage(
+            imagePayload.data,
+            imagePayload.format,
+            posicaoX,
+            posicaoY,
+            larguraRender,
+            alturaRender,
+            undefined,
+            imagePayload.compression
+        );
+
+        return {
+            pdf,
+            layout,
+            larguraRender,
+            alturaRender
+        };
+    }
+
+    function recortarCanvasParaPaginaPdf(canvas, startSourceY, pageSourceHeight, sourceWidth, sourceHeight) {
+        const renderScale = Math.max(Number(canvas.__pdfRenderScale) || (canvas.height / sourceHeight) || 1, 1);
+        const startCanvasY = Math.max(Math.floor(startSourceY * renderScale), 0);
+        const canvasSliceHeight = Math.max(
+            Math.min(Math.ceil(pageSourceHeight * renderScale), canvas.height - startCanvasY),
+            1
+        );
+        const sliceCanvas = document.createElement('canvas');
+        const context = sliceCanvas.getContext('2d');
+
+        sliceCanvas.width = canvas.width;
+        sliceCanvas.height = canvasSliceHeight;
+
+        if (context) {
+            context.fillStyle = '#ffffff';
+            context.fillRect(0, 0, sliceCanvas.width, sliceCanvas.height);
+            context.drawImage(
+                canvas,
+                0,
+                startCanvasY,
+                canvas.width,
+                canvasSliceHeight,
+                0,
+                0,
+                canvas.width,
+                canvasSliceHeight
+            );
+        }
+
+        sliceCanvas.__pdfSourceWidth = sourceWidth;
+        sliceCanvas.__pdfSourceHeight = Math.min(pageSourceHeight, sourceHeight - startSourceY);
+        sliceCanvas.__pdfRenderScale = renderScale;
+
+        return sliceCanvas;
+    }
+
+    function dividirCanvasEmPaginasPdf(canvas, options = {}) {
+        const sourceWidth = Math.max(Number(canvas.__pdfSourceWidth || canvas.width), 1);
+        const sourceHeight = Math.max(Number(canvas.__pdfSourceHeight || canvas.height), 1);
+        const minimumPages = Math.max(Number(options.minimumPages) || 1, 1);
+        const configuredMaxHeight = Number(options.maxSourcePageHeight);
+        const maxSourcePageHeight = Number.isFinite(configuredMaxHeight) && configuredMaxHeight > 0
+            ? configuredMaxHeight
+            : sourceHeight;
+        const pageCountByHeight = Math.max(Math.ceil(sourceHeight / maxSourcePageHeight), 1);
+        const pageCount = Math.max(pageCountByHeight, minimumPages);
+        const pageSourceHeight = sourceHeight / pageCount;
+
+        return Array.from({ length: pageCount }, (_, pageIndex) => {
+            const startSourceY = pageIndex * pageSourceHeight;
+            return recortarCanvasParaPaginaPdf(
+                canvas,
+                startSourceY,
+                pageSourceHeight,
+                sourceWidth,
+                sourceHeight
+            );
+        });
+    }
+
+    function adicionarCanvasAoPdf(pdf, canvas, options = {}) {
+        const layout = resolvePdfOneSheetLayout(canvas, options);
+        let pdfDoc = pdf;
+
+        if (!pdfDoc) {
+            pdfDoc = new window.jspdf.jsPDF({
+                orientation: layout.orientation,
+                unit: 'mm',
+                format: layout.format,
+                compress: true
+            });
+        } else {
+            pdfDoc.addPage(layout.format, layout.orientation);
+        }
+
+        const larguraRender = layout.sourceWidth * layout.scale;
+        const alturaRender = layout.sourceHeight * layout.scale;
+        const posicaoX = (layout.pageWidth - larguraRender) / 2;
+        const posicaoY = (layout.pageHeight - alturaRender) / 2;
+        const imagePayload = getPdfCanvasImagePayload(canvas, options);
+
+        pdfDoc.addImage(
+            imagePayload.data,
+            imagePayload.format,
+            posicaoX,
+            posicaoY,
+            larguraRender,
+            alturaRender,
+            undefined,
+            imagePayload.compression
+        );
+
+        return {
+            pdf: pdfDoc,
+            layout
+        };
+    }
+
+    function criarPdfMultipaginasComCanvas(canvas, options = {}) {
+        const pageCanvases = dividirCanvasEmPaginasPdf(canvas, options);
+        let pdf = null;
+        const layouts = [];
+
+        pageCanvases.forEach((pageCanvas) => {
+            const result = adicionarCanvasAoPdf(pdf, pageCanvas, options);
+            pdf = result.pdf;
+            layouts.push(result.layout);
+        });
+
+        return {
+            pdf,
+            pageCount: pageCanvases.length,
+            layouts
+        };
     }
 
     function baixarPdfSemPreview(pdf, fileName) {
@@ -2202,6 +2472,8 @@
     window.aguardarLayoutRelatorioPdf = aguardarLayoutRelatorioPdf;
     window.lockPdfViewportOverflow = lockPdfViewportOverflow;
     window.renderizarPaginaPdfEmCanvas = renderizarPaginaPdfEmCanvas;
+    window.criarPdfUmaFolhaComCanvas = criarPdfUmaFolhaComCanvas;
+    window.criarPdfMultipaginasComCanvas = criarPdfMultipaginasComCanvas;
 
     window.gerarRelatorioCalendarioCompleto = gerarRelatorioCalendarioCompleto = async function gerarRelatorioCalendarioCompletoConsolidado(mes, ano) {
         const dados = await construirDadosRelatorioMensal(mes, ano);
@@ -2303,37 +2575,22 @@
             container = criarContainerTemporarioRelatorioPdf(htmlPDF, { width: 1500 });
             await aguardarLayoutRelatorioPdf();
 
-            const paginas = Array.from(container.querySelectorAll('.pdf-pagina'));
-            const elementos = paginas.length > 0 ? paginas : [container];
-            const pdf = new window.jspdf.jsPDF({
-                orientation: 'landscape',
-                unit: 'mm',
-                format: 'a4'
+            const canvas = await renderizarPaginaPdfEmCanvas(container, {
+                minWidth: 1800,
+                minHeight: 1200,
+                scale: 1.6,
+                maxCanvasSide: 12000,
+                maxCanvasPixels: 22000000
             });
-            const pageWidth = pdf.internal.pageSize.getWidth();
-            const pageHeight = pdf.internal.pageSize.getHeight();
-            const margem = 8;
-            const larguraUtil = pageWidth - (margem * 2);
-            const alturaUtil = pageHeight - (margem * 2);
-
-            for (let indice = 0; indice < elementos.length; indice += 1) {
-                const canvas = await renderizarPaginaPdfEmCanvas(elementos[indice], {
-                    minWidth: 1800,
-                    minHeight: 1200,
-                    scale: 2.3
-                });
-                const escala = Math.min(larguraUtil / canvas.width, alturaUtil / canvas.height);
-                const larguraRender = canvas.width * escala;
-                const alturaRender = canvas.height * escala;
-                const posicaoX = (pageWidth - larguraRender) / 2;
-                const posicaoY = (pageHeight - alturaRender) / 2;
-
-                if (indice > 0) {
-                    pdf.addPage();
-                }
-
-                pdf.addImage(canvas, 'PNG', posicaoX, posicaoY, larguraRender, alturaRender, undefined, 'MEDIUM');
-            }
+            const { pdf } = criarPdfMultipaginasComCanvas(canvas, {
+                preferLandscape: true,
+                marginMm: 6,
+                minScaleMmPerPixel: 0.065,
+                imageFormat: 'JPEG',
+                imageQuality: 0.94,
+                minimumPages: 2,
+                maxSourcePageHeight: 1300
+            });
 
             const salvarPdf = typeof window.baixarPdfSemPreview === 'function'
                 ? window.baixarPdfSemPreview
@@ -2597,6 +2854,7 @@
         return {
             ...item,
             dataISO: obterDataISO(item.dataISO || item.data_plantao),
+            tipoPlantao: item.tipoPlantao || item.tipo_plantao || null,
             horaInicio: obterHoraValor(item.horaInicio || item.hora_inicio),
             horaFim: obterHoraValor(item.horaFim || item.hora_fim),
             observacao: item.observacao || null,
@@ -3030,6 +3288,13 @@
             <div class="editor-plantao">
                 <div class="editor-form-grid">
                     <div class="editor-form-group">
+                        <label><i class="fas fa-calendar-week"></i> Tipo do plantao</label>
+                        <select id="plantaoTipoPlantao" class="form-control">
+                            <option value="sabado" selected>Sabado</option>
+                        </select>
+                        <small class="helper-text">Plantao extra permitido apenas aos sabados.</small>
+                    </div>
+                    <div class="editor-form-group">
                         <label><i class="fas fa-clock"></i> Horario do plantao</label>
                         <div class="time-inputs plantao-time-inputs">
                             <input type="time" id="plantaoHoraInicio" value="${escapeHtml(formatarHoraInput(state.horaInicio))}">
@@ -3202,6 +3467,11 @@
                         </div>
                         <div class="colaborador-info">
                             <h4 class="colaborador-nome">${escapeHtml(colaborador.Nome || 'Sem nome')}</h4>
+                            ${colaborador.SetorNome ? `
+                                <div class="colaborador-setor-badge">
+                                    <i class="fas fa-layer-group"></i> ${escapeHtml(colaborador.SetorNome)}
+                                </div>
+                            ` : ''}
                             <div class="colaborador-horarios">
                                 <span class="horario-tag">
                                     <i class="fas fa-briefcase"></i> ${escapeHtml(formatarHora(colaborador.TrabalhoInicio))} - ${escapeHtml(formatarHora(colaborador.TrabalhoFim))}
@@ -3244,6 +3514,534 @@
             });
         };
     }
+
+    function buildSetorEditorOptions(selectedId = '') {
+        return [
+            '<option value="">Selecione...</option>',
+            ...((window.setores || []).map((setor) => `
+                <option value="${setor.id}" ${Number(selectedId) === Number(setor.id) ? 'selected' : ''}>${escapeHtml(setor.nome)}</option>
+            `))
+        ].join('');
+    }
+
+    const JORNADA_SEMANAL_DIAS = [
+        { diaSemana: 0, label: 'Domingo' },
+        { diaSemana: 1, label: 'Segunda' },
+        { diaSemana: 2, label: 'Terca' },
+        { diaSemana: 3, label: 'Quarta' },
+        { diaSemana: 4, label: 'Quinta' },
+        { diaSemana: 5, label: 'Sexta' },
+        { diaSemana: 6, label: 'Sabado' }
+    ];
+
+    function buildJornadaSemanalDefaultRows() {
+        return JORNADA_SEMANAL_DIAS.map((dia) => ({
+            diaSemana: dia.diaSemana,
+            label: dia.label,
+            checked: false,
+            trabalhoInicio: '',
+            trabalhoFim: '',
+            almocoInicio: '',
+            almocoFim: ''
+        }));
+    }
+
+    function mapJornadaSemanalRowsToEditor(items = []) {
+        const byDay = new Map();
+
+        (Array.isArray(items) ? items : []).forEach((item) => {
+            const day = Number(item.diaSemana ?? item.DiaSemana);
+
+            if (!Number.isInteger(day) || day < 0 || day > 6) {
+                return;
+            }
+
+            byDay.set(day, {
+                trabalhoInicio: formatarHora(item.trabalhoInicio || item.TrabalhoInicio || ''),
+                trabalhoFim: formatarHora(item.trabalhoFim || item.TrabalhoFim || ''),
+                almocoInicio: formatarHora(item.almocoInicio || item.AlmocoInicio || ''),
+                almocoFim: formatarHora(item.almocoFim || item.AlmocoFim || '')
+            });
+        });
+
+        return buildJornadaSemanalDefaultRows().map((row) => {
+            const loaded = byDay.get(row.diaSemana);
+
+            if (!loaded) {
+                return row;
+            }
+
+            return {
+                ...row,
+                checked: true,
+                ...loaded
+            };
+        });
+    }
+
+    function getJornadaSemanalEditorMeta() {
+        if (!window.__jornadaSemanalEditorMeta) {
+            window.__jornadaSemanalEditorMeta = {
+                colaboradorId: null,
+                hasExisting: false,
+                touched: false,
+                loaded: false
+            };
+        }
+
+        return window.__jornadaSemanalEditorMeta;
+    }
+
+    function setJornadaSemanalEditorTouched(value = true) {
+        const meta = getJornadaSemanalEditorMeta();
+        meta.touched = Boolean(value);
+    }
+
+    function renderJornadaSemanalRows(rows = []) {
+        return rows.map((row) => `
+            <div class="jornada-semanal-row${row.checked ? ' is-selected' : ''}" data-jornada-row="${row.diaSemana}">
+                <label class="jornada-semanal-day-toggle">
+                    <input type="checkbox" data-jornada-check="${row.diaSemana}" ${row.checked ? 'checked' : ''}>
+                    <span>${escapeHtml(row.label)}</span>
+                </label>
+                <div class="jornada-semanal-times${row.checked ? '' : ' is-hidden'}" data-jornada-times="${row.diaSemana}">
+                    <div class="jornada-time-group">
+                        <small>Jornada</small>
+                        <div class="jornada-time-pair">
+                            <input type="time" data-jornada-entrada="${row.diaSemana}" value="${escapeHtml(row.trabalhoInicio || '')}" class="form-control" title="Entrada">
+                            <span>ate</span>
+                            <input type="time" data-jornada-saida="${row.diaSemana}" value="${escapeHtml(row.trabalhoFim || '')}" class="form-control" title="Saida">
+                        </div>
+                    </div>
+                    <div class="jornada-time-group">
+                        <small>Almoco</small>
+                        <div class="jornada-time-pair">
+                            <input type="time" data-jornada-almoco-inicio="${row.diaSemana}" value="${escapeHtml(row.almocoInicio || '')}" class="form-control" title="Almoco inicio">
+                            <span>ate</span>
+                            <input type="time" data-jornada-almoco-fim="${row.diaSemana}" value="${escapeHtml(row.almocoFim || '')}" class="form-control" title="Almoco fim">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    function buildJornadaSemanalEditorMarkup(rows = [], options = {}) {
+        const { showSuggestion = false } = options;
+
+        return `
+            <div class="editor-form-group">
+                <label><i class="fas fa-calendar-week"></i> Jornada semanal</label>
+                <div id="jornadaSemanalSection" class="jornada-semanal-shell">
+                    <div class="jornada-semanal-actions">
+                        <button type="button" class="btn-secondary btn-jornada-action" id="btnJornadaSegSex">
+                            <i class="fas fa-business-time"></i> Selecionar segunda a sexta
+                        </button>
+                        <button type="button" class="btn-secondary btn-jornada-action" id="btnJornadaTodos">
+                            <i class="fas fa-layer-group"></i> Selecionar todos
+                        </button>
+                        <button type="button" class="btn-secondary btn-jornada-action" id="btnJornadaCopiarPadrao">
+                            <i class="fas fa-copy"></i> Copiar horario padrao para dias selecionados
+                        </button>
+                    </div>
+                    <div class="jornada-semanal-grid" id="jornadaSemanalGrid">
+                        ${renderJornadaSemanalRows(rows)}
+                    </div>
+                    <div id="jornadaSemanalHint" class="helper-text jornada-semanal-hint${showSuggestion ? '' : ' is-hidden'}">
+                        Este colaborador ainda nao possui jornada semanal salva. Use o botao abaixo para sugerir o padrao atual sem salvar automaticamente.
+                    </div>
+                    <div id="jornadaSemanalSuggestionActions" class="jornada-semanal-suggestion-actions${showSuggestion ? '' : ' is-hidden'}">
+                        <button type="button" class="btn-secondary btn-jornada-action" id="btnJornadaSugerirPadrao">
+                            <i class="fas fa-magic"></i> Sugerir jornada com base no horario padrao
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    function toggleJornadaSemanalDayRow(day, checked) {
+        const row = document.querySelector(`[data-jornada-row="${day}"]`);
+        const times = document.querySelector(`[data-jornada-times="${day}"]`);
+
+        if (row) {
+            row.classList.toggle('is-selected', checked);
+        }
+
+        if (times) {
+            times.classList.toggle('is-hidden', !checked);
+        }
+    }
+
+    function getHorarioPadraoEditor() {
+        return {
+            trabalhoInicio: document.getElementById('editorTrabInicio')?.value || '',
+            trabalhoFim: document.getElementById('editorTrabFim')?.value || '',
+            almocoInicio: document.getElementById('editorAlmInicio')?.value || '',
+            almocoFim: document.getElementById('editorAlmFim')?.value || ''
+        };
+    }
+
+    function copyHorarioPadraoParaJornadaSelecionada() {
+        const padrao = getHorarioPadraoEditor();
+        const checkedDays = Array.from(document.querySelectorAll('[data-jornada-check]:checked'));
+
+        checkedDays.forEach((checkbox) => {
+            const day = checkbox.getAttribute('data-jornada-check');
+            const entrada = document.querySelector(`[data-jornada-entrada="${day}"]`);
+            const saida = document.querySelector(`[data-jornada-saida="${day}"]`);
+            const almocoInicio = document.querySelector(`[data-jornada-almoco-inicio="${day}"]`);
+            const almocoFim = document.querySelector(`[data-jornada-almoco-fim="${day}"]`);
+
+            if (entrada) entrada.value = padrao.trabalhoInicio;
+            if (saida) saida.value = padrao.trabalhoFim;
+            if (almocoInicio) almocoInicio.value = padrao.almocoInicio;
+            if (almocoFim) almocoFim.value = padrao.almocoFim;
+        });
+
+        if (checkedDays.length > 0) {
+            setJornadaSemanalEditorTouched(true);
+        }
+    }
+
+    function setJornadaSemanalDays(days = []) {
+        const daySet = new Set(days.map((day) => Number(day)));
+
+        JORNADA_SEMANAL_DIAS.forEach((dayInfo) => {
+            const checkbox = document.querySelector(`[data-jornada-check="${dayInfo.diaSemana}"]`);
+            const checked = daySet.has(dayInfo.diaSemana);
+
+            if (checkbox) {
+                checkbox.checked = checked;
+            }
+
+            toggleJornadaSemanalDayRow(dayInfo.diaSemana, checked);
+        });
+
+        setJornadaSemanalEditorTouched(true);
+    }
+
+    function collectJornadaSemanalPayloadFromEditor() {
+        return JORNADA_SEMANAL_DIAS.map((dayInfo) => {
+            const checked = document.querySelector(`[data-jornada-check="${dayInfo.diaSemana}"]`)?.checked;
+
+            if (!checked) {
+                return null;
+            }
+
+            return {
+                diaSemana: dayInfo.diaSemana,
+                trabalhoInicio: document.querySelector(`[data-jornada-entrada="${dayInfo.diaSemana}"]`)?.value || null,
+                trabalhoFim: document.querySelector(`[data-jornada-saida="${dayInfo.diaSemana}"]`)?.value || null,
+                almocoInicio: document.querySelector(`[data-jornada-almoco-inicio="${dayInfo.diaSemana}"]`)?.value || null,
+                almocoFim: document.querySelector(`[data-jornada-almoco-fim="${dayInfo.diaSemana}"]`)?.value || null
+            };
+        }).filter(Boolean);
+    }
+
+    function bindJornadaSemanalEditorEvents() {
+        const section = document.getElementById('jornadaSemanalSection');
+
+        if (!section || section.dataset.bound === 'true') {
+            return;
+        }
+
+        section.dataset.bound = 'true';
+
+        document.querySelectorAll('[data-jornada-check]').forEach((input) => {
+            input.addEventListener('change', () => {
+                const day = Number(input.getAttribute('data-jornada-check'));
+                toggleJornadaSemanalDayRow(day, input.checked);
+                setJornadaSemanalEditorTouched(true);
+            });
+        });
+
+        document.querySelectorAll(
+            '[data-jornada-entrada], [data-jornada-saida], [data-jornada-almoco-inicio], [data-jornada-almoco-fim]'
+        ).forEach((input) => {
+            input.addEventListener('input', () => {
+                setJornadaSemanalEditorTouched(true);
+            });
+        });
+
+        document.getElementById('btnJornadaSegSex')?.addEventListener('click', () => {
+            setJornadaSemanalDays([1, 2, 3, 4, 5]);
+        });
+
+        document.getElementById('btnJornadaTodos')?.addEventListener('click', () => {
+            setJornadaSemanalDays([0, 1, 2, 3, 4, 5, 6]);
+        });
+
+        document.getElementById('btnJornadaCopiarPadrao')?.addEventListener('click', () => {
+            copyHorarioPadraoParaJornadaSelecionada();
+        });
+
+        document.getElementById('btnJornadaSugerirPadrao')?.addEventListener('click', () => {
+            setJornadaSemanalDays([1, 2, 3, 4, 5]);
+            copyHorarioPadraoParaJornadaSelecionada();
+        });
+    }
+
+    function updateJornadaSemanalSuggestionVisibility(showSuggestion) {
+        const hint = document.getElementById('jornadaSemanalHint');
+        const actions = document.getElementById('jornadaSemanalSuggestionActions');
+
+        if (hint) {
+            hint.classList.toggle('is-hidden', !showSuggestion);
+        }
+
+        if (actions) {
+            actions.classList.toggle('is-hidden', !showSuggestion);
+        }
+    }
+
+    async function hydrateJornadaSemanalEditor(colaboradorId) {
+        const meta = getJornadaSemanalEditorMeta();
+        meta.loaded = false;
+        meta.hasExisting = false;
+
+        if (!colaboradorId || !window.API?.getColaboradorJornadaSemanal) {
+            meta.loaded = true;
+            setJornadaSemanalEditorTouched(false);
+            updateJornadaSemanalSuggestionVisibility(false);
+            bindJornadaSemanalEditorEvents();
+            return;
+        }
+
+        try {
+            const payload = await window.API.getColaboradorJornadaSemanal(colaboradorId);
+            const rows = mapJornadaSemanalRowsToEditor(payload?.items || []);
+            const grid = document.getElementById('jornadaSemanalGrid');
+
+            if (grid) {
+                grid.innerHTML = renderJornadaSemanalRows(rows);
+            }
+
+            meta.hasExisting = rows.some((item) => item.checked);
+            meta.loaded = true;
+            setJornadaSemanalEditorTouched(false);
+            updateJornadaSemanalSuggestionVisibility(!meta.hasExisting);
+            bindJornadaSemanalEditorEvents();
+        } catch (error) {
+            meta.loaded = true;
+            meta.hasExisting = false;
+            setJornadaSemanalEditorTouched(false);
+            updateJornadaSemanalSuggestionVisibility(true);
+            bindJornadaSemanalEditorEvents();
+        }
+    }
+
+    window.abrirEditorColaboradores = abrirEditorColaboradores = async function abrirEditorColaboradoresAtualizado(id) {
+        if (
+            (!Array.isArray(window.setores) || window.setores.length === 0)
+            && typeof carregarSetores === 'function'
+        ) {
+            await carregarSetores();
+        }
+
+        const colaborador = id ? (window.colaboradores || []).find((item) => Number(item.Id) === Number(id)) : null;
+        const editorPanel = document.getElementById('colaboradorEditor');
+        const editorTitle = document.getElementById('editorTitle');
+        const editorContent = document.getElementById('colaboradorEditorContent');
+
+        if (!editorPanel || !editorTitle || !editorContent) {
+            return;
+        }
+
+        editorPanel.style.display = 'block';
+        editorTitle.innerText = colaborador ? 'Editar Colaborador' : 'Novo Colaborador';
+
+        const jornadaMeta = getJornadaSemanalEditorMeta();
+        jornadaMeta.colaboradorId = colaborador ? Number(colaborador.Id) : null;
+        jornadaMeta.hasExisting = false;
+        jornadaMeta.loaded = false;
+        jornadaMeta.touched = false;
+
+        editorContent.innerHTML = `
+            <div class="editor-colaborador">
+                <div class="editor-form-group">
+                    <label><i class="fas fa-user"></i> Nome</label>
+                    <input type="text" id="editorNome" value="${escapeHtml(colaborador?.Nome || '')}" placeholder="Nome completo" class="form-control">
+                </div>
+
+                <div class="editor-form-group">
+                    <label><i class="fas fa-layer-group"></i> Setor</label>
+                    <div class="setor-inputs">
+                        <select id="editorSetorId" class="form-control">
+                            ${buildSetorEditorOptions(colaborador?.SetorId || '')}
+                        </select>
+                        <button type="button" onclick="adicionarSetorRapido()" class="btn-secondary btn-setor-rapido">
+                            <i class="fas fa-plus"></i> Novo setor
+                        </button>
+                    </div>
+                </div>
+
+                <div class="editor-form-group">
+                    <label><i class="fas fa-briefcase"></i> Horario de entrada e saida</label>
+                    <div class="time-inputs">
+                        <input type="time" id="editorTrabInicio" value="${escapeHtml(formatarHora(colaborador?.TrabalhoInicio) || '')}" class="form-control">
+                        <span>ate</span>
+                        <input type="time" id="editorTrabFim" value="${escapeHtml(formatarHora(colaborador?.TrabalhoFim) || '')}" class="form-control">
+                    </div>
+                </div>
+
+                <div class="editor-form-group">
+                    <label><i class="fas fa-utensils"></i> Horario de almoco</label>
+                    <div class="time-inputs">
+                        <input type="time" id="editorAlmInicio" value="${escapeHtml(formatarHora(colaborador?.AlmocoInicio) || '')}" class="form-control">
+                        <span>ate</span>
+                        <input type="time" id="editorAlmFim" value="${escapeHtml(formatarHora(colaborador?.AlmocoFim) || '')}" class="form-control">
+                    </div>
+                    <small class="helper-text">Esses horarios definem a base padrao da escala para esse colaborador.</small>
+                </div>
+
+                ${typeof buildBancoHorasEditorMarkup === 'function' ? buildBancoHorasEditorMarkup(colaborador) : ''}
+                ${buildJornadaSemanalEditorMarkup(buildJornadaSemanalDefaultRows(), { showSuggestion: false })}
+
+                <div class="editor-actions">
+                    <button onclick="salvarColaboradorEditor(${colaborador ? colaborador.Id : 'null'})" class="btn-primary">
+                        <i class="fas fa-save"></i> ${colaborador ? 'Atualizar' : 'Salvar'}
+                    </button>
+                    <button onclick="fecharColaboradorEditor()" class="btn-secondary">
+                        <i class="fas fa-times"></i> Cancelar
+                    </button>
+                </div>
+
+                ${colaborador ? `
+                    <div class="editor-footer">
+                        <button onclick="excluirColaborador(${colaborador.Id})" class="btn-danger" style="width: 100%;">
+                            <i class="fas fa-trash"></i> Excluir Colaborador
+                        </button>
+                    </div>
+                ` : ''}
+            </div>
+        `;
+
+        if (colaborador?.Id) {
+            hydrateJornadaSemanalEditor(colaborador.Id);
+        } else {
+            bindJornadaSemanalEditorEvents();
+            jornadaMeta.loaded = true;
+            updateJornadaSemanalSuggestionVisibility(false);
+            setJornadaSemanalEditorTouched(false);
+        }
+    };
+
+    window.abrirEditorColaborador = abrirEditorColaborador = async function abrirEditorColaboradorAtualizado(id) {
+        return window.abrirEditorColaboradores(id);
+    };
+
+    window.salvarColaboradorEditor = salvarColaboradorEditor = async function salvarColaboradorEditorComSetor(id) {
+        const nome = document.getElementById('editorNome')?.value?.trim();
+        const setorId = document.getElementById('editorSetorId')?.value || null;
+        const trabalhoInicio = document.getElementById('editorTrabInicio')?.value || null;
+        const trabalhoFim = document.getElementById('editorTrabFim')?.value || null;
+        const almocoInicio = document.getElementById('editorAlmInicio')?.value || null;
+        const almocoFim = document.getElementById('editorAlmFim')?.value || null;
+        const bancoHorasSaldoOriginal = (document.getElementById('editorBancoHorasSaldoOriginal')?.value || '').trim() || '+00:00';
+        const bancoHorasHabilitado = document.querySelector('.banco-horas-editor-shell')?.dataset?.enabled !== 'false';
+        let bancoHorasSaldo = bancoHorasSaldoOriginal;
+
+        if (!nome) {
+            mostrarToast('Nome e obrigatorio!', 'error');
+            return;
+        }
+
+        if (!setorId) {
+            mostrarToast('Selecione um setor para o colaborador.', 'warning');
+            return;
+        }
+
+        if (bancoHorasHabilitado) {
+            try {
+                bancoHorasSaldo = obterSaldoBancoHorasEditorValue();
+            } catch (error) {
+                mostrarToast(error.message || 'Revise o saldo do banco de horas.', 'error');
+                return;
+            }
+        }
+
+        try {
+            const metodo = id ? 'PUT' : 'POST';
+            const url = id
+                ? `http://localhost:3000/api/colaboradores/${id}`
+                : 'http://localhost:3000/api/colaboradores';
+            const jornadaMeta = getJornadaSemanalEditorMeta();
+            const jornadaSemanal = collectJornadaSemanalPayloadFromEditor();
+            const shouldSendJornadaSemanal = Boolean(
+                jornadaMeta.touched
+                || (!id && jornadaSemanal.length > 0)
+            );
+            const invalidJornadaDia = shouldSendJornadaSemanal
+                ? jornadaSemanal.find((item) => !item.trabalhoInicio || !item.trabalhoFim)
+                : null;
+            const body = {
+                nome,
+                setorId,
+                trabalhoInicio,
+                trabalhoFim,
+                almocoInicio,
+                almocoFim
+            };
+
+            if (invalidJornadaDia) {
+                const dayInfo = JORNADA_SEMANAL_DIAS.find((day) => Number(day.diaSemana) === Number(invalidJornadaDia.diaSemana));
+                mostrarToast(`Preencha entrada e saida para ${dayInfo?.label || 'o dia selecionado'}.`, 'warning');
+                return;
+            }
+
+            if (shouldSendJornadaSemanal) {
+                body.jornadaSemanal = jornadaSemanal;
+            }
+
+            const response = await fetch(url, {
+                method: metodo,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+            });
+            const data = await response.json().catch(() => null);
+
+            if (!response.ok) {
+                throw new Error(data?.error || data?.message || 'Erro ao salvar');
+            }
+
+            const colaboradorId = Number(data?.data?.Id || data?.Id || id);
+
+            if (
+                bancoHorasHabilitado
+                && bancoHorasSaldo !== bancoHorasSaldoOriginal
+                && Number.isFinite(colaboradorId)
+                && colaboradorId > 0
+                && window.API?.atualizarBancoHorasSaldo
+            ) {
+                await window.API.atualizarBancoHorasSaldo(colaboradorId, {
+                    saldo: bancoHorasSaldo
+                });
+            }
+
+            await Promise.allSettled([
+                typeof carregarSetores === 'function' ? carregarSetores() : Promise.resolve([]),
+                carregarColaboradores(),
+                typeof carregarBancoHorasResumo === 'function' ? carregarBancoHorasResumo() : Promise.resolve(null)
+            ]);
+
+            if (typeof renderListaColaboradores === 'function') {
+                renderListaColaboradores();
+            }
+
+            if (typeof fecharColaboradorEditor === 'function') {
+                fecharColaboradorEditor();
+            }
+
+            mostrarToast(
+                id ? 'Colaborador atualizado!' : 'Colaborador salvo com sucesso!',
+                'success'
+            );
+        } catch (error) {
+            console.error('Erro ao salvar:', error);
+            mostrarToast(error.message || 'Erro ao salvar colaborador', 'error');
+        }
+    };
 
     window.renderColaboradoresPlantao = renderColaboradoresPlantao = function renderColaboradoresPlantaoAvancado(colaboradoresIds) {
         if (!colaboradoresIds || colaboradoresIds.length === 0) {
@@ -3296,6 +4094,10 @@
     function ajustarAncoraSabadoPlantao(referenciaISO) {
         const data = criarDataLocalPlantao(obterDataISO(referenciaISO) || obterDataISO(new Date()));
 
+        if (data.getDay() === 0) {
+            data.setDate(data.getDate() - 1);
+        }
+
         while (data.getDay() !== 6) {
             data.setDate(data.getDate() + 1);
         }
@@ -3345,7 +4147,8 @@
                 temPlantao: Boolean(plantao),
                 isPast: dataISO < hojeISO,
                 isToday: dataISO === hojeISO,
-                isActive: dataFoco === dataISO
+                isActive: dataFoco === dataISO,
+                tipoLabel: 'Sabado'
             });
         }
 
@@ -3358,6 +4161,7 @@
                 type="button"
                 class="sabado-card ${sabado.temPlantao ? 'lancado' : ''} ${sabado.isPast ? 'passado' : ''} ${sabado.isToday ? 'hoje' : ''} ${sabado.isActive ? 'is-active' : ''}"
                 data-plantao-sabado="${sabado.dataISO}"
+                onclick="abrirPlantaoPorData('${sabado.dataISO}')"
                 title="${escapeHtml(sabado.formatada)}${sabado.temPlantao ? ' - Plantao ja lancado' : ''}"
             >
                 <div class="sabado-card-badges">
@@ -3367,6 +4171,7 @@
                 <div class="sabado-dia">${escapeHtml(sabado.dia)}</div>
                 <div class="sabado-mes">${escapeHtml(sabado.mes)}</div>
                 <div class="sabado-ano">${escapeHtml(String(sabado.ano))}</div>
+                <div class="sabado-tipo">${escapeHtml(sabado.tipoLabel || 'Sabado')}</div>
                 <div class="sabado-status">${sabado.temPlantao ? 'Clique para editar' : 'Clique para lancar'}</div>
             </button>
         `).join('');
@@ -3377,6 +4182,35 @@
             element.classList.toggle('is-active', element.getAttribute('data-plantao-sabado') === dataISO);
         });
     }
+
+    async function openPlantaoEditorFromGrid(dataISO) {
+        const normalized = obterDataISO(dataISO);
+
+        if (!normalized || typeof window.abrirEditorPlantao !== 'function') {
+            return;
+        }
+
+        await window.abrirEditorPlantao(normalized, formatarDataPlantaoCard(normalized));
+    }
+
+    function resolvePlantaoWeekdayEscala(dataISO) {
+        const normalized = obterDataISO(dataISO);
+
+        if (!normalized) {
+            return new Date().getDay();
+        }
+
+        const [year, month, day] = normalized.split('-').map(Number);
+        return new Date(year, month - 1, day, 12, 0, 0).getDay();
+    }
+
+    function isPlantaoSabadoEscala(dataISO) {
+        return Boolean(obterDataISO(dataISO)) && resolvePlantaoWeekdayEscala(dataISO) === 6;
+    }
+
+    window.abrirPlantaoPorData = abrirPlantaoPorData = function abrirPlantaoPorDataAtualizado(dataISO) {
+        return openPlantaoEditorFromGrid(dataISO);
+    };
 
     function atualizarResumoPlantaoNaTela() {
         const container = document.getElementById('listaPlantoesLancados');
@@ -3394,7 +4228,13 @@
                 return '<div class="empty-state">Nenhum plantao lancado ainda</div>';
             }
 
-            const ordenados = [...window.plantoesLancados].sort((a, b) => new Date(b.dataISO) - new Date(a.dataISO));
+            const ordenados = [...window.plantoesLancados]
+                .filter((plantao) => plantao.tipoPlantao === 'sabado' || isPlantaoSabadoEscala(plantao.dataISO))
+                .sort((a, b) => new Date(b.dataISO) - new Date(a.dataISO));
+
+            if (ordenados.length === 0) {
+                return '<div class="empty-state">Nenhum plantao de sabado lancado ainda</div>';
+            }
 
             return ordenados.map((plantao) => `
                 <div class="plantao-card">
@@ -3402,6 +4242,7 @@
                         <div>
                             <div class="plantao-data">${escapeHtml(formatarDataPtBr(plantao.dataISO))}</div>
                             <div class="plantao-meta">
+                                <span><i class="fas fa-calendar-week"></i> ${escapeHtml((plantao.tipoPlantao || 'sabado').charAt(0).toUpperCase() + (plantao.tipoPlantao || 'sabado').slice(1))}</span>
                                 <span><i class="fas fa-clock"></i> ${escapeHtml(formatarHoraInput(plantao.horaInicio) || '--:--')} - ${escapeHtml(formatarHoraInput(plantao.horaFim) || '--:--')}</span>
                                 <span><i class="fas fa-wallet"></i> ${escapeHtml(plantao.duracaoFormatada || (plantao.horaInicio && plantao.horaFim ? minutosParaTexto((((Number(plantao.horaFim.slice(0, 2)) * 60) + Number(plantao.horaFim.slice(3, 5))) - ((Number(plantao.horaInicio.slice(0, 2)) * 60) + Number(plantao.horaInicio.slice(3, 5))))) : 'Horario pendente'))}</span>
                             </div>
@@ -3442,6 +4283,8 @@
             typeof carregarBancoHorasResumo === 'function' ? carregarBancoHorasResumo() : Promise.resolve(null)
         ]);
 
+        window.plantoesLancados = (window.plantoesLancados || []).filter((plantao) => isPlantaoSabadoEscala(plantao.dataISO));
+
         const dataFoco = obterDataISO(window.__plantaoDataFocoISO || getPlantaoEditorState()?.dataISO || '');
         definirAncoraSabadoPlantao(dataFoco || obterAncoraSabadoPlantao());
 
@@ -3452,8 +4295,8 @@
         appContent.innerHTML = `
             <div class="page-header">
                 <div>
-                    <h1><i class="fas fa-calendar-plus"></i> Plantoes de Sabado</h1>
-                    <p>Consulte sabados anteriores e futuros, abra um plantao existente para editar e mantenha o mesmo registro atualizado.</p>
+                    <h1><i class="fas fa-calendar-plus"></i> Plantoes de sabado</h1>
+                    <p>Consulte os plantões de sabado, abra um registro existente para editar e mantenha o mesmo lancamento atualizado.</p>
                 </div>
             </div>
 
@@ -3531,15 +4374,19 @@
             renderLancamentoPlantao();
         });
 
-        document.querySelectorAll('[data-plantao-sabado]').forEach((element) => {
-            element.addEventListener('click', () => {
-                const dataISO = element.getAttribute('data-plantao-sabado');
-                window.abrirEditorPlantao(dataISO, formatarDataPlantaoCard(dataISO));
-            });
+        document.getElementById('listaSabados')?.addEventListener('click', async (event) => {
+            const trigger = event.target.closest('[data-plantao-sabado]');
+
+            if (!trigger) {
+                return;
+            }
+
+            const dataISO = trigger.getAttribute('data-plantao-sabado');
+            await openPlantaoEditorFromGrid(dataISO);
         });
 
         if (dataFoco) {
-            await window.abrirEditorPlantao(dataFoco, formatarDataPlantaoCard(dataFoco));
+            await openPlantaoEditorFromGrid(dataFoco);
         } else {
             const editorPanel = document.getElementById('plantaoEditor');
 
@@ -3552,14 +4399,37 @@
     };
 
     window.abrirEditorPlantao = abrirEditorPlantao = async function abrirEditorPlantaoAvancado(dataISO, dataFormatada) {
+        const editorPanel = document.getElementById('plantaoEditor');
+        const editorTitle = document.getElementById('plantaoDataTitle');
+        const editorContent = document.getElementById('plantaoEditorContent');
+
+        if (!editorPanel || !editorTitle || !editorContent) {
+            window.__plantaoDataFocoISO = dataISO;
+
+            if (typeof renderLancamentoPlantao === 'function') {
+                await renderLancamentoPlantao();
+            }
+
+            return;
+        }
+
         window.__plantaoDataFocoISO = dataISO;
         definirAncoraSabadoPlantao(dataISO);
         atualizarSabadoSelecionadoPlantao(dataISO);
 
         const existente = (window.plantoesLancados || []).find((item) => item.dataISO === dataISO);
+
+        if (!isPlantaoSabadoEscala(dataISO)) {
+            if (typeof mostrarToast === 'function') {
+                mostrarToast('Plantao agora e lancado somente aos sabados.', 'warning');
+            }
+            return;
+        }
+
         const state = setPlantaoEditorState({
             dataISO,
             dataFormatada,
+            tipoPlantao: 'sabado',
             horaInicio: existente?.horaInicio ? formatarHoraInput(existente.horaInicio) : '',
             horaFim: existente?.horaFim ? formatarHoraInput(existente.horaFim) : '',
             observacao: existente?.observacao || '',
@@ -3596,6 +4466,7 @@
     };
 
     window.salvarPlantao = salvarPlantao = async function salvarPlantaoAvancado(dataISO) {
+        const tipoPlantao = 'sabado';
         const horaInicio = document.getElementById('plantaoHoraInicio')?.value;
         const horaFim = document.getElementById('plantaoHoraFim')?.value;
         const observacao = document.getElementById('plantaoObservacao')?.value || '';
@@ -3617,10 +4488,16 @@
             return;
         }
 
+        if (!isPlantaoSabadoEscala(dataISO)) {
+            mostrarToast('Plantao agora e lancado somente aos sabados.', 'warning');
+            return;
+        }
+
         try {
             window.__plantaoDataFocoISO = dataISO;
             await window.API.salvarPlantao({
                 dataISO,
+                tipoPlantao,
                 horaInicio,
                 horaFim,
                 observacao,
@@ -3835,7 +4712,8 @@
         'QUARTA-FEIRA',
         'QUINTA-FEIRA',
         'SEXTA-FEIRA',
-        'SABADO'
+        'SABADO',
+        'DOMINGO'
     ];
 
     function buildEscalaMonthOptions(selectedMonth) {
@@ -4016,12 +4894,15 @@
 
         const start = `${year}-${String(month).padStart(2, '0')}-01`;
         const bounds = getMonthBoundsEscala(start);
+        const setorId = getRelatorioEscalaSetorId();
 
         return {
             month,
             year,
             dataInicio: bounds.start,
-            dataFim: bounds.end
+            dataFim: bounds.end,
+            setorId,
+            setorNome: getRelatorioEscalaSetorNome(setorId)
         };
     }
 
@@ -4041,11 +4922,11 @@
         const slots = getEscalaCalendarSlots(boardUtils, days);
         const weeks = [];
 
-        for (let index = 0; index < slots.length; index += 6) {
-            weeks.push(slots.slice(index, index + 6));
+        for (let index = 0; index < slots.length; index += 7) {
+            weeks.push(slots.slice(index, index + 7));
         }
 
-        return weeks.length > 0 ? weeks : [Array(6).fill(null)];
+        return weeks.length > 0 ? weeks : [Array(7).fill(null)];
     }
 
     function formatEscalaMonthHeading(month, year) {
@@ -4095,8 +4976,8 @@
 
     function renderEscalaQuadroCalendarTable(weeks, options = {}) {
         const normalizedWeeks = Array.isArray(weeks) && weeks.length > 0
-            ? weeks.map((week) => Array.from({ length: 6 }, (_, index) => week?.[index] || null))
-            : [Array(6).fill(null)];
+            ? weeks.map((week) => Array.from({ length: 7 }, (_, index) => week?.[index] || null))
+            : [Array(7).fill(null)];
         const wrapperClassName = options.wrapperClassName || 'escala-quadro-calendario';
         const titleClassName = options.titleClassName || 'escala-quadro-calendario-titulo';
         const tableClassName = options.tableClassName || 'escala-quadro-calendario-tabela';
@@ -4133,6 +5014,63 @@
         `;
     }
 
+    function getEscalaSetorNome(item) {
+        const nome = item?.setorNome ?? item?.SetorNome ?? item?.setor ?? item?.Setor;
+        const normalized = String(nome ?? '').trim();
+        return normalized || 'Sem setor';
+    }
+
+    function getEscalaSetorKey(item) {
+        const id = item?.setorId ?? item?.SetorId;
+
+        if (id !== undefined && id !== null && String(id).trim() !== '') {
+            return `id:${String(id).trim()}`;
+        }
+
+        return `nome:${getEscalaSetorNome(item).toLowerCase()}`;
+    }
+
+    function groupEscalaItemsBySetor(items, options = {}) {
+        const source = Array.isArray(items) ? items : [];
+        const groups = new Map();
+
+        source.forEach((item) => {
+            const key = getEscalaSetorKey(item);
+
+            if (!groups.has(key)) {
+                groups.set(key, {
+                    key,
+                    setorNome: getEscalaSetorNome(item),
+                    items: []
+                });
+            }
+
+            groups.get(key).items.push(item);
+        });
+
+        const result = [...groups.values()].sort((first, second) => (
+            first.setorNome.localeCompare(second.setorNome, 'pt-BR', { sensitivity: 'base' })
+        ));
+
+        if (result.length === 0 && options.includeEmpty) {
+            return [{
+                key: 'sem-setor',
+                setorNome: 'Sem setor',
+                items: []
+            }];
+        }
+
+        return result;
+    }
+
+    function normalizeEscalaReportItems(items) {
+        return (Array.isArray(items) ? items : []).map((item) => ({
+            ...item,
+            tipo: window.normalizeRuntimeEscalaTipo(item.tipo || item.Tipo || 'normal'),
+            setorNome: getEscalaSetorNome(item)
+        }));
+    }
+
     function renderMonthlyEscalaReport(items, filters) {
         const boardUtils = window.EscalaReportUtils;
 
@@ -4145,24 +5083,44 @@
             `;
         }
 
-        const days = boardUtils.buildEscalaQuadroMensal(items, {
-            month: filters.month,
-            year: filters.year
+        const normalizedItems = normalizeEscalaReportItems(items);
+        const setorGroups = groupEscalaItemsBySetor(normalizedItems, { includeEmpty: true }).map((group) => {
+            const days = boardUtils.buildEscalaQuadroMensal(group.items, {
+                month: filters.month,
+                year: filters.year
+            });
+
+            return {
+                ...group,
+                days,
+                calendarSlots: getEscalaCalendarSlots(boardUtils, days),
+                daysWithScale: days.filter((day) => day.hasScale).length,
+                totalRows: days.reduce((sum, day) => sum + day.rows.length, 0)
+            };
         });
-        const calendarSlots = getEscalaCalendarSlots(boardUtils, days);
-        const daysWithScale = days.filter((day) => day.hasScale).length;
-        const totalRows = days.reduce((sum, day) => sum + day.rows.length, 0);
+        const daysWithScale = setorGroups.reduce((sum, group) => sum + group.daysWithScale, 0);
+        const totalRows = setorGroups.reduce((sum, group) => sum + group.totalRows, 0);
+
         return `
             <div class="escala-quadro-mensal">
+                ${renderRelatorioEscalaFiltrosAtivos(filters)}
                 <div class="relatorio-total" hidden>
                     Mes: <strong>${escapeHtmlEscala(MESES_LABELS[filters.month - 1] || filters.month)}/${escapeHtmlEscala(filters.year)}</strong>
-                    • Dias exibidos: <strong>${days.length}</strong>
+                    • Setores: <strong>${setorGroups.length}</strong>
                     • Dias com escala: <strong>${daysWithScale}</strong>
                     • Linhas listadas: <strong>${totalRows}</strong>
                 </div>
-                <div class="escala-quadro-grid escala-quadro-grid-calendario">
-                    ${calendarSlots.map((day) => renderEscalaQuadroDayCard(day)).join('')}
-                </div>
+                ${setorGroups.map((group) => `
+                    <section class="relatorio-setor-section">
+                        <div class="relatorio-setor-header">
+                            <span><i class="fas fa-layer-group"></i> ${escapeHtmlEscala(group.setorNome)}</span>
+                            <strong>${group.totalRows} registro(s)</strong>
+                        </div>
+                        <div class="escala-quadro-grid escala-quadro-grid-calendario">
+                            ${group.calendarSlots.map((day) => renderEscalaQuadroDayCard(day)).join('')}
+                        </div>
+                    </section>
+                `).join('')}
             </div>
         `;
     }
@@ -4177,6 +5135,57 @@
     function setCurrentScaleState(state) {
         window.__escalaDiaState = state;
         return state;
+    }
+
+    function getScaleHourBoundsEscala(items = getCurrentScaleState().items || []) {
+        let earliestMinutes = null;
+        let latestMinutes = null;
+
+        const includeCandidate = (value) => {
+            if (!Number.isFinite(value)) {
+                return;
+            }
+
+            earliestMinutes = earliestMinutes === null ? value : Math.min(earliestMinutes, value);
+            latestMinutes = latestMinutes === null ? value : Math.max(latestMinutes, value);
+        };
+
+        (items || []).forEach((item) => {
+            const workStart = getTimeMinutesEscala(item?.horaInicio);
+            const workEnd = getTimeMinutesEscala(item?.horaFim);
+
+            if (workStart !== null && workEnd !== null && workEnd > workStart) {
+                includeCandidate(workStart);
+                includeCandidate(workEnd);
+                includeCandidate(getTimeMinutesEscala(item?.almocoInicio));
+                includeCandidate(getTimeMinutesEscala(item?.almocoFim));
+            }
+        });
+
+        if (earliestMinutes === null || latestMinutes === null) {
+            earliestMinutes = HORA_INICIAL * 60;
+            latestMinutes = HORA_FINAL * 60;
+        }
+
+        const startHour = Math.max(0, Math.floor(earliestMinutes / 60));
+        const endHour = Math.min(23, Math.ceil(latestMinutes / 60));
+
+        return {
+            startHour,
+            endHour: Math.max(startHour, endHour),
+            columnCount: Math.max(1, (Math.max(startHour, endHour) - startHour) + 1)
+        };
+    }
+
+    function applyScaleHourBoundsCssEscala(items = getCurrentScaleState().items || []) {
+        const escalaPage = document.querySelector('.escala-page');
+        const bounds = getScaleHourBoundsEscala(items);
+
+        if (escalaPage) {
+            escalaPage.style.setProperty('--escala-hour-columns', String(bounds.columnCount));
+        }
+
+        return bounds;
     }
 
     function getScaleSortModeEscala() {
@@ -4194,6 +5203,86 @@
         }
 
         return normalized;
+    }
+
+    function getScaleSectorFilterEscala() {
+        return window.__escalaSectorFilterId || 'all';
+    }
+
+    function setScaleSectorFilterEscala(value) {
+        const normalized = value === 'all' || !value ? 'all' : String(value);
+        window.__escalaSectorFilterId = normalized;
+        return normalized;
+    }
+
+    function buildScaleSectorFiltersEscala(items = []) {
+        const dynamicMap = new Map();
+
+        (window.setores || []).forEach((setor) => {
+            dynamicMap.set(String(setor.id), {
+                id: String(setor.id),
+                nome: setor.nome
+            });
+        });
+
+        (items || []).forEach((item) => {
+            if (item.setorId && item.setorNome && !dynamicMap.has(String(item.setorId))) {
+                dynamicMap.set(String(item.setorId), {
+                    id: String(item.setorId),
+                    nome: item.setorNome
+                });
+            }
+        });
+
+        return [
+            { id: 'all', nome: 'Todos' },
+            ...Array.from(dynamicMap.values()).sort((first, second) => String(first.nome || '').localeCompare(String(second.nome || '')))
+        ];
+    }
+
+    function filterScaleItemsBySectorEscala(items = []) {
+        const filterId = getScaleSectorFilterEscala();
+
+        if (filterId === 'all') {
+            return [...items];
+        }
+
+        return (items || []).filter((item) => String(item.setorId || '') === String(filterId));
+    }
+
+    function renderScaleSectorTabsEscala(items = []) {
+        const container = document.getElementById('escalaSectorTabs');
+
+        if (!container) {
+            return;
+        }
+
+        const currentFilter = getScaleSectorFilterEscala();
+        const filters = buildScaleSectorFiltersEscala(items);
+        const hasCurrentFilter = filters.some((item) => String(item.id) === String(currentFilter));
+        const safeFilter = hasCurrentFilter ? currentFilter : 'all';
+
+        if (!hasCurrentFilter) {
+            setScaleSectorFilterEscala(safeFilter);
+        }
+
+        container.innerHTML = filters.map((setor) => `
+            <button
+                type="button"
+                class="escala-sector-tab ${String(setor.id) === String(safeFilter) ? 'is-active' : ''}"
+                data-escala-setor="${escapeHtmlEscala(String(setor.id))}"
+            >
+                ${escapeHtmlEscala(setor.nome)}
+            </button>
+        `).join('');
+
+        container.querySelectorAll('[data-escala-setor]').forEach((button) => {
+            button.addEventListener('click', () => {
+                setScaleSectorFilterEscala(button.getAttribute('data-escala-setor'));
+                renderScaleSectorTabsEscala(getCurrentScaleState().items || []);
+                renderScaleRowsEscala(getCurrentScaleState());
+            });
+        });
     }
 
     function getSortableMinutesEscala(value) {
@@ -4257,6 +5346,56 @@
         }) || null;
     }
 
+    function getIntervalOverlapMinutesEscala(start, end, targetStart, targetEnd) {
+        if (![start, end, targetStart, targetEnd].every(Number.isFinite) || end <= start || targetEnd <= targetStart) {
+            return 0;
+        }
+
+        return Math.max(Math.min(end, targetEnd) - Math.max(start, targetStart), 0);
+    }
+
+    function getClampedIntervalEscala(start, end, min, max) {
+        if (![start, end, min, max].every(Number.isFinite) || end <= start || max <= min) {
+            return null;
+        }
+
+        const clampedStart = Math.max(start, min);
+        const clampedEnd = Math.min(end, max);
+
+        if (clampedEnd <= clampedStart) {
+            return null;
+        }
+
+        return {
+            start: clampedStart,
+            end: clampedEnd
+        };
+    }
+
+    function mergeIntervalsEscala(intervals) {
+        const sorted = intervals
+            .filter(Boolean)
+            .sort((first, second) => first.start - second.start || first.end - second.end);
+        const merged = [];
+
+        sorted.forEach((interval) => {
+            const previous = merged[merged.length - 1];
+
+            if (!previous || interval.start > previous.end) {
+                merged.push({ ...interval });
+                return;
+            }
+
+            previous.end = Math.max(previous.end, interval.end);
+        });
+
+        return merged;
+    }
+
+    function hasCellClassEscala(className, expectedClass) {
+        return String(className || '').split(/\s+/).includes(expectedClass);
+    }
+
     function calculateWorkedMinutesEscala(record) {
         const start = getTimeMinutesEscala(record.horaInicio);
         const end = getTimeMinutesEscala(record.horaFim);
@@ -4265,12 +5404,13 @@
             return 0;
         }
 
-        let total = Math.max(end - start, 0);
+        const total = Math.max(end - start, 0);
+        const blockedIntervals = [];
         const lunchStart = getTimeMinutesEscala(record.almocoInicio);
         const lunchEnd = getTimeMinutesEscala(record.almocoFim);
 
         if (lunchStart !== null && lunchEnd !== null && lunchEnd > lunchStart) {
-            total -= Math.max(Math.min(end, lunchEnd) - Math.max(start, lunchStart), 0);
+            blockedIntervals.push(getClampedIntervalEscala(lunchStart, lunchEnd, start, end));
         }
 
         const partialAbsence = getPartialAbsenceEscala(record.colaboradorId, record.dataISO);
@@ -4278,10 +5418,38 @@
         const absenceEnd = getTimeMinutesEscala(partialAbsence?.horaFim || partialAbsence?.HoraFim);
 
         if (absenceStart !== null && absenceEnd !== null && absenceEnd > absenceStart) {
-            total -= Math.max(Math.min(end, absenceEnd) - Math.max(start, absenceStart), 0);
+            blockedIntervals.push(getClampedIntervalEscala(absenceStart, absenceEnd, start, end));
         }
 
-        return Math.max(total, 0);
+        const blockedMinutes = mergeIntervalsEscala(blockedIntervals)
+            .reduce((sum, interval) => sum + Math.max(interval.end - interval.start, 0), 0);
+
+        return Math.max(total - blockedMinutes, 0);
+    }
+
+    function getColaboradorCadastroEscala(colaboradorId) {
+        return (window.colaboradores || []).find((item) => Number(item.Id) === Number(colaboradorId)) || null;
+    }
+
+    function getDefaultLunchRangeEscala(colaboradorId) {
+        const colaborador = getColaboradorCadastroEscala(colaboradorId);
+        const start = getTimeMinutesEscala(colaborador?.AlmocoInicio || colaborador?.almocoInicio);
+        const end = getTimeMinutesEscala(colaborador?.AlmocoFim || colaborador?.almocoFim);
+
+        if (start === null || end === null || end <= start) {
+            return null;
+        }
+
+        return { start, end };
+    }
+
+    function isSameLunchAsCadastroEscala(colaboradorId, almocoInicio, almocoFim) {
+        const colaborador = getColaboradorCadastroEscala(colaboradorId);
+        const cadastroInicio = formatTimeInputEscala(colaborador?.AlmocoInicio || colaborador?.almocoInicio);
+        const cadastroFim = formatTimeInputEscala(colaborador?.AlmocoFim || colaborador?.almocoFim);
+
+        return cadastroInicio === formatTimeInputEscala(almocoInicio)
+            && cadastroFim === formatTimeInputEscala(almocoFim);
     }
 
     function getCellStateEscala(record, hour) {
@@ -4290,6 +5458,8 @@
         const end = getTimeMinutesEscala(record.horaFim);
         const lunchStart = getTimeMinutesEscala(record.almocoInicio);
         const lunchEnd = getTimeMinutesEscala(record.almocoFim);
+        const defaultLunch = getDefaultLunchRangeEscala(record.colaboradorId);
+        const adjustedLunch = Boolean(record.almocoPersonalizado || record.almocoAjustado);
         const currentHourStart = hour * 60;
         const currentHourEnd = (hour + 1) * 60;
         const partialAbsence = getPartialAbsenceEscala(record.colaboradorId, record.dataISO);
@@ -4308,23 +5478,36 @@
             return { className: 'ausencia', status: 'Ausencia' };
         }
 
-        if (start === null || end === null || currentHourStart < start || currentHourStart >= end) {
+        const workOverlap = getIntervalOverlapMinutesEscala(currentHourStart, currentHourEnd, start, end);
+
+        if (start === null || end === null || end <= start || workOverlap <= 0) {
             return { className: 'fora-expediente', status: 'Fora do expediente' };
         }
 
-        if (absenceStart !== null && absenceEnd !== null) {
-            const overlapAbsence = Math.max(Math.min(currentHourEnd, absenceEnd) - Math.max(currentHourStart, absenceStart), 0);
+        if (absenceStart !== null && absenceEnd !== null && absenceEnd > absenceStart) {
+            const overlapAbsence = getIntervalOverlapMinutesEscala(currentHourStart, currentHourEnd, absenceStart, absenceEnd);
 
             if (overlapAbsence > 0) {
                 return { className: 'ausencia-parcial', status: 'Ausencia parcial' };
             }
         }
 
-        if (lunchStart !== null && lunchEnd !== null) {
-            const overlapLunch = Math.max(Math.min(currentHourEnd, lunchEnd) - Math.max(currentHourStart, lunchStart), 0);
+        if (lunchStart !== null && lunchEnd !== null && lunchEnd > lunchStart) {
+            const overlapLunch = getIntervalOverlapMinutesEscala(currentHourStart, currentHourEnd, lunchStart, lunchEnd);
 
             if (overlapLunch > 0) {
-                return { className: 'almoco', status: 'Almoco' };
+                return { className: `almoco${adjustedLunch ? ' almoco-ajustado' : ''}`, status: 'Almoco' };
+            }
+        }
+
+        if (adjustedLunch && defaultLunch) {
+            const overlapDefaultLunch = Math.max(
+                Math.min(currentHourEnd, defaultLunch.end) - Math.max(currentHourStart, defaultLunch.start),
+                0
+            );
+
+            if (overlapDefaultLunch > 0) {
+                return { className: 'trabalhando almoco-cadastro-hint', status: 'Horario padrao do almoco' };
             }
         }
 
@@ -4334,6 +5517,448 @@
         };
     }
 
+    function clearLunchDropPreviewEscala() {
+        document.querySelectorAll('.timeline-cell.drop-target-over, .timeline-cell.drop-preview').forEach((cell) => {
+            cell.classList.remove('drop-target-over', 'drop-preview');
+        });
+
+        document.querySelectorAll('.timeline-row.is-dragging-lunch, .timeline-row.is-saving-lunch').forEach((row) => {
+            row.classList.remove('is-dragging-lunch', 'is-saving-lunch');
+        });
+    }
+
+    function buildLunchDropRangeEscala(record, targetHour) {
+        const workStart = getTimeMinutesEscala(record.horaInicio);
+        const workEnd = getTimeMinutesEscala(record.horaFim);
+        const lunchStart = getTimeMinutesEscala(record.almocoInicio);
+        const lunchEnd = getTimeMinutesEscala(record.almocoFim);
+
+        if (
+            workStart === null
+            || workEnd === null
+            || lunchStart === null
+            || lunchEnd === null
+            || lunchEnd <= lunchStart
+        ) {
+            return null;
+        }
+
+        const duration = lunchEnd - lunchStart;
+        const nextStart = targetHour * 60;
+        const nextEnd = nextStart + duration;
+
+        if (nextStart < workStart || nextEnd > workEnd) {
+            return null;
+        }
+
+        return {
+            startMinutes: nextStart,
+            endMinutes: nextEnd
+        };
+    }
+
+    function applyLunchDropPreviewEscala(row, range) {
+        clearLunchDropPreviewEscala();
+
+        if (!row || !range) {
+            return;
+        }
+
+        row.classList.add('is-dragging-lunch');
+
+        row.querySelectorAll('.timeline-cell[data-hour]').forEach((cell) => {
+            const hour = Number(cell.dataset.hour);
+            const currentHourStart = hour * 60;
+            const currentHourEnd = (hour + 1) * 60;
+            const overlap = Math.max(
+                Math.min(currentHourEnd, range.endMinutes) - Math.max(currentHourStart, range.startMinutes),
+                0
+            );
+
+            if (overlap > 0) {
+                cell.classList.add('drop-preview');
+            }
+        });
+    }
+
+    function getTimelineVisibleBoundsEscala() {
+        const bounds = getScaleHourBoundsEscala();
+        return {
+            start: bounds.startHour * 60,
+            end: (bounds.endHour + 1) * 60
+        };
+    }
+
+    function getScaleLunchDraftEscala(colaboradorId) {
+        return window.__escalaLunchDrafts?.[Number(colaboradorId)] || null;
+    }
+
+    function setScaleLunchDraftEscala(colaboradorId, draft) {
+        if (!window.__escalaLunchDrafts) {
+            window.__escalaLunchDrafts = {};
+        }
+
+        if (!draft) {
+            delete window.__escalaLunchDrafts[Number(colaboradorId)];
+            return;
+        }
+
+        window.__escalaLunchDrafts[Number(colaboradorId)] = draft;
+    }
+
+    function applyScaleLunchDraftEscala(record) {
+        const draft = getScaleLunchDraftEscala(record?.colaboradorId);
+
+        if (!draft) {
+            return record;
+        }
+
+        return {
+            ...record,
+            almocoInicio: draft.almocoInicio,
+            almocoFim: draft.almocoFim
+        };
+    }
+
+    function buildTimelineLunchOverlayEscala(record) {
+        const workStart = getTimeMinutesEscala(record.horaInicio);
+        const workEnd = getTimeMinutesEscala(record.horaFim);
+        const lunchStart = getTimeMinutesEscala(record.almocoInicio);
+        const lunchEnd = getTimeMinutesEscala(record.almocoFim);
+        const visibleBounds = getTimelineVisibleBoundsEscala();
+        const visibleSpan = visibleBounds.end - visibleBounds.start;
+
+        if (workStart === null || workEnd === null || lunchStart === null || lunchEnd === null || lunchEnd <= lunchStart) {
+            return '';
+        }
+
+        const clampedStart = Math.max(lunchStart, visibleBounds.start);
+        const clampedEnd = Math.min(lunchEnd, visibleBounds.end);
+
+        if (clampedEnd <= clampedStart || visibleSpan <= 0) {
+            return '';
+        }
+
+        const left = ((clampedStart - visibleBounds.start) / visibleSpan) * 100;
+        const width = ((clampedEnd - clampedStart) / visibleSpan) * 100;
+        const adjusted = record.almocoPersonalizado || record.almocoAjustado;
+
+        return `
+            <div class="timeline-lunch-overlay" data-colaborador-id="${record.colaboradorId}">
+                <div
+                    class="timeline-lunch-drag-block${adjusted ? ' is-adjusted' : ''}"
+                    data-role="lunch-block"
+                    style="left:${left}%;width:${width}%;"
+                    title="Arraste o almoco diretamente na tabela"
+                >
+                    <button type="button" class="timeline-lunch-handle start" data-role="start" aria-label="Ajustar inicio do almoco"></button>
+                    <span class="timeline-lunch-label">${escapeHtmlEscala(formatTimeRangeEscala(record.almocoInicio, record.almocoFim))}</span>
+                    <button type="button" class="timeline-lunch-handle end" data-role="end" aria-label="Ajustar fim do almoco"></button>
+                </div>
+            </div>
+        `;
+    }
+
+    async function salvarAjusteDiretoAlmocoEscala(colaboradorId, startMinutes, endMinutes) {
+        const state = getCurrentScaleState();
+        const currentRecord = (state.items || []).find((item) => Number(item.colaboradorId) === Number(colaboradorId));
+
+        if (!currentRecord) {
+            throw new Error('Registro diario nao encontrado para este colaborador.');
+        }
+
+        const nextStart = formatMinutesToTimeEscala(startMinutes);
+        const nextEnd = formatMinutesToTimeEscala(endMinutes);
+        const restoredDefault = isSameLunchAsCadastroEscala(colaboradorId, nextStart, nextEnd);
+        const currentStart = formatTimeInputEscala(currentRecord.almocoInicio);
+        const currentEnd = formatTimeInputEscala(currentRecord.almocoFim);
+
+        if (nextStart === currentStart && nextEnd === currentEnd) {
+            setScaleLunchDraftEscala(colaboradorId, null);
+            return {
+                restoredDefault
+            };
+        }
+
+        setScaleLunchDraftEscala(colaboradorId, {
+            almocoInicio: nextStart,
+            almocoFim: nextEnd
+        });
+
+        try {
+            await window.API.salvarEscalaDia(state.dataISO, colaboradorId, {
+                horaInicio: currentRecord.horaInicio || null,
+                horaFim: currentRecord.horaFim || null,
+                almocoInicio: nextStart,
+                almocoFim: nextEnd,
+                observacao: currentRecord.observacao ?? null
+            });
+            setScaleLunchDraftEscala(colaboradorId, null);
+            await atualizarTudo({ silent: true, source: 'escala' });
+
+            if (window.__escalaEditorColaboradorId && Number(window.__escalaEditorColaboradorId) === Number(colaboradorId)) {
+                abrirEditorNaEscala(colaboradorId);
+            }
+
+            return {
+                restoredDefault
+            };
+        } catch (error) {
+            setScaleLunchDraftEscala(colaboradorId, null);
+            renderScaleRowsEscala(getCurrentScaleState());
+            throw error;
+        }
+    }
+
+    function bindLunchCellDragEscala(row, record) {
+        const lunchCells = Array.from(row.querySelectorAll('.timeline-cell.almoco[data-hour]'));
+        const allCells = Array.from(row.querySelectorAll('.timeline-cell[data-hour]'));
+
+        if (lunchCells.length === 0) {
+            return;
+        }
+
+        const dragState = {
+            colaboradorId: Number(record.colaboradorId),
+            dataISO: record.dataISO
+        };
+
+        lunchCells.forEach((cell) => {
+            cell.draggable = true;
+            cell.classList.add('is-lunch-draggable');
+
+            cell.addEventListener('dragstart', (event) => {
+                window.__escalaLunchHtmlDrag = dragState;
+                row.classList.add('is-dragging-lunch');
+                cell.classList.add('is-drag-source');
+
+                if (event.dataTransfer) {
+                    event.dataTransfer.effectAllowed = 'move';
+                    event.dataTransfer.setData('text/plain', String(record.colaboradorId));
+                }
+            });
+
+            cell.addEventListener('dragend', () => {
+                cell.classList.remove('is-drag-source');
+                window.__escalaLunchHtmlDrag = null;
+                clearLunchDropPreviewEscala();
+            });
+        });
+
+        allCells.forEach((cell) => {
+            const hour = Number(cell.dataset.hour);
+
+            cell.addEventListener('dragover', (event) => {
+                const currentDrag = window.__escalaLunchHtmlDrag;
+                const range = buildLunchDropRangeEscala(record, hour);
+
+                if (!currentDrag || currentDrag.colaboradorId !== Number(record.colaboradorId) || !range) {
+                    return;
+                }
+
+                event.preventDefault();
+                if (event.dataTransfer) {
+                    event.dataTransfer.dropEffect = 'move';
+                }
+                cell.classList.add('drop-target-over');
+                applyLunchDropPreviewEscala(row, range);
+            });
+
+            cell.addEventListener('dragleave', () => {
+                cell.classList.remove('drop-target-over');
+            });
+
+            cell.addEventListener('drop', async (event) => {
+                const currentDrag = window.__escalaLunchHtmlDrag;
+                const range = buildLunchDropRangeEscala(record, hour);
+
+                event.preventDefault();
+                event.stopPropagation();
+                cell.classList.remove('drop-target-over');
+
+                if (!currentDrag || currentDrag.colaboradorId !== Number(record.colaboradorId) || !range) {
+                    clearLunchDropPreviewEscala();
+                    return;
+                }
+
+                row.classList.add('is-saving-lunch');
+
+                try {
+                    const result = await salvarAjusteDiretoAlmocoEscala(record.colaboradorId, range.startMinutes, range.endMinutes);
+                    if (typeof mostrarToast === 'function') {
+                        mostrarToast(
+                            result?.restoredDefault
+                                ? 'Almoco voltou ao horario padrao do cadastro.'
+                                : 'Almoco ajustado apenas para este dia.',
+                            'success'
+                        );
+                    }
+                } catch (error) {
+                    if (typeof mostrarToast === 'function') {
+                        mostrarToast(`Erro ao ajustar almoco: ${error.message}`, 'error');
+                    }
+                } finally {
+                    window.__escalaLunchHtmlDrag = null;
+                    clearLunchDropPreviewEscala();
+                }
+            });
+        });
+    }
+
+    function bindTimelineLunchDragEscala(row, record) {
+        const overlay = row.querySelector('.timeline-lunch-overlay');
+        const block = overlay?.querySelector('[data-role="lunch-block"]');
+        const startHandle = overlay?.querySelector('[data-role="start"]');
+        const endHandle = overlay?.querySelector('[data-role="end"]');
+        const timeCells = Array.from(row.querySelectorAll('.timeline-cell:not(.total-cell)'));
+
+        if (!overlay || !block || !startHandle || !endHandle || timeCells.length === 0) {
+            return;
+        }
+
+        const firstCell = timeCells[0];
+        const lastCell = timeCells[timeCells.length - 1];
+        const rowRect = row.getBoundingClientRect();
+        const firstRect = firstCell.getBoundingClientRect();
+        const lastRect = lastCell.getBoundingClientRect();
+        const overlayLeft = firstRect.left - rowRect.left;
+        const overlayWidth = lastRect.right - firstRect.left;
+
+        overlay.style.left = `${overlayLeft}px`;
+        overlay.style.width = `${overlayWidth}px`;
+
+        const visibleBounds = getTimelineVisibleBoundsEscala();
+        const workStart = getTimeMinutesEscala(record.horaInicio);
+        const workEnd = getTimeMinutesEscala(record.horaFim);
+
+        if (workStart === null || workEnd === null || workEnd <= workStart) {
+            return;
+        }
+
+        const getPointerMinutes = (clientX) => {
+            const rect = overlay.getBoundingClientRect();
+
+            if (rect.width <= 0) {
+                return workStart;
+            }
+
+            const ratio = Math.min(Math.max((clientX - rect.left) / rect.width, 0), 1);
+            const absolute = visibleBounds.start + ((visibleBounds.end - visibleBounds.start) * ratio);
+            return roundMinutesEscala(absolute);
+        };
+
+        const updateBlock = (startMinutes, endMinutes) => {
+            const visibleSpan = visibleBounds.end - visibleBounds.start;
+            const left = ((startMinutes - visibleBounds.start) / visibleSpan) * 100;
+            const width = ((endMinutes - startMinutes) / visibleSpan) * 100;
+            const label = block.querySelector('.timeline-lunch-label');
+
+            block.style.left = `${left}%`;
+            block.style.width = `${width}%`;
+
+            if (label) {
+                label.textContent = formatTimeRangeEscala(
+                    formatMinutesToTimeEscala(startMinutes),
+                    formatMinutesToTimeEscala(endMinutes)
+                );
+            }
+        };
+
+        const beginDrag = (mode, event) => {
+            event.preventDefault();
+            event.stopPropagation();
+
+            const initialStart = getTimeMinutesEscala(record.almocoInicio);
+            const initialEnd = getTimeMinutesEscala(record.almocoFim);
+
+            if (initialStart === null || initialEnd === null || initialEnd <= initialStart) {
+                return;
+            }
+
+            const duration = initialEnd - initialStart;
+            const pointerState = {
+                mode,
+                startPointerMinutes: getPointerMinutes(event.clientX),
+                initialStart,
+                initialEnd,
+                duration
+            };
+
+            const move = (moveEvent) => {
+                let nextStart = pointerState.initialStart;
+                let nextEnd = pointerState.initialEnd;
+
+                if (pointerState.mode === 'move') {
+                    const currentPointerMinutes = getPointerMinutes(moveEvent.clientX);
+                    const delta = currentPointerMinutes - pointerState.startPointerMinutes;
+                    nextStart = roundMinutesEscala(
+                        clampMinutesEscala(pointerState.initialStart + delta, workStart, workEnd - duration)
+                    );
+                    nextEnd = nextStart + duration;
+                } else if (pointerState.mode === 'start') {
+                    nextStart = roundMinutesEscala(
+                        clampMinutesEscala(getPointerMinutes(moveEvent.clientX), workStart, pointerState.initialEnd - ESCALA_EDITOR_PASSO_MINUTOS)
+                    );
+                } else {
+                    nextEnd = roundMinutesEscala(
+                        clampMinutesEscala(getPointerMinutes(moveEvent.clientX), pointerState.initialStart + ESCALA_EDITOR_PASSO_MINUTOS, workEnd)
+                    );
+                }
+
+                if (nextEnd <= nextStart) {
+                    nextEnd = nextStart + ESCALA_EDITOR_PASSO_MINUTOS;
+                }
+
+                updateBlock(nextStart, nextEnd);
+                block.dataset.pendingStart = String(nextStart);
+                block.dataset.pendingEnd = String(nextEnd);
+            };
+
+            const stop = async () => {
+                window.removeEventListener('pointermove', move);
+                window.removeEventListener('pointerup', stop);
+
+                const pendingStart = Number(block.dataset.pendingStart || pointerState.initialStart);
+                const pendingEnd = Number(block.dataset.pendingEnd || pointerState.initialEnd);
+                delete block.dataset.pendingStart;
+                delete block.dataset.pendingEnd;
+
+                row.classList.add('is-saving-lunch');
+
+                try {
+                    await salvarAjusteDiretoAlmocoEscala(record.colaboradorId, pendingStart, pendingEnd);
+                    if (typeof mostrarToast === 'function') {
+                        mostrarToast('Almoco ajustado com sucesso!', 'success');
+                    }
+                } catch (error) {
+                    updateBlock(pointerState.initialStart, pointerState.initialEnd);
+                    if (typeof mostrarToast === 'function') {
+                        mostrarToast(`Erro ao ajustar almoco: ${error.message}`, 'error');
+                    }
+                } finally {
+                    row.classList.remove('is-saving-lunch');
+                }
+            };
+
+            window.addEventListener('pointermove', move);
+            window.addEventListener('pointerup', stop, { once: true });
+        };
+
+        block.addEventListener('click', (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+        });
+        block.addEventListener('pointerdown', (event) => {
+            if (event.target === startHandle || event.target === endHandle) {
+                return;
+            }
+
+            beginDrag('move', event);
+        });
+        startHandle.addEventListener('pointerdown', (event) => beginDrag('start', event));
+        endHandle.addEventListener('pointerdown', (event) => beginDrag('end', event));
+    }
+
     function renderScaleHeaderEscala() {
         const header = document.getElementById('timelineHeader');
 
@@ -4341,10 +5966,12 @@
             return;
         }
 
+        const bounds = applyScaleHourBoundsCssEscala();
+
         header.innerHTML = '<div class="timeline-name-header">Colaborador</div>'
             + '<div class="hora-header total-header" title="Total de horas no dia">Total</div>'
-            + Array.from({ length: (HORA_FINAL - HORA_INICIAL) + 1 }, (_, index) => {
-                const hour = HORA_INICIAL + index;
+            + Array.from({ length: bounds.columnCount }, (_, index) => {
+                const hour = bounds.startHour + index;
                 return `<div class="hora-header">${String(hour).padStart(2, '0')}:00</div>`;
             }).join('');
     }
@@ -4356,14 +5983,15 @@
             return;
         }
 
-        const counts = Array.from({ length: (HORA_FINAL - HORA_INICIAL) + 1 }, (_, index) => ({
-            hour: HORA_INICIAL + index,
+        const bounds = getScaleHourBoundsEscala(items);
+        const counts = Array.from({ length: bounds.columnCount }, (_, index) => ({
+            hour: bounds.startHour + index,
             count: 0
         }));
 
         items.forEach((record) => {
             counts.forEach((item) => {
-                if (getCellStateEscala(record, item.hour).className === 'trabalhando') {
+                if (hasCellClassEscala(getCellStateEscala(record, item.hour).className, 'trabalhando')) {
                     item.count += 1;
                 }
             });
@@ -4402,9 +6030,10 @@
         }
 
         container.style.display = 'block';
+        const bounds = getScaleHourBoundsEscala(items);
 
-        const cards = Array.from({ length: (HORA_FINAL - HORA_INICIAL) + 1 }, (_, index) => {
-            const hour = HORA_INICIAL + index;
+        const cards = Array.from({ length: bounds.columnCount }, (_, index) => {
+            const hour = bounds.startHour + index;
             const counters = {
                 trabalhando: 0,
                 almoco: 0,
@@ -4417,15 +6046,15 @@
             items.forEach((record) => {
                 const state = getCellStateEscala(record, hour).className;
 
-                if (state === 'trabalhando' || state === 'plantao') {
+                if (hasCellClassEscala(state, 'trabalhando')) {
                     counters.trabalhando += 1;
-                } else if (state === 'almoco') {
+                } else if (hasCellClassEscala(state, 'almoco')) {
                     counters.almoco += 1;
-                } else if (state === 'ferias') {
+                } else if (hasCellClassEscala(state, 'ferias')) {
                     counters.ferias += 1;
-                } else if (state === 'ausencia-parcial' || state === 'ausencia') {
+                } else if (hasCellClassEscala(state, 'ausencia-parcial') || hasCellClassEscala(state, 'ausencia')) {
                     counters.ausente += 1;
-                } else if (state === 'folga') {
+                } else if (hasCellClassEscala(state, 'folga')) {
                     counters.folga += 1;
                 } else {
                     counters.fora += 1;
@@ -4475,9 +6104,9 @@
         let icon = 'fa-calendar-times';
 
         if (weekday === 0) {
-            title = 'Nao ha expediente aos domingos';
-            description = 'Nenhum colaborador aparece na escala padrao para domingo.';
-            icon = 'fa-sun';
+            title = 'Nenhum registro para este domingo';
+            description = 'Configure a jornada semanal do colaborador ou use ajuste manual para este dia.';
+            icon = 'fa-calendar-day';
             label = 'DOMINGO';
         } else if (weekday === 6) {
             title = 'Nenhum registro para este sabado';
@@ -4486,6 +6115,7 @@
             label = 'SABADO';
         }
 
+        const bounds = getScaleHourBoundsEscala();
         body.innerHTML = `
             <div class="timeline-row mensagem-row">
                 <div class="timeline-name mensagem-nome">
@@ -4493,7 +6123,7 @@
                     <span>${label}</span>
                 </div>
                 <div class="timeline-cell total-cell"></div>
-                <div class="timeline-cell mensagem-cell" style="grid-column: span 12;">
+                <div class="timeline-cell mensagem-cell" style="grid-column: span ${bounds.columnCount};">
                     <div class="mensagem-conteudo">
                         <i class="fas ${icon}"></i>
                         <h3>${escapeHtmlEscala(title)}</h3>
@@ -4508,6 +6138,9 @@
         const row = document.createElement('div');
         const workRange = formatTimeRangeEscala(record.horaInicio, record.horaFim);
         const lunchRange = formatTimeRangeEscala(record.almocoInicio, record.almocoFim);
+        const almocoStatus = record.almocoPersonalizado || record.almocoAjustado
+            ? 'Almoco ajustado'
+            : 'Almoco padrao';
 
         row.className = 'timeline-row timeline-inline-editor-row';
         row.innerHTML = `
@@ -4523,7 +6156,7 @@
                     <div class="timeline-inline-head">
                         <div>
                             <strong>${escapeHtmlEscala(formatDatePtBrEscala(record.dataISO))} • ${escapeHtmlEscala(getDayLabelEscala(record.dataISO))}</strong>
-                            <span>Clique na faixa e arraste para reposicionar a jornada ou o almoco.</span>
+                            <span>Arraste o bloco de almoco na horizontal para ajustar apenas este dia.</span>
                         </div>
                         <div class="timeline-inline-summary">
                             <span class="timeline-pill work">
@@ -4533,6 +6166,10 @@
                             <span class="timeline-pill lunch">
                                 <i class="fas fa-utensils"></i>
                                 ${escapeHtmlEscala(lunchRange)}
+                            </span>
+                            <span class="timeline-pill ${record.almocoPersonalizado || record.almocoAjustado ? 'warning' : ''}">
+                                <i class="fas fa-wand-magic-sparkles"></i>
+                                ${escapeHtmlEscala(almocoStatus)}
                             </span>
                         </div>
                     </div>
@@ -4545,9 +6182,20 @@
                         <textarea id="escalaObservacao-${record.colaboradorId}">${escapeHtmlEscala(record.observacao || '')}</textarea>
                     </div>
 
+                    <div class="escala-range-card">
+                        <div class="escala-range-card-header">
+                            <strong>Almoco do dia</strong>
+                            <span>O bloco fica preso a jornada do colaborador e respeita a duracao original.</span>
+                        </div>
+                        <div id="escalaRangeLunch-${record.colaboradorId}" class="escala-range-editor"></div>
+                    </div>
+
                     <div class="timeline-inline-actions">
                         <button type="button" onclick="salvarEscalaDia(${record.colaboradorId})" class="btn-primary">
                             <i class="fas fa-save"></i> Salvar ajuste
+                        </button>
+                        <button type="button" onclick="restaurarAlmocoPadraoEscala(${record.colaboradorId})" class="btn-secondary">
+                            <i class="fas fa-rotate-left"></i> Voltar ao padrao
                         </button>
                         <button type="button" onclick="fecharEditor()" class="btn-secondary">
                             <i class="fas fa-times"></i> Fechar
@@ -4567,14 +6215,15 @@
             return;
         }
 
-        const items = [...(state.items || [])].sort(compareScaleRecordsEscala);
+        const items = filterScaleItemsBySectorEscala(state.items || []).sort(compareScaleRecordsEscala);
         const selectedColaboradorId = Number(window.__escalaEditorColaboradorId || 0);
+        const bounds = applyScaleHourBoundsCssEscala(items);
 
         body.innerHTML = '';
 
         if (items.length === 0) {
             renderScaleEmptyMessageEscala(state.dataISO);
-            renderScaleSummaryEscala([]);
+            atualizarBotaoRestaurarAlmocosEscala();
             return;
         }
 
@@ -4588,38 +6237,42 @@
             row.className = `timeline-row${type === 'plantao' ? ' plantao-row' : ''}${isSelected ? ' is-selected' : ''}`;
 
             row.innerHTML = `
-                <div class="timeline-name" data-colaborador-id="${record.colaboradorId}">
+                <div class="timeline-name" data-colaborador-id="${record.colaboradorId}" title="Editar escala de ${escapeHtmlEscala(record.colaboradorNome || 'colaborador')}">
                     <i class="fas fa-user"></i>
-                    <span>${escapeHtmlEscala(record.colaboradorNome || 'Sem nome')}</span>
-                    ${type === 'plantao' ? '<span class="plantao-badge"><i class="fas fa-calendar-check"></i> Plantao</span>' : ''}
-                    ${type !== 'normal' && type !== 'plantao' ? `<small class="escala-dia-tipo">${escapeHtmlEscala(typeLabel)}</small>` : ''}
-                    <i class="fas fa-pen edit-indicator"></i>
+                    <span class="timeline-name-main">
+                        <strong class="timeline-name-text">${escapeHtmlEscala(record.colaboradorNome || 'Sem nome')}</strong>
+                        <span class="timeline-name-meta">
+                            ${record.setorNome ? `<small class="escala-sector-chip">${escapeHtmlEscala(record.setorNome)}</small>` : ''}
+                            ${type === 'plantao' ? '<span class="plantao-badge"><i class="fas fa-calendar-check"></i> Plantao</span>' : ''}
+                            ${type !== 'normal' && type !== 'plantao' ? `<small class="escala-dia-tipo">${escapeHtmlEscala(typeLabel)}</small>` : ''}
+                        </span>
+                    </span>
+                    <span class="timeline-name-action" aria-label="Editar escala">
+                        <i class="fas fa-pen edit-indicator"></i>
+                    </span>
                 </div>
                 <div class="timeline-cell total-cell">
                     <span class="total-valor">${escapeHtmlEscala(totalLabel)}</span>
                 </div>
-                ${Array.from({ length: (HORA_FINAL - HORA_INICIAL) + 1 }, (_, index) => {
-                    const hour = HORA_INICIAL + index;
+                ${Array.from({ length: bounds.columnCount }, (_, index) => {
+                    const hour = bounds.startHour + index;
                     const cellState = getCellStateEscala(record, hour);
-                    return `<div class="timeline-cell ${cellState.className}"></div>`;
+                    return `<div class="timeline-cell ${cellState.className}" data-hour="${hour}" data-colaborador-id="${record.colaboradorId}"></div>`;
                 }).join('')}
             `;
 
-            row.querySelector('.timeline-name')?.addEventListener('click', () => {
+            row.querySelector('.timeline-name')?.addEventListener('click', (event) => {
+                event.preventDefault();
+                event.stopPropagation();
                 abrirEditorNaEscala(record.colaboradorId);
             });
 
-            row.querySelectorAll('.timeline-cell:not(.total-cell)').forEach((cell) => {
-                cell.addEventListener('click', () => {
-                    abrirEditorNaEscala(record.colaboradorId);
-                });
-            });
-
             body.appendChild(row);
+            bindLunchCellDragEscala(row, record);
         });
 
         renderTotalRowEscala(items);
-        renderScaleSummaryEscala(items);
+        atualizarBotaoRestaurarAlmocosEscala();
     }
 
     function getScaleEditorRecordEscala(colaboradorId) {
@@ -5058,6 +6711,7 @@
         }
 
         renderScaleHeaderEscala();
+        renderScaleSectorTabsEscala(state.items || []);
         renderScaleRowsEscala(state);
 
         return state;
@@ -5117,6 +6771,32 @@
         renderScaleEditorEscala(record);
     };
 
+    function bindScaleOutsideSelectionEscala() {
+        const escalaPage = document.querySelector('.escala-page');
+
+        if (!escalaPage || escalaPage.dataset.selectionBound === 'true') {
+            return;
+        }
+
+        escalaPage.dataset.selectionBound = 'true';
+        escalaPage.addEventListener('click', (event) => {
+            if (!window.__escalaEditorColaboradorId) {
+                return;
+            }
+
+            const clickedInsideTimeline = event.target.closest('.timeline-container');
+            const clickedInsideSidebar = event.target.closest('#sidebarEditor');
+
+            if (clickedInsideTimeline || clickedInsideSidebar) {
+                return;
+            }
+
+            if (typeof window.fecharEditor === 'function') {
+                window.fecharEditor();
+            }
+        });
+    }
+
     window.salvarEscalaDia = salvarEscalaDia = async function salvarEscalaDiaAtualizada(colaboradorId) {
         const state = getCurrentScaleState();
         const currentRecord = (state.items || []).find((item) => Number(item.colaboradorId) === Number(colaboradorId)) || {};
@@ -5175,6 +6855,31 @@
         }
     };
 
+    window.restaurarAlmocoPadraoEscala = restaurarAlmocoPadraoEscala = async function restaurarAlmocoPadraoEscalaAtualizado(colaboradorId) {
+        const colaborador = (window.colaboradores || []).find((item) => Number(item.Id) === Number(colaboradorId));
+
+        if (!colaborador) {
+            if (typeof mostrarToast === 'function') {
+                mostrarToast('Colaborador nao encontrado para restaurar o almoco.', 'warning');
+            }
+            return;
+        }
+
+        const inicioInput = document.getElementById(`escalaAlmocoInicio-${colaboradorId}`);
+        const fimInput = document.getElementById(`escalaAlmocoFim-${colaboradorId}`);
+
+        if (inicioInput) {
+            inicioInput.value = formatarHora(colaborador.AlmocoInicio) || '';
+        }
+
+        if (fimInput) {
+            fimInput.value = formatarHora(colaborador.AlmocoFim) || '';
+        }
+
+        syncScaleDragEditorEscala(colaboradorId);
+        await salvarEscalaDia(colaboradorId);
+    };
+
     function obterDataSelecionadaEscala() {
         return document.getElementById('seletorDataEscala')?.value || getCurrentScaleState()?.dataISO || toISODateEscala(new Date());
     }
@@ -5208,6 +6913,104 @@
             ? 'Abrir o plantao do sabado selecionado'
             : 'Selecione um sabado para abrir o plantao';
         botaoPlantao.classList.toggle('is-disabled', !isSaturday);
+    }
+
+    function atualizarBotaoRestaurarAlmocosEscala() {
+        const button = document.getElementById('btnRestaurarAlmocosCadastroEscala');
+
+        if (!button) {
+            return;
+        }
+
+        const hasVisibleItems = filterScaleItemsBySectorEscala(getCurrentScaleState().items || []).length > 0;
+        button.disabled = !hasVisibleItems;
+        button.classList.toggle('is-disabled', !hasVisibleItems);
+        button.title = hasVisibleItems
+            ? 'Restaurar os almocos da data para o horario cadastrado nos colaboradores'
+            : 'Nao ha colaboradores visiveis para restaurar nesta data';
+    }
+
+    function getSelectedScaleSectorContextEscala() {
+        const filterId = getScaleSectorFilterEscala();
+
+        if (filterId === 'all') {
+            return {
+                setorId: null,
+                setorNome: 'todos os setores'
+            };
+        }
+
+        const selected = buildScaleSectorFiltersEscala(getCurrentScaleState().items || [])
+            .find((item) => String(item.id) === String(filterId));
+
+        return {
+            setorId: Number(filterId),
+            setorNome: selected?.nome || `setor ${filterId}`
+        };
+    }
+
+    async function restaurarAlmocosCadastroDiaEscala() {
+        const state = getCurrentScaleState();
+        const dataISO = obterDataSelecionadaEscala();
+        const visibleItems = filterScaleItemsBySectorEscala(state.items || []);
+
+        if (visibleItems.length === 0) {
+            if (typeof mostrarToast === 'function') {
+                mostrarToast('Nao ha colaboradores visiveis para restaurar nesta data.', 'warning');
+            }
+            return;
+        }
+
+        const setor = getSelectedScaleSectorContextEscala();
+        const scopeLabel = setor.setorId ? `do setor ${setor.setorNome}` : 'de todos os setores';
+        const confirmed = window.confirm(
+            `Restaurar os almocos ${scopeLabel} em ${formatDatePtBrEscala(dataISO)} para o horario do cadastro?`
+        );
+
+        if (!confirmed) {
+            return;
+        }
+
+        const button = document.getElementById('btnRestaurarAlmocosCadastroEscala');
+        const selectedEditorId = window.__escalaEditorColaboradorId;
+
+        if (button) {
+            button.disabled = true;
+            button.classList.add('is-loading');
+        }
+
+        try {
+            const payload = await window.API.restaurarAlmocosCadastroEscala(dataISO, {
+                setorId: setor.setorId || undefined
+            });
+            const result = payload?.data || {};
+
+            window.__escalaLunchDrafts = {};
+            await carregarEscalaSelecionadaEscala(dataISO);
+
+            if (selectedEditorId && getScaleEditorRecordEscala(selectedEditorId)) {
+                abrirEditorNaEscala(selectedEditorId);
+            }
+
+            const details = [
+                `${result.updated || 0} almoco(s) restaurado(s)`,
+                result.invalidos ? `${result.invalidos} fora da jornada` : '',
+                result.semCadastro ? `${result.semCadastro} sem almoco no cadastro` : ''
+            ].filter(Boolean).join(', ');
+
+            if (typeof mostrarToast === 'function') {
+                mostrarToast(`Restauracao concluida: ${details}.`, result.updated ? 'success' : 'warning');
+            }
+        } catch (error) {
+            if (typeof mostrarToast === 'function') {
+                mostrarToast(`Erro ao restaurar almocos: ${error.message}`, 'error');
+            }
+        } finally {
+            if (button) {
+                button.classList.remove('is-loading');
+                atualizarBotaoRestaurarAlmocosEscala();
+            }
+        }
     }
 
     function abrirLancamentoPessoalEscala() {
@@ -5247,12 +7050,14 @@
 
         await Promise.allSettled([
             typeof carregarColaboradores === 'function' ? carregarColaboradores() : Promise.resolve([]),
+            typeof carregarSetores === 'function' ? carregarSetores() : Promise.resolve([]),
             typeof carregarAusencias === 'function' ? carregarAusencias() : Promise.resolve([]),
             typeof carregarPlantoes === 'function' ? carregarPlantoes() : Promise.resolve([])
         ]);
 
         appContent.innerHTML = `
             <div class="escala-page">
+                <div class="escala-sticky-panel">
                 <div class="escala-header">
                     <h1>Escala do Dia</h1>
                     <p>Visualize e gerencie a escala de trabalhos do dia selecionado.</p>
@@ -5279,6 +7084,9 @@
                         <button id="btnAbrirPlantaoEscala" class="btn-secondary">
                             <i class="fas fa-calendar-check"></i> Abrir plantao
                         </button>
+                        <button id="btnRestaurarAlmocosCadastroEscala" class="btn-secondary btn-reset-lunch" type="button">
+                            <i class="fas fa-rotate-left"></i> Resetar almocos
+                        </button>
                     </div>
 
                     <div class="legenda-timeline legenda">
@@ -5292,7 +7100,10 @@
                     </div>
                 </div>
 
+                </div>
+
                 <div class="escala-view-controls">
+                    <div class="escala-sector-tabs" id="escalaSectorTabs"></div>
                     <label class="escala-select-chip" for="escalaSortMode">
                         <span>Organizar</span>
                         <select id="escalaSortMode" class="form-control">
@@ -5334,17 +7145,11 @@
                     </div>
                 </div>
 
-                <div class="resumo-container" id="resumoContainer">
-                    <div class="resumo-header">
-                        <i class="fas fa-chart-pie"></i>
-                        <h4>Resumo por horario</h4>
-                    </div>
-                    <div class="resumo-grid" id="resumoGrid"></div>
-                </div>
             </div>
         `;
 
         ensureScaleSidebarToggleEscala();
+        bindScaleOutsideSelectionEscala();
         atualizarAcoesCabecalhoEscala();
 
         document.getElementById('btnDiaAnteriorEscala')?.addEventListener('click', async () => {
@@ -5363,6 +7168,7 @@
 
         document.getElementById('btnNovoLancamentoEscala')?.addEventListener('click', abrirLancamentoPessoalEscala);
         document.getElementById('btnAbrirPlantaoEscala')?.addEventListener('click', abrirPlantaoDaEscala);
+        document.getElementById('btnRestaurarAlmocosCadastroEscala')?.addEventListener('click', restaurarAlmocosCadastroDiaEscala);
         document.getElementById('escalaSortMode')?.addEventListener('change', (event) => {
             setScaleSortModeEscala(event.target.value);
             renderScaleRowsEscala(getCurrentScaleState());
@@ -5424,6 +7230,7 @@
             escalaAno: document.getElementById('relatorioEscalaAno')?.value || '',
             escalaDataInicio: document.getElementById('relatorioEscalaDataInicio')?.value || '',
             escalaDataFim: document.getElementById('relatorioEscalaDataFim')?.value || '',
+            escalaSetor: document.getElementById('relatorioEscalaSetor')?.value || '',
             escalaColaborador: document.getElementById('relatorioEscalaColaborador')?.value || '',
             escalaTipo: document.getElementById('relatorioEscalaTipo')?.value || '',
             plantaoDataInicio: document.getElementById('relatorioPlantaoDataInicio')?.value || '',
@@ -5450,6 +7257,7 @@
         setValue('relatorioEscalaAno', snapshot.escalaAno);
         setValue('relatorioEscalaDataInicio', snapshot.escalaDataInicio);
         setValue('relatorioEscalaDataFim', snapshot.escalaDataFim);
+        setValue('relatorioEscalaSetor', snapshot.escalaSetor);
         setValue('relatorioEscalaColaborador', snapshot.escalaColaborador);
         setValue('relatorioEscalaTipo', snapshot.escalaTipo);
         setValue('relatorioPlantaoDataInicio', snapshot.plantaoDataInicio);
@@ -5546,6 +7354,75 @@
         `;
     }
 
+    function getSetorIdFromItemEscala(item) {
+        return item?.id ?? item?.Id ?? item?.setorId ?? item?.SetorId ?? null;
+    }
+
+    function getSetorNomeFromItemEscala(item) {
+        return item?.nome ?? item?.Nome ?? item?.setorNome ?? item?.SetorNome ?? '';
+    }
+
+    function buildSetorOptionsRelatorioEscala(selectedId = '') {
+        const setoresOrdenados = [...(window.setores || [])]
+            .map((item) => ({
+                id: getSetorIdFromItemEscala(item),
+                nome: getSetorNomeFromItemEscala(item)
+            }))
+            .filter((item) => item.id !== null && item.id !== undefined && String(item.id).trim() !== '')
+            .sort((first, second) => String(first.nome || '').localeCompare(String(second.nome || ''), 'pt-BR', { sensitivity: 'base' }));
+
+        return `
+            <option value="">Todos os setores</option>
+            ${setoresOrdenados.map((setor) => `
+                <option value="${escapeHtmlEscala(String(setor.id))}" ${String(selectedId) === String(setor.id) ? 'selected' : ''}>
+                    ${escapeHtmlEscala(setor.nome || 'Sem nome')}
+                </option>
+            `).join('')}
+        `;
+    }
+
+    function getRelatorioEscalaSetorId() {
+        const value = document.getElementById('relatorioEscalaSetor')?.value || '';
+        return value ? String(value) : '';
+    }
+
+    function getRelatorioEscalaSetorNome(setorId = getRelatorioEscalaSetorId()) {
+        if (!setorId) {
+            return 'Todos os setores';
+        }
+
+        const setor = (window.setores || []).find((item) => String(getSetorIdFromItemEscala(item)) === String(setorId));
+        const nome = getSetorNomeFromItemEscala(setor);
+        return nome || `Setor ${setorId}`;
+    }
+
+    function getRelatorioEscalaSetorFileSuffix(setorId = getRelatorioEscalaSetorId()) {
+        if (!setorId) {
+            return '';
+        }
+
+        return `_${getRelatorioEscalaSetorNome(setorId)
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .replace(/[^a-zA-Z0-9]+/g, '_')
+            .replace(/^_+|_+$/g, '')
+            .slice(0, 40) || `Setor_${setorId}`}`;
+    }
+
+    function renderRelatorioEscalaFiltrosAtivos(filters = {}) {
+        const setorNome = filters.setorNome || getRelatorioEscalaSetorNome(filters.setorId);
+
+        if (!filters.setorId) {
+            return '';
+        }
+
+        return `
+            <div class="relatorio-filtros-ativos">
+                <span><i class="fas fa-building"></i> Setor: <strong>${escapeHtmlEscala(setorNome)}</strong></span>
+            </div>
+        `;
+    }
+
     function buildTipoOptionsEscala(selectedType = '') {
         return `
             <option value="">Todos os tipos</option>
@@ -5565,10 +7442,8 @@
             `;
         }
 
-        const normalizedItems = items.map((item) => ({
-            ...item,
-            tipo: window.normalizeRuntimeEscalaTipo(item.tipo || item.Tipo || 'normal')
-        }));
+        const normalizedItems = normalizeEscalaReportItems(items);
+        const setorGroups = groupEscalaItemsBySetor(normalizedItems);
         const colaboradoresUnicos = new Set(normalizedItems.map((item) => String(item.colaboradorId || item.colaboradorNome || ''))).size;
         const resumo = normalizedItems.reduce((accumulator, item) => {
             accumulator[item.tipo] = (accumulator[item.tipo] || 0) + 1;
@@ -5584,6 +7459,7 @@
 
         return `
             <div class="relatorio-tabela-container">
+                ${renderRelatorioEscalaFiltrosAtivos(filters)}
                 <div class="relatorio-total">
                     Periodo: <strong>${escapeHtmlEscala(formatDatePtBrEscala(filters.dataInicio))}</strong>
                     ate
@@ -5606,6 +7482,13 @@
                         </div>
                     </div>
                     <div class="resumo-card-estatistica">
+                        <i class="fas fa-layer-group"></i>
+                        <div>
+                            <strong>${setorGroups.length}</strong>
+                            <span>Setores</span>
+                        </div>
+                    </div>
+                    <div class="resumo-card-estatistica">
                         <i class="fas fa-calendar-check"></i>
                         <div>
                             <strong>${resumo.plantao}</strong>
@@ -5620,34 +7503,42 @@
                         </div>
                     </div>
                 </div>
-                <table class="relatorio-tabela escala-detalhada-tabela">
-                    <thead>
-                        <tr>
-                            <th>Data</th>
-                            <th>Dia</th>
-                            <th>Colaborador</th>
-                            <th>Entrada</th>
-                            <th>Saida</th>
-                            <th>Almoco</th>
-                            <th>Tipo</th>
-                            <th>Observacoes</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${normalizedItems.map((item) => `
-                            <tr>
-                                <td><strong>${escapeHtmlEscala(formatDatePtBrEscala(item.dataISO))}</strong></td>
-                                <td>${escapeHtmlEscala(item.diaSemana || getDayLabelEscala(item.dataISO))}</td>
-                                <td>${escapeHtmlEscala(item.colaboradorNome || '--')}</td>
-                                <td>${escapeHtmlEscala(item.horaInicio || '--')}</td>
-                                <td>${escapeHtmlEscala(item.horaFim || '--')}</td>
-                                <td>${escapeHtmlEscala(item.almoco || '--')}</td>
-                                <td><span class="evento-tipo badge-${escapeHtmlEscala(item.tipo)}">${escapeHtmlEscala(TIPO_LABELS[item.tipo] || item.tipo || '--')}</span></td>
-                                <td>${escapeHtmlEscala(item.observacao || '--')}</td>
-                            </tr>
-                        `).join('')}
-                    </tbody>
-                </table>
+                ${setorGroups.map((group) => `
+                    <section class="relatorio-setor-section">
+                        <div class="relatorio-setor-header">
+                            <span><i class="fas fa-layer-group"></i> ${escapeHtmlEscala(group.setorNome)}</span>
+                            <strong>${group.items.length} registro(s)</strong>
+                        </div>
+                        <table class="relatorio-tabela escala-detalhada-tabela">
+                            <thead>
+                                <tr>
+                                    <th>Data</th>
+                                    <th>Dia</th>
+                                    <th>Colaborador</th>
+                                    <th>Entrada</th>
+                                    <th>Saida</th>
+                                    <th>Almoco</th>
+                                    <th>Tipo</th>
+                                    <th>Observacoes</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${group.items.map((item) => `
+                                    <tr>
+                                        <td><strong>${escapeHtmlEscala(formatDatePtBrEscala(item.dataISO))}</strong></td>
+                                        <td>${escapeHtmlEscala(item.diaSemana || getDayLabelEscala(item.dataISO))}</td>
+                                        <td>${escapeHtmlEscala(item.colaboradorNome || '--')}</td>
+                                        <td>${escapeHtmlEscala(item.horaInicio || '--')}</td>
+                                        <td>${escapeHtmlEscala(item.horaFim || '--')}</td>
+                                        <td>${escapeHtmlEscala(item.almoco || '--')}</td>
+                                        <td><span class="evento-tipo badge-${escapeHtmlEscala(item.tipo)}">${escapeHtmlEscala(TIPO_LABELS[item.tipo] || item.tipo || '--')}</span></td>
+                                        <td>${escapeHtmlEscala(item.observacao || '--')}</td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </section>
+                `).join('')}
             </div>
         `;
     }
@@ -5824,6 +7715,248 @@
         `;
     }
 
+    function compactEscalaExportLabel(value) {
+        return String(value || '--')
+            .replace(/\s+às\s+/gi, '-')
+            .replace(/\s+-\s+/g, '-')
+            .replace(/\s+/g, ' ')
+            .trim() || '--';
+    }
+
+    function compactEscalaExportName(value) {
+        const name = String(value || '--').replace(/\s+/g, ' ').trim();
+
+        if (name.length <= 12) {
+            return name;
+        }
+
+        const parts = name.split(' ').filter(Boolean);
+
+        if (parts.length >= 2) {
+            return `${parts[0]} ${parts[1].charAt(0)}.`;
+        }
+
+        return `${name.slice(0, 13)}...`;
+    }
+
+    function renderEscalaExportDayCard(day) {
+        if (!day) {
+            return '<article class="escala-export-dia-placeholder" aria-hidden="true"></article>';
+        }
+
+        if (!day.hasScale || !Array.isArray(day.rows) || day.rows.length === 0) {
+            return `
+                <article class="escala-export-dia is-empty">
+                    <div class="escala-export-dia-header">${escapeHtmlEscala(day.dateLabel || '--')}</div>
+                    <div class="escala-export-empty">Sem escala</div>
+                </article>
+            `;
+        }
+
+        return `
+            <article class="escala-export-dia">
+                <div class="escala-export-dia-header">${escapeHtmlEscala(day.dateLabel || '--')}</div>
+                <div class="escala-export-lines">
+                    ${day.rows.map((row) => `
+                        <div class="escala-export-line">
+                            <span class="escala-export-time">${escapeHtmlEscala(compactEscalaExportLabel(row.almocoLabel))}</span>
+                            <strong title="${escapeHtmlEscala(row.colaboradorNome || '--')}">${escapeHtmlEscala(compactEscalaExportName(row.colaboradorNome))}</strong>
+                            <span class="escala-export-work">${escapeHtmlEscala(compactEscalaExportLabel(row.jornadaLabel))}</span>
+                        </div>
+                    `).join('')}
+                </div>
+            </article>
+        `;
+    }
+
+    function getEscalaExportDayRowCount(day) {
+        return Array.isArray(day?.rows) ? day.rows.length : 0;
+    }
+
+    function applyEscalaExportRowspan(rows, labelKey, showKey, rowspanKey) {
+        let index = 0;
+
+        while (index < rows.length) {
+            const currentLabel = rows[index][labelKey];
+            let end = index + 1;
+
+            while (end < rows.length && rows[end][labelKey] === currentLabel) {
+                end += 1;
+            }
+
+            rows[index][showKey] = true;
+            rows[index][rowspanKey] = end - index;
+
+            for (let current = index + 1; current < end; current += 1) {
+                rows[current][showKey] = false;
+                rows[current][rowspanKey] = 0;
+            }
+
+            index = end;
+        }
+
+        return rows;
+    }
+
+    function sliceEscalaExportDayRows(day, startIndex, maxRows) {
+        if (!day || !Array.isArray(day.rows)) {
+            return day;
+        }
+
+        const rows = day.rows.slice(startIndex, startIndex + maxRows).map((row) => ({ ...row }));
+
+        applyEscalaExportRowspan(rows, 'almocoLabel', 'showAlmoco', 'almocoRowspan');
+        applyEscalaExportRowspan(rows, 'jornadaLabel', 'showJornada', 'jornadaRowspan');
+
+        return {
+            ...day,
+            rows,
+            hasScale: rows.length > 0
+        };
+    }
+
+    function buildEscalaExportHolidayMap(feriados) {
+        const map = new Map();
+
+        (Array.isArray(feriados) ? feriados : []).forEach((item) => {
+            const dataISO = String(item?.dataISO || item?.Data || item?.data || '').split('T')[0];
+
+            if (!dataISO) {
+                return;
+            }
+
+            const nome = String(item?.nome || item?.Nome || 'Feriado').trim() || 'Feriado';
+
+            if (!map.has(dataISO)) {
+                map.set(dataISO, nome);
+            }
+        });
+
+        return map;
+    }
+
+    function hasEscalaExportRows(day) {
+        return Array.isArray(day?.rows) && day.rows.length > 0;
+    }
+
+    function shouldIncludeSundayInMonthlyExport(snapshot) {
+        const groups = Array.isArray(snapshot?.setorGroups) && snapshot.setorGroups.length > 0
+            ? snapshot.setorGroups
+            : [{ calendarWeeks: Array.isArray(snapshot?.calendarWeeks) ? snapshot.calendarWeeks : [] }];
+
+        return groups.some((group) => (
+            (Array.isArray(group.calendarWeeks) ? group.calendarWeeks : []).some((week) => hasEscalaExportRows(week?.[6]))
+        ));
+    }
+
+    function getEscalaExportWeekSlots(week, includeSunday) {
+        const slots = Array.from({ length: 7 }, (_, index) => week?.[index] || null);
+        return includeSunday ? slots : slots.slice(0, 6);
+    }
+
+    function getEscalaExportWeekdayLabels(includeSunday) {
+        return includeSunday ? ESCALA_QUADRO_WEEKDAY_HEADERS : ESCALA_QUADRO_WEEKDAY_HEADERS.slice(0, 6);
+    }
+
+    function getEscalaExportEntryMaxRows(weeks, includeSunday) {
+        return Math.max(0, ...weeks.flatMap((week) => (
+            getEscalaExportWeekSlots(week, includeSunday).map((day) => getEscalaExportDayRowCount(day))
+        )));
+    }
+
+    function getEscalaSheetDensityClass(maxRows, weekCount) {
+        if (maxRows >= 17 || (weekCount > 1 && maxRows >= 13)) {
+            return ' is-ultra-dense';
+        }
+
+        if (maxRows >= 11 || (weekCount > 1 && maxRows >= 9)) {
+            return ' is-dense';
+        }
+
+        return '';
+    }
+
+    function getMonthlyEscalaOnePageMaxRows(weekCount) {
+        if (weekCount >= 6) {
+            return 9;
+        }
+
+        if (weekCount >= 5) {
+            return 14;
+        }
+
+        return 18;
+    }
+
+    function shouldShowEscalaSheetLunchColumn(day, weekDayIndex) {
+        if (weekDayIndex >= 5) {
+            return (Array.isArray(day?.rows) ? day.rows : []).some((row) => {
+                const label = String(row?.almocoLabel || '').trim();
+                return label && label !== '--';
+            });
+        }
+
+        return true;
+    }
+
+    function getEscalaSheetRowClassName(row) {
+        const tipo = String(row?.tipo || 'normal').toLowerCase();
+
+        if (!tipo || tipo === 'normal') {
+            return '';
+        }
+
+        return ` is-${tipo}`;
+    }
+
+    function renderEscalaSheetDayTable(day, options = {}) {
+        if (!day) {
+            return '<article class="escala-sheet-day is-placeholder" aria-hidden="true"></article>';
+        }
+
+        const holidayLabel = options.holidayMap?.get(day.dataISO);
+        const weekDayIndex = Number(options.weekDayIndex) || 0;
+        const includeLunch = shouldShowEscalaSheetLunchColumn(day, weekDayIndex);
+        const columnCount = includeLunch ? 3 : 2;
+        const rows = Array.isArray(day.rows) ? day.rows : [];
+        const hasRows = day.hasScale && rows.length > 0;
+        const emptyLabel = holidayLabel ? 'FERIADO' : 'Sem escala';
+        const titleAttribute = holidayLabel ? ` title="${escapeHtmlEscala(holidayLabel)}"` : '';
+
+        return `
+            <article class="escala-sheet-day${hasRows ? '' : ' is-empty'}${holidayLabel ? ' is-holiday' : ''}">
+                <div class="escala-sheet-day-date"${titleAttribute}>${escapeHtmlEscala(day.dateLabel || '--')}</div>
+                <table class="escala-sheet-table">
+                    <colgroup>
+                        ${includeLunch
+                            ? '<col style="width:29%"><col style="width:41%"><col style="width:30%">'
+                            : '<col style="width:66%"><col style="width:34%">'}
+                    </colgroup>
+                    <thead>
+                        <tr>
+                            ${includeLunch ? '<th>Almoco</th>' : ''}
+                            <th>Colaborador</th>
+                            <th>Jornada</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${hasRows ? rows.map((row) => `
+                            <tr class="${getEscalaSheetRowClassName(row)}">
+                                ${includeLunch && row.showAlmoco ? `<td rowspan="${row.almocoRowspan || 1}" class="escala-sheet-group">${escapeHtmlEscala(row.almocoLabel || '--')}</td>` : ''}
+                                <td class="escala-sheet-name">${escapeHtmlEscala(row.colaboradorNome || '--')}</td>
+                                ${row.showJornada ? `<td rowspan="${row.jornadaRowspan || 1}" class="escala-sheet-group">${escapeHtmlEscala(row.jornadaLabel || '--')}</td>` : ''}
+                            </tr>
+                        `).join('') : `
+                            <tr>
+                                <td colspan="${columnCount}" class="escala-sheet-empty">${escapeHtmlEscala(emptyLabel)}</td>
+                            </tr>
+                        `}
+                    </tbody>
+                </table>
+            </article>
+        `;
+    }
+
     async function buildEscalaExportSnapshot() {
         const modo = getEscalaReportMode();
 
@@ -5836,9 +7969,10 @@
 
             const payload = await window.API.getEscalaRelatorio({
                 dataInicio: filters.dataInicio,
-                dataFim: filters.dataFim
+                dataFim: filters.dataFim,
+                setorId: filters.setorId || undefined
             });
-            const items = Array.isArray(payload?.items) ? payload.items : [];
+            const items = normalizeEscalaReportItems(Array.isArray(payload?.items) ? payload.items : []);
             const boardUtils = window.EscalaReportUtils;
 
             if (!boardUtils || typeof boardUtils.buildEscalaQuadroMensal !== 'function') {
@@ -5847,20 +7981,33 @@
 
             const feriados = await collectEscalaHolidayItems(filters.dataInicio, filters.dataFim);
 
-            const days = boardUtils.buildEscalaQuadroMensal(items, {
+            const setorGroups = groupEscalaItemsBySetor(items, { includeEmpty: true }).map((group) => {
+                const days = boardUtils.buildEscalaQuadroMensal(group.items, {
+                    month: filters.month,
+                    year: filters.year
+                });
+
+                return {
+                    ...group,
+                    days,
+                    calendarWeeks: getEscalaCalendarWeeks(boardUtils, days)
+                };
+            });
+            const days = setorGroups[0]?.days || boardUtils.buildEscalaQuadroMensal([], {
                 month: filters.month,
                 year: filters.year
             });
-            const calendarWeeks = getEscalaCalendarWeeks(boardUtils, days);
+            const calendarWeeks = setorGroups[0]?.calendarWeeks || getEscalaCalendarWeeks(boardUtils, days);
 
             return {
                 mode: modo,
-                title: `Quadro mensal de Escala - ${MESES_LABELS[filters.month - 1] || filters.month} ${filters.year}`,
-                fileBase: `Escala_Mensal_${filters.year}-${String(filters.month).padStart(2, '0')}`,
+                title: `Quadro mensal de Escala - ${MESES_LABELS[filters.month - 1] || filters.month} ${filters.year}${filters.setorId ? ` - Setor: ${filters.setorNome}` : ''}`,
+                fileBase: `Escala_Mensal_${filters.year}-${String(filters.month).padStart(2, '0')}${getRelatorioEscalaSetorFileSuffix(filters.setorId)}`,
                 filters,
                 items,
                 feriados,
                 stats: buildEscalaExportStats(items, feriados),
+                setorGroups,
                 days,
                 calendarWeeks,
                 calendarSlots: calendarWeeks.flat()
@@ -5869,6 +8016,7 @@
 
         const dataInicio = document.getElementById('relatorioEscalaDataInicio')?.value;
         const dataFim = document.getElementById('relatorioEscalaDataFim')?.value;
+        const setorId = getRelatorioEscalaSetorId();
         const colaboradorId = document.getElementById('relatorioEscalaColaborador')?.value || '';
         const tipo = document.getElementById('relatorioEscalaTipo')?.value || '';
 
@@ -5879,63 +8027,183 @@
         const payload = await window.API.getEscalaRelatorio({
             dataInicio,
             dataFim,
+            setorId: setorId || undefined,
             colaboradorId: colaboradorId || undefined,
             tipo: tipo || undefined
         });
-        const items = Array.isArray(payload?.items) ? payload.items : [];
+        const items = normalizeEscalaReportItems(Array.isArray(payload?.items) ? payload.items : []);
         const feriados = await collectEscalaHolidayItems(dataInicio, dataFim);
+        const setorGroups = groupEscalaItemsBySetor(items);
 
         return {
             mode: modo,
-            title: `Relatorio de Escala - ${formatDatePtBrEscala(dataInicio)} ate ${formatDatePtBrEscala(dataFim)}`,
-            fileBase: `Escala_Detalhada_${dataInicio}_${dataFim}`,
+            title: `Relatorio de Escala - ${formatDatePtBrEscala(dataInicio)} ate ${formatDatePtBrEscala(dataFim)}${setorId ? ` - Setor: ${getRelatorioEscalaSetorNome(setorId)}` : ''}`,
+            fileBase: `Escala_Detalhada_${dataInicio}_${dataFim}${getRelatorioEscalaSetorFileSuffix(setorId)}`,
             filters: {
                 dataInicio,
-                dataFim
+                dataFim,
+                setorId,
+                setorNome: getRelatorioEscalaSetorNome(setorId)
             },
             items,
+            setorGroups,
             feriados,
             stats: buildEscalaExportStats(items, feriados)
         };
     }
 
-    function renderMonthlyEscalaExportPages(snapshot) {
-        const weeks = Array.isArray(snapshot.calendarWeeks) && snapshot.calendarWeeks.length > 0
-            ? snapshot.calendarWeeks
-            : [Array(6).fill(null)];
-        const pages = chunkEscalaItems(weeks, 6);
+    function buildMonthlyEscalaExportPageEntries(snapshot) {
+        const compactWeekMaxRows = 12;
+        const maxRowsPerWeekDay = 22;
+        const sectorEntries = Array.isArray(snapshot.setorGroups) && snapshot.setorGroups.length > 0
+            ? snapshot.setorGroups
+            : [{
+                setorNome: 'Sem setor',
+                calendarWeeks: Array.isArray(snapshot.calendarWeeks) ? snapshot.calendarWeeks : []
+            }];
+        const includeSunday = shouldIncludeSundayInMonthlyExport(snapshot);
 
-        return pages.map((group, pageIndex) => `
-            <section class="pdf-pagina escala-export-page">
-                <div class="escala-export-header">
-                    <h1>${escapeHtmlEscala(snapshot.title)}</h1>
-                    <p>Pagina ${pageIndex + 1} de ${pages.length}</p>
+        return sectorEntries.flatMap((sector) => {
+            const weeks = Array.isArray(sector.calendarWeeks) && sector.calendarWeeks.length > 0
+                ? sector.calendarWeeks
+                : [Array(7).fill(null)];
+            const monthMaxRows = getEscalaExportEntryMaxRows(weeks, includeSunday);
+            const onePageMaxRows = getMonthlyEscalaOnePageMaxRows(weeks.length);
+
+            if (monthMaxRows <= onePageMaxRows) {
+                return [{
+                    sector,
+                    weeks,
+                    kind: 'month',
+                    includeSunday,
+                    label: 'Mes completo'
+                }];
+            }
+
+            const entries = [];
+            let weekIndex = 0;
+
+            while (weekIndex < weeks.length) {
+                const currentWeek = Array.isArray(weeks[weekIndex]) ? weeks[weekIndex] : Array(7).fill(null);
+                const weekMaxRows = Math.max(0, ...currentWeek.map((day) => getEscalaExportDayRowCount(day)));
+                const partCount = Math.max(1, Math.ceil(weekMaxRows / maxRowsPerWeekDay));
+
+                if (partCount > 1) {
+                    Array.from({ length: partCount }, (_, partIndex) => {
+                        const startIndex = partIndex * maxRowsPerWeekDay;
+                        const weekPart = currentWeek.map((day) => sliceEscalaExportDayRows(day, startIndex, maxRowsPerWeekDay));
+
+                        entries.push({
+                            sector,
+                            weeks: [weekPart],
+                            kind: 'week',
+                            weekIndex,
+                            partIndex,
+                            partCount,
+                            includeSunday,
+                            label: `Semana ${weekIndex + 1} - parte ${partIndex + 1}`
+                        });
+                    });
+                    weekIndex += 1;
+                    continue;
+                }
+
+                const nextWeek = weeks[weekIndex + 1] || null;
+                const nextWeekMaxRows = nextWeek
+                    ? Math.max(0, ...nextWeek.map((day) => getEscalaExportDayRowCount(day)))
+                    : 0;
+                const canPairWeeks = nextWeek
+                    && weekMaxRows <= compactWeekMaxRows
+                    && nextWeekMaxRows <= compactWeekMaxRows;
+                const entryWeeks = canPairWeeks ? [currentWeek, nextWeek] : [currentWeek];
+                const endWeekIndex = weekIndex + entryWeeks.length - 1;
+
+                entries.push({
+                    sector,
+                    weeks: entryWeeks,
+                    kind: entryWeeks.length > 1 ? 'weeks' : 'week',
+                    weekIndex,
+                    endWeekIndex,
+                    includeSunday,
+                    label: entryWeeks.length > 1
+                        ? `Semanas ${weekIndex + 1}-${endWeekIndex + 1}`
+                        : `Semana ${weekIndex + 1}`
+                });
+
+                weekIndex += entryWeeks.length;
+            }
+
+            return entries;
+        });
+    }
+
+    function renderMonthlyEscalaExportPages(snapshot) {
+        const pageEntries = buildMonthlyEscalaExportPageEntries(snapshot);
+        const holidayMap = buildEscalaExportHolidayMap(snapshot.feriados);
+        const pageTitle = formatEscalaMonthHeading(snapshot.filters?.month, snapshot.filters?.year);
+
+        return pageEntries.map((entry, pageIndex) => `
+            <section class="pdf-pagina escala-export-page escala-export-month-page${getEscalaSheetDensityClass(getEscalaExportEntryMaxRows(entry.weeks, entry.includeSunday), entry.weeks.length)}">
+                <div class="escala-sheet-title">${escapeHtmlEscala(pageTitle)}</div>
+                <div class="escala-sheet-meta">
+                    <strong>Setor: ${escapeHtmlEscala(entry.sector.setorNome || 'Sem setor')}</strong>
+                    <span>${escapeHtmlEscala(entry.label)} - Pagina ${pageIndex + 1} de ${pageEntries.length}</span>
                 </div>
-                <div class="escala-export-grid escala-export-grid-calendario" style="--week-count:${group.length || 1};">
-                    ${group.flat().map((day) => renderEscalaQuadroDayCard(day)).join('')}
+                <div class="escala-sheet-weekdays" style="--weekday-count:${entry.includeSunday ? 7 : 6};">
+                    ${getEscalaExportWeekdayLabels(entry.includeSunday).map((label) => `<span>${escapeHtmlEscala(label)}</span>`).join('')}
+                </div>
+                <div class="escala-sheet-grid" style="--weekday-count:${entry.includeSunday ? 7 : 6}; --week-count:${entry.weeks.length || 1};">
+                    ${entry.weeks.flatMap((week) => (
+                        getEscalaExportWeekSlots(week, entry.includeSunday).map((day, weekDayIndex) => renderEscalaSheetDayTable(day, {
+                            weekDayIndex,
+                            holidayMap
+                        }))
+                    )).join('')}
                 </div>
             </section>
         `).join('');
     }
 
     function renderDetailedEscalaExportPages(snapshot) {
-        const chunks = chunkEscalaItems(snapshot.items, 24);
-        const pages = chunks.length > 0 ? chunks : [[]];
+        const setorGroups = Array.isArray(snapshot.setorGroups) && snapshot.setorGroups.length > 0
+            ? snapshot.setorGroups
+            : groupEscalaItemsBySetor(snapshot.items);
+        const pageEntries = [];
 
-        return pages.map((group, pageIndex) => `
+        (setorGroups.length > 0 ? setorGroups : [{ setorNome: 'Sem setor', items: [] }]).forEach((sector) => {
+            const chunks = chunkEscalaItems(sector.items, 22);
+            const pages = chunks.length > 0 ? chunks : [[]];
+
+            pages.forEach((group, sectorPageIndex) => {
+                pageEntries.push({
+                    sector,
+                    group,
+                    sectorPageIndex,
+                    sectorPageCount: pages.length
+                });
+            });
+        });
+
+        return pageEntries.map((entry, pageIndex) => `
             <section class="pdf-pagina escala-export-page escala-export-detailed">
                 <div class="escala-export-header">
                     <h1>${escapeHtmlEscala(snapshot.title)}</h1>
-                    <p>Pagina ${pageIndex + 1} de ${pages.length}</p>
+                    <p>Pagina ${pageIndex + 1} de ${pageEntries.length}</p>
                 </div>
                 ${pageIndex === 0 ? `
                     <div class="escala-export-summary">
                         <span>Periodo: <strong>${escapeHtmlEscala(formatDatePtBrEscala(snapshot.filters.dataInicio))}</strong> ate <strong>${escapeHtmlEscala(formatDatePtBrEscala(snapshot.filters.dataFim))}</strong></span>
+                        ${snapshot.filters.setorId ? `<span>Setor: <strong>${escapeHtmlEscala(snapshot.filters.setorNome || getRelatorioEscalaSetorNome(snapshot.filters.setorId))}</strong></span>` : ''}
                         <span>Registros: <strong>${snapshot.items.length}</strong></span>
+                        <span>Setores: <strong>${setorGroups.length}</strong></span>
                     </div>
                     ${renderEscalaExportStats(snapshot.stats)}
                     ${renderEscalaHolidayList(snapshot.feriados)}
                 ` : ''}
+                <div class="relatorio-setor-header escala-export-setor-header">
+                    <span>Setor: ${escapeHtmlEscala(entry.sector.setorNome || 'Sem setor')}</span>
+                    <strong>${entry.sector.items.length} registro(s)</strong>
+                </div>
                 <table class="relatorio-tabela escala-detalhada-tabela escala-export-table">
                     <thead>
                         <tr>
@@ -5950,7 +8218,7 @@
                         </tr>
                     </thead>
                     <tbody>
-                        ${group.map((item) => `
+                        ${entry.group.map((item) => `
                             <tr>
                                 <td><strong>${escapeHtmlEscala(formatDatePtBrEscala(item.dataISO))}</strong></td>
                                 <td>${escapeHtmlEscala(item.diaSemana || getDayLabelEscala(item.dataISO))}</td>
@@ -5969,6 +8237,30 @@
     }
 
     function gerarHtmlPdfRelatorioEscala(snapshot) {
+        const isMonthlyExport = snapshot.mode === RELATORIO_ESCALA_MODOS.QUADRO_MENSAL;
+        const pageMetrics = isMonthlyExport
+            ? {
+                bodyWidth: 1660,
+                pageWidth: 1660,
+                pageHeight: 1160,
+                pagePadding: 6,
+                gridMinHeight: 1010,
+                titleSize: 28,
+                sectorHeaderSize: 18,
+                dayHeaderSize: 18,
+                tableFontSize: 14
+            }
+            : {
+                bodyWidth: 1480,
+                pageWidth: 1444,
+                pageHeight: 980,
+                pagePadding: 10,
+                gridMinHeight: 900,
+                titleSize: 28,
+                sectorHeaderSize: 13,
+                dayHeaderSize: 12,
+                tableFontSize: 10
+            };
         const bodyHtml = snapshot.mode === RELATORIO_ESCALA_MODOS.QUADRO_MENSAL
             ? renderMonthlyEscalaExportPages(snapshot)
             : renderDetailedEscalaExportPages(snapshot);
@@ -5985,19 +8277,230 @@
                         font-family: Arial, sans-serif;
                         background: #ffffff;
                         color: #0f172a;
-                        width: 1480px;
-                        padding: 16px;
+                        width: ${pageMetrics.bodyWidth}px;
+                        padding: ${isMonthlyExport ? 0 : 16}px;
                     }
                     .pdf-pagina {
-                        width: 1444px;
-                        min-height: 980px;
+                        width: ${pageMetrics.pageWidth}px;
+                        min-height: ${pageMetrics.pageHeight}px;
+                        height: auto;
                         background: white;
-                        padding: 10px;
+                        padding: ${pageMetrics.pagePadding}px;
                         display: flex;
                         flex-direction: column;
+                        overflow: visible;
                     }
                     .pdf-pagina + .pdf-pagina {
                         margin-top: 24px;
+                    }
+                    .escala-export-month-page {
+                        height: ${pageMetrics.pageHeight}px;
+                        min-height: ${pageMetrics.pageHeight}px;
+                        overflow: hidden;
+                        background: #ffffff;
+                        color: #000000;
+                    }
+                    .escala-export-month-page + .escala-export-month-page {
+                        margin-top: 0;
+                    }
+                    .escala-sheet-title {
+                        background: #28577e;
+                        border: 2px solid #111111;
+                        color: #ffffff;
+                        font-size: 42px;
+                        font-weight: 900;
+                        line-height: 1;
+                        padding: 8px 10px 9px;
+                        text-align: center;
+                        text-transform: uppercase;
+                    }
+                    .escala-sheet-meta {
+                        display: flex;
+                        align-items: center;
+                        justify-content: space-between;
+                        gap: 12px;
+                        padding: 5px 2px 6px;
+                        color: #111111;
+                        font-size: 14px;
+                        font-weight: 700;
+                    }
+                    .escala-sheet-meta span {
+                        font-size: 12px;
+                        font-weight: 700;
+                    }
+                    .escala-sheet-weekdays {
+                        display: grid;
+                        grid-template-columns: repeat(var(--weekday-count, 6), minmax(0, 1fr));
+                        gap: 5px;
+                        margin-bottom: 5px;
+                    }
+                    .escala-sheet-weekdays span {
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        min-height: 48px;
+                        padding: 4px 6px;
+                        background: #28577e;
+                        border: 2px solid #ffffff;
+                        color: #ffffff;
+                        font-size: 17px;
+                        font-weight: 900;
+                        line-height: 1.05;
+                        text-align: center;
+                    }
+                    .escala-sheet-grid {
+                        flex: 1;
+                        min-height: 0;
+                        display: grid;
+                        grid-template-columns: repeat(var(--weekday-count, 6), minmax(0, 1fr));
+                        grid-template-rows: repeat(var(--week-count, 2), auto);
+                        column-gap: 8px;
+                        row-gap: 14px;
+                        align-content: start;
+                        align-items: start;
+                    }
+                    .escala-sheet-day {
+                        min-width: 0;
+                        min-height: 0;
+                        overflow: hidden;
+                        display: flex;
+                        flex-direction: column;
+                        background: #f8fafc;
+                        border: 1.5px solid #172033;
+                        box-shadow: 0 0 0 2px #e2e8f0;
+                    }
+                    .escala-sheet-day.is-placeholder {
+                        border-color: transparent;
+                        background: #ffffff;
+                        box-shadow: none;
+                    }
+                    .escala-sheet-day-date {
+                        padding: 2px 5px;
+                        background: #28577e;
+                        border-bottom: 1.5px solid #111111;
+                        color: #ffffff;
+                        font-size: 15px;
+                        font-weight: 900;
+                        line-height: 1.05;
+                        text-align: center;
+                    }
+                    .escala-sheet-table {
+                        width: 100%;
+                        height: auto;
+                        flex: 0 0 auto;
+                        border-collapse: collapse;
+                        table-layout: fixed;
+                        background: #ffffff;
+                    }
+                    .escala-sheet-table th,
+                    .escala-sheet-table td {
+                        border: 1px solid #2f3a46;
+                        color: #000000;
+                        font-size: 11px;
+                        line-height: 1;
+                        padding: 1px 2px;
+                        text-align: center;
+                        vertical-align: middle;
+                    }
+                    .escala-sheet-table th {
+                        height: 15px;
+                        background: #b7d7f0;
+                        font-weight: 900;
+                    }
+                    .escala-sheet-table td {
+                        height: 17px;
+                        background: #ffffff;
+                        font-weight: 500;
+                    }
+                    .escala-sheet-table tbody tr:nth-child(even) td {
+                        background: #f8fbff;
+                    }
+                    .escala-sheet-group {
+                        background: #eef6fd !important;
+                        font-weight: 700 !important;
+                    }
+                    .escala-sheet-name {
+                        background: #ffffff !important;
+                        overflow: hidden;
+                        text-overflow: ellipsis;
+                        white-space: nowrap;
+                    }
+                    .escala-sheet-table tr.is-plantao .escala-sheet-name,
+                    .escala-sheet-table tr.is-ajuste .escala-sheet-name,
+                    .escala-sheet-table tr.is-ausencia .escala-sheet-name {
+                        color: #d00000;
+                        font-weight: 800;
+                    }
+                    .escala-sheet-empty {
+                        height: 100%;
+                        color: #222222 !important;
+                        font-size: 13px !important;
+                        font-style: italic;
+                        font-weight: 700 !important;
+                    }
+                    .escala-sheet-day.is-empty .escala-sheet-table {
+                        height: 100%;
+                        flex: 1;
+                    }
+                    .escala-sheet-day.is-holiday .escala-sheet-empty {
+                        color: #000000 !important;
+                        font-size: 16px !important;
+                        font-style: normal;
+                        letter-spacing: 0;
+                    }
+                    .escala-export-month-page.is-dense .escala-sheet-title {
+                        font-size: 36px;
+                        padding: 6px 8px;
+                    }
+                    .escala-export-month-page.is-dense .escala-sheet-weekdays span {
+                        min-height: 40px;
+                        font-size: 14px;
+                    }
+                    .escala-export-month-page.is-dense .escala-sheet-day-date {
+                        font-size: 13px;
+                        padding: 2px 4px;
+                    }
+                    .escala-export-month-page.is-dense .escala-sheet-grid {
+                        row-gap: 10px;
+                    }
+                    .escala-export-month-page.is-dense .escala-sheet-table th,
+                    .escala-export-month-page.is-dense .escala-sheet-table td {
+                        font-size: 9.5px;
+                        line-height: 1;
+                        padding: 0 1px;
+                    }
+                    .escala-export-month-page.is-dense .escala-sheet-table th {
+                        height: 13px;
+                    }
+                    .escala-export-month-page.is-dense .escala-sheet-table td {
+                        height: 14px;
+                    }
+                    .escala-export-month-page.is-ultra-dense .escala-sheet-title {
+                        font-size: 32px;
+                        padding: 5px 8px;
+                    }
+                    .escala-export-month-page.is-ultra-dense .escala-sheet-weekdays span {
+                        min-height: 34px;
+                        font-size: 12px;
+                    }
+                    .escala-export-month-page.is-ultra-dense .escala-sheet-day-date {
+                        font-size: 11px;
+                        padding: 1px 3px;
+                    }
+                    .escala-export-month-page.is-ultra-dense .escala-sheet-grid {
+                        row-gap: 8px;
+                    }
+                    .escala-export-month-page.is-ultra-dense .escala-sheet-table th,
+                    .escala-export-month-page.is-ultra-dense .escala-sheet-table td {
+                        font-size: 8px;
+                        line-height: 1;
+                        padding: 0 1px;
+                    }
+                    .escala-export-month-page.is-ultra-dense .escala-sheet-table th {
+                        height: 11px;
+                    }
+                    .escala-export-month-page.is-ultra-dense .escala-sheet-table td {
+                        height: 12px;
                     }
                     .escala-export-header {
                         display: flex;
@@ -6007,7 +8510,7 @@
                         margin-bottom: 8px;
                     }
                     .escala-export-header h1 {
-                        font-size: 28px;
+                        font-size: ${pageMetrics.titleSize}px;
                         line-height: 1.08;
                         color: #1e3a5f;
                     }
@@ -6079,18 +8582,133 @@
                     .escala-export-page:not(.escala-export-detailed) .escala-export-holidays {
                         display: none !important;
                     }
+                    .relatorio-setor-header {
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                        gap: 12px;
+                        margin-bottom: 10px;
+                        padding: 9px 12px;
+                        border-radius: 8px;
+                        background: #f8fafc;
+                        border: 1px solid #dbe3ef;
+                        color: #1e3a5f;
+                        font-size: ${pageMetrics.sectorHeaderSize}px;
+                        font-weight: 700;
+                    }
+                    .relatorio-setor-header strong {
+                        color: #475569;
+                        font-size: 12px;
+                    }
                     .escala-export-grid {
                         display: grid;
-                        grid-template-columns: repeat(6, minmax(0, 1fr));
+                        grid-template-columns: repeat(7, minmax(0, 1fr));
                         grid-template-rows: repeat(var(--week-count, 5), minmax(0, 1fr));
-                        gap: 10px;
+                        gap: ${isMonthlyExport ? 8 : 10}px;
                         align-items: stretch;
                         flex: 1;
-                        min-height: 900px;
+                        min-height: ${pageMetrics.gridMinHeight}px;
+                        height: auto;
+                        overflow: visible;
+                    }
+                    .escala-export-weekdays {
+                        display: grid;
+                        grid-template-columns: repeat(7, minmax(0, 1fr));
+                        gap: 8px;
+                        margin-bottom: 8px;
+                    }
+                    .escala-export-weekdays span {
+                        padding: 6px 8px;
+                        border-radius: 8px;
+                        background: #24415f;
+                        color: #f8fafc;
+                        text-align: center;
+                        font-size: 13px;
+                        font-weight: 800;
                     }
                     .escala-export-grid-calendario .escala-quadro-dia,
                     .escala-export-grid-calendario .escala-quadro-dia-placeholder {
                         height: 100%;
+                    }
+                    .escala-export-dia,
+                    .escala-export-dia-placeholder {
+                        min-width: 0;
+                        border: 1px solid #d6e0ea;
+                        border-radius: 10px;
+                        overflow: hidden;
+                        background: #ffffff;
+                        display: flex;
+                        flex-direction: column;
+                        height: 100%;
+                        box-shadow: 0 3px 9px rgba(15, 23, 42, 0.04);
+                    }
+                    .escala-export-dia-placeholder {
+                        border-style: dashed;
+                        background: #f8fbff;
+                        opacity: 0.55;
+                    }
+                    .escala-export-dia.is-empty {
+                        background: #fbfdff;
+                    }
+                    .escala-export-dia-header {
+                        padding: 7px 8px;
+                        background: #e8f0fb;
+                        color: #24415f;
+                        font-size: ${pageMetrics.dayHeaderSize}px;
+                        font-weight: 800;
+                        line-height: 1.05;
+                        text-align: center;
+                        border-bottom: 1px solid #d6e0ea;
+                    }
+                    .escala-export-lines {
+                        display: flex;
+                        flex-direction: column;
+                        gap: 4px;
+                        padding: 7px;
+                        min-height: 0;
+                        overflow: hidden;
+                    }
+                    .escala-export-line {
+                        display: grid;
+                        grid-template-columns: minmax(48px, 0.9fr) minmax(0, 1.25fr) minmax(48px, 0.9fr);
+                        align-items: center;
+                        gap: 4px;
+                        min-height: 26px;
+                        padding: 4px 5px;
+                        border: 1px solid #dbe3ef;
+                        border-radius: 7px;
+                        background: #f8fbff;
+                        color: #1f2937;
+                        font-size: 12px;
+                        line-height: 1.05;
+                    }
+                    .escala-export-line strong {
+                        min-width: 0;
+                        overflow: hidden;
+                        text-overflow: ellipsis;
+                        white-space: nowrap;
+                        color: #111827;
+                        font-size: 12px;
+                        text-align: center;
+                    }
+                    .escala-export-time,
+                    .escala-export-work {
+                        min-width: 0;
+                        overflow: hidden;
+                        text-overflow: ellipsis;
+                        white-space: nowrap;
+                        font-weight: 800;
+                        text-align: center;
+                        color: #334155;
+                    }
+                    .escala-export-empty {
+                        flex: 1;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        color: #64748b;
+                        font-size: 13px;
+                        font-style: italic;
                     }
                     .escala-quadro-dia {
                         border: 1px solid #d6e0ea;
@@ -6109,10 +8727,10 @@
                         opacity: 0.6;
                     }
                     .escala-quadro-dia-header {
-                        padding: 6px 8px;
+                        padding: ${isMonthlyExport ? '8px 10px' : '6px 8px'};
                         background: #e8f0fb;
                         color: #24415f;
-                        font-size: 12px;
+                        font-size: ${pageMetrics.dayHeaderSize}px;
                         font-weight: 700;
                         text-align: center;
                         border-bottom: 1px solid #d6e0ea;
@@ -6127,9 +8745,9 @@
                     .escala-quadro-tabela th,
                     .escala-quadro-tabela td {
                         border: 1px solid #dbe3ef;
-                        padding: 4px 5px;
-                        font-size: 10px;
-                        line-height: 1.15;
+                        padding: ${isMonthlyExport ? '5px 6px' : '4px 5px'};
+                        font-size: ${pageMetrics.tableFontSize}px;
+                        line-height: ${isMonthlyExport ? '1.2' : '1.15'};
                         text-align: center;
                         vertical-align: middle;
                     }
@@ -6186,6 +8804,7 @@
     const gerarRelatorioEscalaDetalhadoLegacy = async function gerarRelatorioEscalaDetalhado() {
         const dataInicio = document.getElementById('relatorioEscalaDataInicio')?.value;
         const dataFim = document.getElementById('relatorioEscalaDataFim')?.value;
+        const setorId = getRelatorioEscalaSetorId();
         const colaboradorId = document.getElementById('relatorioEscalaColaborador')?.value || '';
         const tipo = document.getElementById('relatorioEscalaTipo')?.value || '';
 
@@ -6200,14 +8819,17 @@
             const payload = await window.API.getEscalaRelatorio({
                 dataInicio,
                 dataFim,
+                setorId: setorId || undefined,
                 colaboradorId: colaboradorId || undefined,
                 tipo: tipo || undefined
             });
             const items = Array.isArray(payload?.items) ? payload.items : [];
-            document.getElementById('relatorioTitulo').innerText = `Relatorio de Escala • ${formatDatePtBrEscala(dataInicio)} ate ${formatDatePtBrEscala(dataFim)}`;
+            document.getElementById('relatorioTitulo').innerText = `Relatorio de Escala - ${formatDatePtBrEscala(dataInicio)} ate ${formatDatePtBrEscala(dataFim)}${setorId ? ` - Setor: ${getRelatorioEscalaSetorNome(setorId)}` : ''}`;
             document.getElementById('relatorioConteudo').innerHTML = renderDetailedEscalaReport(items, {
                 dataInicio,
-                dataFim
+                dataFim,
+                setorId,
+                setorNome: getRelatorioEscalaSetorNome(setorId)
             });
             document.getElementById('relatorioVisualizacao').style.display = 'block';
         } catch (error) {
@@ -6233,11 +8855,12 @@
 
                 const payload = await window.API.getEscalaRelatorio({
                     dataInicio: filters.dataInicio,
-                    dataFim: filters.dataFim
+                    dataFim: filters.dataFim,
+                    setorId: filters.setorId || undefined
                 });
                 const items = Array.isArray(payload?.items) ? payload.items : [];
 
-                document.getElementById('relatorioTitulo').innerText = `Quadro mensal de Escala • ${MESES_LABELS[filters.month - 1] || filters.month} ${filters.year}`;
+                document.getElementById('relatorioTitulo').innerText = `Quadro mensal de Escala - ${MESES_LABELS[filters.month - 1] || filters.month} ${filters.year}${filters.setorId ? ` - Setor: ${filters.setorNome}` : ''}`;
                 document.getElementById('relatorioConteudo').innerHTML = renderMonthlyEscalaReport(items, filters);
                 document.getElementById('relatorioVisualizacao').style.display = 'block';
                 return;
@@ -6245,6 +8868,7 @@
 
             const dataInicio = document.getElementById('relatorioEscalaDataInicio')?.value;
             const dataFim = document.getElementById('relatorioEscalaDataFim')?.value;
+            const setorId = getRelatorioEscalaSetorId();
             const colaboradorId = document.getElementById('relatorioEscalaColaborador')?.value || '';
             const tipo = document.getElementById('relatorioEscalaTipo')?.value || '';
 
@@ -6258,14 +8882,17 @@
             const payload = await window.API.getEscalaRelatorio({
                 dataInicio,
                 dataFim,
+                setorId: setorId || undefined,
                 colaboradorId: colaboradorId || undefined,
                 tipo: tipo || undefined
             });
             const items = Array.isArray(payload?.items) ? payload.items : [];
-            document.getElementById('relatorioTitulo').innerText = `Relatorio de Escala • ${formatDatePtBrEscala(dataInicio)} ate ${formatDatePtBrEscala(dataFim)}`;
+            document.getElementById('relatorioTitulo').innerText = `Relatorio de Escala - ${formatDatePtBrEscala(dataInicio)} ate ${formatDatePtBrEscala(dataFim)}${setorId ? ` - Setor: ${getRelatorioEscalaSetorNome(setorId)}` : ''}`;
             document.getElementById('relatorioConteudo').innerHTML = renderDetailedEscalaReport(items, {
                 dataInicio,
-                dataFim
+                dataFim,
+                setorId,
+                setorNome: getRelatorioEscalaSetorNome(setorId)
             });
             document.getElementById('relatorioVisualizacao').style.display = 'block';
         } catch (error) {
@@ -6287,16 +8914,13 @@
         let releaseViewportLock = null;
 
         try {
-            releaseViewportLock = typeof window.lockPdfViewportOverflow === 'function'
-                ? window.lockPdfViewportOverflow()
-                : null;
-
             if (typeof mostrarToast === 'function') {
                 mostrarToast('Gerando PDF do relatorio de escala...', 'warning');
             }
 
             const snapshot = await buildEscalaExportSnapshot();
             const html = gerarHtmlPdfRelatorioEscala(snapshot);
+            const isMonthlyExport = snapshot.mode === RELATORIO_ESCALA_MODOS.QUADRO_MENSAL;
 
             if (typeof window.criarContainerTemporarioRelatorioPdf !== 'function'
                 || typeof window.aguardarLayoutRelatorioPdf !== 'function'
@@ -6304,40 +8928,27 @@
                 throw new Error('Os utilitarios de renderizacao do PDF nao estao disponiveis.');
             }
 
-            container = window.criarContainerTemporarioRelatorioPdf(html, { width: 1480 });
+            container = window.criarContainerTemporarioRelatorioPdf(html, {
+                width: isMonthlyExport ? 1700 : 1480
+            });
             await window.aguardarLayoutRelatorioPdf();
 
-            const paginas = Array.from(container.querySelectorAll('.pdf-pagina'));
-            const elementos = paginas.length > 0 ? paginas : [container];
-            const pdf = new window.jspdf.jsPDF({
-                orientation: 'landscape',
-                unit: 'mm',
-                format: 'a4'
+            const canvas = await window.renderizarPaginaPdfEmCanvas(container, {
+                minWidth: isMonthlyExport ? 1700 : 1800,
+                minHeight: isMonthlyExport ? 1180 : 1200,
+                scale: isMonthlyExport ? 1.45 : 1.65,
+                maxCanvasSide: isMonthlyExport ? 12000 : 14000,
+                maxCanvasPixels: isMonthlyExport ? 22000000 : 24000000
             });
-            const pageWidth = pdf.internal.pageSize.getWidth();
-            const pageHeight = pdf.internal.pageSize.getHeight();
-            const margem = 8;
-            const larguraUtil = pageWidth - (margem * 2);
-            const alturaUtil = pageHeight - (margem * 2);
-
-            for (let indice = 0; indice < elementos.length; indice += 1) {
-                const canvas = await window.renderizarPaginaPdfEmCanvas(elementos[indice], {
-                    minWidth: snapshot.mode === RELATORIO_ESCALA_MODOS.QUADRO_MENSAL ? 2000 : 1800,
-                    minHeight: snapshot.mode === RELATORIO_ESCALA_MODOS.QUADRO_MENSAL ? 1280 : 1200,
-                    scale: snapshot.mode === RELATORIO_ESCALA_MODOS.QUADRO_MENSAL ? 2.4 : 2.15
-                });
-                const escala = Math.min(larguraUtil / canvas.width, alturaUtil / canvas.height);
-                const larguraRender = canvas.width * escala;
-                const alturaRender = canvas.height * escala;
-                const posicaoX = (pageWidth - larguraRender) / 2;
-                const posicaoY = (pageHeight - alturaRender) / 2;
-
-                if (indice > 0) {
-                    pdf.addPage();
-                }
-
-                pdf.addImage(canvas, 'PNG', posicaoX, posicaoY, larguraRender, alturaRender, undefined, 'MEDIUM');
-            }
+            const { pdf } = window.criarPdfMultipaginasComCanvas(canvas, {
+                preferLandscape: true,
+                marginMm: isMonthlyExport ? 5 : 6,
+                minScaleMmPerPixel: isMonthlyExport ? 0.075 : 0.065,
+                imageFormat: 'JPEG',
+                imageQuality: 0.94,
+                minimumPages: isMonthlyExport ? 1 : 2,
+                maxSourcePageHeight: isMonthlyExport ? 1160 : 1300
+            });
 
             const salvarPdf = typeof window.baixarPdfSemPreview === 'function'
                 ? window.baixarPdfSemPreview
@@ -6414,13 +9025,202 @@
         };
     }
 
-    window.gerarRelatorioPlantoes = gerarRelatorioPlantoes = async function gerarRelatorioPlantoesAtualizado() {
-        const dataInicio = document.getElementById('relatorioPlantaoDataInicio')?.value;
-        const dataFim = document.getElementById('relatorioPlantaoDataFim')?.value;
-        const colaboradorId = document.getElementById('relatorioPlantaoColaborador')?.value || '';
-        const status = document.getElementById('relatorioPlantaoStatus')?.value || 'todos';
+    function getPlantaoReportFiltersFromUI() {
+        return {
+            dataInicio: document.getElementById('relatorioPlantaoDataInicio')?.value || '',
+            dataFim: document.getElementById('relatorioPlantaoDataFim')?.value || '',
+            colaboradorId: document.getElementById('relatorioPlantaoColaborador')?.value || '',
+            status: document.getElementById('relatorioPlantaoStatus')?.value || 'todos'
+        };
+    }
 
-        if (!dataInicio || !dataFim) {
+    async function buildPlantaoReportItems(filters) {
+        if (typeof carregarColaboradores === 'function') {
+            await carregarColaboradores();
+        }
+
+        const payload = await window.API.getPlantoes({
+            from: filters.dataInicio,
+            to: filters.dataFim
+        });
+
+        return (Array.isArray(payload) ? payload : [])
+            .map((item) => ({
+                ...item,
+                dataISO: toISODateEscala(item.dataISO || item.data_plantao),
+                tipoPlantao: item.tipoPlantao || item.tipo_plantao || null,
+                colaboradores: Array.isArray(item.colaboradores) ? item.colaboradores : [],
+                horaInicio: item.horaInicio || item.hora_inicio || null,
+                horaFim: item.horaFim || item.hora_fim || null,
+                observacao: item.observacao || null,
+                duracaoMinutos: Number(item.duracaoMinutos || 0) || null,
+                duracaoFormatada: item.duracaoFormatada || null
+            }))
+            .filter((plantao) => {
+                if (plantao.tipoPlantao !== 'sabado' && !isPlantaoSabadoEscala(plantao.dataISO)) {
+                    return false;
+                }
+
+                if (filters.colaboradorId && !(plantao.colaboradores || []).some((id) => Number(id) === Number(filters.colaboradorId))) {
+                    return false;
+                }
+
+                if (filters.status === 'com_equipe') {
+                    return (plantao.colaboradores || []).length > 0;
+                }
+
+                if (filters.status === 'sem_equipe') {
+                    return (plantao.colaboradores || []).length === 0;
+                }
+
+                return true;
+            });
+    }
+
+    function gerarHtmlPdfRelatorioPlantoes(items, filters = {}) {
+        return `
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="UTF-8">
+                <title>Relatorio de Plantoes</title>
+                <style>
+                    * { box-sizing: border-box; margin: 0; padding: 0; }
+                    body {
+                        width: 1480px;
+                        padding: 16px;
+                        background: #ffffff;
+                        color: #0f172a;
+                        font-family: Arial, sans-serif;
+                    }
+                    .pdf-pagina {
+                        width: 1448px;
+                        min-height: 980px;
+                        padding: 18px;
+                        background: #ffffff;
+                        overflow: visible;
+                    }
+                    .plantao-export-header {
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: flex-end;
+                        gap: 18px;
+                        margin-bottom: 16px;
+                        padding-bottom: 12px;
+                        border-bottom: 2px solid #dbeafe;
+                    }
+                    .plantao-export-header h1 {
+                        color: #1e3a5f;
+                        font-size: 30px;
+                        line-height: 1.1;
+                    }
+                    .plantao-export-header p {
+                        color: #64748b;
+                        font-size: 13px;
+                        font-weight: 700;
+                    }
+                    .relatorio-total {
+                        margin-bottom: 14px;
+                        padding: 10px 12px;
+                        border-radius: 10px;
+                        background: #eef2ff;
+                        color: #312e81;
+                        font-size: 14px;
+                        font-weight: 600;
+                    }
+                    .resumo-cards {
+                        display: grid;
+                        grid-template-columns: repeat(4, minmax(0, 1fr));
+                        gap: 10px;
+                    }
+                    .resumo-card-estatistica {
+                        display: flex;
+                        align-items: center;
+                        gap: 10px;
+                        padding: 12px;
+                        border: 1px solid #dbe3ef;
+                        border-radius: 10px;
+                        background: #f8fafc;
+                    }
+                    .resumo-card-estatistica i {
+                        color: #6366f1;
+                        font-size: 18px;
+                    }
+                    .resumo-card-estatistica strong {
+                        display: block;
+                        color: #0f172a;
+                        font-size: 18px;
+                    }
+                    .resumo-card-estatistica span {
+                        color: #64748b;
+                        font-size: 12px;
+                        font-weight: 700;
+                    }
+                    .relatorio-tabela {
+                        width: 100%;
+                        border-collapse: collapse;
+                        margin-top: 12px;
+                    }
+                    .relatorio-tabela th,
+                    .relatorio-tabela td {
+                        border: 1px solid #dbe3ef;
+                        padding: 8px 10px;
+                        color: #0f172a;
+                        font-size: 12px;
+                        line-height: 1.3;
+                        text-align: left;
+                        vertical-align: top;
+                    }
+                    .relatorio-tabela th {
+                        background: #e2e8f0;
+                        color: #0f172a;
+                        font-weight: 800;
+                    }
+                    .evento-tipo {
+                        display: inline-block;
+                        padding: 4px 8px;
+                        border-radius: 999px;
+                        font-weight: 700;
+                        font-size: 11px;
+                    }
+                    .badge-folga {
+                        background: #dcfce7;
+                        color: #166534;
+                    }
+                    .badge-ausencia {
+                        background: #fee2e2;
+                        color: #991b1b;
+                    }
+                    .empty-state {
+                        padding: 28px;
+                        border: 1px dashed #cbd5e1;
+                        border-radius: 12px;
+                        color: #64748b;
+                        text-align: center;
+                        font-size: 16px;
+                    }
+                </style>
+            </head>
+            <body>
+                <section class="pdf-pagina plantao-export-page">
+                    <header class="plantao-export-header">
+                        <div>
+                            <h1>Relatorio de Plantoes de Sabado</h1>
+                            <p>${escapeHtmlEscala(formatDatePtBrEscala(filters.dataInicio))} ate ${escapeHtmlEscala(formatDatePtBrEscala(filters.dataFim))}</p>
+                        </div>
+                        <p>Gerado em ${escapeHtmlEscala(new Date().toLocaleDateString('pt-BR'))}</p>
+                    </header>
+                    ${renderRelatorioPlantoes(items, filters)}
+                </section>
+            </body>
+            </html>
+        `;
+    }
+
+    window.gerarRelatorioPlantoes = gerarRelatorioPlantoes = async function gerarRelatorioPlantoesAtualizado() {
+        const filters = getPlantaoReportFiltersFromUI();
+
+        if (!filters.dataInicio || !filters.dataFim) {
             if (typeof mostrarToast === 'function') {
                 mostrarToast('Informe a data inicial e final do relatorio de plantoes.', 'error');
             }
@@ -6428,49 +9228,85 @@
         }
 
         try {
-            const payload = await window.API.getPlantoes({
-                from: dataInicio,
-                to: dataFim
-            });
-            const items = (Array.isArray(payload) ? payload : [])
-                .map((item) => ({
-                    ...item,
-                    dataISO: toISODateEscala(item.dataISO || item.data_plantao),
-                    colaboradores: Array.isArray(item.colaboradores) ? item.colaboradores : [],
-                    horaInicio: item.horaInicio || item.hora_inicio || null,
-                    horaFim: item.horaFim || item.hora_fim || null,
-                    observacao: item.observacao || null,
-                    duracaoMinutos: Number(item.duracaoMinutos || 0) || null,
-                    duracaoFormatada: item.duracaoFormatada || null
-                }))
-                .filter((plantao) => {
-                    if (colaboradorId && !(plantao.colaboradores || []).some((id) => Number(id) === Number(colaboradorId))) {
-                        return false;
-                    }
+            const items = await buildPlantaoReportItems(filters);
 
-                    if (status === 'com_equipe') {
-                        return (plantao.colaboradores || []).length > 0;
-                    }
-
-                    if (status === 'sem_equipe') {
-                        return (plantao.colaboradores || []).length === 0;
-                    }
-
-                    return true;
-                });
-
-            document.getElementById('relatorioTitulo').innerText = `Relatorio de Plantoes â€¢ ${formatDatePtBrEscala(dataInicio)} ate ${formatDatePtBrEscala(dataFim)}`;
-            document.getElementById('relatorioConteudo').innerHTML = renderRelatorioPlantoes(items, {
-                dataInicio,
-                dataFim,
-                colaboradorId,
-                status
-            });
+            document.getElementById('relatorioTitulo').innerText = `Relatorio de Plantoes de Sabado - ${formatDatePtBrEscala(filters.dataInicio)} ate ${formatDatePtBrEscala(filters.dataFim)}`;
+            document.getElementById('relatorioConteudo').innerHTML = renderRelatorioPlantoes(items, filters);
             document.getElementById('relatorioVisualizacao').style.display = 'block';
         } catch (error) {
             if (typeof mostrarToast === 'function') {
                 mostrarToast(`Erro ao gerar relatorio de plantoes: ${error.message}`, 'error');
             }
+        }
+    };
+
+    window.exportarRelatorioPlantoes = exportarRelatorioPlantoes = async function exportarRelatorioPlantoesAtualizado() {
+        const filters = getPlantaoReportFiltersFromUI();
+
+        if (!filters.dataInicio || !filters.dataFim) {
+            if (typeof mostrarToast === 'function') {
+                mostrarToast('Informe a data inicial e final do relatorio de plantoes.', 'error');
+            }
+            return;
+        }
+
+        if (typeof html2canvas !== 'function' || !window.jspdf || typeof window.jspdf.jsPDF !== 'function') {
+            if (typeof mostrarToast === 'function') {
+                mostrarToast('Bibliotecas de exportacao nao estao disponiveis.', 'error');
+            }
+            return;
+        }
+
+        let container = null;
+        let releaseViewportLock = null;
+
+        try {
+            if (typeof mostrarToast === 'function') {
+                mostrarToast('Gerando PDF de plantoes...', 'warning');
+            }
+
+            const items = await buildPlantaoReportItems(filters);
+            const html = gerarHtmlPdfRelatorioPlantoes(items, filters);
+
+            releaseViewportLock = typeof window.lockPdfViewportOverflow === 'function'
+                ? window.lockPdfViewportOverflow()
+                : null;
+            container = window.criarContainerTemporarioRelatorioPdf(html, { width: 1480 });
+            await window.aguardarLayoutRelatorioPdf();
+
+            const canvas = await window.renderizarPaginaPdfEmCanvas(container, {
+                minWidth: 1600,
+                minHeight: 1000,
+                scale: 1.65,
+                maxCanvasSide: 12000,
+                maxCanvasPixels: 22000000
+            });
+            const { pdf } = window.criarPdfMultipaginasComCanvas(canvas, {
+                preferLandscape: true,
+                marginMm: 6,
+                minScaleMmPerPixel: 0.065,
+                imageFormat: 'JPEG',
+                imageQuality: 0.94,
+                minimumPages: 1,
+                maxSourcePageHeight: 1300
+            });
+            const salvarPdf = typeof window.baixarPdfSemPreview === 'function'
+                ? window.baixarPdfSemPreview
+                : (pdfDoc, nomeArquivo) => pdfDoc.save(nomeArquivo);
+            salvarPdf(pdf, `Relatorio_Plantoes_${filters.dataInicio}_${filters.dataFim}.pdf`);
+
+            if (typeof mostrarToast === 'function') {
+                mostrarToast('PDF de plantoes gerado com sucesso!', 'success');
+            }
+        } catch (error) {
+            console.error('Erro ao exportar relatorio de plantoes:', error);
+
+            if (typeof mostrarToast === 'function') {
+                mostrarToast(`Erro ao exportar relatorio de plantoes: ${error.message}`, 'error');
+            }
+        } finally {
+            releaseViewportLock?.();
+            container?.remove();
         }
     };
 
@@ -6522,6 +9358,7 @@
                     <thead>
                         <tr>
                             <th>Data</th>
+                            <th>Tipo</th>
                             <th>Horario</th>
                             <th>Status</th>
                             <th>Colaboradores</th>
@@ -6541,6 +9378,7 @@
                             return `
                                 <tr>
                                     <td><strong>${escapeHtmlEscala(formatDatePtBrEscala(plantao.dataISO))}</strong></td>
+                                    <td>${escapeHtmlEscala((plantao.tipoPlantao || 'sabado').charAt(0).toUpperCase() + (plantao.tipoPlantao || 'sabado').slice(1))}</td>
                                     <td>${escapeHtmlEscala(formatTimeRangeEscala(plantao.horaInicio, plantao.horaFim))}</td>
                                     <td><span class="evento-tipo ${statusClass}">${escapeHtmlEscala(statusLabel)}</span></td>
                                     <td>${escapeHtmlEscala(colaboradores.join(', ') || '--')}</td>
@@ -6571,6 +9409,7 @@
 
         await Promise.allSettled([
             typeof carregarColaboradores === 'function' ? carregarColaboradores() : Promise.resolve([]),
+            typeof carregarSetores === 'function' ? carregarSetores() : Promise.resolve([]),
             typeof carregarPlantoes === 'function' ? carregarPlantoes() : Promise.resolve([])
         ]);
 
@@ -6629,6 +9468,12 @@
                                     <option value="${RELATORIO_ESCALA_MODOS.DETALHADO}">Detalhado</option>
                                 </select>
                             </div>
+                            <div class="filtro-group">
+                                <label><i class="fas fa-building"></i> Setor</label>
+                                <select id="relatorioEscalaSetor" class="form-control">
+                                    ${buildSetorOptionsRelatorioEscala()}
+                                </select>
+                            </div>
                             <div class="relatorio-escala-view is-active" data-escala-report-mode="${RELATORIO_ESCALA_MODOS.QUADRO_MENSAL}">
                                 <div class="filtro-group">
                                     <label><i class="fas fa-calendar-alt"></i> Mes/Ano</label>
@@ -6677,11 +9522,11 @@
                 <div class="relatorio-card">
                     <div class="relatorio-card-header">
                         <i class="fas fa-calendar-check"></i>
-                        <h2>Relatorio de Plantoes</h2>
+                        <h2>Relatorio de Plantoes de Sabado</h2>
                     </div>
                     <div class="relatorio-card-body">
                         <p class="relatorio-descricao">
-                            Consulte plantoes por periodo, colaborador e status da equipe.
+                            Consulte plantoes de sabado por periodo, colaborador e status da equipe.
                         </p>
                         <div class="relatorio-filtros">
                             <div class="filtro-group">
@@ -6710,6 +9555,9 @@
                         <div class="relatorio-actions">
                             <button onclick="gerarRelatorioPlantoes()" class="btn-primary">
                                 <i class="fas fa-file-alt"></i> Visualizar
+                            </button>
+                            <button onclick="exportarRelatorioPlantoes()" class="btn-secondary">
+                                <i class="fas fa-download"></i> Exportar
                             </button>
                         </div>
                     </div>

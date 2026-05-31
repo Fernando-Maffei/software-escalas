@@ -12,11 +12,13 @@ const {
 const { AppError } = require('./utils/errors');
 
 const colaboradoresRoutes = require('./routes/colaboradores');
+const setoresRoutes = require('./routes/setores');
 const ausenciasRoutes = require('./routes/ausencias');
 const plantoesRoutes = require('./routes/plantoes');
 const feriadosRoutes = require('./routes/feriados');
 const bancoHorasRoutes = require('./routes/banco-horas');
 const escalaRoutes = require('./routes/escala');
+const jornadaSemanalRoutes = require('./routes/jornada-semanal');
 const configuracaoBancoRoutes = require('./routes/configuracao-banco');
 
 const DEFAULT_HOST = '0.0.0.0';
@@ -135,11 +137,13 @@ app.get('/api/test', (req, res) => {
 });
 
 app.use('/api/colaboradores', colaboradoresRoutes);
+app.use('/api/setores', setoresRoutes);
 app.use('/api/ausencias', ausenciasRoutes);
 app.use('/api/plantoes', plantoesRoutes);
 app.use('/api/feriados', feriadosRoutes);
 app.use('/api/banco-horas', bancoHorasRoutes);
 app.use('/api/escala', escalaRoutes);
+app.use('/api/jornada-semanal', jornadaSemanalRoutes);
 app.use('/api/configuracao-banco', configuracaoBancoRoutes);
 
 app.get(/^(?!\/api(?:\/|$)).*/, (req, res) => {
@@ -207,11 +211,13 @@ function start(options = {}) {
         console.log('Rotas disponiveis:');
         console.log('- GET  /api/health');
         console.log('- GET  /api/colaboradores');
+        console.log('- GET  /api/setores');
         console.log('- GET  /api/ausencias');
         console.log('- GET  /api/plantoes');
         console.log('- GET  /api/feriados');
         console.log('- GET  /api/banco-horas/resumo');
         console.log('- GET  /api/escala/dia/:dataISO');
+        console.log('- GET  /api/jornada-semanal');
         console.log('- GET  /api/configuracao-banco');
 
         try {

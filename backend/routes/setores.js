@@ -1,0 +1,87 @@
+const express = require('express');
+
+const { sql, conectar } = require('../db');
+const { AppError } = require('../utils/errors');
+const { getSchemaInfo, hasTable } = require('../utils/schema');
+const { withTransaction } = require('../utils/transactions');
+const { listSetores, normalizeSetorNome } = require('../utils/setores');
+
+const router = express.Router();
+
+router.get('/', async (req, res) => {
+    const pool = await conectar();
+    const schema = await getSchemaInfo(pool);
+    const includeInactive = String(req.query.includeInactive || '').trim().toLowerCase() === 'true';
+
+    if (!hasTable(schema, 'Setores')) {
+        res.json([]);
+        return;
+    }
+
+    const items = await listSetores(pool, {
+        onlyActive: !includeInactive
+    });
+
+    res.json(items);
+});
+
+router.post('/', async (req, res) => {
+    const pool = await conectar();
+    const schema = await getSchemaInfo(pool);
+    const nome = normalizeSetorNome(req.body?.nome);
+
+    if (!hasTable(schema, 'Setores')) {
+        throw new AppError(409, 'A tabela de setores ainda nao foi criada. Use a opcao de verificar/gerar tabelas antes de cadastrar setores.');
+    }
+
+    const result = await withTransaction(sql, pool, async (tx) => {
+        const existing = await tx.request()
+            .input('nome', sql.NVarChar(120), nome)
+            .query(`
+                SELECT TOP 1
+                    Id,
+                    Nome,
+                    Ativo,
+                    Ordem,
+                    CriadoEm,
+                    AtualizadoEm
+                FROM Setores
+                WHERE Nome = @nome
+            `);
+
+        if (existing.recordset.length > 0) {
+            return {
+                action: 'existing',
+                record: existing.recordset[0]
+            };
+        }
+
+        const ordemResult = await tx.request().query('SELECT COALESCE(MAX(Ordem), 0) AS maxOrdem FROM Setores');
+        const nextOrder = Number(ordemResult.recordset[0]?.maxOrdem || 0) + 1;
+
+        const inserted = await tx.request()
+            .input('nome', sql.NVarChar(120), nome)
+            .input('ordem', sql.Int, nextOrder)
+            .query(`
+                INSERT INTO Setores (Nome, Ordem)
+                OUTPUT INSERTED.*
+                VALUES (@nome, @ordem)
+            `);
+
+        return {
+            action: 'created',
+            record: inserted.recordset[0]
+        };
+    });
+
+    res.status(result.action === 'created' ? 201 : 200).json({
+        success: true,
+        action: result.action,
+        message: result.action === 'created'
+            ? 'Setor criado com sucesso!'
+            : 'Setor ja existente.',
+        data: result.record
+    });
+});
+
+module.exports = router;

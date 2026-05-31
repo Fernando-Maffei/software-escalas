@@ -16,6 +16,17 @@
     border: 1px solid var(--border);
 }
 
+.colaboradores-page-header {
+    position: sticky;
+    top: 0;
+    z-index: 60;
+    margin-bottom: 18px;
+    padding: 0 0 16px;
+    background: var(--bg-soft);
+    border-bottom: 1px solid rgba(148, 163, 184, 0.14);
+    box-shadow: 0 16px 24px -24px rgba(15, 23, 42, 0.45);
+}
+
 .colaboradores-header {
     display: flex;
     justify-content: space-between;
@@ -23,6 +34,16 @@
     margin-bottom: 20px;
     padding-bottom: 16px;
     border-bottom: 2px solid var(--border);
+}
+
+.colaboradores-container .colaboradores-header {
+    position: sticky;
+    top: 88px;
+    z-index: 55;
+    margin: -20px -20px 20px;
+    padding: 20px 20px 16px;
+    background: var(--card);
+    border-radius: 24px 24px 0 0;
 }
 
 .search-box {
@@ -142,6 +163,20 @@
 .colaborador-horarios {
     display: flex;
     gap: 12px;
+}
+
+.colaborador-setor-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 8px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    background: #eff6ff;
+    color: #1d4ed8;
+    font-size: 12px;
+    font-weight: 600;
+    border: 1px solid #bfdbfe;
 }
 
 .banco-horas-card {
@@ -319,6 +354,17 @@
     color: var(--primary);
 }
 
+.setor-inputs {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 10px;
+    align-items: center;
+}
+
+.btn-setor-rapido {
+    white-space: nowrap;
+}
+
 #colaboradorEditor .time-inputs {
     display: flex;
     align-items: center;
@@ -348,6 +394,113 @@
     color: var(--text-light);
     font-size: 14px;
     font-weight: 500;
+}
+
+#colaboradorEditor .jornada-semanal-shell {
+    display: grid;
+    gap: 12px;
+    padding: 14px;
+    border-radius: 16px;
+    background: var(--card-dark);
+    border: 1px solid var(--border);
+}
+
+#colaboradorEditor .jornada-semanal-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+#colaboradorEditor .btn-jornada-action {
+    font-size: 12px;
+    padding: 8px 10px;
+}
+
+#colaboradorEditor .jornada-semanal-grid {
+    display: grid;
+    gap: 8px;
+}
+
+#colaboradorEditor .jornada-semanal-row {
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: white;
+    padding: 10px;
+    display: grid;
+    gap: 8px;
+}
+
+#colaboradorEditor .jornada-semanal-row.is-selected {
+    border-color: rgba(99, 102, 241, 0.35);
+    background: rgba(99, 102, 241, 0.08);
+}
+
+#colaboradorEditor .jornada-semanal-day-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 0;
+}
+
+#colaboradorEditor .jornada-semanal-times {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+}
+
+#colaboradorEditor .jornada-time-group {
+    display: grid;
+    gap: 6px;
+}
+
+#colaboradorEditor .jornada-time-group small {
+    color: var(--text-light);
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0;
+    text-transform: uppercase;
+}
+
+#colaboradorEditor .jornada-time-pair {
+    display: grid;
+    grid-template-columns: minmax(96px, 1fr) 28px minmax(96px, 1fr);
+    gap: 8px;
+    align-items: center;
+}
+
+#colaboradorEditor .jornada-time-pair input {
+    width: 100%;
+    min-width: 0;
+    height: 38px;
+    padding: 8px 10px;
+    text-align: center;
+}
+
+#colaboradorEditor .jornada-time-pair span {
+    color: var(--text-light);
+    font-size: 12px;
+    font-weight: 700;
+    text-align: center;
+}
+
+#colaboradorEditor .jornada-semanal-times.is-hidden {
+    display: none;
+}
+
+#colaboradorEditor .jornada-semanal-hint {
+    margin: 0;
+}
+
+#colaboradorEditor .jornada-semanal-hint.is-hidden,
+#colaboradorEditor .jornada-semanal-suggestion-actions.is-hidden {
+    display: none;
+}
+
+#colaboradorEditor .jornada-semanal-suggestion-actions {
+    display: flex;
 }
 
 #colaboradorEditor .banco-horas-input {
@@ -516,6 +669,11 @@
 }
 
 @media (max-width: 980px) {
+    .colaboradores-page-header,
+    .colaboradores-container .colaboradores-header {
+        position: static;
+    }
+
     .colaboradores-layout {
         flex-direction: column;
     }
@@ -532,6 +690,10 @@
 
     .banco-horas-card {
         align-items: flex-start;
+    }
+
+    #colaboradorEditor .jornada-time-pair {
+        grid-template-columns: minmax(86px, 1fr) 28px minmax(86px, 1fr);
     }
 }
 
@@ -649,6 +811,25 @@
 
 [data-theme="dark"] #colaboradorEditor .time-inputs span {
     color: var(--text-light);
+}
+
+[data-theme="dark"] #colaboradorEditor .jornada-semanal-shell {
+    background: rgba(15, 23, 42, 0.7);
+    border-color: var(--border);
+}
+
+[data-theme="dark"] #colaboradorEditor .jornada-semanal-row {
+    background: var(--card);
+    border-color: var(--border);
+}
+
+[data-theme="dark"] #colaboradorEditor .jornada-semanal-row.is-selected {
+    background: rgba(99, 102, 241, 0.2);
+    border-color: rgba(129, 140, 248, 0.4);
+}
+
+[data-theme="dark"] #colaboradorEditor .jornada-semanal-day-toggle {
+    color: var(--text);
 }
 
 [data-theme="dark"] #colaboradorEditor .banco-horas-editor-shell {

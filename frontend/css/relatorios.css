@@ -104,6 +104,30 @@
     display: block;
 }
 
+.relatorio-filtros-ativos {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 14px;
+}
+
+.relatorio-filtros-ativos span {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 8px 12px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--primary-soft);
+    color: var(--primary-dark);
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.relatorio-filtros-ativos i {
+    color: var(--primary);
+}
+
 .escala-detalhada-tabela td:last-child {
     min-width: 220px;
     white-space: normal;
@@ -343,6 +367,45 @@
     margin-left: 5px;
 }
 
+.relatorio-setor-section {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-top: 18px;
+    padding: 14px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--card);
+}
+
+.relatorio-setor-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    background: var(--card-dark);
+    color: var(--text);
+    font-weight: 700;
+}
+
+.relatorio-setor-header span {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.relatorio-setor-header i {
+    color: var(--primary);
+}
+
+.relatorio-setor-header strong {
+    white-space: nowrap;
+    color: var(--text-light);
+    font-size: 12px;
+}
+
 .escala-quadro-mensal {
     display: flex;
     flex-direction: column;
@@ -358,7 +421,7 @@
 
 .escala-quadro-grid-calendario {
     align-items: stretch;
-    grid-template-columns: repeat(6, minmax(180px, 1fr));
+    grid-template-columns: repeat(7, minmax(180px, 1fr));
     min-width: 1080px;
     grid-auto-rows: 1fr;
 }
@@ -577,7 +640,7 @@
     }
 
     .escala-quadro-grid-calendario {
-        grid-template-columns: repeat(6, minmax(170px, 1fr));
+        grid-template-columns: repeat(7, minmax(170px, 1fr));
         min-width: 1020px;
     }
 }
@@ -588,7 +651,7 @@
     }
 
     .escala-quadro-grid-calendario {
-        grid-template-columns: repeat(6, minmax(160px, 1fr));
+        grid-template-columns: repeat(7, minmax(160px, 1fr));
         min-width: 960px;
     }
 }
@@ -692,6 +755,11 @@
     .resumo-cards {
         grid-template-columns: 1fr;
     }
+
+    .relatorio-setor-header {
+        align-items: flex-start;
+        flex-direction: column;
+    }
     
     .calendario-resumo {
         grid-template-columns: 1fr;
@@ -729,7 +797,7 @@
     }
 
     .escala-quadro-grid-calendario {
-        grid-template-columns: repeat(6, minmax(145px, 1fr));
+        grid-template-columns: repeat(7, minmax(145px, 1fr));
         min-width: 870px;
     }
 }

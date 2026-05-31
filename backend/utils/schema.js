@@ -1,7 +1,16 @@
 const { AppError } = require('./errors');
 
 const SCHEMA_CACHE_TTL_MS = 10000;
-const TRACKED_TABLES = ['Ausencias', 'BancoHorasMovimentos', 'Colaboradores', 'plantoes', 'escala_dia'];
+const TRACKED_TABLES = [
+    'Ausencias',
+    'BancoHorasMovimentos',
+    'Colaboradores',
+    'ColaboradorJornadaSemanal',
+    'Setores',
+    'plantoes',
+    'escala_dia',
+    'AlmocosPersonalizados'
+];
 
 let schemaCache = null;
 let schemaCacheExpiresAt = 0;
@@ -67,12 +76,17 @@ function clearSchemaCache() {
 function getBancoHorasCapabilities(schema) {
     return {
         hasMovimentosTable: hasTable(schema, 'BancoHorasMovimentos'),
+        hasJornadaSemanalTable: hasTable(schema, 'ColaboradorJornadaSemanal'),
         hasAusenciaSubtipo: hasColumn(schema, 'Ausencias', 'Subtipo'),
         hasAusenciaDesconta: hasColumn(schema, 'Ausencias', 'DescontaBancoHoras'),
         hasAusenciaObservacao: hasColumn(schema, 'Ausencias', 'Observacao'),
+        hasColaboradorSetorId: hasColumn(schema, 'Colaboradores', 'SetorId'),
+        hasSetoresTable: hasTable(schema, 'Setores'),
+        hasAlmocosPersonalizadosTable: hasTable(schema, 'AlmocosPersonalizados'),
         hasPlantaoHoraInicio: hasColumn(schema, 'plantoes', 'hora_inicio'),
         hasPlantaoHoraFim: hasColumn(schema, 'plantoes', 'hora_fim'),
-        hasPlantaoObservacao: hasColumn(schema, 'plantoes', 'observacao')
+        hasPlantaoObservacao: hasColumn(schema, 'plantoes', 'observacao'),
+        hasPlantaoTipo: hasColumn(schema, 'plantoes', 'tipo_plantao')
     };
 }
 
@@ -88,12 +102,24 @@ function describeBancoHorasMissingPieces(schema) {
         missing.push('coluna Ausencias.DescontaBancoHoras');
     }
 
+    if (!capabilities.hasSetoresTable) {
+        missing.push('tabela Setores');
+    }
+
+    if (!capabilities.hasColaboradorSetorId) {
+        missing.push('coluna Colaboradores.SetorId');
+    }
+
     if (!capabilities.hasPlantaoHoraInicio) {
         missing.push('coluna plantoes.hora_inicio');
     }
 
     if (!capabilities.hasPlantaoHoraFim) {
         missing.push('coluna plantoes.hora_fim');
+    }
+
+    if (!capabilities.hasPlantaoTipo) {
+        missing.push('coluna plantoes.tipo_plantao');
     }
 
     return missing;

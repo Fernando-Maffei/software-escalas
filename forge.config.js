@@ -6,7 +6,15 @@ module.exports = {
     packagerConfig: {
         asar: true,
         executableName: 'appdeescalas',
-        icon: appIconBasePath
+        icon: appIconBasePath,
+        ignore: [
+            /^\/\.git($|\/)/,
+            /^\/\.tmp-/,
+            /^\/out($|\/)/,
+            /^\/out-locked-/,
+            /^\/tmp-server-.*\.log$/,
+            /^\/backend\/config\/.*\.json$/
+        ]
     },
     makers: [
         {

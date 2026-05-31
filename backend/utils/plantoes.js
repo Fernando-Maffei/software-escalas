@@ -4,6 +4,7 @@ const {
     ensurePositiveInt,
     extractDateString,
     extractTimeString,
+    normalizeEnum,
     normalizeIsoDate,
     normalizeNumericArray
 } = require('./validation');
@@ -18,6 +19,68 @@ function normalizeColaboradores(values) {
     }
 
     return normalizeNumericArray(values, 'Colaborador');
+}
+
+const PLANTAO_TIPOS = ['sabado'];
+
+function resolvePlantaoTypeByDate(dataISO) {
+    const normalized = normalizeIsoDate(dataISO, 'Data do plantao');
+    const [year, month, day] = normalized.split('-').map(Number);
+    const weekday = new Date(Date.UTC(year, month - 1, day, 12, 0, 0)).getUTCDay();
+
+    if (weekday === 6) {
+        return 'sabado';
+    }
+
+    throw new AppError(400, 'Plantao deve ser lancado somente para sabado.');
+}
+
+function normalizePlantaoType(value, dataISO = null) {
+    if (value === undefined || value === null || String(value).trim() === '') {
+        if (dataISO) {
+            return resolvePlantaoTypeByDate(dataISO);
+        }
+
+        throw new AppError(400, 'Tipo de plantao e obrigatorio.');
+    }
+
+    const normalized = normalizeEnum(value, 'Tipo de plantao', PLANTAO_TIPOS);
+
+    if (dataISO) {
+        const expected = resolvePlantaoTypeByDate(dataISO);
+
+        if (normalized !== expected) {
+            throw new AppError(400, `A data informada corresponde a ${expected}, nao a ${normalized}.`);
+        }
+    }
+
+    return normalized;
+}
+
+function resolveLegacyPlantaoType(row, dataISO) {
+    const rawType = row.tipoPlantao ?? row.tipo_plantao ?? row.TipoPlantao ?? null;
+
+    if (rawType !== undefined && rawType !== null && String(rawType).trim() !== '') {
+        const normalized = String(rawType)
+            .trim()
+            .toLowerCase()
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '');
+
+        if (normalized === 'sabado' || normalized === 'domingo') {
+            return normalized;
+        }
+    }
+
+    if (!dataISO) {
+        return null;
+    }
+
+    try {
+        return resolvePlantaoTypeByDate(dataISO);
+    } catch (error) {
+        return null;
+    }
 }
 
 function serializePlantaoRecord(row) {
@@ -45,6 +108,7 @@ function serializePlantaoRecord(row) {
         data_plantao: rawDate,
         dataISO,
         colaboradores: normalizeColaboradores(colaboradores),
+        tipoPlantao: resolveLegacyPlantaoType(row, dataISO),
         horaInicio: extractTimeString(row.hora_inicio ?? row.HoraInicio ?? row.horaInicio),
         horaFim: extractTimeString(row.hora_fim ?? row.HoraFim ?? row.horaFim),
         observacao: row.observacao ?? row.Observacao ?? null,
@@ -87,5 +151,7 @@ module.exports = {
     formatDateToISO,
     generateUpcomingSaturdays,
     normalizeColaboradores,
+    normalizePlantaoType,
+    resolvePlantaoTypeByDate,
     serializePlantaoRecord
 };

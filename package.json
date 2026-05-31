@@ -1,6 +1,6 @@
 {
   "name": "app-de-escalas",
-  "version": "1.1.0-beta",
+  "version": "1.2.0",
   "description": "Sistema desktop e web para gestao de escalas de trabalho.",
   "productName": "App de Escalas",
   "main": "electron/main.js",
@@ -19,7 +19,6 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
-    "body-parser": "^2.2.2",
     "cors": "^2.8.6",
     "electron-squirrel-startup": "^1.0.1",
     "express": "^5.2.1",

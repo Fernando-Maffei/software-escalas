@@ -88,9 +88,16 @@ const API = {
     health: () => API.get('/health'),
 
     getColaboradores: (params = {}) => API.get('/colaboradores', params),
+    getSetores: (params = {}) => API.get('/setores', params),
+    salvarSetor: (data) => API.post('/setores', data),
     salvarColaborador: (data) => data.id
         ? API.put(`/colaboradores/${data.id}`, data)
         : API.post('/colaboradores', data),
+    getColaboradorJornadaSemanal: (colaboradorId) => API.get(`/colaboradores/${colaboradorId}/jornada-semanal`),
+    salvarColaboradorJornadaSemanal: (colaboradorId, jornadaSemanal) => API.put(`/colaboradores/${colaboradorId}/jornada-semanal`, {
+        jornadaSemanal
+    }),
+    getJornadaSemanal: (params = {}) => API.get('/jornada-semanal', params),
     excluirColaborador: (id) => API.delete(`/colaboradores/${id}`),
 
     getAusencias: (params = {}) => API.get('/ausencias', params),
@@ -110,10 +117,11 @@ const API = {
     excluirPlantao: (dataISO) => API.delete(`/plantoes/${dataISO}`),
     getPlantaoDisponibilidade: (dataISO, params = {}) => API.get(`/plantoes/disponibilidade/${dataISO}`, params),
 
-    getEscalaDia: (dataISO) => API.get(`/escala/dia/${dataISO}`),
+    getEscalaDia: (dataISO, params = {}) => API.get(`/escala/dia/${dataISO}`, params),
     getEscalaRelatorio: (params = {}) => API.get('/escala/relatorio', params),
     salvarEscalaDia: (dataISO, colaboradorId, data) => API.put(`/escala/dia/${dataISO}/colaborador/${colaboradorId}`, data),
     aplicarAlmocoPeriodo: (data) => API.put('/escala/almoco-periodo', data),
+    restaurarAlmocosCadastroEscala: (dataISO, data = {}) => API.put(`/escala/dia/${dataISO}/almocos/cadastro`, data),
     sincronizarEscala: (data) => API.post('/escala/rebuild', data),
 
     getBancoHorasStatus: () => API.get('/banco-horas/status'),

@@ -89,9 +89,12 @@ SET
 
 IF NOT EXISTS (
     SELECT 1
-    FROM sys.default_constraints
-    WHERE parent_object_id = OBJECT_ID('dbo.escala_dia')
-      AND name = 'DF_escala_dia_tipo'
+    FROM sys.default_constraints dc
+    INNER JOIN sys.columns c
+        ON c.object_id = dc.parent_object_id
+       AND c.column_id = dc.parent_column_id
+    WHERE dc.parent_object_id = OBJECT_ID('dbo.escala_dia')
+      AND c.name = 'tipo'
 )
 BEGIN
     ALTER TABLE dbo.escala_dia
@@ -100,9 +103,12 @@ END;
 
 IF NOT EXISTS (
     SELECT 1
-    FROM sys.default_constraints
-    WHERE parent_object_id = OBJECT_ID('dbo.escala_dia')
-      AND name = 'DF_escala_dia_ajuste_manual'
+    FROM sys.default_constraints dc
+    INNER JOIN sys.columns c
+        ON c.object_id = dc.parent_object_id
+       AND c.column_id = dc.parent_column_id
+    WHERE dc.parent_object_id = OBJECT_ID('dbo.escala_dia')
+      AND c.name = 'ajuste_manual'
 )
 BEGIN
     ALTER TABLE dbo.escala_dia
@@ -111,9 +117,12 @@ END;
 
 IF NOT EXISTS (
     SELECT 1
-    FROM sys.default_constraints
-    WHERE parent_object_id = OBJECT_ID('dbo.escala_dia')
-      AND name = 'DF_escala_dia_almoco_ajustado'
+    FROM sys.default_constraints dc
+    INNER JOIN sys.columns c
+        ON c.object_id = dc.parent_object_id
+       AND c.column_id = dc.parent_column_id
+    WHERE dc.parent_object_id = OBJECT_ID('dbo.escala_dia')
+      AND c.name = 'almoco_ajustado'
 )
 BEGIN
     ALTER TABLE dbo.escala_dia
@@ -122,9 +131,12 @@ END;
 
 IF NOT EXISTS (
     SELECT 1
-    FROM sys.default_constraints
-    WHERE parent_object_id = OBJECT_ID('dbo.escala_dia')
-      AND name = 'DF_escala_dia_criado_em'
+    FROM sys.default_constraints dc
+    INNER JOIN sys.columns c
+        ON c.object_id = dc.parent_object_id
+       AND c.column_id = dc.parent_column_id
+    WHERE dc.parent_object_id = OBJECT_ID('dbo.escala_dia')
+      AND c.name = 'criado_em'
 )
 BEGIN
     ALTER TABLE dbo.escala_dia
@@ -133,9 +145,12 @@ END;
 
 IF NOT EXISTS (
     SELECT 1
-    FROM sys.default_constraints
-    WHERE parent_object_id = OBJECT_ID('dbo.escala_dia')
-      AND name = 'DF_escala_dia_atualizado_em'
+    FROM sys.default_constraints dc
+    INNER JOIN sys.columns c
+        ON c.object_id = dc.parent_object_id
+       AND c.column_id = dc.parent_column_id
+    WHERE dc.parent_object_id = OBJECT_ID('dbo.escala_dia')
+      AND c.name = 'atualizado_em'
 )
 BEGIN
     ALTER TABLE dbo.escala_dia

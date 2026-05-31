@@ -4,6 +4,8 @@ const {
     formatDateToISO,
     generateUpcomingSaturdays,
     normalizeColaboradores,
+    normalizePlantaoType,
+    resolvePlantaoTypeByDate,
     serializePlantaoRecord
 } = require('../backend/utils/plantoes');
 
@@ -31,12 +33,34 @@ module.exports = [
             const serialized = serializePlantaoRecord({
                 id: 10,
                 data_plantao: new Date('2026-04-25T12:00:00'),
-                colaboradores_ids: '[5,2,5]'
+                colaboradores_ids: '[5,2,5]',
+                tipo_plantao: 'sabado'
             });
 
             assert.equal(serialized.id, 10);
             assert.equal(serialized.dataISO, '2026-04-25');
             assert.deepEqual(serialized.colaboradores, [2, 5]);
+            assert.equal(serialized.tipoPlantao, 'sabado');
+        }
+    },
+    {
+        name: 'resolvePlantaoTypeByDate accepts only saturday',
+        run() {
+            assert.equal(resolvePlantaoTypeByDate('2026-04-25'), 'sabado');
+            assert.throws(
+                () => resolvePlantaoTypeByDate('2026-04-26'),
+                /somente para sabado/i
+            );
+        }
+    },
+    {
+        name: 'normalizePlantaoType validates explicit type against weekend date',
+        run() {
+            assert.equal(normalizePlantaoType('sabado', '2026-04-25'), 'sabado');
+            assert.throws(
+                () => normalizePlantaoType('domingo', '2026-04-25'),
+                /Tipo de plantao/i
+            );
         }
     },
     {
