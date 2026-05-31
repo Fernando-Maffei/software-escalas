@@ -1,5 +1,6 @@
 const { sql } = require('../db');
 const { AppError } = require('./errors');
+const { listJornadaSemanal } = require('./jornada-semanal');
 const { serializePlantaoRecord } = require('./plantoes');
 const { getBancoHorasCapabilities, hasTable } = require('./schema');
 const {
@@ -28,7 +29,43 @@ const DIA_SEMANA_LABELS = [
 ];
 
 function normalizeEscalaTipo(value, fieldName = 'Tipo') {
-    return normalizeEnum(value, fieldName, ESCALA_TIPOS, { defaultValue: 'normal' });
+    if (value === undefined || value === null || String(value).trim() === '') {
+        return 'normal';
+    }
+
+    const normalized = String(value)
+        .trim()
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[\s-]+/g, '_')
+        .replace(/_+/g, '_');
+
+    if (normalized.startsWith('plantao')) {
+        return 'plantao';
+    }
+
+    if (normalized.startsWith('folga')) {
+        return 'folga';
+    }
+
+    if (normalized.startsWith('ferias')) {
+        return 'ferias';
+    }
+
+    if (normalized.startsWith('ausencia')) {
+        return 'ausencia';
+    }
+
+    if (normalized.startsWith('ajuste')) {
+        return 'ajuste';
+    }
+
+    if (normalized === 'normal') {
+        return 'normal';
+    }
+
+    throw new AppError(400, `${fieldName} invalido.`);
 }
 
 function getDayOfWeek(dataISO) {
@@ -117,6 +154,82 @@ function getColaboradorDefaultTimes(colaborador) {
     };
 }
 
+function hasColaboradorDefaultWorkSchedule(colaborador) {
+    const defaults = getColaboradorDefaultTimes(colaborador);
+    return Boolean(defaults.horaInicio && defaults.horaFim);
+}
+
+function createEscalaRecordFromWeeklySchedule(colaborador, jornadaDia, dataISO, overrides = {}) {
+    const trabalhoInicio = extractTimeString(jornadaDia?.trabalhoInicio ?? jornadaDia?.TrabalhoInicio);
+    const trabalhoFim = extractTimeString(jornadaDia?.trabalhoFim ?? jornadaDia?.TrabalhoFim);
+    const almocoInicio = extractTimeString(jornadaDia?.almocoInicio ?? jornadaDia?.AlmocoInicio);
+    const almocoFim = extractTimeString(jornadaDia?.almocoFim ?? jornadaDia?.AlmocoFim);
+
+    return createDefaultEscalaRecord(colaborador, dataISO, {
+        ...overrides,
+        horaInicio: overrides.horaInicio !== undefined ? overrides.horaInicio : trabalhoInicio,
+        horaFim: overrides.horaFim !== undefined ? overrides.horaFim : trabalhoFim,
+        almocoInicio: overrides.almocoInicio !== undefined ? overrides.almocoInicio : almocoInicio,
+        almocoFim: overrides.almocoFim !== undefined ? overrides.almocoFim : almocoFim,
+        tipo: overrides.tipo || 'normal'
+    });
+}
+
+function buildJornadaSemanalIndex(jornadaRows) {
+    const map = new Map();
+
+    for (const row of jornadaRows || []) {
+        const colaboradorId = Number(row.colaboradorId || row.ColaboradorId || 0);
+        const diaSemana = Number(row.diaSemana ?? row.DiaSemana);
+        const ativo = coerceBoolean(row.ativo ?? row.Ativo);
+
+        if (!Number.isFinite(colaboradorId) || colaboradorId <= 0 || !Number.isFinite(diaSemana)) {
+            continue;
+        }
+
+        if (!map.has(colaboradorId)) {
+            map.set(colaboradorId, {
+                hasRows: false,
+                activeByDay: new Map()
+            });
+        }
+
+        const target = map.get(colaboradorId);
+        target.hasRows = true;
+
+        if (ativo) {
+            target.activeByDay.set(diaSemana, row);
+        }
+    }
+
+    return map;
+}
+
+function canDeleteAutomaticEscalaRecord(record) {
+    if (!record) {
+        return false;
+    }
+
+    return !record.ajusteManual
+        && !trimToNull(record.origemTipo)
+        && !record.origemId
+        && (record.tipo === 'normal' || record.tipo === 'ajuste');
+}
+
+function getColaboradorDefaultLunchTimes(colaborador) {
+    const defaults = getColaboradorDefaultTimes(colaborador);
+
+    return {
+        almocoInicio: defaults.almocoInicio,
+        almocoFim: defaults.almocoFim
+    };
+}
+
+function areSameLunchTimes(firstStart, firstEnd, secondStart, secondEnd) {
+    return (extractTimeString(firstStart) || null) === (extractTimeString(secondStart) || null)
+        && (extractTimeString(firstEnd) || null) === (extractTimeString(secondEnd) || null);
+}
+
 function createDefaultEscalaRecord(colaborador, dataISO, overrides = {}) {
     const defaults = getColaboradorDefaultTimes(colaborador);
 
@@ -124,6 +237,8 @@ function createDefaultEscalaRecord(colaborador, dataISO, overrides = {}) {
         id: overrides.id ?? null,
         colaboradorId: Number(colaborador.Id || colaborador.id || overrides.colaboradorId),
         colaboradorNome: colaborador.Nome || colaborador.nome || overrides.colaboradorNome || null,
+        setorId: colaborador.SetorId ?? colaborador.setorId ?? overrides.setorId ?? null,
+        setorNome: colaborador.SetorNome || colaborador.setorNome || overrides.setorNome || null,
         dataISO: normalizeIsoDate(dataISO, 'Data'),
         horaInicio: overrides.horaInicio !== undefined ? overrides.horaInicio : defaults.horaInicio,
         horaFim: overrides.horaFim !== undefined ? overrides.horaFim : defaults.horaFim,
@@ -142,7 +257,7 @@ function createDefaultEscalaRecord(colaborador, dataISO, overrides = {}) {
     };
 }
 
-function createAusenciaEscalaRecord(colaborador, ausencia, dataISO) {
+function createAusenciaEscalaRecord(colaborador, ausencia, dataISO, baseRecord = null) {
     const tipo = normalizeEscalaTipo(ausencia.Tipo || ausencia.tipo || 'ausencia');
     const periodoTipo = String(ausencia.PeriodoTipo || ausencia.periodoTipo || 'dia_inteiro').trim().toLowerCase();
     const observacaoBase = trimToNull(ausencia.Observacao || ausencia.observacao);
@@ -155,6 +270,10 @@ function createAusenciaEscalaRecord(colaborador, ausencia, dataISO) {
 
     if (periodoTipo === 'horas') {
         return createDefaultEscalaRecord(colaborador, dataISO, {
+            horaInicio: baseRecord?.horaInicio,
+            horaFim: baseRecord?.horaFim,
+            almocoInicio: baseRecord?.almocoInicio,
+            almocoFim: baseRecord?.almocoFim,
             tipo,
             observacao: buildEscalaObservationParts(observacaoBase, subtipo, observacaoPeriodo),
             origemTipo: 'ausencia',
@@ -197,6 +316,7 @@ function buildColaboradorDefaultSyncRecord(colaborador, existingRecord) {
 function canAutoRefreshDefaultEscala(record) {
     return Boolean(record)
         && !record.ajusteManual
+        && !record.almocoAjustado
         && !trimToNull(record.origemTipo)
         && !record.origemId;
 }
@@ -206,6 +326,8 @@ function serializeEscalaDiaRecord(row) {
         id: row.id ?? row.Id ?? null,
         colaboradorId: Number(row.colaborador_id ?? row.ColaboradorId ?? row.colaboradorId ?? 0) || null,
         colaboradorNome: row.colaboradorNome ?? row.ColaboradorNome ?? row.Nome ?? row.nome ?? null,
+        setorId: row.setorId ?? row.SetorId ?? null,
+        setorNome: row.setorNome ?? row.SetorNome ?? null,
         dataISO: normalizeIsoDate(
             row.dataISO
                 || row.DataISO
@@ -223,6 +345,7 @@ function serializeEscalaDiaRecord(row) {
         origemId: row.origem_id ?? row.OrigemId ?? null,
         ajusteManual: coerceBoolean(row.ajuste_manual ?? row.AjusteManual),
         almocoAjustado: coerceBoolean(row.almoco_ajustado ?? row.AlmocoAjustado),
+        almocoPersonalizado: coerceBoolean(row.almoco_personalizado ?? row.AlmocoPersonalizado),
         criadoEm: row.criado_em ?? row.CriadoEm ?? null,
         atualizadoEm: row.atualizado_em ?? row.AtualizadoEm ?? null
     };
@@ -272,6 +395,8 @@ function mergeEscalaRecord(existingRecord, incomingRecord, options = {}) {
         id: existingRecord.id ?? incomingRecord.id ?? null,
         colaboradorId: existingRecord.colaboradorId,
         colaboradorNome: existingRecord.colaboradorNome || incomingRecord.colaboradorNome || null,
+        setorId: existingRecord.setorId ?? incomingRecord.setorId ?? null,
+        setorNome: existingRecord.setorNome || incomingRecord.setorNome || null,
         dataISO: existingRecord.dataISO,
         almocoInicio: preserveLunch ? existingRecord.almocoInicio : incomingRecord.almocoInicio,
         almocoFim: preserveLunch ? existingRecord.almocoFim : incomingRecord.almocoFim,
@@ -346,7 +471,14 @@ async function findColaboradorById(poolOrTx, colaboradorId) {
     const id = ensurePositiveInt(colaboradorId, 'Colaborador');
     const result = await poolOrTx.request()
         .input('id', sql.Int, id)
-        .query('SELECT * FROM Colaboradores WHERE Id = @id');
+        .query(`
+            SELECT
+                c.*,
+                s.Nome AS SetorNome
+            FROM Colaboradores c
+            LEFT JOIN Setores s ON s.Id = c.SetorId
+            WHERE c.Id = @id
+        `);
 
     if (result.recordset.length === 0) {
         throw new AppError(404, 'Colaborador nao encontrado.');
@@ -362,21 +494,24 @@ async function listColaboradores(poolOrTx, options = {}) {
 
     if (colaboradorId) {
         request.input('colaboradorId', sql.Int, ensurePositiveInt(colaboradorId, 'Colaborador'));
-        clauses.push('Id = @colaboradorId');
+        clauses.push('c.Id = @colaboradorId');
     }
 
     const result = await request.query(`
-        SELECT *
-        FROM Colaboradores
+        SELECT
+            c.*,
+            s.Nome AS SetorNome
+        FROM Colaboradores c
+        LEFT JOIN Setores s ON s.Id = c.SetorId
         ${clauses.length > 0 ? `WHERE ${clauses.join(' AND ')}` : ''}
-        ORDER BY Nome
+        ORDER BY c.Nome
     `);
 
     return result.recordset;
 }
 
 async function listEscalaDiaRows(poolOrTx, startISO, endISO, options = {}) {
-    const { colaboradorId = null, tipo = null } = options;
+    const { colaboradorId = null, tipo = null, setorId = null } = options;
     const request = poolOrTx.request()
         .input('dataInicio', sql.Date, normalizeIsoDate(startISO, 'Data inicial'))
         .input('dataFim', sql.Date, normalizeIsoDate(endISO, 'Data final'));
@@ -392,12 +527,20 @@ async function listEscalaDiaRows(poolOrTx, startISO, endISO, options = {}) {
         clauses.push('LOWER(e.tipo) = @tipo');
     }
 
+    if (setorId) {
+        request.input('setorId', sql.Int, ensurePositiveInt(setorId, 'Setor'));
+        clauses.push('c.SetorId = @setorId');
+    }
+
     const result = await request.query(`
         SELECT
             ${buildEscalaSelect('e')},
-            c.Nome AS colaboradorNome
+            c.Nome AS colaboradorNome,
+            c.SetorId AS setorId,
+            s.Nome AS setorNome
         FROM escala_dia e
         INNER JOIN Colaboradores c ON c.Id = e.colaborador_id
+        LEFT JOIN Setores s ON s.Id = c.SetorId
         WHERE ${clauses.join(' AND ')}
         ORDER BY e.data, c.Nome
     `);
@@ -412,9 +555,12 @@ async function findEscalaDiaByColaboradorAndDate(poolOrTx, colaboradorId, dataIS
         .query(`
             SELECT
                 ${buildEscalaSelect('e')},
-                c.Nome AS colaboradorNome
+                c.Nome AS colaboradorNome,
+                c.SetorId AS setorId,
+                s.Nome AS setorNome
             FROM escala_dia e
             INNER JOIN Colaboradores c ON c.Id = e.colaborador_id
+            LEFT JOIN Setores s ON s.Id = c.SetorId
             WHERE e.colaborador_id = @colaboradorId
               AND e.data = @data
         `);
@@ -539,36 +685,85 @@ async function ensureEscalaBaseForPeriod(poolOrTx, schema, startISO, endISO, opt
 
     const { colaboradorId = null, includeSaturday = false } = options;
     const colaboradores = await listColaboradores(poolOrTx, { colaboradorId });
+    const jornadaSemanalRows = await listJornadaSemanal(poolOrTx, schema, {
+        colaboradorId,
+        onlyActive: false,
+        allowMissingTable: true
+    });
+    const jornadaSemanalIndex = buildJornadaSemanalIndex(jornadaSemanalRows);
+    const hasJornadaSemanalSupport = hasTable(schema, 'ColaboradorJornadaSemanal');
     const existingRows = await listEscalaDiaRows(poolOrTx, startISO, endISO, { colaboradorId });
     const existingMap = new Map(existingRows.map((row) => [buildEscalaKey(row.colaboradorId, row.dataISO), row]));
     const counters = {
         created: 0,
         updated: 0,
-        skipped: 0
+        skipped: 0,
+        deleted: 0
     };
 
     for (const dataISO of iterateIsoDates(startISO, endISO)) {
         const weekday = getDayOfWeek(dataISO);
-        const shouldCreate = includeSaturday
-            ? weekday >= 1 && weekday <= 6
-            : shouldCreateWeekdayBase(dataISO);
-
-        if (!shouldCreate) {
-            continue;
-        }
 
         for (const colaborador of colaboradores) {
             const key = buildEscalaKey(colaborador.Id, dataISO);
             const existingRecord = existingMap.get(key) || null;
-            const defaultRecord = createDefaultEscalaRecord(colaborador, dataISO, {
-                tipo: weekday === 6 ? 'ajuste' : 'normal'
-            });
+            const jornadaInfo = jornadaSemanalIndex.get(Number(colaborador.Id)) || {
+                hasRows: false,
+                activeByDay: new Map()
+            };
+            let defaultRecord = null;
+
+            if (hasJornadaSemanalSupport && jornadaInfo.hasRows) {
+                const jornadaDia = jornadaInfo.activeByDay.get(weekday);
+
+                if (jornadaDia) {
+                    defaultRecord = createEscalaRecordFromWeeklySchedule(colaborador, jornadaDia, dataISO, {
+                        tipo: 'normal'
+                    });
+
+                    if (!defaultRecord.horaInicio || !defaultRecord.horaFim) {
+                        defaultRecord = null;
+                    }
+                }
+            } else {
+                const shouldCreate = includeSaturday
+                    ? weekday >= 1 && weekday <= 6
+                    : shouldCreateWeekdayBase(dataISO);
+
+                if (shouldCreate && hasColaboradorDefaultWorkSchedule(colaborador)) {
+                    defaultRecord = createDefaultEscalaRecord(colaborador, dataISO, {
+                        tipo: 'normal'
+                    });
+                }
+            }
+
+            if (!defaultRecord) {
+                if (existingRecord && canDeleteAutomaticEscalaRecord(existingRecord)) {
+                    await poolOrTx.request()
+                        .input('colaboradorId', sql.Int, ensurePositiveInt(colaborador.Id, 'Colaborador'))
+                        .input('data', sql.Date, normalizeIsoDate(dataISO, 'Data'))
+                        .query(`
+                            DELETE FROM escala_dia
+                            WHERE colaborador_id = @colaboradorId
+                              AND data = @data
+                        `);
+
+                    existingMap.delete(key);
+                    counters.deleted += 1;
+                } else if (existingRecord) {
+                    counters.skipped += 1;
+                }
+
+                continue;
+            }
 
             if (!existingRecord) {
                 const created = await persistEscalaDiaRecord(poolOrTx, defaultRecord);
                 existingMap.set(key, serializeEscalaDiaRecord({
                     ...created,
-                    colaboradorNome: colaborador.Nome
+                    colaboradorNome: colaborador.Nome,
+                    setorId: colaborador.SetorId ?? null,
+                    setorNome: colaborador.SetorNome ?? null
                 }));
                 counters.created += 1;
                 continue;
@@ -595,14 +790,34 @@ async function syncColaboradorDefaultsToEscalaDia(poolOrTx, schema, colaborador)
     ensureEscalaDiaTable(schema);
 
     const colaboradorId = ensurePositiveInt(colaborador.Id || colaborador.id, 'Colaborador');
+
+    if (hasTable(schema, 'ColaboradorJornadaSemanal')) {
+        const jornadaRows = await listJornadaSemanal(poolOrTx, schema, {
+            colaboradorId,
+            onlyActive: false,
+            allowMissingTable: true
+        });
+
+        if (jornadaRows.length > 0) {
+            return {
+                updated: 0,
+                skipped: 0,
+                ignoredByWeeklySchedule: true
+            };
+        }
+    }
+
     const result = await poolOrTx.request()
         .input('colaboradorId', sql.Int, colaboradorId)
         .query(`
             SELECT
                 ${buildEscalaSelect('e')},
-                c.Nome AS colaboradorNome
+                c.Nome AS colaboradorNome,
+                c.SetorId AS setorId,
+                s.Nome AS setorNome
             FROM escala_dia e
             INNER JOIN Colaboradores c ON c.Id = e.colaborador_id
+            LEFT JOIN Setores s ON s.Id = c.SetorId
             WHERE e.colaborador_id = @colaboradorId
             ORDER BY e.data
         `);
@@ -630,6 +845,146 @@ async function syncColaboradorDefaultsToEscalaDia(poolOrTx, schema, colaborador)
     }
 
     return counters;
+}
+
+async function listLunchOverrideRows(poolOrTx, startISO, endISO, options = {}) {
+    const capabilities = getBancoHorasCapabilities(options.schema || {});
+
+    if (!capabilities.hasAlmocosPersonalizadosTable) {
+        return [];
+    }
+
+    const request = poolOrTx.request()
+        .input('dataInicio', sql.Date, normalizeIsoDate(startISO, 'Data inicial'))
+        .input('dataFim', sql.Date, normalizeIsoDate(endISO, 'Data final'));
+    const clauses = ['a.Data BETWEEN @dataInicio AND @dataFim'];
+
+    if (options.colaboradorId) {
+        request.input('colaboradorId', sql.Int, ensurePositiveInt(options.colaboradorId, 'Colaborador'));
+        clauses.push('a.ColaboradorId = @colaboradorId');
+    }
+
+    const result = await request.query(`
+        SELECT
+            a.Id,
+            a.ColaboradorId,
+            CONVERT(VARCHAR(10), a.Data, 23) AS dataISO,
+            a.AlmocoInicio,
+            a.AlmocoFim,
+            a.CriadoEm,
+            a.AtualizadoEm
+        FROM AlmocosPersonalizados a
+        WHERE ${clauses.join(' AND ')}
+        ORDER BY a.Data, a.ColaboradorId
+    `);
+
+    return result.recordset.map((row) => ({
+        id: row.Id,
+        colaboradorId: Number(row.ColaboradorId),
+        dataISO: normalizeIsoDate(row.dataISO, 'Data'),
+        almocoInicio: extractTimeString(row.AlmocoInicio),
+        almocoFim: extractTimeString(row.AlmocoFim),
+        criadoEm: row.CriadoEm,
+        atualizadoEm: row.AtualizadoEm
+    }));
+}
+
+async function upsertLunchOverride(poolOrTx, schema, colaborador, dataISO, almocoInicio, almocoFim) {
+    const capabilities = getBancoHorasCapabilities(schema);
+
+    if (!capabilities.hasAlmocosPersonalizadosTable) {
+        return { action: 'skipped', reason: 'almocos_table_missing' };
+    }
+
+    const defaults = getColaboradorDefaultLunchTimes(colaborador);
+    const useDefault = areSameLunchTimes(defaults.almocoInicio, defaults.almocoFim, almocoInicio, almocoFim);
+
+    if (useDefault || (!almocoInicio && !almocoFim)) {
+        await poolOrTx.request()
+            .input('colaboradorId', sql.Int, ensurePositiveInt(colaborador.Id || colaborador.id, 'Colaborador'))
+            .input('data', sql.Date, normalizeIsoDate(dataISO, 'Data'))
+            .query(`
+                DELETE FROM AlmocosPersonalizados
+                WHERE ColaboradorId = @colaboradorId
+                  AND Data = @data
+            `);
+
+        return { action: 'deleted' };
+    }
+
+    await poolOrTx.request()
+        .input('colaboradorId', sql.Int, ensurePositiveInt(colaborador.Id || colaborador.id, 'Colaborador'))
+        .input('data', sql.Date, normalizeIsoDate(dataISO, 'Data'))
+        .input('almocoInicio', sql.Time, toSqlTime(almocoInicio, 'Inicio do almoco'))
+        .input('almocoFim', sql.Time, toSqlTime(almocoFim, 'Fim do almoco'))
+        .query(`
+            MERGE AlmocosPersonalizados AS target
+            USING (
+                SELECT
+                    @colaboradorId AS ColaboradorId,
+                    @data AS Data
+            ) AS source
+            ON target.ColaboradorId = source.ColaboradorId
+               AND target.Data = source.Data
+            WHEN MATCHED THEN UPDATE SET
+                AlmocoInicio = @almocoInicio,
+                AlmocoFim = @almocoFim,
+                AtualizadoEm = GETDATE()
+            WHEN NOT MATCHED THEN INSERT (
+                ColaboradorId,
+                Data,
+                AlmocoInicio,
+                AlmocoFim
+            ) VALUES (
+                @colaboradorId,
+                @data,
+                @almocoInicio,
+                @almocoFim
+            );
+        `);
+
+    return { action: 'upserted' };
+}
+
+async function hydrateLunchOverridesIntoEscala(poolOrTx, schema, existingMap, colaboradores, startISO, endISO, options = {}) {
+    const overrides = await listLunchOverrideRows(poolOrTx, startISO, endISO, {
+        schema,
+        colaboradorId: options.colaboradorId || null
+    });
+    const colaboradoresMap = new Map((colaboradores || []).map((item) => [Number(item.Id), item]));
+
+    for (const override of overrides) {
+        const colaborador = colaboradoresMap.get(Number(override.colaboradorId));
+
+        if (!colaborador) {
+            continue;
+        }
+
+        const key = buildEscalaKey(override.colaboradorId, override.dataISO);
+        const existing = existingMap.get(key) || createDefaultEscalaRecord(colaborador, override.dataISO, {
+            tipo: getDayOfWeek(override.dataISO) === 6 ? 'ajuste' : 'normal'
+        });
+        const nextRecord = {
+            ...existing,
+            colaboradorId: override.colaboradorId,
+            colaboradorNome: colaborador.Nome,
+            setorId: colaborador.SetorId ?? null,
+            setorNome: colaborador.SetorNome ?? null,
+            dataISO: override.dataISO,
+            almocoInicio: override.almocoInicio,
+            almocoFim: override.almocoFim,
+            almocoAjustado: true
+        };
+
+        const persisted = await persistEscalaDiaRecord(poolOrTx, nextRecord);
+        existingMap.set(key, serializeEscalaDiaRecord({
+            ...persisted,
+            colaboradorNome: colaborador.Nome,
+            setorId: colaborador.SetorId ?? null,
+            setorNome: colaborador.SetorNome ?? null,
+            almocoPersonalizado: true
+        }));
+    }
 }
 
 function buildHistoricAusenciaSelect(schema) {
@@ -720,10 +1075,18 @@ async function hydrateHistoricSourcesIntoEscala(poolOrTx, schema, existingMap, c
         const effectiveEnd = dataFimAusencia < endISO ? dataFimAusencia : endISO;
 
         for (const dataISO of iterateIsoDates(effectiveStart, effectiveEnd)) {
+            const key = buildEscalaKey(colaborador.Id, dataISO);
+            const existing = existingMap.get(key) || null;
+
+            if (!existing) {
+                counters.skipped += 1;
+                continue;
+            }
+
             const result = await applyAutomaticEscalaRecord(
                 poolOrTx,
                 existingMap,
-                createAusenciaEscalaRecord(colaborador, ausencia, dataISO),
+                createAusenciaEscalaRecord(colaborador, ausencia, dataISO, existing),
                 { force: false }
             );
 
@@ -749,6 +1112,10 @@ async function hydrateHistoricSourcesIntoEscala(poolOrTx, schema, existingMap, c
     for (const row of plantoesResult.recordset) {
         const plantao = serializePlantaoRecord(row);
 
+        if (plantao.tipoPlantao !== 'sabado') {
+            continue;
+        }
+
         for (const colaboradorEscalado of plantao.colaboradores) {
             if (colaboradorId && Number(colaboradorEscalado) !== Number(colaboradorId)) {
                 continue;
@@ -757,6 +1124,14 @@ async function hydrateHistoricSourcesIntoEscala(poolOrTx, schema, existingMap, c
             const colaborador = colaboradoresMap.get(Number(colaboradorEscalado));
 
             if (!colaborador) {
+                continue;
+            }
+
+            const key = buildEscalaKey(colaborador.Id, plantao.dataISO);
+            const existing = existingMap.get(key) || null;
+
+            if (existing && normalizeEscalaTipo(existing.tipo || 'normal') !== 'plantao' && !trimToNull(existing.origemTipo)) {
+                counters.skipped += 1;
                 continue;
             }
 
@@ -800,6 +1175,16 @@ async function ensureEscalaDiaForPeriod(poolOrTx, schema, startISO, endISO, opti
         counters.skipped += hydratedCounters.skipped || 0;
     }
 
+    await hydrateLunchOverridesIntoEscala(
+        poolOrTx,
+        schema,
+        baseResult.existingMap,
+        baseResult.colaboradores,
+        startISO,
+        endISO,
+        { colaboradorId }
+    );
+
     return {
         counters,
         existingMap: baseResult.existingMap,
@@ -825,10 +1210,16 @@ async function syncAusenciaToEscalaDia(poolOrTx, schema, ausencia, colaborador) 
     const existingMap = new Map(existingRows.map((row) => [buildEscalaKey(row.colaboradorId, row.dataISO), row]));
 
     for (const dataISO of iterateIsoDates(dataInicio, dataFim)) {
+        const key = buildEscalaKey(colaborador.Id, dataISO);
+
+        if (!existingMap.has(key)) {
+            continue;
+        }
+
         await applyAutomaticEscalaRecord(
             poolOrTx,
             existingMap,
-            createAusenciaEscalaRecord(colaborador, ausencia, dataISO),
+            createAusenciaEscalaRecord(colaborador, ausencia, dataISO, existingMap.get(key)),
             { force: true }
         );
     }
@@ -838,6 +1229,11 @@ async function syncPlantaoToEscalaDia(poolOrTx, schema, plantaoRow, colaboradore
     ensureEscalaDiaTable(schema);
 
     const plantao = serializePlantaoRecord(plantaoRow);
+
+    if (plantao.tipoPlantao !== 'sabado') {
+        return;
+    }
+
     const colaboradoresIds = Array.isArray(plantao.colaboradores) ? plantao.colaboradores : [];
     const colaboradoresMap = new Map((colaboradores || []).map((item) => [Number(item.Id), item]));
 
@@ -856,11 +1252,18 @@ async function syncPlantaoToEscalaDia(poolOrTx, schema, plantaoRow, colaboradore
             continue;
         }
 
+        const key = buildEscalaKey(colaborador.Id, plantao.dataISO);
+        const existing = existingMap.get(key) || null;
+
+        if (existing && normalizeEscalaTipo(existing.tipo || 'normal') !== 'plantao' && !trimToNull(existing.origemTipo)) {
+            continue;
+        }
+
         await applyAutomaticEscalaRecord(
             poolOrTx,
             existingMap,
             createPlantaoEscalaRecord(colaborador, plantao),
-            { force: true }
+            { force: false }
         );
     }
 }
@@ -892,6 +1295,8 @@ async function upsertManualEscalaDia(poolOrTx, schema, payload) {
         dataISO,
         colaboradorId: colaborador.Id,
         colaboradorNome: colaborador.Nome,
+        setorId: colaborador.SetorId ?? null,
+        setorNome: colaborador.SetorNome ?? null,
         horaInicio: payload.horaInicio !== undefined ? payload.horaInicio : fallback.horaInicio,
         horaFim: payload.horaFim !== undefined ? payload.horaFim : fallback.horaFim,
         almocoInicio: payload.almocoInicio !== undefined ? payload.almocoInicio : fallback.almocoInicio,
@@ -903,7 +1308,14 @@ async function upsertManualEscalaDia(poolOrTx, schema, payload) {
             ? payload.observacao
             : fallback.observacao,
         ajusteManual: true,
-        almocoAjustado: fallback.almocoAjustado || payload.almocoInicio !== undefined || payload.almocoFim !== undefined
+        almocoAjustado: payload.almocoInicio !== undefined || payload.almocoFim !== undefined
+            ? !areSameLunchTimes(
+                colaborador.AlmocoInicio || colaborador.almocoInicio,
+                colaborador.AlmocoFim || colaborador.almocoFim,
+                payload.almocoInicio !== undefined ? payload.almocoInicio : fallback.almocoInicio,
+                payload.almocoFim !== undefined ? payload.almocoFim : fallback.almocoFim
+            )
+            : Boolean(fallback.almocoAjustado)
     };
 
     validateEscalaTimes(nextRecord, {
@@ -911,10 +1323,14 @@ async function upsertManualEscalaDia(poolOrTx, schema, payload) {
     });
 
     const persisted = await persistEscalaDiaRecord(poolOrTx, nextRecord);
+    await upsertLunchOverride(poolOrTx, schema, colaborador, dataISO, nextRecord.almocoInicio, nextRecord.almocoFim);
 
     return serializeEscalaDiaRecord({
         ...persisted,
-        colaboradorNome: colaborador.Nome
+        colaboradorNome: colaborador.Nome,
+        setorId: colaborador.SetorId ?? null,
+        setorNome: colaborador.SetorNome ?? null,
+        almocoPersonalizado: Boolean(nextRecord.almocoAjustado)
     });
 }
 
@@ -950,22 +1366,27 @@ async function applyLunchPeriod(poolOrTx, schema, payload) {
         const key = buildEscalaKey(colaborador.Id, dataISO);
         const existing = existingMap.get(key) || null;
 
-        if (!existing && isSunday(dataISO)) {
+        if (!existing) {
             skipped += 1;
             continue;
         }
 
-        const baseRecord = existing || createDefaultEscalaRecord(colaborador, dataISO, {
-            tipo: getDayOfWeek(dataISO) === 6 ? 'ajuste' : 'normal'
-        });
+        const baseRecord = existing;
         const nextRecord = {
             ...baseRecord,
             colaboradorId: colaborador.Id,
             colaboradorNome: colaborador.Nome,
+            setorId: colaborador.SetorId ?? null,
+            setorNome: colaborador.SetorNome ?? null,
             dataISO,
             almocoInicio,
             almocoFim,
-            almocoAjustado: true
+            almocoAjustado: !areSameLunchTimes(
+                colaborador.AlmocoInicio || colaborador.almocoInicio,
+                colaborador.AlmocoFim || colaborador.almocoFim,
+                almocoInicio,
+                almocoFim
+            )
         };
 
         validateEscalaTimes(nextRecord, {
@@ -973,15 +1394,17 @@ async function applyLunchPeriod(poolOrTx, schema, payload) {
         });
 
         const persisted = await persistEscalaDiaRecord(poolOrTx, nextRecord);
+        await upsertLunchOverride(poolOrTx, schema, colaborador, dataISO, nextRecord.almocoInicio, nextRecord.almocoFim);
         existingMap.set(key, serializeEscalaDiaRecord({
             ...persisted,
-            colaboradorNome: colaborador.Nome
+            colaboradorNome: colaborador.Nome,
+            setorId: colaborador.SetorId ?? null,
+            setorNome: colaborador.SetorNome ?? null,
+            almocoPersonalizado: Boolean(nextRecord.almocoAjustado)
         }));
 
         if (existing) {
             updated += 1;
-        } else {
-            created += 1;
         }
     }
 
@@ -992,12 +1415,90 @@ async function applyLunchPeriod(poolOrTx, schema, payload) {
     };
 }
 
-async function listEscalaDiaByDate(poolOrTx, schema, dataISO) {
+async function resetEscalaLunchesToCadastro(poolOrTx, schema, dataISO, options = {}) {
     ensureEscalaDiaTable(schema);
 
     const normalized = normalizeIsoDate(dataISO, 'Data');
     await ensureEscalaDiaForPeriod(poolOrTx, schema, normalized, normalized);
-    const rows = await listEscalaDiaRows(poolOrTx, normalized, normalized);
+
+    const rows = await listEscalaDiaRows(poolOrTx, normalized, normalized, {
+        setorId: options.setorId || null
+    });
+    const colaboradores = await listColaboradores(poolOrTx);
+    const colaboradoresMap = new Map(colaboradores.map((item) => [Number(item.Id), item]));
+    const result = {
+        total: rows.length,
+        updated: 0,
+        skipped: 0,
+        semCadastro: 0,
+        invalidos: 0
+    };
+
+    for (const row of rows) {
+        const colaborador = colaboradoresMap.get(Number(row.colaboradorId));
+
+        if (!colaborador) {
+            result.skipped += 1;
+            continue;
+        }
+
+        const defaults = getColaboradorDefaultLunchTimes(colaborador);
+        const defaultStart = defaults.almocoInicio || null;
+        const defaultEnd = defaults.almocoFim || null;
+        const shouldClearLunch = !defaultStart && !defaultEnd;
+
+        if (!shouldClearLunch && (!defaultStart || !defaultEnd)) {
+            result.semCadastro += 1;
+            continue;
+        }
+
+        if (!shouldClearLunch && compareTimes(defaultStart, defaultEnd) >= 0) {
+            result.invalidos += 1;
+            continue;
+        }
+
+        if (
+            !shouldClearLunch
+            && row.horaInicio
+            && row.horaFim
+            && (compareTimes(defaultStart, row.horaInicio) < 0 || compareTimes(defaultEnd, row.horaFim) > 0)
+        ) {
+            result.invalidos += 1;
+            continue;
+        }
+
+        const sameLunch = areSameLunchTimes(row.almocoInicio, row.almocoFim, defaultStart, defaultEnd);
+
+        await upsertLunchOverride(poolOrTx, schema, colaborador, normalized, defaultStart, defaultEnd);
+
+        if (sameLunch && !row.almocoAjustado) {
+            result.skipped += 1;
+            continue;
+        }
+
+        await persistEscalaDiaRecord(poolOrTx, {
+            ...row,
+            almocoInicio: defaultStart,
+            almocoFim: defaultEnd,
+            almocoAjustado: false
+        });
+        result.updated += 1;
+    }
+
+    result.skipped += result.semCadastro + result.invalidos;
+    return result;
+}
+
+async function listEscalaDiaByDate(poolOrTx, schema, dataISO, options = {}) {
+    ensureEscalaDiaTable(schema);
+
+    const normalized = normalizeIsoDate(dataISO, 'Data');
+    await ensureEscalaDiaForPeriod(poolOrTx, schema, normalized, normalized, {
+        setorId: options.setorId || null
+    });
+    const rows = await listEscalaDiaRows(poolOrTx, normalized, normalized, {
+        setorId: options.setorId || null
+    });
 
     return rows.map((row) => ({
         ...row,
@@ -1017,6 +1518,7 @@ async function listEscalaReport(poolOrTx, schema, filters) {
 
     const rows = await listEscalaDiaRows(poolOrTx, dataInicio, dataFim, {
         colaboradorId: filters.colaboradorId || null,
+        setorId: filters.setorId || null,
         tipo: filters.tipo || null
     });
 
@@ -1026,6 +1528,8 @@ async function listEscalaReport(poolOrTx, schema, filters) {
         diaSemana: getDayOfWeekLabel(row.dataISO),
         colaboradorId: row.colaboradorId,
         colaboradorNome: row.colaboradorNome,
+        setorId: row.setorId,
+        setorNome: row.setorNome,
         horaInicio: formatTimeToDisplay(row.horaInicio),
         horaFim: formatTimeToDisplay(row.horaFim),
         almocoInicio: formatTimeToDisplay(row.almocoInicio),
@@ -1054,12 +1558,14 @@ module.exports = {
     formatTimeToDisplay,
     getDayOfWeek,
     getDayOfWeekLabel,
+    getColaboradorDefaultLunchTimes,
     isSunday,
     iterateIsoDates,
     listEscalaDiaByDate,
     listEscalaReport,
     normalizeEscalaTipo,
     persistEscalaDiaRecord,
+    resetEscalaLunchesToCadastro,
     restoreEscalaDefaultsForPeriod,
     serializeEscalaDiaRecord,
     shouldCreateWeekdayBase,

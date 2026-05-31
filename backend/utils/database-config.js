@@ -1,10 +1,9 @@
 const fs = require('fs');
-const path = require('path');
 
 const { AppError } = require('./errors');
+const { ensureDataDirectory, resolveDataPath } = require('./app-paths');
 
-const CONFIG_DIR = path.join(__dirname, '..', 'config');
-const CONFIG_PATH = path.join(CONFIG_DIR, 'database.local.json');
+const CONFIG_PATH = resolveDataPath('database.local.json');
 const AUTHENTICATION_TYPES = Object.freeze({
     SQL: 'sql',
     WINDOWS: 'windows'
@@ -94,7 +93,7 @@ function readConfigFile() {
     } catch (error) {
         throw new AppError(
             500,
-            'O arquivo local de configuracao do banco esta invalido. Revise backend/config/database.local.json.',
+            'O arquivo local de configuracao do banco esta invalido. Revise o JSON salvo para este aplicativo.',
             { configPath: CONFIG_PATH }
         );
     }
@@ -265,7 +264,7 @@ function saveDatabaseSettings(settings) {
         currentSettings: getDefaultDatabaseSettings()
     });
 
-    fs.mkdirSync(CONFIG_DIR, { recursive: true });
+    ensureDataDirectory();
     fs.writeFileSync(CONFIG_PATH, JSON.stringify(normalized, null, 2), 'utf8');
     return normalized;
 }

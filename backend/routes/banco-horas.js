@@ -86,6 +86,10 @@ function buildPlantoesSelect(schema) {
         columns.push('observacao');
     }
 
+    if (capabilities.hasPlantaoTipo) {
+        columns.push('tipo_plantao');
+    }
+
     return columns.join(',\n                ');
 }
 

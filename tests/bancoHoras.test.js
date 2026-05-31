@@ -45,6 +45,38 @@ module.exports = [
         }
     },
     {
+        name: 'calculateAusenciaDebitMinutes ignores future absences until reference date',
+        run() {
+            const minutos = calculateAusenciaDebitMinutes({
+                Tipo: 'folga',
+                DataInicio: '2026-05-10',
+                DataFim: '2026-05-12',
+                PeriodoTipo: 'dia_inteiro',
+                DescontaBancoHoras: true
+            }, colaboradorBase, {
+                referenceDateISO: '2026-05-09'
+            });
+
+            assert.equal(minutos, 0);
+        }
+    },
+    {
+        name: 'calculateAusenciaDebitMinutes counts only elapsed days from a multi-day leave',
+        run() {
+            const minutos = calculateAusenciaDebitMinutes({
+                Tipo: 'folga',
+                DataInicio: '2026-05-04',
+                DataFim: '2026-05-08',
+                PeriodoTipo: 'dia_inteiro',
+                DescontaBancoHoras: true
+            }, colaboradorBase, {
+                referenceDateISO: '2026-05-06'
+            });
+
+            assert.equal(minutos, 1440);
+        }
+    },
+    {
         name: 'isAusenciaOverlappingPlantao compares hour overlap on the same day',
         run() {
             assert.equal(isAusenciaOverlappingPlantao({

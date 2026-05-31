@@ -25,6 +25,19 @@
   display: flex;
   align-items: center;
   gap: 8px; 
+  position: relative;
+}
+
+#monthTitle {
+  cursor: pointer;
+}
+
+.calendar-month-picker {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
 }
 
 .calendar-header .nav-btn {

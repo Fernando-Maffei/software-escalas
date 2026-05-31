@@ -3,8 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Software de Escalas</title>
-  <link rel="stylesheet" href="style.css?v=20260427h">
+  <title>Central de Escalas</title>
+  <link rel="icon" type="image/png" href="assets/branding/central-escalas-logo.png">
+  <link rel="stylesheet" href="style.css?v=20260531d">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
@@ -12,18 +13,22 @@
 </head>
 <body>
 
-<!-- Toast Container - DEVE ESTAR ANTES DO CONTEÚDO -->
 <div id="toastContainer" style="position: fixed; bottom: 20px; right: 20px; z-index: 9999;"></div>
 
-<!-- CONTEÚDO PRINCIPAL - DEVE ESTAR ANTES DOS SCRIPTS -->
 <div class="container">
     <aside class="sidebar" id="mainSidebar">
       <div class="sidebar-header">
         <div class="logo-container">
-          <i class="fas fa-calendar-check"></i>
+          <img src="assets/branding/central-escalas-logo.png" alt="Central de Escalas" class="logo-image">
         </div>
-        <span class="sidebar-title">Escalas</span>
+        <div class="sidebar-brand-copy">
+          <span class="sidebar-title">Central de Escalas</span>
+          <span class="sidebar-subtitle">Painel operacional</span>
+        </div>
       </div>
+      <button id="toggleMainSidebar" class="sidebar-main-toggle" type="button" title="Recolher menu">
+        <i class="fas fa-bars"></i>
+        </button>
 
       <button class="sidebar-btn" data-page="dashboard">
         <div class="btn-content">
@@ -93,30 +98,9 @@
       
       <div class="sidebar-spacer"></div>
       
-      <!-- FOOTER DA SIDEBAR -->
-      <div class="sidebar-footer">
-        <div class="user-profile">
-          <div class="user-avatar">
-            <i class="fas fa-user-astronaut"></i>
-          </div>
-          <div class="user-info">
-            <span class="user-name">Fernando</span>
-            <span class="user-role">Administrador</span>
-          </div>
-        </div>
-        <div class="user-actions">
-          <button class="icon-btn" title="Configurações">
-            <i class="fas fa-sliders-h"></i>
-          </button>
-          <button class="icon-btn" title="Sair">
-            <i class="fas fa-sign-out-alt"></i>
-          </button>
-        </div>
-      </div>
-      
       <div class="version-badge">
         <i class="fas fa-code-branch"></i>
-        <span>v1.0.0</span>
+        <span>v1.2.0</span>
       </div>
     </aside>
 
@@ -199,10 +183,10 @@
                                 Tipo
                             </label>
                             <select id="tipoLancamento" class="form-control">
-                                <option value="folga">🌸 Folga</option>
-                                <option value="ausencia">⚠️ Ausência</option>
-                                <option value="ferias">🏖️ Férias</option>
-                                <option value="feriado">🏛️ Feriado</option>
+                                <option value="folga">Folga</option>
+                                <option value="ausencia">Ausência</option>
+                                <option value="ferias">Férias</option>
+                                <option value="feriado">Feriado</option>
                             </select>
                         </div>
 
@@ -222,12 +206,12 @@
                                 <label>
                                     <i class="fas fa-clock"></i>
                                     Tipo de Período
-                                </label>
-                                <select id="periodoTipo" class="form-control">
-                                    <option value="dia_inteiro">📅 Dia inteiro</option>
-                                    <option value="horas">⏰ Horas específicas</option>
-                                </select>
-                            </div>
+                            </label>
+                            <select id="periodoTipo" class="form-control">
+                                    <option value="dia_inteiro">Dia inteiro</option>
+                                    <option value="horas">Horas específicas</option>
+                            </select>
+                        </div>
                         </div>
 
                         <!-- Campos para Feriado -->
@@ -236,12 +220,12 @@
                                 <label>
                                     <i class="fas fa-map-marker-alt"></i>
                                     Abrangência
-                                </label>
-                                <select id="feriadoTipo" class="form-control">
-                                    <option value="municipal">🏛️ Municipal</option>
-                                    <option value="estadual">🏛️ Estadual</option>
-                                </select>
-                            </div>
+                            </label>
+                            <select id="feriadoTipo" class="form-control">
+                                    <option value="municipal">Municipal</option>
+                                    <option value="estadual">Estadual</option>
+                            </select>
+                        </div>
                         </div>
 
                         <!-- Datas -->
@@ -339,7 +323,6 @@
 </div>
 
 <!-- MODAL DE CONFIRMAÇÃO -->
-<!-- MODAL DE CONFIRMAÇÃO -->
 <div id="modalConfirmacao" class="modal hidden">
     <div class="modal-content">
         <div class="modal-header">
@@ -407,14 +390,13 @@
     </div>
 </div>
 
-<!-- SCRIPTS - DEVEM VIR POR ÚLTIMO -->
-<script src="Js/api.js"></script>
+<script src="Js/api.js?v=20260531b"></script>
 <script src="Js/calendar.js"></script>
 <script src="Js/dashboard.js"></script>
-<script src="Js/app.js?v=20260427h"></script>
-<script src="Js/lancamentos.js"></script>
-<script src="Js/escala-report-utils.js?v=20260427h"></script>
-<script src="Js/runtime-fixes.js?v=20260427h"></script>
+<script src="Js/app.js?v=20260531l"></script>
+<script src="Js/lancamentos.js?v=20260501j"></script>
+<script src="Js/escala-report-utils.js?v=20260531b"></script>
+<script src="Js/runtime-fixes.js?v=20260531f"></script>
 <script src="https://unpkg.com/lucide@latest"></script>
 
 <script>
@@ -473,6 +455,52 @@
             };
         });
     })();
+</script>
+
+<script>
+  (function () {
+    document.addEventListener('DOMContentLoaded', function () {
+      const toggleBtn = document.getElementById('toggleMainSidebar');
+
+      if (!toggleBtn) return;
+
+      document.body.classList.add('sidebar-no-transition');
+
+      const estadoSalvo = localStorage.getItem('mainSidebarCollapsed');
+
+      if (estadoSalvo === 'true') {
+        document.body.classList.add('main-sidebar-collapsed');
+        toggleBtn.title = 'Expandir menu';
+      } else {
+        document.body.classList.remove('main-sidebar-collapsed');
+        toggleBtn.title = 'Recolher menu';
+      }
+
+      setTimeout(function () {
+        document.body.classList.remove('sidebar-no-transition');
+      }, 100);
+
+      toggleBtn.addEventListener('click', function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+
+        document.body.classList.add('sidebar-is-animating');
+
+        const vaiRecolher = !document.body.classList.contains('main-sidebar-collapsed');
+
+        document.body.classList.toggle('main-sidebar-collapsed', vaiRecolher);
+
+        localStorage.setItem('mainSidebarCollapsed', vaiRecolher ? 'true' : 'false');
+
+        toggleBtn.title = vaiRecolher ? 'Expandir menu' : 'Recolher menu';
+
+        setTimeout(function () {
+          document.body.classList.remove('sidebar-is-animating');
+          window.dispatchEvent(new Event('resize'));
+        }, 340);
+      });
+    });
+  })();
 </script>
 
 </body>

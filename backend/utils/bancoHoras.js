@@ -84,6 +84,16 @@ function enumerateBusinessDates(startISO, endISO) {
     return dates;
 }
 
+function filterDatesUpToReference(dates, referenceDateISO = extractDateString(new Date())) {
+    const reference = referenceDateISO ? normalizeIsoDate(referenceDateISO, 'Data de referencia') : null;
+
+    if (!reference) {
+        return [...dates];
+    }
+
+    return dates.filter((dateISO) => dateISO <= reference);
+}
+
 function resolveDefaultDescontaBancoHoras(tipo, subtipo = null) {
     const normalizedTipo = String(tipo || '').trim().toLowerCase();
     const normalizedSubtipo = String(subtipo || '').trim().toLowerCase();
@@ -107,7 +117,8 @@ function normalizeSubtipo(value) {
     return String(value).trim().toLowerCase();
 }
 
-function calculateAusenciaDebitMinutes(ausencia, colaborador) {
+function calculateAusenciaDebitMinutes(ausencia, colaborador, options = {}) {
+    const { referenceDateISO = extractDateString(new Date()) } = options;
     const tipo = String(ausencia.tipo || ausencia.Tipo || '').trim().toLowerCase();
     const subtipo = normalizeSubtipo(ausencia.subtipo || ausencia.Subtipo);
     const hasExplicitDesconto = ausencia.descontaBancoHoras !== undefined
@@ -123,6 +134,12 @@ function calculateAusenciaDebitMinutes(ausencia, colaborador) {
     const periodoTipo = String(ausencia.periodoTipo || ausencia.PeriodoTipo || 'dia_inteiro').trim().toLowerCase();
 
     if (periodoTipo === 'horas') {
+        const dataInicio = extractDateString(ausencia.dataInicio || ausencia.DataInicio);
+
+        if (referenceDateISO && dataInicio && dataInicio > normalizeIsoDate(referenceDateISO, 'Data de referencia')) {
+            return 0;
+        }
+
         return calculateIntervalMinutes(
             ausencia.horaInicio || ausencia.HoraInicio,
             ausencia.horaFim || ausencia.HoraFim
@@ -130,10 +147,10 @@ function calculateAusenciaDebitMinutes(ausencia, colaborador) {
     }
 
     const dailyMinutes = calculateDailyWorkMinutes(colaborador);
-    const dates = enumerateBusinessDates(
+    const dates = filterDatesUpToReference(enumerateBusinessDates(
         extractDateString(ausencia.dataInicio || ausencia.DataInicio),
         extractDateString(ausencia.dataFim || ausencia.DataFim)
-    );
+    ), referenceDateISO);
 
     return dailyMinutes * dates.length;
 }
@@ -315,5 +332,6 @@ module.exports = {
     minutesToDurationLabel,
     normalizeSubtipo,
     resolveDefaultDescontaBancoHoras,
-    timeToMinutes
+    timeToMinutes,
+    filterDatesUpToReference
 };

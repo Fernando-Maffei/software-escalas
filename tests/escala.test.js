@@ -50,6 +50,29 @@ module.exports = [
         }
     },
     {
+        name: 'createAusenciaEscalaRecord normalizes accented leave types from legacy data',
+        run() {
+            const colaborador = {
+                Id: 2,
+                Nome: 'Julia',
+                TrabalhoInicio: '08:00:00',
+                TrabalhoFim: '17:00:00',
+                AlmocoInicio: '12:00:00',
+                AlmocoFim: '13:00:00'
+            };
+            const ausencia = {
+                Id: 100,
+                Tipo: 'Aus\u00EAncia',
+                PeriodoTipo: 'dia_inteiro'
+            };
+            const record = createAusenciaEscalaRecord(colaborador, ausencia, '2026-05-03');
+
+            assert.equal(record.tipo, 'ausencia');
+            assert.equal(record.origemTipo, 'ausencia');
+            assert.equal(record.origemId, 100);
+        }
+    },
+    {
         name: 'createPlantaoEscalaRecord preserves shift hours and source metadata',
         run() {
             const colaborador = {
@@ -90,6 +113,14 @@ module.exports = [
 
             assert.equal(canAutoRefreshDefaultEscala({
                 ajusteManual: false,
+                almocoAjustado: true,
+                origemTipo: null,
+                origemId: null
+            }), false);
+
+            assert.equal(canAutoRefreshDefaultEscala({
+                ajusteManual: false,
+                almocoAjustado: false,
                 origemTipo: 'plantao',
                 origemId: 10
             }), false);
@@ -123,20 +154,25 @@ module.exports = [
         }
     },
     {
-        name: 'buildEscalaQuadroMensal hides Sundays and keeps empty Saturdays visible',
+        name: 'buildEscalaQuadroMensal keeps Sundays and empty weekends visible',
         run() {
             const days = buildEscalaQuadroMensal([], {
                 year: 2026,
                 month: 5
             });
 
-            assert.ok(days.length > 0);
-            assert.ok(days.every((day) => day.dayLabel !== 'Domingo'));
+            assert.equal(days.length, 31);
+            assert.ok(days.some((day) => day.dayLabel === 'Domingo'));
 
             const saturday = days.find((day) => day.dataISO === '2026-05-02');
             assert.ok(saturday);
             assert.equal(saturday.hasScale, false);
             assert.deepEqual(saturday.rows, []);
+
+            const sunday = days.find((day) => day.dataISO === '2026-05-03');
+            assert.ok(sunday);
+            assert.equal(sunday.hasScale, false);
+            assert.deepEqual(sunday.rows, []);
         }
     },
     {
@@ -237,7 +273,7 @@ module.exports = [
         }
     },
     {
-        name: 'buildEscalaQuadroCalendarSlots aligns month days in monday-to-saturday calendar weeks',
+        name: 'buildEscalaQuadroCalendarSlots aligns month days in monday-to-sunday calendar weeks',
         run() {
             const days = buildEscalaQuadroMensal([], {
                 year: 2026,
@@ -245,15 +281,16 @@ module.exports = [
             });
             const slots = buildEscalaQuadroCalendarSlots(days);
 
-            assert.equal(slots.length, 30);
+            assert.equal(slots.length, 35);
             assert.equal(slots[0], null);
             assert.equal(slots[1], null);
             assert.equal(slots[2], null);
             assert.equal(slots[3], null);
             assert.equal(slots[4]?.dataISO, '2026-05-01');
             assert.equal(slots[5]?.dataISO, '2026-05-02');
-            assert.equal(slots[6]?.dataISO, '2026-05-04');
-            assert.equal(slots[7]?.dataISO, '2026-05-05');
+            assert.equal(slots[6]?.dataISO, '2026-05-03');
+            assert.equal(slots[7]?.dataISO, '2026-05-04');
+            assert.equal(slots[8]?.dataISO, '2026-05-05');
         }
     }
 ];

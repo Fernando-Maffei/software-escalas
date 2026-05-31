@@ -16,6 +16,77 @@ if (typeof API === 'undefined') {
 let editandoLancamentoId = null;
 let editandoTipoLancamento = null; 
 
+function getTipoLancamentoMeta(tipo) {
+    const normalized = String(tipo || '').toLowerCase();
+
+    if (normalized === 'folga') {
+        return {
+            iconClass: 'fa-user-clock',
+            classe: 'folga',
+            texto: 'Folga',
+            cor: '#10b981'
+        };
+    }
+
+    if (normalized === 'ausencia') {
+        return {
+            iconClass: 'fa-triangle-exclamation',
+            classe: 'ausencia',
+            texto: 'Ausência',
+            cor: '#ef4444'
+        };
+    }
+
+    if (normalized === 'ferias') {
+        return {
+            iconClass: 'fa-umbrella-beach',
+            classe: 'ferias',
+            texto: 'Férias',
+            cor: '#3b82f6'
+        };
+    }
+
+    if (normalized === 'feriado') {
+        return {
+            iconClass: 'fa-calendar-day',
+            classe: 'feriado',
+            texto: 'Feriado',
+            cor: '#f59e0b'
+        };
+    }
+
+    return {
+        iconClass: 'fa-calendar-day',
+        classe: '',
+        texto: normalized || 'Lançamento',
+        cor: '#6366f1'
+    };
+}
+
+function getFeriadoOrigemMeta(tipo, origem) {
+    const normalizedTipo = String(tipo || '').toLowerCase();
+    const isManual = origem === 'manual';
+
+    if (!isManual) {
+        return {
+            iconClass: 'fa-flag',
+            texto: 'Federal'
+        };
+    }
+
+    if (normalizedTipo === 'estadual') {
+        return {
+            iconClass: 'fa-map',
+            texto: 'Estadual'
+        };
+    }
+
+    return {
+        iconClass: 'fa-building-columns',
+        texto: 'Municipal'
+    };
+}
+
 function inicializarLancamentosUmaVez() {
     if (window.__lancamentosBootstrapDone) {
         return;
@@ -33,8 +104,6 @@ function inicializarLancamentosUmaVez() {
 // Garantir que os eventos são configurados quando a página carrega
 document.addEventListener('DOMContentLoaded', function() {
     inicializarLancamentosUmaVez();
-    return;
-    setTimeout(configurarEventosAbas, 500); // Pequeno delay para garantir que o DOM está pronto
 });
 
 // Também configurar quando o modal for aberto
@@ -305,47 +374,29 @@ async function carregarListaPessoalPorDia(dataISO) {
             const colaborador = window.colaboradores?.find(c => c.Id === (a.colaboradorId || a.ColaboradorId));
             const tipo = (a.tipo || a.Tipo || '').toLowerCase();
             
-            let icone = '📅';
-            let classe = '';
-            let texto = tipo;
-            let cor = '#6366f1';
-            
-            if (tipo === 'folga') {
-                icone = '🌸';
-                classe = 'folga';
-                texto = 'Folga';
-                cor = '#10b981';
-            } else if (tipo === 'ausencia') {
-                icone = '⚠️';
-                classe = 'ausencia';
-                texto = 'Ausência';
-                cor = '#ef4444';
-            } else if (tipo === 'ferias') {
-                icone = '🏖️';
-                classe = 'ferias';
-                texto = 'Férias';
-                cor = '#3b82f6';
-            }
+            const meta = getTipoLancamentoMeta(tipo);
+            const classe = meta.classe;
+            const texto = meta.texto;
             
             // 🔥 FORMATAR DATAS CORRETAMENTE
             const dataInicioStr = formatarDataParaExibicao(a.DataInicio || a.dataInicio);
             const dataFimStr = formatarDataParaExibicao(a.DataFim || a.dataFim);
             
             html += `
-                <div class="lancamento-card pessoal" data-id="${a.id || a.Id}" style="border-left-color: ${cor};">
+                <div class="lancamento-card pessoal" data-id="${a.id || a.Id}" style="border-left-color: ${meta.cor};">
                     <div class="lancamento-header">
                         <div class="lancamento-titulo">
-                            <i class="fas fa-user-circle" style="color: ${cor};"></i>
+                            <i class="fas fa-user-circle" style="color: ${meta.cor};"></i>
                             <span><strong>${colaborador?.Nome || 'Desconhecido'}</strong></span>
                         </div>
-                        <span class="lancamento-badge ${classe}" style="background: ${cor}20; color: ${cor};">
-                            ${icone} ${texto}
+                        <span class="lancamento-badge ${classe}" style="background: ${meta.cor}20; color: ${meta.cor}; border-color: ${meta.cor}40;">
+                            <i class="fas ${meta.iconClass}"></i> ${texto}
                         </span>
                     </div>
                     
                     <div class="lancamento-info-grid">
                         <div class="info-item">
-                            <i class="fas fa-calendar-alt" style="color: ${cor};"></i>
+                            <i class="fas fa-calendar-alt" style="color: ${meta.cor};"></i>
                             <div class="info-detalhes">
                                 <span class="info-label">Período</span>
                                 <span class="info-valor">${dataInicioStr} - ${dataFimStr}</span>
@@ -431,6 +482,7 @@ async function carregarListaFeriadosPorDia(dataISO) {
         feriadosDoDia.forEach(f => {
             const dataFormatada = formatarDataBR(f.data);
             const isManual = f.origem === 'manual';
+            const badgeMeta = getFeriadoOrigemMeta(f.tipo, f.origem);
             
             html += `
                 <div class="lancamento-card" style="border-left: 4px solid ${f.cor};">
@@ -439,8 +491,8 @@ async function carregarListaFeriadosPorDia(dataISO) {
                             <i class="fas ${isManual ? 'fa-city' : 'fa-globe'}" style="color: ${f.cor};"></i>
                             <span><strong>${f.nome}</strong></span>
                         </div>
-                        <span class="lancamento-badge" style="background: ${f.cor}20; color: ${f.cor};">
-                            ${f.icone} ${isManual ? f.tipo : 'Federal'}
+                        <span class="lancamento-badge ${isManual ? String(f.tipo || '').toLowerCase() : 'federal'}" style="background: ${f.cor}20; color: ${f.cor}; border-color: ${f.cor}40;">
+                            <i class="fas ${badgeMeta.iconClass}"></i> ${badgeMeta.texto}
                         </span>
                     </div>
                     
@@ -553,7 +605,6 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
 
 document.addEventListener('DOMContentLoaded', function() {
     inicializarLancamentosUmaVez();
-    return;
 });
 
 // ================= CONFIGURAÇÃO DAS ABAS =================
@@ -942,6 +993,11 @@ async function carregarListaPessoal() {
                 texto = 'Férias';
                 cor = '#3b82f6';
             }
+
+            const meta = getTipoLancamentoMeta(tipo);
+            classe = meta.classe;
+            texto = meta.texto;
+            cor = meta.cor;
             
             // ===== FUNÇÃO SEGURA PARA FORMATAR DATA =====
             function formatarDataBR(dataStr) {
@@ -1033,17 +1089,17 @@ async function carregarListaPessoal() {
                 <div class="lancamento-card pessoal" data-id="${id}" style="border-left-color: ${cor};">
                     <div class="lancamento-header">
                         <div class="lancamento-titulo">
-                            <i class="fas fa-user-circle" style="color: ${cor};"></i>
+                            <i class="fas fa-user-circle" style="color: ${meta.cor};"></i>
                             <span><strong>${colaborador?.Nome || 'Desconhecido'}</strong></span>
                         </div>
-                        <span class="lancamento-badge ${classe}" style="background: ${cor}20; color: ${cor}; border-color: ${cor}40;">
-                            ${icone} ${texto}
+                        <span class="lancamento-badge ${classe}" style="background: ${meta.cor}20; color: ${meta.cor}; border-color: ${meta.cor}40;">
+                            <i class="fas ${meta.iconClass}"></i> ${texto}
                         </span>
                     </div>
                     
                     <div class="lancamento-info-grid">
                         <div class="info-item">
-                            <i class="fas fa-calendar-alt" style="color: ${cor};"></i>
+                            <i class="fas fa-calendar-alt" style="color: ${meta.cor};"></i>
                             <div class="info-detalhes">
                                 <span class="info-label">Período</span>
                                 <span class="info-valor">${dataInicioStr} - ${dataFimStr}</span>
@@ -1051,7 +1107,7 @@ async function carregarListaPessoal() {
                         </div>
                         
                         <div class="info-item">
-                            <i class="fas fa-hourglass-half" style="color: ${cor};"></i>
+                            <i class="fas fa-hourglass-half" style="color: ${meta.cor};"></i>
                             <div class="info-detalhes">
                                 <span class="info-label">Duração</span>
                                 <span class="info-valor">${duracao}</span>
@@ -1059,7 +1115,7 @@ async function carregarListaPessoal() {
                         </div>
                         
                         <div class="info-item">
-                            <i class="fas fa-clock" style="color: ${cor};"></i>
+                            <i class="fas fa-clock" style="color: ${meta.cor};"></i>
                             <div class="info-detalhes">
                                 <span class="info-label">Horário</span>
                                 <span class="info-valor">${infoHorario}</span>
@@ -1192,6 +1248,7 @@ async function carregarListaFeriados() {
             const isManual = f.origem === 'manual';
             const cor = f.cor;
             const bgCor = isManual ? '#f59e0b20' : '#2563eb20';
+            const badgeMeta = getFeriadoOrigemMeta(f.tipo, f.origem);
             
             html += `
                 <div class="lancamento-card" style="border-left: 4px solid ${cor}; margin-bottom: 10px;">
@@ -1200,8 +1257,8 @@ async function carregarListaFeriados() {
                             <i class="fas ${isManual ? 'fa-city' : 'fa-globe'}" style="color: ${cor};"></i>
                             <span><strong>${f.nome}</strong></span>
                         </div>
-                        <span class="lancamento-badge" style="background: ${bgCor}; color: ${cor};">
-                            ${f.icone} ${isManual ? f.tipo : 'Federal'}
+                        <span class="lancamento-badge ${isManual ? String(f.tipo || '').toLowerCase() : 'federal'}" style="background: ${bgCor}; color: ${cor}; border-color: ${cor}40;">
+                            <i class="fas ${badgeMeta.iconClass}"></i> ${badgeMeta.texto}
                         </span>
                     </div>
                     
@@ -1268,6 +1325,42 @@ diagnosticarFeriados();
 
 // ================= EDITAR LANÇAMENTO =================
 
+function normalizarDataInputLancamento(valor) {
+    if (!valor) {
+        return '';
+    }
+
+    if (typeof valor === 'string') {
+        return valor.includes('T') ? valor.split('T')[0] : valor;
+    }
+
+    const data = new Date(valor);
+    if (Number.isNaN(data.getTime())) {
+        return '';
+    }
+
+    const ano = data.getFullYear();
+    const mes = String(data.getMonth() + 1).padStart(2, '0');
+    const dia = String(data.getDate()).padStart(2, '0');
+    return `${ano}-${mes}-${dia}`;
+}
+
+async function salvarFeriadoLancamento(dataInicio) {
+    const nome = document.getElementById("feriadoNome")?.value?.trim();
+    const abrangencia = document.getElementById("feriadoTipo")?.value || 'municipal';
+
+    if (!nome || !dataInicio) {
+        throw new Error("Preencha nome e data do feriado.");
+    }
+
+    return window.API.salvarFeriado({
+        id: editandoTipoLancamento === 'feriado' ? editandoLancamentoId : undefined,
+        nome,
+        data: dataInicio,
+        tipo: abrangencia
+    });
+}
+
 function editarLancamento(tipo, id) {
     if (tipo === 'feriado') {
         if (id && id.toString().startsWith('api-')) {
@@ -1291,8 +1384,7 @@ function editarLancamento(tipo, id) {
         document.getElementById("feriadoNome").value = item.Nome || item.nome;
         document.getElementById("feriadoTipo").value = item.Tipo || item.tipo || 'municipal';
         
-        const data = new Date(item.Data || item.data);
-        const dataFormatada = data.toISOString().split('T')[0];
+        const dataFormatada = normalizarDataInputLancamento(item.Data || item.data);
         document.getElementById("dataInicio").value = dataFormatada;
         document.getElementById("dataFim").value = dataFormatada;
         
@@ -1317,10 +1409,8 @@ function editarLancamento(tipo, id) {
         
         document.getElementById("colaboradorSelect").value = item.colaboradorId || item.ColaboradorId;
         
-        const dataInicio = new Date(item.DataInicio || item.dataInicio);
-        const dataFim = new Date(item.DataFim || item.dataFim);
-        document.getElementById("dataInicio").value = dataInicio.toISOString().split('T')[0];
-        document.getElementById("dataFim").value = dataFim.toISOString().split('T')[0];
+        document.getElementById("dataInicio").value = normalizarDataInputLancamento(item.DataInicio || item.dataInicio);
+        document.getElementById("dataFim").value = normalizarDataInputLancamento(item.DataFim || item.dataFim);
         
         // Preencher período
         const periodoTipo = item.periodoTipo || item.PeriodoTipo || 'dia_inteiro';
@@ -1371,9 +1461,21 @@ async function salvarLancamento() {
         let resultado;
         
         if (tipo === 'feriado') {
-            resultado = await salvarFeriado();
+            resultado = await salvarFeriadoLancamento(dataInicio);
         } else {
             resultado = await salvarAusencia(tipo, dataInicio, dataFim);
+        }
+
+        if (typeof window.atualizarTudo === 'function') {
+            await window.atualizarTudo({ silent: true, source: 'lancamento' });
+            mostrarToast("Salvo com sucesso!", "success");
+            resetarFormularioLancamento();
+
+            if (editandoTipoLancamento) {
+                cancelarEdicaoLancamento();
+            }
+
+            return;
         }
         
         console.log("✅ Salvo com sucesso:", resultado);
@@ -1445,7 +1547,8 @@ function excluirLancamento(tipo, id) {
     const infoEl = document.getElementById("confirmacaoInfo");
     if (infoEl) {
         const dataInfo = item.DataInicio || item.dataInicio || item.Data || item.data;
-        const dataStr = dataInfo ? new Date(dataInfo).toLocaleDateString('pt-BR') : '';
+        const dataIso = normalizarDataInputLancamento(dataInfo);
+        const dataStr = dataIso ? dataIso.split('-').reverse().join('/') : '';
         infoEl.innerText = `${nome} - ${dataStr}`;
     }
     

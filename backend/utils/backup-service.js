@@ -8,6 +8,7 @@ const {
 } = require('./backup-config');
 const { REQUIRED_TABLES } = require('./database-schema');
 const { AppError } = require('./errors');
+const { normalizeDiaSemana } = require('./jornada-semanal');
 const { normalizeColaboradores } = require('./plantoes');
 const { withTransaction } = require('./transactions');
 const {
@@ -29,6 +30,7 @@ const ESCALA_DIA_TIPOS = Object.freeze(['normal', 'plantao', 'folga', 'ferias', 
 const BACKUP_DELETE_ORDER = Object.freeze([
     'BancoHorasMovimentos',
     'escala_dia',
+    'ColaboradorJornadaSemanal',
     'Ausencias',
     'plantoes',
     'Feriados',
@@ -36,6 +38,7 @@ const BACKUP_DELETE_ORDER = Object.freeze([
 ]);
 const BACKUP_INSERT_ORDER = Object.freeze([
     'Colaboradores',
+    'ColaboradorJornadaSemanal',
     'Feriados',
     'Ausencias',
     'plantoes',
@@ -52,6 +55,21 @@ const TABLE_INSERT_SPECS = Object.freeze({
             ['TrabalhoFim', sql.Time],
             ['AlmocoInicio', sql.Time],
             ['AlmocoFim', sql.Time]
+        ]
+    },
+    ColaboradorJornadaSemanal: {
+        identityColumn: 'Id',
+        columns: [
+            ['Id', sql.Int],
+            ['ColaboradorId', sql.Int],
+            ['DiaSemana', sql.TinyInt],
+            ['TrabalhoInicio', sql.Time],
+            ['TrabalhoFim', sql.Time],
+            ['AlmocoInicio', sql.Time],
+            ['AlmocoFim', sql.Time],
+            ['Ativo', sql.Bit],
+            ['DataCadastro', sql.DateTime],
+            ['DataAtualizacao', sql.DateTime]
         ]
     },
     Feriados: {
@@ -317,7 +335,7 @@ async function createSystemBackup(pool, options = {}) {
     const payload = {
         metadata: {
             system: 'Software de Escalas',
-            version: '1.0.0',
+            version: '1.2.0',
             generatedAt: generatedAt.toISOString(),
             generatedBy: options.generatedBy || 'backup-local-manual',
             database: options.databaseInfo || {},
@@ -386,6 +404,63 @@ function normalizeColaboradorRow(row) {
     });
 
     return normalized;
+}
+
+function normalizeJornadaSemanalRow(row) {
+    const colaboradorId = ensurePositiveInt(
+        getFirstDefinedValue(row, ['ColaboradorId', 'colaboradorId']),
+        'Colaborador da jornada semanal'
+    );
+    const diaSemana = normalizeDiaSemana(
+        getFirstDefinedValue(row, ['DiaSemana', 'diaSemana']),
+        'Dia da semana da jornada'
+    );
+    const trabalhoInicio = normalizeBackupTimeValue(
+        getFirstDefinedValue(row, ['TrabalhoInicio', 'trabalhoInicio']),
+        'Inicio do trabalho da jornada semanal'
+    );
+    const trabalhoFim = normalizeBackupTimeValue(
+        getFirstDefinedValue(row, ['TrabalhoFim', 'trabalhoFim']),
+        'Fim do trabalho da jornada semanal'
+    );
+    const almocoInicio = normalizeBackupTimeValue(
+        getFirstDefinedValue(row, ['AlmocoInicio', 'almocoInicio']),
+        'Inicio do almoco da jornada semanal'
+    );
+    const almocoFim = normalizeBackupTimeValue(
+        getFirstDefinedValue(row, ['AlmocoFim', 'almocoFim']),
+        'Fim do almoco da jornada semanal'
+    );
+
+    validateWorkSchedule({
+        trabalhoInicio: extractTimeString(trabalhoInicio),
+        trabalhoFim: extractTimeString(trabalhoFim),
+        almocoInicio: extractTimeString(almocoInicio),
+        almocoFim: extractTimeString(almocoFim)
+    });
+
+    return {
+        Id: normalizeNullablePositiveInt(getFirstDefinedValue(row, ['Id', 'id']), 'Id da jornada semanal'),
+        ColaboradorId: colaboradorId,
+        DiaSemana: diaSemana,
+        TrabalhoInicio: trabalhoInicio,
+        TrabalhoFim: trabalhoFim,
+        AlmocoInicio: almocoInicio,
+        AlmocoFim: almocoFim,
+        Ativo: normalizeBoolean(getFirstDefinedValue(row, ['Ativo', 'ativo']), 'Status da jornada semanal', {
+            defaultValue: true
+        }),
+        DataCadastro: normalizeBackupDateTime(
+            getFirstDefinedValue(row, ['DataCadastro', 'dataCadastro']),
+            'Data de cadastro da jornada semanal',
+            new Date()
+        ),
+        DataAtualizacao: normalizeBackupDateTime(
+            getFirstDefinedValue(row, ['DataAtualizacao', 'dataAtualizacao']),
+            'Data de atualizacao da jornada semanal',
+            new Date()
+        )
+    };
 }
 
 function normalizeFeriadoRow(row) {
@@ -637,6 +712,7 @@ function coerceBackupPayload(rawPayload = {}) {
         preferences: isPlainObject(payload.preferencias) ? payload.preferencias : {},
         data: {
             Colaboradores: [],
+            ColaboradorJornadaSemanal: [],
             Ausencias: [],
             Feriados: [],
             plantoes: [],
@@ -650,6 +726,11 @@ function coerceBackupPayload(rawPayload = {}) {
             getBackupArray(dataSource, ['colaboradores', 'Colaboradores']),
             normalizeColaboradorRow,
             'Lista de colaboradores'
+        );
+        snapshot.data.ColaboradorJornadaSemanal = normalizeRows(
+            getBackupArray(dataSource, ['jornadaSemanal', 'ColaboradorJornadaSemanal']),
+            normalizeJornadaSemanalRow,
+            'Lista de jornada semanal'
         );
         snapshot.data.Ausencias = normalizeRows(
             getBackupArray(dataSource, ['ausencias', 'Ausencias']),
@@ -683,6 +764,11 @@ function coerceBackupPayload(rawPayload = {}) {
         getBackupArray(dataSource, ['Colaboradores']),
         normalizeColaboradorRow,
         'Tabela Colaboradores'
+    );
+    snapshot.data.ColaboradorJornadaSemanal = normalizeRows(
+        getBackupArray(dataSource, ['ColaboradorJornadaSemanal']),
+        normalizeJornadaSemanalRow,
+        'Tabela ColaboradorJornadaSemanal'
     );
     snapshot.data.Feriados = normalizeRows(
         getBackupArray(dataSource, ['Feriados']),

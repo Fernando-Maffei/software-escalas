@@ -214,6 +214,7 @@
                 colaboradorNome: item.colaboradorNome,
                 almocoLabel: formatCompactRange(item.almocoInicio, item.almocoFim),
                 jornadaLabel: formatCompactRange(item.horaInicio, item.horaFim),
+                tipo: item.tipo,
                 showAlmoco: true,
                 almocoRowspan: 1,
                 showJornada: true,
@@ -240,7 +241,7 @@
         for (const rawItem of Array.isArray(items) ? items : []) {
             const item = normalizeBoardRecord(rawItem);
 
-            if (!item.dataISO || !item.dataISO.startsWith(monthPrefix) || getIsoDayOfWeek(item.dataISO) === 0) {
+            if (!item.dataISO || !item.dataISO.startsWith(monthPrefix)) {
                 continue;
             }
 
@@ -260,11 +261,6 @@
 
         for (let day = 1; day <= totalDays; day += 1) {
             const dataISO = `${year}-${padNumber(month)}-${padNumber(day)}`;
-
-            if (getIsoDayOfWeek(dataISO) === 0) {
-                continue;
-            }
-
             const rows = buildBoardRows(itemsByDay.get(dataISO) || []);
             days.push({
                 dataISO,
@@ -281,20 +277,21 @@
     function buildEscalaQuadroCalendarWeeks(days) {
         const sortedDays = [...(Array.isArray(days) ? days : [])].sort((first, second) => String(first?.dataISO || '').localeCompare(String(second?.dataISO || '')));
         const weeks = [];
-        let currentWeek = Array(6).fill(null);
+        let currentWeek = Array(7).fill(null);
 
         sortedDays.forEach((day) => {
             const weekday = getIsoDayOfWeek(day?.dataISO);
+            const slot = weekday === 0 ? 6 : weekday - 1;
 
-            if (weekday < 1 || weekday > 6) {
+            if (slot < 0 || slot > 6) {
                 return;
             }
 
-            currentWeek[weekday - 1] = day;
+            currentWeek[slot] = day;
 
-            if (weekday === 6) {
+            if (slot === 6) {
                 weeks.push(currentWeek);
-                currentWeek = Array(6).fill(null);
+                currentWeek = Array(7).fill(null);
             }
         });
 

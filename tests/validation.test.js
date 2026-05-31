@@ -4,6 +4,7 @@ const {
     buildDateRange,
     extractDateString,
     extractTimeString,
+    normalizeEnum,
     normalizeIsoDate,
     normalizeTime,
     validateWorkSchedule
@@ -20,6 +21,14 @@ module.exports = [
         name: 'normalizeIsoDate rejects impossible calendar dates',
         run() {
             assert.throws(() => normalizeIsoDate('2026-02-30'), /invalida/);
+        }
+    },
+    {
+        name: 'normalizeEnum accepts accented labels and normalizes separators',
+        run() {
+            assert.equal(normalizeEnum('Aus\u00EAncia', 'Tipo', ['folga', 'ausencia', 'ferias']), 'ausencia');
+            assert.equal(normalizeEnum('F\u00E9rias', 'Tipo', ['folga', 'ausencia', 'ferias']), 'ferias');
+            assert.equal(normalizeEnum('dia inteiro', 'Periodo', ['dia_inteiro', 'horas']), 'dia_inteiro');
         }
     },
     {

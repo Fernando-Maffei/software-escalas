@@ -2,9 +2,9 @@ const fs = require('fs');
 const path = require('path');
 
 const { AppError } = require('./errors');
+const { ensureDataDirectory, resolveDataPath } = require('./app-paths');
 
-const CONFIG_DIR = path.join(__dirname, '..', 'config');
-const CONFIG_PATH = path.join(CONFIG_DIR, 'backup.local.json');
+const CONFIG_PATH = resolveDataPath('backup.local.json');
 
 function normalizeTrimmedString(value) {
     if (value === undefined || value === null) {
@@ -132,7 +132,7 @@ function readConfigFile() {
     } catch (error) {
         throw new AppError(
             500,
-            'O arquivo local de configuracao de backup esta invalido. Revise backend/config/backup.local.json.',
+            'O arquivo local de configuracao de backup esta invalido. Revise o JSON salvo para este aplicativo.',
             { configPath: CONFIG_PATH }
         );
     }
@@ -203,7 +203,7 @@ function getBackupSettings() {
 function saveBackupSettings(settings) {
     const normalized = coerceBackupSettings(settings);
 
-    fs.mkdirSync(CONFIG_DIR, { recursive: true });
+    ensureDataDirectory();
     fs.writeFileSync(CONFIG_PATH, JSON.stringify(normalized, null, 2), 'utf8');
     return normalized;
 }

@@ -6,17 +6,22 @@ const { clearSchemaCache } = require('./schema');
 
 const REQUIRED_TABLES = Object.freeze([
     'Colaboradores',
+    'ColaboradorJornadaSemanal',
+    'Setores',
     'Ausencias',
     'Feriados',
     'plantoes',
     'BancoHorasMovimentos',
-    'escala_dia'
+    'escala_dia',
+    'AlmocosPersonalizados'
 ]);
 
 const SCHEMA_SCRIPT_PATHS = Object.freeze([
     path.join(__dirname, '..', '..', 'database', 'migrations', '2026-04-27-base-schema.sql'),
     path.join(__dirname, '..', '..', 'database', 'migrations', '2026-04-23-banco-horas.sql'),
-    path.join(__dirname, '..', '..', 'database', 'migrations', '2026-04-24-escala-dia.sql')
+    path.join(__dirname, '..', '..', 'database', 'migrations', '2026-04-24-escala-dia.sql'),
+    path.join(__dirname, '..', '..', 'database', 'migrations', '2026-05-21-setores-plantoes-almoco.sql'),
+    path.join(__dirname, '..', '..', 'database', 'migrations', '2026-05-28-colaborador-jornada-semanal.sql')
 ]);
 
 function splitSqlBatches(script) {
@@ -28,9 +33,16 @@ function splitSqlBatches(script) {
 
 async function executeSqlScriptFile(pool, filePath) {
     const script = await fs.promises.readFile(filePath, 'utf8');
+    const batches = splitSqlBatches(script);
 
-    for (const batch of splitSqlBatches(script)) {
-        await pool.request().batch(batch);
+    for (let index = 0; index < batches.length; index += 1) {
+        try {
+            await pool.request().batch(batches[index]);
+        } catch (error) {
+            const fileName = path.basename(filePath);
+            error.message = `[schema] Falha ao executar ${fileName} (lote ${index + 1}/${batches.length}): ${error.message || error}`;
+            throw error;
+        }
     }
 }
 
@@ -45,8 +57,54 @@ async function listExistingRequiredTables(pool) {
     return result.recordset.map((row) => row.TABLE_NAME);
 }
 
+async function getSchemaSnapshot(pool) {
+    const result = await pool.request().query(`
+        SELECT
+            TABLE_NAME,
+            COLUMN_NAME
+        FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_NAME IN (${REQUIRED_TABLES.map((table) => `'${table}'`).join(', ')})
+        ORDER BY TABLE_NAME, ORDINAL_POSITION
+    `);
+
+    const tables = new Map();
+
+    result.recordset.forEach((row) => {
+        const tableName = row.TABLE_NAME;
+        const columnName = row.COLUMN_NAME;
+
+        if (!tables.has(tableName)) {
+            tables.set(tableName, new Set());
+        }
+
+        tables.get(tableName).add(columnName);
+    });
+
+    return tables;
+}
+
+function diffSchemaColumns(before, after) {
+    const addedColumns = [];
+
+    after.forEach((columns, tableName) => {
+        const previousColumns = before.get(tableName) || new Set();
+
+        columns.forEach((columnName) => {
+            if (!previousColumns.has(columnName)) {
+                addedColumns.push({
+                    table: tableName,
+                    column: columnName
+                });
+            }
+        });
+    });
+
+    return addedColumns;
+}
+
 async function ensureApplicationSchema(pool) {
     const before = await listExistingRequiredTables(pool);
+    const schemaBefore = await getSchemaSnapshot(pool);
 
     for (const filePath of SCHEMA_SCRIPT_PATHS) {
         await executeSqlScriptFile(pool, filePath);
@@ -55,7 +113,10 @@ async function ensureApplicationSchema(pool) {
     clearSchemaCache();
 
     const after = await listExistingRequiredTables(pool);
+    const schemaAfter = await getSchemaSnapshot(pool);
     const missingTables = REQUIRED_TABLES.filter((table) => !after.includes(table));
+    const createdTables = REQUIRED_TABLES.filter((table) => !before.includes(table) && after.includes(table));
+    const addedColumns = diffSchemaColumns(schemaBefore, schemaAfter);
 
     if (missingTables.length > 0) {
         throw new AppError(
@@ -65,10 +126,18 @@ async function ensureApplicationSchema(pool) {
         );
     }
 
+    createdTables.forEach((tableName) => {
+        console.log(`[schema] tabela criada: ${tableName}`);
+    });
+    addedColumns.forEach(({ table, column }) => {
+        console.log(`[schema] coluna criada/garantida: ${table}.${column}`);
+    });
+
     return {
         requiredTables: [...REQUIRED_TABLES],
-        createdTables: REQUIRED_TABLES.filter((table) => !before.includes(table) && after.includes(table)),
+        createdTables,
         existingTables: REQUIRED_TABLES.filter((table) => before.includes(table)),
+        addedColumns,
         scriptsExecuted: SCHEMA_SCRIPT_PATHS.map((filePath) => path.basename(filePath))
     };
 }

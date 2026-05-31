@@ -28,6 +28,8 @@ const {
 const {
     generateUpcomingSaturdays,
     normalizeColaboradores,
+    normalizePlantaoType,
+    resolvePlantaoTypeByDate,
     serializePlantaoRecord
 } = require('../utils/plantoes');
 
@@ -51,6 +53,10 @@ function buildPlantaoSelect(schema) {
 
     if (capabilities.hasPlantaoObservacao) {
         columns.push('observacao');
+    }
+
+    if (capabilities.hasPlantaoTipo) {
+        columns.push('tipo_plantao');
     }
 
     return columns.join(',\n            ');
@@ -114,8 +120,13 @@ function buildPlantaoPayload(body, fallback = {}) {
         ? normalizeOptionalText(body.observacao, 'Observacao', { maxLength: 500 })
         : normalizeOptionalText(fallback.observacao || fallback.Observacao, 'Observacao', { maxLength: 500 });
 
+    const tipoPlantao = body.tipoPlantao !== undefined
+        ? normalizePlantaoType(body.tipoPlantao, dataISO)
+        : normalizePlantaoType(fallback.tipo_plantao || fallback.TipoPlantao || fallback.tipoPlantao, dataISO);
+
     return {
         dataISO,
+        tipoPlantao,
         colaboradores,
         horaInicio,
         horaFim,
@@ -255,6 +266,7 @@ async function syncPlantaoMovements(poolOrTx, schema, row) {
 router.get('/', async (req, res) => {
     const pool = await conectar();
     const schema = await getSchemaInfo(pool);
+    const capabilities = getBancoHorasCapabilities(schema);
     const request = pool.request();
     const clauses = [];
 
@@ -266,6 +278,15 @@ router.get('/', async (req, res) => {
     if (req.query.to) {
         request.input('to', sql.Date, normalizeIsoDate(req.query.to, 'Data final'));
         clauses.push('data_plantao <= @to');
+    }
+
+    if (req.query.tipoPlantao) {
+        const tipoPlantao = normalizePlantaoType(req.query.tipoPlantao);
+
+        if (capabilities.hasPlantaoTipo) {
+            request.input('tipoPlantao', sql.NVarChar(30), tipoPlantao);
+            clauses.push('LOWER(tipo_plantao) = @tipoPlantao');
+        }
     }
 
     const result = await request.query(`
@@ -285,7 +306,7 @@ router.get('/', async (req, res) => {
         }
 
         return serialized;
-    });
+    }).filter((plantao) => plantao.tipoPlantao === 'sabado');
 
     res.json(records);
 });
@@ -299,6 +320,7 @@ router.get('/disponibilidade/:dataISO', async (req, res) => {
     const pool = await conectar();
     const schema = await getSchemaInfo(pool);
     const dataISO = normalizeIsoDate(req.params.dataISO, 'Data do plantao');
+    resolvePlantaoTypeByDate(dataISO);
     const horaInicio = req.query.horaInicio ? normalizeNullableTime(req.query.horaInicio, 'Hora inicial do plantao') : null;
     const horaFim = req.query.horaFim ? normalizeNullableTime(req.query.horaFim, 'Hora final do plantao') : null;
 
@@ -324,6 +346,7 @@ router.get('/:dataISO', async (req, res) => {
     const pool = await conectar();
     const schema = await getSchemaInfo(pool);
     const dataISO = normalizeIsoDate(req.params.dataISO, 'Data do plantao');
+    resolvePlantaoTypeByDate(dataISO);
     const plantao = await findPlantaoByDate(pool, dataISO, schema);
 
     if (!plantao) {
@@ -378,9 +401,14 @@ router.post('/', async (req, res) => {
                 setParts.push('observacao = @observacao');
             }
 
+            if (capabilities.hasPlantaoTipo) {
+                setParts.push('tipo_plantao = @tipoPlantao');
+            }
+
             const updateResult = await tx.request()
                 .input('data_plantao', sql.Date, payload.dataISO)
                 .input('colaboradores_ids', sql.NVarChar(sql.MAX), JSON.stringify(payload.colaboradores))
+                .input('tipoPlantao', sql.NVarChar(30), payload.tipoPlantao)
                 .input('horaInicio', sql.Time, toSqlTime(payload.horaInicio, 'Hora inicial do plantao'))
                 .input('horaFim', sql.Time, toSqlTime(payload.horaFim, 'Hora final do plantao'))
                 .input('observacao', sql.NVarChar(500), payload.observacao)
@@ -413,9 +441,15 @@ router.post('/', async (req, res) => {
                 values.push('@observacao');
             }
 
+            if (capabilities.hasPlantaoTipo) {
+                fields.push('tipo_plantao');
+                values.push('@tipoPlantao');
+            }
+
             const insertResult = await tx.request()
                 .input('data_plantao', sql.Date, payload.dataISO)
                 .input('colaboradores_ids', sql.NVarChar(sql.MAX), JSON.stringify(payload.colaboradores))
+                .input('tipoPlantao', sql.NVarChar(30), payload.tipoPlantao)
                 .input('horaInicio', sql.Time, toSqlTime(payload.horaInicio, 'Hora inicial do plantao'))
                 .input('horaFim', sql.Time, toSqlTime(payload.horaFim, 'Hora final do plantao'))
                 .input('observacao', sql.NVarChar(500), payload.observacao)
@@ -438,6 +472,10 @@ router.post('/', async (req, res) => {
 
         if (saved.observacao === undefined && capabilities.hasPlantaoObservacao) {
             saved.observacao = payload.observacao;
+        }
+
+        if (saved.tipo_plantao === undefined && capabilities.hasPlantaoTipo) {
+            saved.tipo_plantao = payload.tipoPlantao;
         }
 
         await syncPlantaoMovements(tx, schema, saved);

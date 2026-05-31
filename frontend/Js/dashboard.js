@@ -24,21 +24,134 @@ function toISODate(value) {
     return `${year}-${month}-${day}`;
 }
 
-function obterHoraNumericaSegura(valor) {
-    if (typeof obterHoraNumerica === 'function') {
-        return obterHoraNumerica(valor);
-    }
-
-    if (!valor) {
+function formatTimeInputDashboard(value) {
+    if (!value) {
         return null;
     }
 
-    const raw = String(valor);
-    const hora = raw.includes('T')
-        ? raw.match(/T(\d{2})/)?.[1]
-        : raw.split(':')[0];
+    const raw = String(value).trim();
 
-    return hora !== undefined ? Number(hora) : null;
+    if (!raw) {
+        return null;
+    }
+
+    if (raw.includes('T')) {
+        const match = raw.match(/T(\d{2}:\d{2})/);
+        return match ? match[1] : null;
+    }
+
+    if (!raw.includes(':')) {
+        return null;
+    }
+
+    return raw.slice(0, 5);
+}
+
+function getTimeMinutesDashboard(value) {
+    const formatted = formatTimeInputDashboard(value);
+
+    if (!formatted) {
+        return null;
+    }
+
+    const [hours, minutes] = formatted.split(':').map(Number);
+    return (hours * 60) + minutes;
+}
+
+function getIsoDayOfWeekDashboard(dataISO) {
+    const normalized = toISODate(dataISO);
+
+    if (!normalized) {
+        return new Date().getDay();
+    }
+
+    const [year, month, day] = normalized.split('-').map(Number);
+    return new Date(year, month - 1, day, 12, 0, 0).getDay();
+}
+
+function buildJornadaSemanalIndex(items = []) {
+    const map = new Map();
+
+    (Array.isArray(items) ? items : []).forEach((item) => {
+        const colaboradorId = Number(item.colaboradorId || item.ColaboradorId || 0);
+        const diaSemana = Number(item.diaSemana ?? item.DiaSemana);
+        const trabalhoInicio = formatTimeInputDashboard(item.trabalhoInicio || item.TrabalhoInicio);
+        const trabalhoFim = formatTimeInputDashboard(item.trabalhoFim || item.TrabalhoFim);
+        const almocoInicio = formatTimeInputDashboard(item.almocoInicio || item.AlmocoInicio);
+        const almocoFim = formatTimeInputDashboard(item.almocoFim || item.AlmocoFim);
+
+        if (!Number.isFinite(colaboradorId) || colaboradorId <= 0 || !Number.isFinite(diaSemana)) {
+            return;
+        }
+
+        if (!map.has(colaboradorId)) {
+            map.set(colaboradorId, new Map());
+        }
+
+        if (!trabalhoInicio || !trabalhoFim) {
+            return;
+        }
+
+        map.get(colaboradorId).set(diaSemana, {
+            trabalhoInicio,
+            trabalhoFim,
+            almocoInicio,
+            almocoFim
+        });
+    });
+
+    return map;
+}
+
+function hasColaboradorHorarioPadrao(colaborador) {
+    return Boolean(
+        formatTimeInputDashboard(colaborador?.TrabalhoInicio || colaborador?.trabalhoInicio)
+        && formatTimeInputDashboard(colaborador?.TrabalhoFim || colaborador?.trabalhoFim)
+    );
+}
+
+function getFallbackScheduleForDate(colaborador, dataISO) {
+    const weekday = getIsoDayOfWeekDashboard(dataISO);
+
+    if (weekday === 0 || weekday === 6) {
+        return null;
+    }
+
+    const trabalhoInicio = formatTimeInputDashboard(colaborador?.TrabalhoInicio || colaborador?.trabalhoInicio);
+    const trabalhoFim = formatTimeInputDashboard(colaborador?.TrabalhoFim || colaborador?.trabalhoFim);
+
+    if (!trabalhoInicio || !trabalhoFim) {
+        return null;
+    }
+
+    return {
+        trabalhoInicio,
+        trabalhoFim,
+        almocoInicio: formatTimeInputDashboard(colaborador?.AlmocoInicio || colaborador?.almocoInicio),
+        almocoFim: formatTimeInputDashboard(colaborador?.AlmocoFim || colaborador?.almocoFim),
+        origem: 'padrao'
+    };
+}
+
+function getColaboradorScheduleForDate(colaborador, dataISO, jornadaSemanalIndex) {
+    const colaboradorId = Number(colaborador?.Id || colaborador?.id || 0);
+    const weekday = getIsoDayOfWeekDashboard(dataISO);
+    const jornadaByDay = jornadaSemanalIndex.get(colaboradorId);
+
+    if (jornadaByDay) {
+        const jornadaDia = jornadaByDay.get(weekday);
+
+        if (!jornadaDia?.trabalhoInicio || !jornadaDia?.trabalhoFim) {
+            return null;
+        }
+
+        return {
+            ...jornadaDia,
+            origem: 'jornada'
+        };
+    }
+
+    return getFallbackScheduleForDate(colaborador, dataISO);
 }
 
 function obterAusenciasNaData(dataISO) {
@@ -51,39 +164,72 @@ function obterAusenciasNaData(dataISO) {
 }
 
 function obterAusenciaDoColaboradorNaData(colaboradorId, dataISO) {
-    return obterAusenciasNaData(dataISO).find((ausencia) => (ausencia.colaboradorId || ausencia.ColaboradorId) === colaboradorId) || null;
+    return obterAusenciasNaData(dataISO).find((ausencia) => Number(ausencia.colaboradorId || ausencia.ColaboradorId) === Number(colaboradorId)) || null;
 }
 
-function colaboradorDisponivelNaHora(colaborador, hora, dataISO) {
+function escapeHtmlDashboard(value) {
+    return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
+function getDashboardSetorId(colaborador) {
+    const value = colaborador?.SetorId ?? colaborador?.setorId ?? colaborador?.setor_id ?? null;
+
+    if (value === null || value === undefined || String(value).trim() === '') {
+        return '';
+    }
+
+    return String(value);
+}
+
+function getDashboardSetorNome(colaborador, setoresById = new Map()) {
+    const setorId = getDashboardSetorId(colaborador);
+    const nomeDireto = colaborador?.SetorNome ?? colaborador?.setorNome ?? colaborador?.setor ?? colaborador?.Setor;
+    const nomeSetor = nomeDireto || setoresById.get(setorId)?.nome || setoresById.get(setorId)?.Nome;
+    const normalized = String(nomeSetor || '').trim();
+
+    return normalized || 'Sem setor';
+}
+
+function colaboradorDisponivelAgora(colaborador, minutosAtuais, dataISO, jornadaSemanalIndex) {
     const ausencia = obterAusenciaDoColaboradorNaData(colaborador.Id, dataISO);
     const tipo = String(ausencia?.tipo || ausencia?.Tipo || '').toLowerCase();
-    const periodoTipo = ausencia?.periodoTipo || ausencia?.PeriodoTipo;
+    const periodoTipo = String(ausencia?.periodoTipo || ausencia?.PeriodoTipo || '').toLowerCase();
+    const schedule = getColaboradorScheduleForDate(colaborador, dataISO, jornadaSemanalIndex);
+
+    if (!schedule) {
+        return false;
+    }
 
     if (ausencia && periodoTipo !== 'horas') {
         return false;
     }
 
-    const trabalhoInicio = obterHoraNumericaSegura(colaborador.TrabalhoInicio);
-    const trabalhoFim = obterHoraNumericaSegura(colaborador.TrabalhoFim);
-    const almocoInicio = obterHoraNumericaSegura(colaborador.AlmocoInicio);
-    const almocoFim = obterHoraNumericaSegura(colaborador.AlmocoFim);
+    const trabalhoInicio = getTimeMinutesDashboard(schedule.trabalhoInicio);
+    const trabalhoFim = getTimeMinutesDashboard(schedule.trabalhoFim);
+    const almocoInicio = getTimeMinutesDashboard(schedule.almocoInicio);
+    const almocoFim = getTimeMinutesDashboard(schedule.almocoFim);
 
     if (trabalhoInicio === null || trabalhoFim === null) {
         return false;
     }
 
-    const dentroDoTrabalho = hora >= trabalhoInicio && hora < trabalhoFim;
-    const estaNoAlmoco = almocoInicio !== null && almocoFim !== null && hora >= almocoInicio && hora < almocoFim;
+    const dentroDoTrabalho = minutosAtuais >= trabalhoInicio && minutosAtuais < trabalhoFim;
+    const estaNoAlmoco = almocoInicio !== null && almocoFim !== null && minutosAtuais >= almocoInicio && minutosAtuais < almocoFim;
 
     if (!dentroDoTrabalho || estaNoAlmoco) {
         return false;
     }
 
     if (periodoTipo === 'horas') {
-        const horaInicio = obterHoraNumericaSegura(ausencia?.horaInicio || ausencia?.HoraInicio);
-        const horaFim = obterHoraNumericaSegura(ausencia?.horaFim || ausencia?.HoraFim);
+        const horaInicio = getTimeMinutesDashboard(ausencia?.horaInicio || ausencia?.HoraInicio);
+        const horaFim = getTimeMinutesDashboard(ausencia?.horaFim || ausencia?.HoraFim);
 
-        if (horaInicio !== null && horaFim !== null && hora >= horaInicio && hora < horaFim) {
+        if (horaInicio !== null && horaFim !== null && minutosAtuais >= horaInicio && minutosAtuais < horaFim) {
             return false;
         }
     }
@@ -91,18 +237,26 @@ function colaboradorDisponivelNaHora(colaborador, hora, dataISO) {
     return tipo !== 'ferias' && tipo !== 'folga' && tipo !== 'ausencia';
 }
 
-function calcularMetricas(agora, dataHoje) {
-    const colaboradores = window.colaboradores || [];
-    const ativos = colaboradores.filter((colaborador) => colaborador.TrabalhoInicio && colaborador.TrabalhoFim);
+function calcularMetricas(agora, dataHoje, jornadaSemanalIndex, colaboradoresBase = window.colaboradores || []) {
+    const colaboradores = Array.isArray(colaboradoresBase) ? colaboradoresBase : [];
+    const minutosAtuais = (agora.getHours() * 60) + agora.getMinutes();
+    const ativosHoje = colaboradores.filter((colaborador) => Boolean(
+        getColaboradorScheduleForDate(colaborador, dataHoje, jornadaSemanalIndex)
+    ));
     const ausenciasHoje = obterAusenciasNaData(dataHoje);
     const ausentesIntegralmente = new Set(
         ausenciasHoje
-            .filter((ausencia) => (ausencia.periodoTipo || ausencia.PeriodoTipo) !== 'horas')
-            .map((ausencia) => ausencia.colaboradorId || ausencia.ColaboradorId)
+            .filter((ausencia) => String(ausencia.periodoTipo || ausencia.PeriodoTipo || '').toLowerCase() !== 'horas')
+            .map((ausencia) => Number(ausencia.colaboradorId || ausencia.ColaboradorId))
+            .filter((id) => Number.isFinite(id))
     );
 
-    const disponibilidadeHoje = Math.max(ativos.length - ausentesIntegralmente.size, 0);
-    const trabalhandoAgora = ativos.filter((colaborador) => colaboradorDisponivelNaHora(colaborador, agora.getHours(), dataHoje)).length;
+    const disponibilidadeHoje = ativosHoje.filter(
+        (colaborador) => !ausentesIntegralmente.has(Number(colaborador.Id))
+    ).length;
+    const trabalhandoAgora = ativosHoje.filter(
+        (colaborador) => colaboradorDisponivelAgora(colaborador, minutosAtuais, dataHoje, jornadaSemanalIndex)
+    ).length;
     const feriasHoje = ausenciasHoje.filter((ausencia) => String(ausencia.tipo || ausencia.Tipo || '').toLowerCase() === 'ferias').length;
 
     const proximosPlantoes = (window.plantoesLancados || []).filter((plantao) => {
@@ -116,13 +270,13 @@ function calcularMetricas(agora, dataHoje) {
     });
 
     const plantaoSemEquipe = proximosPlantoes.filter((plantao) => !Array.isArray(plantao.colaboradores) || plantao.colaboradores.length === 0).length;
-    const coberturaPercentual = ativos.length > 0
-        ? Math.round((disponibilidadeHoje / ativos.length) * 100)
+    const coberturaPercentual = ativosHoje.length > 0
+        ? Math.round((disponibilidadeHoje / ativosHoje.length) * 100)
         : 0;
 
     return {
         totalColaboradores: colaboradores.length,
-        ativos: ativos.length,
+        ativosHoje: ativosHoje.length,
         disponibilidadeHoje,
         trabalhandoAgora,
         ausenciasHoje: ausenciasHoje.length,
@@ -131,6 +285,38 @@ function calcularMetricas(agora, dataHoje) {
         plantaoSemEquipe,
         coberturaPercentual
     };
+}
+
+function calcularMetricasPorSetor(agora, dataHoje, jornadaSemanalIndex) {
+    const colaboradores = Array.isArray(window.colaboradores) ? window.colaboradores : [];
+    const setoresById = new Map(
+        (Array.isArray(window.setores) ? window.setores : [])
+            .map((setor) => [String(setor.id ?? setor.Id ?? ''), setor])
+            .filter(([id]) => id)
+    );
+    const grupos = new Map();
+
+    colaboradores.forEach((colaborador) => {
+        const setorId = getDashboardSetorId(colaborador) || 'sem-setor';
+        const setorNome = getDashboardSetorNome(colaborador, setoresById);
+
+        if (!grupos.has(setorId)) {
+            grupos.set(setorId, {
+                setorId,
+                setorNome,
+                colaboradores: []
+            });
+        }
+
+        grupos.get(setorId).colaboradores.push(colaborador);
+    });
+
+    return Array.from(grupos.values())
+        .sort((first, second) => first.setorNome.localeCompare(second.setorNome, 'pt-BR', { sensitivity: 'base' }))
+        .map((grupo) => ({
+            ...grupo,
+            metricas: calcularMetricas(agora, dataHoje, jornadaSemanalIndex, grupo.colaboradores)
+        }));
 }
 
 function gerarCardMetrica(titulo, valor, icone, subtitulo, destaque) {
@@ -155,18 +341,88 @@ function gerarCardMetrica(titulo, valor, icone, subtitulo, destaque) {
     `;
 }
 
-function gerarAlertas(metricas, dataHoje) {
+function gerarSetoresDashboard(gruposSetor = []) {
+    if (!Array.isArray(gruposSetor) || gruposSetor.length === 0) {
+        return '';
+    }
+
+    return `
+        <section class="dashboard-sector-section">
+            <div class="dashboard-sector-header">
+                <div>
+                    <h3><i class="fas fa-layer-group"></i> Indicadores por setor</h3>
+                    <p>Leitura do dia considerando jornada semanal, almoco e ausencias.</p>
+                </div>
+            </div>
+
+            <div class="dashboard-sector-grid">
+                ${gruposSetor.map((grupo) => {
+                    const metricas = grupo.metricas;
+                    const cobertura = Math.max(0, Math.min(100, metricas.coberturaPercentual || 0));
+
+                    return `
+                        <article class="dashboard-sector-card">
+                            <div class="dashboard-sector-card-header">
+                                <span title="${escapeHtmlDashboard(grupo.setorNome)}">${escapeHtmlDashboard(grupo.setorNome)}</span>
+                                <strong>${metricas.totalColaboradores}</strong>
+                            </div>
+
+                            <div class="dashboard-sector-stats">
+                                <div>
+                                    <strong>${metricas.ativosHoje}</strong>
+                                    <span>Escalados</span>
+                                </div>
+                                <div>
+                                    <strong>${metricas.trabalhandoAgora}</strong>
+                                    <span>Agora</span>
+                                </div>
+                                <div>
+                                    <strong>${metricas.disponibilidadeHoje}</strong>
+                                    <span>Disponiveis</span>
+                                </div>
+                            </div>
+
+                            <div class="dashboard-sector-progress" aria-label="Cobertura ${cobertura}%">
+                                <span style="width: ${cobertura}%;"></span>
+                            </div>
+                        </article>
+                    `;
+                }).join('')}
+            </div>
+        </section>
+    `;
+}
+
+function gerarAlertas(metricas, dataHoje, jornadaSemanalIndex) {
     const alertas = [];
     const colaboradores = window.colaboradores || [];
     const ausenciasHoje = obterAusenciasNaData(dataHoje);
 
-    const semHorario = colaboradores.filter((colaborador) => !colaborador.TrabalhoInicio || !colaborador.TrabalhoFim);
-    if (semHorario.length > 0) {
+    const semJornadaNemPadrao = colaboradores.filter((colaborador) => {
+        const colaboradorId = Number(colaborador.Id || colaborador.id || 0);
+        return !jornadaSemanalIndex.has(colaboradorId) && !hasColaboradorHorarioPadrao(colaborador);
+    });
+
+    if (semJornadaNemPadrao.length > 0) {
         alertas.push({
             tipo: 'warning',
             icone: 'clock',
-            titulo: `${semHorario.length} colaborador(es) sem jornada definida`,
-            descricao: 'Preencha horários de entrada e saída para melhorar a escala.'
+            titulo: `${semJornadaNemPadrao.length} colaborador(es) sem jornada definida`,
+            descricao: 'Cadastre jornada semanal ou horario padrao para manter a escala consistente.'
+        });
+    }
+
+    const apenasPadraoSemJornada = colaboradores.filter((colaborador) => {
+        const colaboradorId = Number(colaborador.Id || colaborador.id || 0);
+        return !jornadaSemanalIndex.has(colaboradorId) && hasColaboradorHorarioPadrao(colaborador);
+    });
+
+    if (apenasPadraoSemJornada.length > 0) {
+        alertas.push({
+            tipo: 'warning',
+            icone: 'calendar-week',
+            titulo: `${apenasPadraoSemJornada.length} colaborador(es) usando apenas horario padrao`,
+            descricao: 'Considere completar a jornada semanal para dias flexiveis e fins de semana.'
         });
     }
 
@@ -283,11 +539,26 @@ function gerarGraficoAusencias() {
     `;
 }
 
-function gerarGraficoOcupacao(dataHoje) {
+function gerarGraficoOcupacao(dataHoje, jornadaSemanalIndex) {
     const ocupacao = [];
+    const colaboradores = window.colaboradores || [];
+    const horariosAtivos = colaboradores
+        .map((colaborador) => getColaboradorScheduleForDate(colaborador, dataHoje, jornadaSemanalIndex))
+        .filter(Boolean);
+    const earliest = horariosAtivos
+        .map((item) => getTimeMinutesDashboard(item.trabalhoInicio))
+        .filter((value) => Number.isFinite(value));
+    const latest = horariosAtivos
+        .map((item) => getTimeMinutesDashboard(item.trabalhoFim))
+        .filter((value) => Number.isFinite(value));
+    const startHour = earliest.length > 0 ? Math.max(0, Math.floor(Math.min(...earliest) / 60)) : 7;
+    const endHour = latest.length > 0 ? Math.min(23, Math.ceil(Math.max(...latest) / 60) - 1) : 18;
 
-    for (let hora = 7; hora <= 18; hora += 1) {
-        const contagem = (window.colaboradores || []).filter((colaborador) => colaboradorDisponivelNaHora(colaborador, hora, dataHoje)).length;
+    for (let hora = startHour; hora <= endHour; hora += 1) {
+        const minutos = hora * 60;
+        const contagem = colaboradores.filter(
+            (colaborador) => colaboradorDisponivelAgora(colaborador, minutos, dataHoje, jornadaSemanalIndex)
+        ).length;
         ocupacao.push({ hora, contagem });
     }
 
@@ -424,18 +695,24 @@ async function renderDashboardInternal() {
     const hoje = new Date();
     const dataHoje = toISODate(hoje);
 
-    await Promise.all([
+    const [, , , , , , jornadaSemanalResponse] = await Promise.all([
         carregarColaboradores(),
+        typeof carregarSetores === 'function' ? carregarSetores() : Promise.resolve([]),
         carregarAusencias(),
         carregarFeriadosLocais(),
         typeof carregarPlantoes === 'function' ? carregarPlantoes() : Promise.resolve([]),
         typeof window.carregarFeriadosNacionais === 'function'
             ? window.carregarFeriadosNacionais(hoje.getFullYear())
-            : Promise.resolve([])
+            : Promise.resolve([]),
+        typeof window.API?.getJornadaSemanal === 'function'
+            ? window.API.getJornadaSemanal().catch(() => ({ items: [] }))
+            : Promise.resolve({ items: [] })
     ]);
 
-    const metricas = calcularMetricas(hoje, dataHoje);
-    const alertas = gerarAlertas(metricas, dataHoje);
+    const jornadaSemanalIndex = buildJornadaSemanalIndex(jornadaSemanalResponse?.items || []);
+    const metricas = calcularMetricas(hoje, dataHoje, jornadaSemanalIndex);
+    const metricasPorSetor = calcularMetricasPorSetor(hoje, dataHoje, jornadaSemanalIndex);
+    const alertas = gerarAlertas(metricas, dataHoje, jornadaSemanalIndex);
     const proximosEventos = await buscarProximosEventos();
 
     appContent.innerHTML = `
@@ -446,8 +723,8 @@ async function renderDashboardInternal() {
 
         <div class="dashboard-grid">
             ${gerarCardMetrica('Colaboradores', metricas.totalColaboradores, 'users', 'Total cadastrados', {
-                valor: metricas.ativos,
-                rotulo: 'Com horário definido'
+                valor: metricas.ativosHoje,
+                rotulo: 'Escalados hoje'
             })}
             ${gerarCardMetrica('Cobertura do dia', metricas.disponibilidadeHoje, 'user-check', 'Disponíveis hoje', {
                 valor: `${metricas.coberturaPercentual}%`,
@@ -462,6 +739,8 @@ async function renderDashboardInternal() {
                 rotulo: 'Sem equipe definida'
             })}
         </div>
+
+        ${gerarSetoresDashboard(metricasPorSetor)}
 
         <div class="alerts-section">
             <div class="alerts-header">
@@ -491,7 +770,7 @@ async function renderDashboardInternal() {
             <div class="chart-card">
                 <h4><i class="fas fa-clock"></i> Cobertura por hora</h4>
                 <div id="chartOcupacao" style="height: 200px;">
-                    ${gerarGraficoOcupacao(dataHoje)}
+                    ${gerarGraficoOcupacao(dataHoje, jornadaSemanalIndex)}
                 </div>
             </div>
         </div>
