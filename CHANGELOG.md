@@ -2,6 +2,19 @@
 
 Todas as alteracoes relevantes deste projeto serao documentadas neste arquivo.
 
+## [1.4.0] - 2026-07-08
+
+### Removido
+- Aplicativo desktop Electron e o fluxo de instalador Squirrel (`electron/`, `forge.config.js`, `gerar-instalador.bat`, `scripts/release-desktop.js`, `scripts/show-installer-builder.ps1`). Gerava instaladores de 100+MB por arquitetura e exigia builds separados para `x64`/`x86`/`arm64`, deixando o processo de instalar e atualizar pesado e lento.
+- Conceito de "modo" standalone/server/client do assistente de primeira configuracao do Electron — sem o app desktop, "modo cliente" passa a ser simplesmente abrir o navegador no endereco do servidor, sem nenhuma instalacao.
+
+### Adicionado
+- "Servidor em segundo plano" (iniciar com o Windows sem depender de janela aberta) agora e um recurso do proprio backend web, controlado pela tela Configuracoes > Comunicacao em Rede (`GET/POST /api/sistema/servidor-background/*`), sem depender do Electron.
+
+### Alterado
+- `parar-servidor.bat` agora encerra apenas o processo que esta escutando na porta do servidor, em vez de matar todo processo `node.exe` da maquina.
+- `node_modules` caiu de ~550MB para ~70MB com a remocao das dependencias do Electron/Electron Forge.
+
 ## [1.3.0] - 2026-07-08
 
 ### Adicionado

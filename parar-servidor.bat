@@ -1,11 +1,28 @@
 @echo off
-setlocal
+setlocal enabledelayedexpansion
 
-echo Encerrando processos Node.js em execucao...
-taskkill /F /IM node.exe >nul 2>nul
+set "PORTA=%PORT%"
+if "%PORTA%"=="" set "PORTA=4450"
+
+echo Procurando o servidor na porta %PORTA%...
+
+set "PID_ENCONTRADO="
+for /f "tokens=5" %%P in ('netstat -ano ^| findstr /C:"LISTENING" ^| findstr /C:":%PORTA% "') do (
+    set "PID_ENCONTRADO=%%P"
+)
+
+if not defined PID_ENCONTRADO (
+    echo Nenhum servidor encontrado escutando na porta %PORTA%.
+    echo.
+    pause
+    exit /b 0
+)
+
+echo Encerrando processo (PID !PID_ENCONTRADO!) na porta %PORTA%...
+taskkill /F /PID !PID_ENCONTRADO!
 
 if errorlevel 1 (
-    echo Nenhum processo node.exe estava em execucao.
+    echo Nao foi possivel encerrar o processo automaticamente.
 ) else (
     echo Servidor encerrado com sucesso.
 )

@@ -23,6 +23,7 @@ const bancoHorasRoutes = require('./routes/banco-horas');
 const escalaRoutes = require('./routes/escala');
 const jornadaSemanalRoutes = require('./routes/jornada-semanal');
 const configuracaoBancoRoutes = require('./routes/configuracao-banco');
+const sistemaRoutes = require('./routes/sistema');
 
 const DEFAULT_HOST = '0.0.0.0';
 const DEFAULT_PORT = 4450;
@@ -281,6 +282,7 @@ app.use('/api/banco-horas', bancoHorasRoutes);
 app.use('/api/escala', escalaRoutes);
 app.use('/api/jornada-semanal', jornadaSemanalRoutes);
 app.use('/api/configuracao-banco', configuracaoBancoRoutes);
+app.use('/api/sistema', sistemaRoutes);
 
 app.get(/^(?!\/api(?:\/|$)).*/, (req, res) => {
     res.sendFile(path.join(frontendPath, 'index.html'));

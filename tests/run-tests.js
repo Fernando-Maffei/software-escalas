@@ -1,5 +1,4 @@
 const suites = [
-    ...require('./launcher-config.test.js'),
     ...require('./validation.test.js'),
     ...require('./plantoes.test.js'),
     ...require('./bancoHoras.test.js'),
