@@ -3,6 +3,7 @@ const path = require('path');
 
 const { AppError } = require('./errors');
 const { clearSchemaCache } = require('./schema');
+const { ensureDefaultAdmin } = require('./auth');
 
 const REQUIRED_TABLES = Object.freeze([
     'Colaboradores',
@@ -13,7 +14,8 @@ const REQUIRED_TABLES = Object.freeze([
     'plantoes',
     'BancoHorasMovimentos',
     'escala_dia',
-    'AlmocosPersonalizados'
+    'AlmocosPersonalizados',
+    'Usuarios'
 ]);
 
 const SCHEMA_SCRIPT_PATHS = Object.freeze([
@@ -21,7 +23,8 @@ const SCHEMA_SCRIPT_PATHS = Object.freeze([
     path.join(__dirname, '..', '..', 'database', 'migrations', '2026-04-23-banco-horas.sql'),
     path.join(__dirname, '..', '..', 'database', 'migrations', '2026-04-24-escala-dia.sql'),
     path.join(__dirname, '..', '..', 'database', 'migrations', '2026-05-21-setores-plantoes-almoco.sql'),
-    path.join(__dirname, '..', '..', 'database', 'migrations', '2026-05-28-colaborador-jornada-semanal.sql')
+    path.join(__dirname, '..', '..', 'database', 'migrations', '2026-05-28-colaborador-jornada-semanal.sql'),
+    path.join(__dirname, '..', '..', 'database', 'migrations', '2026-07-08-usuarios.sql')
 ]);
 
 function splitSqlBatches(script) {
@@ -132,6 +135,24 @@ async function ensureApplicationSchema(pool) {
     addedColumns.forEach(({ table, column }) => {
         console.log(`[schema] coluna criada/garantida: ${table}.${column}`);
     });
+
+    const bootstrappedAdmin = await ensureDefaultAdmin(pool);
+
+    if (bootstrappedAdmin) {
+        console.log('========================================================');
+        console.log('[auth] Usuario administrador criado automaticamente.');
+        console.log(`[auth] Usuario: ${bootstrappedAdmin.username}`);
+
+        if (bootstrappedAdmin.generated) {
+            console.log(`[auth] Senha gerada: ${bootstrappedAdmin.password}`);
+            console.log('[auth] Anote esta senha agora - ela nao sera exibida novamente.');
+            console.log('[auth] Uma troca de senha sera solicitada no primeiro login.');
+        } else {
+            console.log('[auth] Senha definida via variavel de ambiente ADMIN_PASSWORD.');
+        }
+
+        console.log('========================================================');
+    }
 
     return {
         requiredTables: [...REQUIRED_TABLES],

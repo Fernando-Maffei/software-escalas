@@ -39,6 +39,30 @@ function normalizeFetchInput(input) {
     return input;
 }
 
+function getRequestUrl(input) {
+    if (typeof input === 'string') {
+        return input;
+    }
+
+    if (input && typeof input.url === 'string') {
+        return input.url;
+    }
+
+    return '';
+}
+
+function notifyIfSessionExpired(response, requestUrl) {
+    if (response.status !== 401) {
+        return;
+    }
+
+    if (!requestUrl.includes('/api/') || requestUrl.includes('/api/auth/')) {
+        return;
+    }
+
+    window.dispatchEvent(new CustomEvent('auth:expired'));
+}
+
 function installApiFetchNormalizer() {
     if (window.__API_FETCH_NORMALIZER_INSTALLED__ || typeof window.fetch !== 'function') {
         return;
@@ -47,7 +71,12 @@ function installApiFetchNormalizer() {
     const nativeFetch = window.fetch.bind(window);
 
     window.fetch = function fetchWithDynamicApiHost(input, init) {
-        return nativeFetch(normalizeFetchInput(input), init);
+        const normalizedInput = normalizeFetchInput(input);
+
+        return nativeFetch(normalizedInput, init).then((response) => {
+            notifyIfSessionExpired(response, getRequestUrl(normalizedInput));
+            return response;
+        });
     };
 
     window.__API_FETCH_NORMALIZER_INSTALLED__ = true;

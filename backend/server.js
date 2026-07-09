@@ -10,7 +10,10 @@ const {
     initializeAutoBackupScheduler
 } = require('./utils/backup-scheduler');
 const { AppError } = require('./utils/errors');
+const { requireAuth } = require('./utils/auth');
+const { ensureApplicationSchema } = require('./utils/database-schema');
 
+const authRoutes = require('./routes/auth');
 const colaboradoresRoutes = require('./routes/colaboradores');
 const setoresRoutes = require('./routes/setores');
 const ausenciasRoutes = require('./routes/ausencias');
@@ -58,22 +61,40 @@ const configuredCorsOrigins = parseCorsOrigins(process.env[CORS_ORIGINS_ENV]);
 
 function getCorsStatus() {
     return {
-        mode: configuredCorsOrigins.size > 0 ? 'restricted' : 'open',
+        mode: configuredCorsOrigins.size > 0 ? 'restricted' : 'same-origin-only',
         allowedOrigins: [...configuredCorsOrigins]
     };
 }
 
-function createCorsOptions() {
-    return {
-        origin(origin, callback) {
-            if (!origin || configuredCorsOrigins.size === 0 || configuredCorsOrigins.has(origin)) {
-                callback(null, true);
-                return;
-            }
+function isSameOriginRequest(req, origin) {
+    if (!origin) {
+        return true;
+    }
 
-            callback(new AppError(403, 'Origem nao autorizada para acessar a API.'));
-        }
-    };
+    try {
+        const requestHost = req.get('host');
+        return Boolean(requestHost) && new URL(origin).host === requestHost;
+    } catch (error) {
+        return false;
+    }
+}
+
+function corsOptionsDelegate(req, callback) {
+    // Navegadores modernos enviam o header "Origin" mesmo em requisicoes de
+    // mesma origem (ex: POST do proprio front-end). Por isso comparamos o
+    // Origin recebido contra o Host da propria requisicao — e nao apenas
+    // contra a allowlist — antes de decidir se e uma chamada same-origin.
+    // Origens cross-site só são liberadas se estiverem na allowlist explicita
+    // de CORS_ORIGINS; por padrao (allowlist vazia) toda origem cross-site e
+    // negada, para nao expor a sessao autenticada a sites de terceiros.
+    const origin = req.header('Origin') || null;
+
+    if (isSameOriginRequest(req, origin) || configuredCorsOrigins.has(origin)) {
+        callback(null, { origin: true, credentials: true });
+        return;
+    }
+
+    callback(new AppError(403, 'Origem nao autorizada para acessar a API.'));
 }
 
 function getServerAccessUrls(host, port, options = {}) {
@@ -211,7 +232,7 @@ function getNetworkStatusPayload(req) {
 }
 
 app.disable('x-powered-by');
-app.use(cors(createCorsOptions()));
+app.use(cors(corsOptionsDelegate));
 app.use(express.json({ limit: '25mb' }));
 app.use(express.static(frontendPath));
 
@@ -229,6 +250,10 @@ app.get('/api/health', async (req, res, next) => {
         next(error);
     }
 });
+
+app.use('/api/auth', authRoutes);
+
+app.use('/api', requireAuth);
 
 app.get('/api/network/status', async (req, res) => {
     const database = await getDatabaseHealth();
@@ -321,6 +346,7 @@ function start(options = {}) {
         });
         console.log('Rotas disponiveis:');
         console.log('- GET  /api/health');
+        console.log('- POST /api/auth/login');
         console.log('- GET  /api/network/status');
         console.log('- GET  /api/colaboradores');
         console.log('- GET  /api/setores');
@@ -333,8 +359,9 @@ function start(options = {}) {
         console.log('- GET  /api/configuracao-banco');
 
         try {
-            await conectar();
+            const pool = await conectar();
             console.log('Banco de dados conectado com sucesso.');
+            await ensureApplicationSchema(pool);
             const scheduler = initializeAutoBackupScheduler();
 
             if (scheduler.scheduled) {

@@ -1,6 +1,7 @@
 /* ================= ARQUIVO PRINCIPAL ================= */
 @import url('css/themes.css');
 @import url('css/base.css');
+@import url('css/auth.css');
 @import url('css/sidebar.css');
 @import url('css/components.css');
 @import url('css/calendar.css');

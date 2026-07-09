@@ -15,6 +15,53 @@
 
 <div id="toastContainer" style="position: fixed; bottom: 20px; right: 20px; z-index: 9999;"></div>
 
+<div id="loginScreen" class="login-screen">
+  <div class="login-card">
+    <div class="login-brand">
+      <img src="assets/branding/central-escalas-logo.png" alt="Central de Escalas" class="login-logo">
+      <h1>Central de Escalas</h1>
+      <p>Entre com sua conta para continuar</p>
+    </div>
+    <form id="loginForm" class="login-form" autocomplete="on">
+      <div class="form-group">
+        <label for="loginUsername">Usuário</label>
+        <input type="text" id="loginUsername" class="form-control" autocomplete="username" required>
+      </div>
+      <div class="form-group">
+        <label for="loginPassword">Senha</label>
+        <input type="password" id="loginPassword" class="form-control" autocomplete="current-password" required>
+      </div>
+      <p id="loginError" class="login-error hidden"></p>
+      <button type="submit" id="loginSubmitBtn" class="btn-primary full-width">
+        <i class="fas fa-sign-in-alt"></i> Entrar
+      </button>
+    </form>
+  </div>
+</div>
+
+<div id="trocarSenhaScreen" class="login-screen hidden">
+  <div class="login-card">
+    <div class="login-brand">
+      <h1>Defina uma nova senha</h1>
+      <p>Este acesso usa uma senha gerada automaticamente. Defina uma nova senha para continuar.</p>
+    </div>
+    <form id="trocarSenhaForm" class="login-form">
+      <div class="form-group">
+        <label for="novaSenhaInput">Nova senha</label>
+        <input type="password" id="novaSenhaInput" class="form-control" minlength="8" autocomplete="new-password" required>
+      </div>
+      <div class="form-group">
+        <label for="confirmarSenhaInput">Confirmar nova senha</label>
+        <input type="password" id="confirmarSenhaInput" class="form-control" minlength="8" autocomplete="new-password" required>
+      </div>
+      <p id="trocarSenhaError" class="login-error hidden"></p>
+      <button type="submit" class="btn-primary full-width">
+        <i class="fas fa-check"></i> Salvar e continuar
+      </button>
+    </form>
+  </div>
+</div>
+
 <div class="container">
     <aside class="sidebar" id="mainSidebar">
       <div class="sidebar-header">
@@ -95,12 +142,30 @@
           <span class="btn-text">Configurações</span>
         </div>
       </button>
-      
+
+      <button class="sidebar-btn secondary" id="abrirTrocarSenhaBtn" type="button">
+        <div class="btn-content">
+          <div class="icon-wrapper">
+            <i class="fas fa-key"></i>
+          </div>
+          <span class="btn-text">Alterar senha</span>
+        </div>
+      </button>
+
+      <button class="sidebar-btn secondary" id="logoutBtn" type="button">
+        <div class="btn-content">
+          <div class="icon-wrapper">
+            <i class="fas fa-sign-out-alt"></i>
+          </div>
+          <span class="btn-text">Sair</span>
+        </div>
+      </button>
+
       <div class="sidebar-spacer"></div>
       
       <div class="version-badge">
         <i class="fas fa-code-branch"></i>
-        <span>v1.2.0</span>
+        <span>v1.3.0</span>
       </div>
     </aside>
 
@@ -347,6 +412,38 @@
     </div>
 </div>
 
+<!-- MODAL DE ALTERAR SENHA -->
+<div id="modalTrocarSenha" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3><i class="fas fa-key"></i> Alterar senha</h3>
+            <button class="modal-close" id="fecharModalTrocarSenhaBtn">&times;</button>
+        </div>
+
+        <div class="modal-body">
+            <form id="modalTrocarSenhaForm">
+                <div class="form-group">
+                    <label>Nova senha</label>
+                    <input type="password" id="modalNovaSenhaInput" class="form-control" minlength="8" autocomplete="new-password" required>
+                </div>
+                <div class="form-group">
+                    <label>Confirmar nova senha</label>
+                    <input type="password" id="modalConfirmarSenhaInput" class="form-control" minlength="8" autocomplete="new-password" required>
+                </div>
+                <p id="modalTrocarSenhaError" class="login-error hidden"></p>
+                <div class="modal-actions">
+                    <button type="submit" class="btn-primary">
+                        <i class="fas fa-check"></i> Salvar
+                    </button>
+                    <button type="button" class="btn-secondary" id="cancelarModalTrocarSenhaBtn">
+                        <i class="fas fa-times"></i> Cancelar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 <!-- MODAL DE HORÁRIOS -->
 <div id="modalHorario" class="modal hidden">
     <div class="modal-content">
@@ -390,6 +487,7 @@
     </div>
 </div>
 
+<script src="Js/auth.js"></script>
 <script src="Js/api.js?v=20260531b"></script>
 <script src="Js/calendar.js"></script>
 <script src="Js/dashboard.js"></script>
@@ -397,11 +495,8 @@
 <script src="Js/lancamentos.js?v=20260501j"></script>
 <script src="Js/escala-report-utils.js?v=20260531b"></script>
 <script src="Js/runtime-fixes.js?v=20260531f"></script>
-<script src="https://unpkg.com/lucide@latest"></script>
 
 <script>
-    lucide.createIcons();
-    
     document.addEventListener('DOMContentLoaded', function() {
         setTimeout(() => {
             const loading = document.querySelector('.loading-indicator');
