@@ -523,3 +523,102 @@ piloto ficam para a continuação da Fase 4.
 
 - Estender os tokens novos para os 8 arquivos CSS ainda não migrados, para eliminar a coexistência de dois padrões.
 - Redesign de telas piloto sobre a fundação de tokens já criada.
+
+---
+
+## Melhoria pontual — Grade de 30 em 30 minutos e responsividade da Escala do Dia (2026-07-09)
+
+### Contexto
+
+Pedido do usuário: a grade da Escala do Dia mostrava colunas de 1 em 1 hora
+e não aproveitava bem o espaço em telas diferentes. Pediu granularidade de
+30 em 30 minutos e melhor responsividade.
+
+### Descoberta antes de mexer: CSS com múltiplas camadas conflitantes
+
+Mapeamento do `escala.css` (3270 linhas) mostrou o mesmo padrão de dívida
+técnica já visto no JS nas fases anteriores: **3 gerações sobrepostas** de
+CSS para a mesma grade (`.timeline-header`/`.timeline-row`), a mais antiga
+com `!important` vencendo silenciosamente sobre a versão "moderna"
+(`.escala-page`-scoped) que deveria estar valendo — confirmado inspecionando
+o `grid-template-columns` computado no navegador antes de qualquer edição,
+não só lendo o CSS estaticamente. Havia ainda uma quarta camada no fim do
+arquivo (~linha 3140) com scroll horizontal e sticky corretos, mas usando
+`repeat(12, ...)` fixo em vez da variável dinâmica — perdendo por
+especificidade, então inerte. E `.escala-scroll { overflow-x: hidden }`
+desabilitava o scroll horizontal por completo, então hoje a grade só sabia
+"espremer" colunas, nunca rolar.
+
+### Granularidade de 30 minutos (`frontend/Js/escala-dia-editor.js`)
+
+Toda a lógica da grade operava em unidades de hora inteira (`hour`,
+`currentHourStart = hour * 60`, arrasto do almoço só encaixava em horas
+cheias). Renomeado para um conceito de "slot" de 30 minutos
+(`SLOT_MINUTES = 30`) em `getScaleHourBoundsEscala`, `getCellStateEscala`,
+`buildLunchDropRangeEscala`, `applyLunchDropPreviewEscala`,
+`bindLunchCellDragEscala`, `renderScaleHeaderEscala`, `renderTotalRowEscala`
+e `renderScaleRowsEscala` — inclusive o atributo `data-hour` virou
+`data-slot`. Cabeçalho agora mostra `07:00`, `07:30`, `08:00`... e o
+arrasto do almoço aceita soltar em qualquer meia hora, não só em hora
+cheia. Testado de ponta a ponta contra a API real: ajuste de almoço para
+um horário só representável em meia hora (11:30–13:30) salvou e foi
+restaurado corretamente.
+
+### Responsividade (`frontend/css/escala.css`)
+
+- Removido `!important` das duas regras antigas que travavam
+  `grid-template-columns` (bloqueavam a versão moderna).
+- `.escala-page .escala-scroll` trocado de `overflow-x: hidden` para
+  `auto` — a grade agora rola horizontalmente em vez de espremer colunas
+  até ficarem ilegíveis.
+- Coluna do colaborador fixada (`position: sticky; left: 0`) no cabeçalho
+  e nas linhas, para continuar visível ao rolar pelas colunas de horário.
+- Adicionado um breakpoint próprio de celular (≤768px) para a grade, que
+  não existia — abaixo de 768px a página caía sem querer nos valores do
+  breakpoint de tablet (1500px).
+- **Incidente corrigido durante o próprio desenvolvimento**: a primeira
+  tentativa usou `minmax(Npx, 1fr)` com `min-width: max-content` para
+  forçar o scroll. Verificação no navegador mostrou que isso fazia
+  **cada linha calcular sua própria largura a partir do próprio
+  conteúdo** — cabeçalho, linha de dados e linha de total ficaram com
+  larguras diferentes entre si (1506px/1042px/1653px em um teste),
+  desalinhando as colunas verticalmente. Corrigido trocando `minmax(...,
+  1fr)` por larguras fixas em pixel por coluna (sem `1fr`, sem
+  `minmax`) — grid determinístico, garante que cabeçalho e todas as
+  linhas resolvam exatamente a mesma largura.
+
+### Verificação realizada
+
+- `node --check` no arquivo JS afetado, `npm run smoke`/`npm test` (45
+  testes) verdes.
+- Testado no navegador, autenticado, em 3 larguras (1440px, 835px,
+  390px): cabeçalho mostrando os rótulos de 30 em 30 minutos; largura de
+  cabeçalho/linha de dados/linha de total conferida via
+  `getBoundingClientRect()` — coincidindo entre si (diferença residual de
+  ~2px de borda, não mais o desalinhamento estrutural do incidente
+  acima); scroll horizontal disparando corretamente quando o conteúdo
+  excede a viewport (`scrollWidth > clientWidth`); coluna do colaborador
+  permanecendo fixa ao rolar (posição antes/depois do scroll
+  praticamente idêntica); ajuste de almoço em horário de meia hora salvo
+  e restaurado via API real; tooltips da linha de total mostrando rótulos
+  corretos ("07:00 - 1 trabalhando", "07:30 - 1 trabalhando"...).
+- Conferido que as demais páginas (Dashboard, Colaboradores, Lançar
+  Plantão, Relatórios) continuam renderizando normalmente — mudança de
+  CSS ficou contida a `.escala-page`.
+- Nenhum erro no console em nenhum dos testes.
+
+### Arquivos modificados
+
+| Arquivo | O que mudou |
+|---|---|
+| `frontend/Js/escala-dia-editor.js` | Grade de horas cheias → slots de 30 minutos |
+| `frontend/css/escala.css` | Remove 2 `!important` que travavam o grid antigo; scroll horizontal habilitado; coluna do colaborador fixa (sticky); colunas em px fixo (não minmax/1fr) para alinhamento entre linhas; novo breakpoint de celular |
+
+### Fora de escopo (fica para uma limpeza futura)
+
+- O CSS de `escala.css` ainda tem a camada legada completa (linhas ~1–186,
+  ~1430–1640) e a camada extra no fim do arquivo (~3140+) inertes, mas não
+  removidas — só as duas declarações de `grid-template-columns` que
+  conflitavam foram neutralizadas. Uma limpeza completa dessas camadas
+  mortas fica para uma fatia de CSS dedicada, fora do escopo deste pedido
+  pontual.

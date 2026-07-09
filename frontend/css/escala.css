@@ -1433,7 +1433,6 @@
 /* ================= LINHA DE TOTAL ================= */
 .timeline-row.total-row {
     display: grid;
-    grid-template-columns: 260px 80px repeat(var(--escala-hour-columns, 12), 1fr) !important;
     background: var(--card-dark);
     border-top: 2px solid var(--primary);
     border-bottom: 1px solid var(--border);
@@ -1630,7 +1629,6 @@
 .timeline-header,
 .timeline-row {
     display: grid;
-    grid-template-columns: 260px 80px repeat(var(--escala-hour-columns, 12), 1fr) !important;
     width: 100%;
 }
 
@@ -2228,7 +2226,7 @@
 }
 
 .escala-page .escala-scroll {
-    overflow-x: hidden;
+    overflow-x: auto;
     padding: 14px;
 }
 
@@ -2257,7 +2255,11 @@
 .escala-page .timeline-header,
 .escala-page .timeline-row {
     display: grid;
-    grid-template-columns: minmax(240px, 286px) minmax(76px, 88px) repeat(var(--escala-hour-columns, 12), minmax(0, 1fr));
+    /* Colunas em px fixo (nao minmax/1fr): cada linha (cabecalho, dados, total)
+       precisa resolver exatamente a mesma largura por coluna, senao desalinham
+       entre si quando o grid depende do conteudo para se dimensionar. */
+    grid-template-columns: 240px 80px repeat(var(--escala-hour-columns, 12), 42px);
+    width: max-content;
 }
 
 .escala-page .timeline-header {
@@ -2279,11 +2281,23 @@
     color: #bfdbfe;
     font-size: 12px;
     font-weight: 800;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+
+.escala-page .timeline-header .hora-header-half {
+    color: rgba(191, 219, 254, 0.55);
+    font-weight: 600;
+    font-size: 11px;
 }
 
 .escala-page .timeline-header .timeline-name-header {
     justify-content: flex-start;
     padding-left: 18px;
+    position: sticky;
+    left: 0;
+    z-index: 4;
+    background: rgb(20, 27, 46);
 }
 
 .escala-page .timeline-header .total-header {
@@ -2326,10 +2340,13 @@
     gap: 10px;
     font-weight: 800;
     color: #f8fafc;
-    background: rgba(15, 23, 42, 0.48);
+    background: rgba(15, 23, 42, 0.96);
     border-right: 1px solid rgba(148, 163, 184, 0.18);
     cursor: pointer;
     transition: background-color 0.18s ease, box-shadow 0.18s ease, color 0.18s ease;
+    position: sticky;
+    left: 0;
+    z-index: 3;
 }
 
 .escala-page .timeline-row:not(.total-row):not(.mensagem-row) .timeline-name {
@@ -2840,7 +2857,7 @@
 @media (max-width: 1500px) {
     .escala-page .timeline-header,
     .escala-page .timeline-row {
-        grid-template-columns: minmax(226px, 266px) minmax(70px, 82px) repeat(var(--escala-hour-columns, 12), minmax(0, 1fr));
+        grid-template-columns: 210px 70px repeat(var(--escala-hour-columns, 12), 36px);
     }
 
     .escala-page .timeline-name {
@@ -2901,6 +2918,31 @@
 @media (max-width: 768px) {
     .escala-page {
         padding-top: 0;
+    }
+
+    .escala-page .timeline-header,
+    .escala-page .timeline-row {
+        grid-template-columns: 158px 64px repeat(var(--escala-hour-columns, 12), 30px);
+    }
+
+    .escala-page .timeline-name {
+        padding: 0 8px 0 10px;
+        gap: 6px;
+    }
+
+    .escala-page .timeline-name > div,
+    .escala-page .timeline-name-text {
+        font-size: 11px;
+    }
+
+    .escala-page .timeline-header div {
+        font-size: 9px;
+        padding: 0 3px;
+    }
+
+    .escala-page .timeline-cell,
+    .escala-page .timeline-row > div {
+        min-height: 44px;
     }
 
     .escala-page .escala-header h1 {
@@ -3007,6 +3049,15 @@
 :root:not([data-theme="dark"]) .escala-page .timeline-header div {
     color: #334155;
     border-right-color: rgba(226, 232, 240, 0.95);
+}
+
+:root:not([data-theme="dark"]) .escala-page .timeline-header .hora-header-half {
+    color: rgba(51, 65, 85, 0.55);
+}
+
+:root:not([data-theme="dark"]) .escala-page .timeline-name,
+:root:not([data-theme="dark"]) .escala-page .timeline-header .timeline-name-header {
+    background: rgba(255, 255, 255, 0.97);
 }
 
 :root:not([data-theme="dark"]) .escala-page .timeline-header .total-header {

@@ -6,6 +6,8 @@
 // (carregarEscalaDiaEscala, obterDataSelecionadaEscala, atualizarAcoesCabecalhoEscala,
 // abrirEditorNaEscala).
 
+    const SLOT_MINUTES = 30;
+
     function getCurrentScaleState() {
         return window.__escalaDiaState || {
             dataISO: toISODateEscala(new Date()),
@@ -48,13 +50,14 @@
             latestMinutes = HORA_FINAL * 60;
         }
 
-        const startHour = Math.max(0, Math.floor(earliestMinutes / 60));
-        const endHour = Math.min(23, Math.ceil(latestMinutes / 60));
+        const lastSlotOfDay = Math.floor((24 * 60) / SLOT_MINUTES) - 1;
+        const startSlot = Math.max(0, Math.floor(earliestMinutes / SLOT_MINUTES));
+        const endSlot = Math.min(lastSlotOfDay, Math.ceil(latestMinutes / SLOT_MINUTES));
 
         return {
-            startHour,
-            endHour: Math.max(startHour, endHour),
-            columnCount: Math.max(1, (Math.max(startHour, endHour) - startHour) + 1)
+            startSlot,
+            endSlot: Math.max(startSlot, endSlot),
+            columnCount: Math.max(1, (Math.max(startSlot, endSlot) - startSlot) + 1)
         };
     }
 
@@ -333,7 +336,7 @@
             && cadastroFim === formatTimeInputEscala(almocoFim);
     }
 
-    function getCellStateEscala(record, hour) {
+    function getCellStateEscala(record, slot) {
         const tipo = window.normalizeRuntimeEscalaTipo(record.tipo || '');
         const start = getTimeMinutesEscala(record.horaInicio);
         const end = getTimeMinutesEscala(record.horaFim);
@@ -341,8 +344,8 @@
         const lunchEnd = getTimeMinutesEscala(record.almocoFim);
         const defaultLunch = getDefaultLunchRangeEscala(record.colaboradorId);
         const adjustedLunch = Boolean(record.almocoPersonalizado || record.almocoAjustado);
-        const currentHourStart = hour * 60;
-        const currentHourEnd = (hour + 1) * 60;
+        const currentHourStart = slot * SLOT_MINUTES;
+        const currentHourEnd = currentHourStart + SLOT_MINUTES;
         const partialAbsence = getPartialAbsenceEscala(record.colaboradorId, record.dataISO);
         const absenceStart = getTimeMinutesEscala(partialAbsence?.horaInicio || partialAbsence?.HoraInicio);
         const absenceEnd = getTimeMinutesEscala(partialAbsence?.horaFim || partialAbsence?.HoraFim);
@@ -408,7 +411,7 @@
         });
     }
 
-    function buildLunchDropRangeEscala(record, targetHour) {
+    function buildLunchDropRangeEscala(record, targetSlot) {
         const workStart = getTimeMinutesEscala(record.horaInicio);
         const workEnd = getTimeMinutesEscala(record.horaFim);
         const lunchStart = getTimeMinutesEscala(record.almocoInicio);
@@ -425,7 +428,7 @@
         }
 
         const duration = lunchEnd - lunchStart;
-        const nextStart = targetHour * 60;
+        const nextStart = targetSlot * SLOT_MINUTES;
         const nextEnd = nextStart + duration;
 
         if (nextStart < workStart || nextEnd > workEnd) {
@@ -447,10 +450,10 @@
 
         row.classList.add('is-dragging-lunch');
 
-        row.querySelectorAll('.timeline-cell[data-hour]').forEach((cell) => {
-            const hour = Number(cell.dataset.hour);
-            const currentHourStart = hour * 60;
-            const currentHourEnd = (hour + 1) * 60;
+        row.querySelectorAll('.timeline-cell[data-slot]').forEach((cell) => {
+            const slot = Number(cell.dataset.slot);
+            const currentHourStart = slot * SLOT_MINUTES;
+            const currentHourEnd = currentHourStart + SLOT_MINUTES;
             const overlap = Math.max(
                 Math.min(currentHourEnd, range.endMinutes) - Math.max(currentHourStart, range.startMinutes),
                 0
@@ -465,8 +468,8 @@
     function getTimelineVisibleBoundsEscala() {
         const bounds = getScaleHourBoundsEscala();
         return {
-            start: bounds.startHour * 60,
-            end: (bounds.endHour + 1) * 60
+            start: bounds.startSlot * SLOT_MINUTES,
+            end: (bounds.endSlot + 1) * SLOT_MINUTES
         };
     }
 
@@ -592,8 +595,8 @@
     }
 
     function bindLunchCellDragEscala(row, record) {
-        const lunchCells = Array.from(row.querySelectorAll('.timeline-cell.almoco[data-hour]'));
-        const allCells = Array.from(row.querySelectorAll('.timeline-cell[data-hour]'));
+        const lunchCells = Array.from(row.querySelectorAll('.timeline-cell.almoco[data-slot]'));
+        const allCells = Array.from(row.querySelectorAll('.timeline-cell[data-slot]'));
 
         if (lunchCells.length === 0) {
             return;
@@ -627,11 +630,11 @@
         });
 
         allCells.forEach((cell) => {
-            const hour = Number(cell.dataset.hour);
+            const slot = Number(cell.dataset.slot);
 
             cell.addEventListener('dragover', (event) => {
                 const currentDrag = window.__escalaLunchHtmlDrag;
-                const range = buildLunchDropRangeEscala(record, hour);
+                const range = buildLunchDropRangeEscala(record, slot);
 
                 if (!currentDrag || currentDrag.colaboradorId !== Number(record.colaboradorId) || !range) {
                     return;
@@ -651,7 +654,7 @@
 
             cell.addEventListener('drop', async (event) => {
                 const currentDrag = window.__escalaLunchHtmlDrag;
-                const range = buildLunchDropRangeEscala(record, hour);
+                const range = buildLunchDropRangeEscala(record, slot);
 
                 event.preventDefault();
                 event.stopPropagation();
@@ -698,8 +701,9 @@
         header.innerHTML = '<div class="timeline-name-header">Colaborador</div>'
             + '<div class="hora-header total-header" title="Total de horas no dia">Total</div>'
             + Array.from({ length: bounds.columnCount }, (_, index) => {
-                const hour = bounds.startHour + index;
-                return `<div class="hora-header">${String(hour).padStart(2, '0')}:00</div>`;
+                const slot = bounds.startSlot + index;
+                const isHourMark = slot % 2 === 0;
+                return `<div class="hora-header${isHourMark ? '' : ' hora-header-half'}">${formatMinutesToTimeEscala(slot * SLOT_MINUTES)}</div>`;
             }).join('');
     }
 
@@ -712,13 +716,13 @@
 
         const bounds = getScaleHourBoundsEscala(items);
         const counts = Array.from({ length: bounds.columnCount }, (_, index) => ({
-            hour: bounds.startHour + index,
+            slot: bounds.startSlot + index,
             count: 0
         }));
 
         items.forEach((record) => {
             counts.forEach((item) => {
-                if (hasCellClassEscala(getCellStateEscala(record, item.hour).className, 'trabalhando')) {
+                if (hasCellClassEscala(getCellStateEscala(record, item.slot).className, 'trabalhando')) {
                     item.count += 1;
                 }
             });
@@ -733,7 +737,7 @@
             </div>
             <div class="timeline-cell total-cell"></div>
             ${counts.map((item) => `
-                <div class="timeline-cell total-cell" title="${item.hour}:00 - ${item.count} trabalhando">
+                <div class="timeline-cell total-cell" title="${formatMinutesToTimeEscala(item.slot * SLOT_MINUTES)} - ${item.count} trabalhando">
                     <span class="total-valor">${item.count}</span>
                 </div>
             `).join('')}
@@ -833,9 +837,9 @@
                     <span class="total-valor">${escapeHtmlEscala(totalLabel)}</span>
                 </div>
                 ${Array.from({ length: bounds.columnCount }, (_, index) => {
-                    const hour = bounds.startHour + index;
-                    const cellState = getCellStateEscala(record, hour);
-                    return `<div class="timeline-cell ${cellState.className}" data-hour="${hour}" data-colaborador-id="${record.colaboradorId}"></div>`;
+                    const slot = bounds.startSlot + index;
+                    const cellState = getCellStateEscala(record, slot);
+                    return `<div class="timeline-cell ${cellState.className}" data-slot="${slot}" data-colaborador-id="${record.colaboradorId}"></div>`;
                 }).join('')}
             `;
 
