@@ -2476,8 +2476,7 @@
         });
     };
 
-    if (typeof renderListaColaboradores === 'function') {
-        window.renderListaColaboradores = renderListaColaboradores = function renderListaColaboradoresComBancoHoras(lista = window.colaboradores || []) {
+    window.renderListaColaboradores = renderListaColaboradores = function renderListaColaboradoresComBancoHoras(lista = window.colaboradores || []) {
             const container = document.getElementById('listaColaboradores');
 
             if (!container) {
@@ -2551,7 +2550,6 @@
                 });
             });
         };
-    }
 
     function buildSetorEditorOptions(selectedId = '') {
         return [
@@ -3260,8 +3258,7 @@
         container.innerHTML = renderPlantoesLancados();
     }
 
-    if (typeof renderPlantoesLancados === 'function') {
-        window.renderPlantoesLancados = renderPlantoesLancados = function renderPlantoesLancadosAvancado() {
+    window.renderPlantoesLancados = renderPlantoesLancados = function renderPlantoesLancadosAvancado() {
             if (!window.plantoesLancados || window.plantoesLancados.length === 0) {
                 return '<div class="empty-state">Nenhum plantao lancado ainda</div>';
             }
@@ -3301,7 +3298,6 @@
                 </div>
             `).join('');
         };
-    }
 
     window.carregarPlantoesLancadosNaTela = carregarPlantoesLancadosNaTela = function carregarPlantoesLancadosNaTelaAtualizado() {
         atualizarResumoPlantaoNaTela();
@@ -4843,160 +4839,6 @@
         });
     }
 
-    function bindTimelineLunchDragEscala(row, record) {
-        const overlay = row.querySelector('.timeline-lunch-overlay');
-        const block = overlay?.querySelector('[data-role="lunch-block"]');
-        const startHandle = overlay?.querySelector('[data-role="start"]');
-        const endHandle = overlay?.querySelector('[data-role="end"]');
-        const timeCells = Array.from(row.querySelectorAll('.timeline-cell:not(.total-cell)'));
-
-        if (!overlay || !block || !startHandle || !endHandle || timeCells.length === 0) {
-            return;
-        }
-
-        const firstCell = timeCells[0];
-        const lastCell = timeCells[timeCells.length - 1];
-        const rowRect = row.getBoundingClientRect();
-        const firstRect = firstCell.getBoundingClientRect();
-        const lastRect = lastCell.getBoundingClientRect();
-        const overlayLeft = firstRect.left - rowRect.left;
-        const overlayWidth = lastRect.right - firstRect.left;
-
-        overlay.style.left = `${overlayLeft}px`;
-        overlay.style.width = `${overlayWidth}px`;
-
-        const visibleBounds = getTimelineVisibleBoundsEscala();
-        const workStart = getTimeMinutesEscala(record.horaInicio);
-        const workEnd = getTimeMinutesEscala(record.horaFim);
-
-        if (workStart === null || workEnd === null || workEnd <= workStart) {
-            return;
-        }
-
-        const getPointerMinutes = (clientX) => {
-            const rect = overlay.getBoundingClientRect();
-
-            if (rect.width <= 0) {
-                return workStart;
-            }
-
-            const ratio = Math.min(Math.max((clientX - rect.left) / rect.width, 0), 1);
-            const absolute = visibleBounds.start + ((visibleBounds.end - visibleBounds.start) * ratio);
-            return roundMinutesEscala(absolute);
-        };
-
-        const updateBlock = (startMinutes, endMinutes) => {
-            const visibleSpan = visibleBounds.end - visibleBounds.start;
-            const left = ((startMinutes - visibleBounds.start) / visibleSpan) * 100;
-            const width = ((endMinutes - startMinutes) / visibleSpan) * 100;
-            const label = block.querySelector('.timeline-lunch-label');
-
-            block.style.left = `${left}%`;
-            block.style.width = `${width}%`;
-
-            if (label) {
-                label.textContent = formatTimeRangeEscala(
-                    formatMinutesToTimeEscala(startMinutes),
-                    formatMinutesToTimeEscala(endMinutes)
-                );
-            }
-        };
-
-        const beginDrag = (mode, event) => {
-            event.preventDefault();
-            event.stopPropagation();
-
-            const initialStart = getTimeMinutesEscala(record.almocoInicio);
-            const initialEnd = getTimeMinutesEscala(record.almocoFim);
-
-            if (initialStart === null || initialEnd === null || initialEnd <= initialStart) {
-                return;
-            }
-
-            const duration = initialEnd - initialStart;
-            const pointerState = {
-                mode,
-                startPointerMinutes: getPointerMinutes(event.clientX),
-                initialStart,
-                initialEnd,
-                duration
-            };
-
-            const move = (moveEvent) => {
-                let nextStart = pointerState.initialStart;
-                let nextEnd = pointerState.initialEnd;
-
-                if (pointerState.mode === 'move') {
-                    const currentPointerMinutes = getPointerMinutes(moveEvent.clientX);
-                    const delta = currentPointerMinutes - pointerState.startPointerMinutes;
-                    nextStart = roundMinutesEscala(
-                        clampMinutesEscala(pointerState.initialStart + delta, workStart, workEnd - duration)
-                    );
-                    nextEnd = nextStart + duration;
-                } else if (pointerState.mode === 'start') {
-                    nextStart = roundMinutesEscala(
-                        clampMinutesEscala(getPointerMinutes(moveEvent.clientX), workStart, pointerState.initialEnd - ESCALA_EDITOR_PASSO_MINUTOS)
-                    );
-                } else {
-                    nextEnd = roundMinutesEscala(
-                        clampMinutesEscala(getPointerMinutes(moveEvent.clientX), pointerState.initialStart + ESCALA_EDITOR_PASSO_MINUTOS, workEnd)
-                    );
-                }
-
-                if (nextEnd <= nextStart) {
-                    nextEnd = nextStart + ESCALA_EDITOR_PASSO_MINUTOS;
-                }
-
-                updateBlock(nextStart, nextEnd);
-                block.dataset.pendingStart = String(nextStart);
-                block.dataset.pendingEnd = String(nextEnd);
-            };
-
-            const stop = async () => {
-                window.removeEventListener('pointermove', move);
-                window.removeEventListener('pointerup', stop);
-
-                const pendingStart = Number(block.dataset.pendingStart || pointerState.initialStart);
-                const pendingEnd = Number(block.dataset.pendingEnd || pointerState.initialEnd);
-                delete block.dataset.pendingStart;
-                delete block.dataset.pendingEnd;
-
-                row.classList.add('is-saving-lunch');
-
-                try {
-                    await salvarAjusteDiretoAlmocoEscala(record.colaboradorId, pendingStart, pendingEnd);
-                    if (typeof mostrarToast === 'function') {
-                        mostrarToast('Almoco ajustado com sucesso!', 'success');
-                    }
-                } catch (error) {
-                    updateBlock(pointerState.initialStart, pointerState.initialEnd);
-                    if (typeof mostrarToast === 'function') {
-                        mostrarToast(`Erro ao ajustar almoco: ${error.message}`, 'error');
-                    }
-                } finally {
-                    row.classList.remove('is-saving-lunch');
-                }
-            };
-
-            window.addEventListener('pointermove', move);
-            window.addEventListener('pointerup', stop, { once: true });
-        };
-
-        block.addEventListener('click', (event) => {
-            event.preventDefault();
-            event.stopPropagation();
-        });
-        block.addEventListener('pointerdown', (event) => {
-            if (event.target === startHandle || event.target === endHandle) {
-                return;
-            }
-
-            beginDrag('move', event);
-        });
-        startHandle.addEventListener('pointerdown', (event) => beginDrag('start', event));
-        endHandle.addEventListener('pointerdown', (event) => beginDrag('end', event));
-    }
-
     function renderScaleHeaderEscala() {
         const header = document.getElementById('timelineHeader');
 
@@ -5095,80 +4937,6 @@
                 </div>
             </div>
         `;
-    }
-
-    function renderInlineScaleEditorRowEscala(record) {
-        const row = document.createElement('div');
-        const workRange = formatTimeRangeEscala(record.horaInicio, record.horaFim);
-        const lunchRange = formatTimeRangeEscala(record.almocoInicio, record.almocoFim);
-        const almocoStatus = record.almocoPersonalizado || record.almocoAjustado
-            ? 'Almoco ajustado'
-            : 'Almoco padrao';
-
-        row.className = 'timeline-row timeline-inline-editor-row';
-        row.innerHTML = `
-            <div class="timeline-name timeline-inline-editor-name">
-                <i class="fas fa-up-down-left-right"></i>
-                <div class="timeline-inline-labels">
-                    <strong>Ajuste rapido</strong>
-                    <small>${escapeHtmlEscala(record.colaboradorNome || 'Colaborador')}</small>
-                </div>
-            </div>
-            <div class="timeline-cell timeline-inline-editor-cell" style="grid-column: 2 / -1;">
-                <div class="timeline-inline-panel">
-                    <div class="timeline-inline-head">
-                        <div>
-                            <strong>${escapeHtmlEscala(formatDatePtBrEscala(record.dataISO))} • ${escapeHtmlEscala(getDayLabelEscala(record.dataISO))}</strong>
-                            <span>Arraste o bloco de almoco na horizontal para ajustar apenas este dia.</span>
-                        </div>
-                        <div class="timeline-inline-summary">
-                            <span class="timeline-pill work">
-                                <i class="fas fa-briefcase"></i>
-                                ${escapeHtmlEscala(workRange)}
-                            </span>
-                            <span class="timeline-pill lunch">
-                                <i class="fas fa-utensils"></i>
-                                ${escapeHtmlEscala(lunchRange)}
-                            </span>
-                            <span class="timeline-pill ${record.almocoPersonalizado || record.almocoAjustado ? 'warning' : ''}">
-                                <i class="fas fa-wand-magic-sparkles"></i>
-                                ${escapeHtmlEscala(almocoStatus)}
-                            </span>
-                        </div>
-                    </div>
-
-                    <div class="escala-inline-hidden-inputs" aria-hidden="true">
-                        <input type="time" id="escalaHoraInicio-${record.colaboradorId}" value="${escapeHtmlEscala(formatTimeInputEscala(record.horaInicio))}">
-                        <input type="time" id="escalaHoraFim-${record.colaboradorId}" value="${escapeHtmlEscala(formatTimeInputEscala(record.horaFim))}">
-                        <input type="time" id="escalaAlmocoInicio-${record.colaboradorId}" value="${escapeHtmlEscala(formatTimeInputEscala(record.almocoInicio))}">
-                        <input type="time" id="escalaAlmocoFim-${record.colaboradorId}" value="${escapeHtmlEscala(formatTimeInputEscala(record.almocoFim))}">
-                        <textarea id="escalaObservacao-${record.colaboradorId}">${escapeHtmlEscala(record.observacao || '')}</textarea>
-                    </div>
-
-                    <div class="escala-range-card">
-                        <div class="escala-range-card-header">
-                            <strong>Almoco do dia</strong>
-                            <span>O bloco fica preso a jornada do colaborador e respeita a duracao original.</span>
-                        </div>
-                        <div id="escalaRangeLunch-${record.colaboradorId}" class="escala-range-editor"></div>
-                    </div>
-
-                    <div class="timeline-inline-actions">
-                        <button type="button" onclick="salvarEscalaDia(${record.colaboradorId})" class="btn-primary">
-                            <i class="fas fa-save"></i> Salvar ajuste
-                        </button>
-                        <button type="button" onclick="restaurarAlmocoPadraoEscala(${record.colaboradorId})" class="btn-secondary">
-                            <i class="fas fa-rotate-left"></i> Voltar ao padrao
-                        </button>
-                        <button type="button" onclick="fecharEditor()" class="btn-secondary">
-                            <i class="fas fa-times"></i> Fechar
-                        </button>
-                    </div>
-                </div>
-            </div>
-        `;
-
-        return row;
     }
 
     function renderScaleRowsEscala(state) {
@@ -5545,27 +5313,6 @@
             });
         });
     }
-
-    window.criarFaixaAlmocoEscala = criarFaixaAlmocoEscala = function criarFaixaAlmocoEscalaAtualizada(colaboradorId) {
-        const defaults = buildDefaultLunchRangeEscala(colaboradorId);
-        setScaleRangeInputsEscala(`escalaAlmocoInicio-${colaboradorId}`, `escalaAlmocoFim-${colaboradorId}`, defaults.start, defaults.end);
-        syncScaleDragEditorEscala(colaboradorId);
-    };
-
-    window.limparFaixaAlmocoEscala = limparFaixaAlmocoEscala = function limparFaixaAlmocoEscalaAtualizada(colaboradorId) {
-        const startInput = document.getElementById(`escalaAlmocoInicio-${colaboradorId}`);
-        const endInput = document.getElementById(`escalaAlmocoFim-${colaboradorId}`);
-
-        if (startInput) {
-            startInput.value = '';
-        }
-
-        if (endInput) {
-            endInput.value = '';
-        }
-
-        syncScaleDragEditorEscala(colaboradorId);
-    };
 
     function renderScaleEditorEscala(record) {
         const sidebar = document.getElementById('sidebarEditor');
@@ -6702,36 +6449,6 @@
         return `${name.slice(0, 13)}...`;
     }
 
-    function renderEscalaExportDayCard(day) {
-        if (!day) {
-            return '<article class="escala-export-dia-placeholder" aria-hidden="true"></article>';
-        }
-
-        if (!day.hasScale || !Array.isArray(day.rows) || day.rows.length === 0) {
-            return `
-                <article class="escala-export-dia is-empty">
-                    <div class="escala-export-dia-header">${escapeHtmlEscala(day.dateLabel || '--')}</div>
-                    <div class="escala-export-empty">Sem escala</div>
-                </article>
-            `;
-        }
-
-        return `
-            <article class="escala-export-dia">
-                <div class="escala-export-dia-header">${escapeHtmlEscala(day.dateLabel || '--')}</div>
-                <div class="escala-export-lines">
-                    ${day.rows.map((row) => `
-                        <div class="escala-export-line">
-                            <span class="escala-export-time">${escapeHtmlEscala(compactEscalaExportLabel(row.almocoLabel))}</span>
-                            <strong title="${escapeHtmlEscala(row.colaboradorNome || '--')}">${escapeHtmlEscala(compactEscalaExportName(row.colaboradorNome))}</strong>
-                            <span class="escala-export-work">${escapeHtmlEscala(compactEscalaExportLabel(row.jornadaLabel))}</span>
-                        </div>
-                    `).join('')}
-                </div>
-            </article>
-        `;
-    }
-
     function getEscalaExportDayRowCount(day) {
         return Array.isArray(day?.rows) ? day.rows.length : 0;
     }
@@ -7763,44 +7480,6 @@
             </html>
         `;
     }
-
-    const gerarRelatorioEscalaDetalhadoLegacy = async function gerarRelatorioEscalaDetalhado() {
-        const dataInicio = document.getElementById('relatorioEscalaDataInicio')?.value;
-        const dataFim = document.getElementById('relatorioEscalaDataFim')?.value;
-        const setorId = getRelatorioEscalaSetorId();
-        const colaboradorId = document.getElementById('relatorioEscalaColaborador')?.value || '';
-        const tipo = document.getElementById('relatorioEscalaTipo')?.value || '';
-
-        if (!dataInicio || !dataFim) {
-            if (typeof mostrarToast === 'function') {
-                mostrarToast('Informe a data inicial e final do relatorio.', 'error');
-            }
-            return;
-        }
-
-        try {
-            const payload = await window.API.getEscalaRelatorio({
-                dataInicio,
-                dataFim,
-                setorId: setorId || undefined,
-                colaboradorId: colaboradorId || undefined,
-                tipo: tipo || undefined
-            });
-            const items = Array.isArray(payload?.items) ? payload.items : [];
-            document.getElementById('relatorioTitulo').innerText = `Relatorio de Escala - ${formatDatePtBrEscala(dataInicio)} ate ${formatDatePtBrEscala(dataFim)}${setorId ? ` - Setor: ${getRelatorioEscalaSetorNome(setorId)}` : ''}`;
-            document.getElementById('relatorioConteudo').innerHTML = renderDetailedEscalaReport(items, {
-                dataInicio,
-                dataFim,
-                setorId,
-                setorNome: getRelatorioEscalaSetorNome(setorId)
-            });
-            document.getElementById('relatorioVisualizacao').style.display = 'block';
-        } catch (error) {
-            if (typeof mostrarToast === 'function') {
-                mostrarToast(`Erro ao gerar relatorio: ${error.message}`, 'error');
-            }
-        }
-    };
 
     window.gerarRelatorioEscala = gerarRelatorioEscala = async function gerarRelatorioEscalaAtualizado() {
         const modo = getEscalaReportMode();

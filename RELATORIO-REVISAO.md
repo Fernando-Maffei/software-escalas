@@ -248,6 +248,110 @@ coisa que poderia passar despercebida numa revisão superficial.
 
 ---
 
+## Fase 3b, parte 1 — Limpeza de código morto adicional (2026-07-09)
+
+### Contexto
+
+Antes de extrair o editor de Escala do Dia e o motor de relatório (a parte
+de alto risco da Fase 3b), foi feito um mapeamento linha a linha das duas
+seções em `runtime-fixes.js` por dois agentes de exploração independentes.
+O mapeamento revelou uma quantidade de código morto muito maior do que a
+fatia 1 da Fase 3 tinha capturado: praticamente todas as funções de ação de
+Colaboradores, Plantões e Relatórios em `app.js` já estavam totalmente
+sombreadas (substituídas em runtime) por `runtime-fixes.js`, que carrega
+por último e reatribui os mesmos nomes globais. Essa limpeza foi tratada
+como uma parte separada da Fase 3b, antes da extração propriamente dita,
+para reduzir o volume de código a mover e o risco da fatia seguinte.
+
+### O que foi removido
+
+**`frontend/Js/app.js`** (7247 → 4307 linhas, -2940): cerca de 30 funções
+inteiras confirmadas mortas — sem nenhum chamador fora do próprio bloco
+morto e sem captura de closure da versão original antes da reatribuição
+(verificado função por função, não em lote). Cobre praticamente todas as
+ações de Colaboradores (`abrirEditorColaboradores`, `abrirEditorColaborador`,
+`renderListaColaboradores`, `salvarColaboradorEditor`), Plantões
+(`abrirEditorPlantao`, `renderLancamentoPlantao`, `renderPlantoesLancados`,
+`carregarPlantoes`, `editarPlantao` e mais 5), Relatórios
+(`gerarRelatorioCalendarioCompleto`, `gerarRelatorioEscala`,
+`gerarDadosRelatorioCompleto`, `gerarHTMLCompletoPDF` — sozinha com ~484
+linhas — e mais 8) e utilitários de inicialização (`confirmarExclusao`,
+`configurarModais`, `configurarObservers`, `atualizarTudo`).
+
+**`frontend/Js/runtime-fixes.js`** (8540 → 8224 linhas, -316): apenas os
+itens confirmados como **sem nenhum chamador em lugar nenhum** —
+`bindTimelineLunchDragEscala` (~154 linhas, drag por ponteiro nunca
+ligado), `renderInlineScaleEditorRowEscala` (~74 linhas, variante de linha
+editável abandonada), `criarFaixaAlmocoEscala`/`limparFaixaAlmocoEscala`
+(expostas em `window.*` mas sem nenhum `onclick` ou chamada em lugar
+nenhum), `renderEscalaExportDayCard` (~30 linhas) e
+`gerarRelatorioEscalaDetalhadoLegacy` (~37 linhas, superada por
+`gerarRelatorioEscala` que faz a mesma coisa mais o modo Quadro Mensal).
+
+### Escopo reduzido deliberadamente: cluster "drag-track" mantido
+
+O mapeamento inicial também apontou um cluster de 10 funções
+(`getScaleEditorRecordEscala`, `syncScaleDragEditorEscala`,
+`renderScaleDragTrackEscala` e mais 7, ~307 linhas) como código mais morto,
+por operar em ids de DOM (`escalaRangeWork-*`/`escalaRangeLunch-*`) que o
+editor realmente ativo nunca cria — na prática um no-op silencioso.
+**Verificação própria antes de apagar** (repetindo grep em todo `frontend/`
+para cada nome, não confiando só no mapeamento anterior) mostrou que duas
+funções desse cluster (`getScaleEditorRecordEscala`,
+`syncScaleDragEditorEscala`) **são chamadas por funções ativas**
+(`restaurarAlmocoPadraoEscala`, `restaurarAlmocosCadastroDiaEscala`).
+Apagar o cluster inteiro teria quebrado essas duas funções com
+`ReferenceError` apesar do efeito prático já ser nulo hoje. Escopo reduzido
+para excluir esse cluster; fica documentado aqui como candidato a limpeza
+futura (precisa de uma decisão: recriar os ids de DOM que faltam para
+reativar a funcionalidade, ou remover cluster + as duas chamadas que o
+mantêm vivo).
+
+### Dois bugs introduzidos e corrigidos durante o próprio desenvolvimento
+
+1. `app.js` tinha um bloco de bootstrap no topo do arquivo
+   (`window.atualizarTudo = atualizarTudo;`) que dependia de hoisting da
+   declaração de `atualizarTudo`, removida nesta limpeza. Isso quebrava a
+   execução de **todo o script** no carregamento da página (`ReferenceError`
+   na primeira linha órfã, abortando o resto do arquivo, inclusive a
+   inicialização de `appContent`) — sintoma observado no navegador foi
+   `Cannot access 'appContent' before initialization` em qualquer função,
+   não um erro relacionado a `atualizarTudo` em si. Corrigido removendo a
+   linha órfã.
+2. Duas reatribuições em `runtime-fixes.js`
+   (`window.renderListaColaboradores = ...`, `window.renderPlantoesLancados
+   = ...`) estavam protegidas por `if (typeof X === 'function') { ... }` —
+   um guard que só passava porque a versão morta em `app.js` sempre
+   existia. Ao remover o original, o guard passou a falhar silenciosamente
+   e a versão viva parava de ser instalada, deixando a lista de
+   Colaboradores e o painel de Plantões lançados sem função nenhuma.
+   Corrigido removendo os guards (agora redundantes) e tornando as
+   reatribuições incondicionais. Encontrado testando cada tela no
+   navegador, não só rodando a suíte de testes — `npm test` continuou
+   verde durante todo o processo, já que a suíte não cobre renderização de
+   tela.
+
+### Verificação realizada
+
+- `node --check` e `npm test` (45 testes) após cada bloco removido.
+- Testado no navegador, autenticado, com reload completo entre mudanças:
+  as 7 páginas (Dashboard, Calendário, Colaboradores, Escala do Dia,
+  Lançar Plantão, Relatórios, Configurações) renderizando conteúdo real;
+  abrir editor de "Novo Colaborador"; abrir editor de plantão via
+  `abrirPlantaoPorData`; gerar os 3 relatórios (Mensal Completo, Escala,
+  Plantões); abrir o editor lateral da Escala do Dia e testar
+  `restaurarAlmocoPadraoEscala` (que exercita o cluster drag-track mantido)
+  — tudo sem erros no console.
+
+### Arquivos modificados
+
+| Arquivo | O que mudou |
+|---|---|
+| `frontend/Js/app.js` | -2940 linhas de código morto (7247 → 4307), mais a correção do bootstrap órfão |
+| `frontend/Js/runtime-fixes.js` | -316 linhas de código morto sem nenhum chamador, mais a correção dos 2 guards órfãos |
+
+---
+
 ## Fase 4 — Design system, fundação (parcial, em andamento) (2026-07-09)
 
 ### Contexto
