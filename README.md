@@ -60,6 +60,30 @@ Observacoes:
 - Se precisar, configure a conexao com o SQL Server pela tela de configuracoes do sistema
 - Se voce ja tiver um `backend/config/database.local.json` configurado, pode copiar esse arquivo junto para evitar reconfigurar
 
+## Como iniciar sem janela de terminal (duplo clique)
+
+Se voce nao quer ficar com a janela preta do terminal aberta, use o
+`iniciar-sem-terminal.vbs` em vez do `.bat`:
+
+1. Dê duplo clique em `iniciar-sem-terminal.vbs`
+2. O servidor sobe **totalmente oculto** (nenhuma janela fica na tela)
+3. A aplicacao abre sozinha no navegador em `http://localhost:4450`
+
+Como o servidor fica invisivel, para **encerrar** use o `parar-servidor.bat`
+(ele localiza e encerra apenas o processo que esta na porta 4450).
+
+Observacoes:
+
+- Na **primeira instalacao** (sem a pasta `node_modules`), use uma vez o
+  `iniciar-servidor.bat` normal — ele instala as dependencias mostrando o
+  andamento. Depois disso, o `iniciar-sem-terminal.vbs` funciona direto.
+  (O proprio `.vbs` detecta isso e chama o `.bat` visivel automaticamente
+  quando as dependencias ainda nao foram instaladas.)
+- Se ja estiver rodando, o `.vbs` so abre o navegador, sem subir um segundo servidor.
+- Voce pode criar um atalho para o `.vbs` na area de trabalho (e ate trocar
+  o icone do atalho) para ter um "botao" de iniciar o sistema.
+- A porta padrao (4450) esta no topo do arquivo `.vbs`, caso precise mudar.
+
 ## Como acessar de outros dispositivos na rede
 
 Depois que o servidor estiver rodando numa maquina (veja acima), qualquer

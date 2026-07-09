@@ -622,3 +622,59 @@ restaurado corretamente.
   conflitavam foram neutralizadas. Uma limpeza completa dessas camadas
   mortas fica para uma fatia de CSS dedicada, fora do escopo deste pedido
   pontual.
+
+---
+
+## Melhoria pontual — Iniciador sem janela de terminal (2026-07-09)
+
+### Contexto
+
+Pedido do usuário: uma forma de iniciar o servidor e abrir a aplicação com
+um duplo clique, sem ficar com uma janela de terminal aberta na tela.
+Como o Electron foi removido de propósito na Fase 2 (por peso), a solução
+foi a via nativa e leve do Windows: um script `.vbs` (zero dependências,
+sem build, sem `.exe` empacotado).
+
+### O que foi criado
+
+- `iniciar-sem-terminal.vbs` (novo): sobe `node backend/server.js`
+  totalmente oculto (via `WScript.Shell.Run` com estilo de janela `0`),
+  espera o servidor responder e abre a aplicação no navegador. Lógica:
+  (1) se o servidor já está no ar, só abre o navegador; (2) se `node_modules`
+  ainda não existe (primeira instalação), delega para o `iniciar-servidor.bat`
+  visível, que instala as dependências com feedback; (3) caso normal, sobe o
+  Node oculto e abre a aplicação; se o servidor não subir em ~20s, mostra um
+  `MsgBox` orientando a rodar o `.bat` visível para ver o erro (em vez de
+  abrir uma aba morta). O encerramento continua pelo `parar-servidor.bat`
+  (que já encerra só o processo da porta configurada).
+- `README.md`: nova seção "Como iniciar sem janela de terminal".
+
+### Verificação realizada
+
+- Probe de disponibilidade (`MSXML2.XMLHTTP` contra `/api/health`) testado
+  no ambiente real: retorna verdadeiro para a porta no ar (4450) e falso
+  para uma porta morta (4999).
+- Fluxo de ramos do `.vbs` traçado com porta morta contra a pasta real do
+  projeto: pula corretamente os ramos 1 e 2 e chega no caminho normal
+  (subir oculto + abrir navegador), detectando o `node_modules` real.
+- Mecanismo de lançamento oculto testado de ponta a ponta: subiu um Node de
+  teste na porta 4999 via `WScript.Shell.Run` estilo `0`, o probe confirmou
+  que respondeu, e `MainWindowHandle: 0` confirmou que **nenhuma janela
+  visível** foi criada — exatamente o objetivo "sem terminal". Processo de
+  teste encerrado em seguida.
+
+### Arquivos modificados/criados
+
+| Arquivo | O que mudou |
+|---|---|
+| `iniciar-sem-terminal.vbs` (novo) | Iniciador oculto: sobe o servidor sem janela e abre a aplicação |
+| `README.md` | Documenta o novo iniciador e como encerrar (via `parar-servidor.bat`) |
+
+### Observação sobre um `.exe` "de verdade"
+
+Um executável `.exe` nativo exigiria uma ferramenta de empacotamento
+(`ps2exe`, `pkg`, etc.) — ou seja, reintroduzir um passo de build e peso,
+justo o que a Fase 2 tirou. O `.vbs` entrega o mesmo comportamento (duplo
+clique, sem terminal, abre a aplicação) sem nenhuma dependência nova. Se no
+futuro o usuário quiser um ícone `.exe` fixável, dá para converter o `.vbs`
+com `ps2exe`, ao custo de instalar essa ferramenta.
