@@ -259,6 +259,15 @@ function getEffectiveDatabaseSettings() {
     return getEffectiveDatabaseSettingsWithSource().settings;
 }
 
+// "Configurado" = existe um conjunto usavel de credenciais (arquivo ou .env),
+// independentemente de o banco estar acessivel neste momento. E a chave do
+// modo bootstrap: as rotas de configuracao so ficam liberadas sem login
+// enquanto isto for false — nunca quando o banco esta configurado mas fora
+// do ar (senao derrubar o banco viraria um jeito de sequestrar a config).
+function isDatabaseConfigured() {
+    return hasUsableConnectionSettings(getEffectiveDatabaseSettings());
+}
+
 function saveDatabaseSettings(settings) {
     const normalized = normalizeDatabaseSettings(settings, {
         currentSettings: getDefaultDatabaseSettings()
@@ -353,6 +362,7 @@ module.exports = {
     getEffectiveDatabaseSettingsWithSource,
     getPublicDatabaseSettings,
     hasUsableConnectionSettings,
+    isDatabaseConfigured,
     maskDatabaseSettings,
     normalizeDatabaseSettings,
     saveDatabaseSettings

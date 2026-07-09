@@ -87,3 +87,115 @@ body.authenticated .login-screen {
 .login-error.hidden {
   display: none;
 }
+
+/* ================= TELA DE CONFIGURACAO INICIAL (BOOTSTRAP) ================= */
+.setup-card {
+  max-width: 520px;
+}
+
+.setup-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  column-gap: 14px;
+}
+
+.setup-grid .setup-col-2 {
+  grid-column: span 2;
+}
+
+.setup-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 4px;
+}
+
+.setup-actions .btn-primary,
+.setup-actions .btn-secondary {
+  width: 100%;
+  justify-content: center;
+}
+
+.setup-success {
+  background: var(--success-soft, rgba(34, 197, 94, 0.12));
+  color: var(--success, #16a34a);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 13px;
+  margin: 0 0 16px;
+  line-height: 1.4;
+}
+
+.setup-success.hidden {
+  display: none;
+}
+
+.setup-admin-resultado {
+  margin-top: 20px;
+  border-top: 1px solid var(--border);
+  padding-top: 20px;
+}
+
+.setup-admin-resultado.hidden {
+  display: none;
+}
+
+.setup-admin-resultado h3 {
+  font-size: 16px;
+  margin: 0 0 8px;
+  color: var(--text);
+}
+
+.setup-admin-resultado p {
+  font-size: 13px;
+  color: var(--text-light);
+  margin: 0 0 14px;
+  line-height: 1.5;
+}
+
+.setup-credencial {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: var(--bg-secondary, var(--bg-soft));
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin-bottom: 10px;
+}
+
+.setup-credencial span {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-light);
+}
+
+.setup-credencial strong {
+  font-family: 'Consolas', 'Courier New', monospace;
+  font-size: 15px;
+  color: var(--text);
+  user-select: all;
+}
+
+.setup-admin-resultado .full-width {
+  width: 100%;
+  justify-content: center;
+  margin-top: 8px;
+}
+
+@media (max-width: 560px) {
+  .setup-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .setup-grid .setup-col-2 {
+    grid-column: span 1;
+  }
+
+  .setup-actions {
+    grid-template-columns: 1fr;
+  }
+}

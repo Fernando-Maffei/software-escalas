@@ -66,9 +66,24 @@ router.post('/salvar', async (req, res, next) => {
         clearSchemaCache();
         await fecharConexao();
 
+        // Garante tabelas (e o admin inicial, se o banco for novo) ja na
+        // gravacao — sem isso, um banco recem-apontado so ganharia as
+        // tabelas no proximo reinicio do servidor, e o login falharia.
+        let schema = null;
+        let adminBootstrap = null;
+        let schemaWarning = null;
+
+        try {
+            const pool = await conectar();
+            schema = await ensureApplicationSchema(pool);
+            adminBootstrap = schema.bootstrappedAdmin;
+        } catch (schemaError) {
+            schemaWarning = `Conexao salva, mas a verificacao das tabelas falhou: ${schemaError.message || schemaError}`;
+        }
+
         res.json({
             success: true,
-            message: 'Configuracao do banco salva com sucesso.',
+            message: schemaWarning || 'Configuracao do banco salva com sucesso.',
             connection,
             configuracao: getPublicDatabaseSettings(),
             savedAt: new Date().toISOString(),
@@ -76,7 +91,10 @@ router.post('/salvar', async (req, res, next) => {
                 host: saved.host,
                 database: saved.database,
                 authenticationType: saved.authenticationType
-            }
+            },
+            createdTables: schema ? schema.createdTables : [],
+            adminBootstrap,
+            schemaWarning
         });
     } catch (error) {
         next(mapDatabaseConnectionError(error, 'Erro ao salvar a configuracao do banco.'));

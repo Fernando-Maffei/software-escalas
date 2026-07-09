@@ -21,18 +21,39 @@ Sistema para gestao de escalas de trabalho, colaboradores, ausencias e plantoes.
 
 ## Login
 
-A partir da versao 1.3.0 o sistema exige login. Na primeira execucao, se a
-tabela `Usuarios` estiver vazia, um usuario administrador e criado
-automaticamente:
+A partir da versao 1.3.0 o sistema exige login. Na primeira execucao com um
+banco novo, se a tabela `Usuarios` estiver vazia, um usuario administrador e
+criado automaticamente:
 
 - Usuario: valor de `ADMIN_USERNAME` (padrao `admin`)
 - Senha: valor de `ADMIN_PASSWORD`, se definida no `.env`; caso contrario,
-  uma senha aleatoria e gerada e impressa **uma unica vez** no console do
-  servidor na primeira inicializacao. Anote essa senha, pois nesse caso o
-  sistema pede a troca no primeiro login.
+  uma senha aleatoria e gerada e exibida **uma unica vez** (na tela de
+  configuracao inicial, ou no console do servidor). Anote essa senha, pois
+  nesse caso o sistema pede a troca no primeiro login.
 
 Veja `.env.example` para configurar `ADMIN_USERNAME`/`ADMIN_PASSWORD` e a
 lista de origens liberadas em `CORS_ORIGINS`.
+
+## Primeira configuracao do banco (instalacao nova)
+
+A partir da versao 1.5.0, numa maquina sem banco configurado (sem
+`backend/config/database.local.json` e sem `.env`), abrir o sistema no
+navegador mostra direto a tela **Configuracao inicial**: informe o servidor,
+instancia, banco e credenciais do SQL Server, teste e salve. O sistema cria
+as tabelas e o usuario administrador na hora — sem editar arquivo nenhum.
+Essa tela so existe enquanto nao ha banco configurado; depois disso, tudo
+volta a exigir login.
+
+(Como alternativa, copiar um `database.local.json` pronto ou preencher o
+`.env` continua funcionando.)
+
+## Usuarios do sistema
+
+Administradores gerenciam as contas em **Configuracoes > Usuarios**: criar
+usuario (com senha temporaria e troca obrigatoria no primeiro acesso),
+ativar/desativar, promover/remover administrador e resetar senha. Usuarios
+comuns usam o sistema normalmente, mas nao veem essa tela. O sistema impede
+desativar/rebaixar a propria conta e o ultimo administrador ativo.
 
 ## Como executar manualmente
 
@@ -119,7 +140,7 @@ Sugestao simples de versionamento:
 - `1.1.0` para nova funcionalidade
 - `2.0.0` para mudanca grande ou quebra de fluxo
 
-Versao atual: `1.4.0`. O historico de alteracoes fica em `CHANGELOG.md`.
+Versao atual: `1.5.0`. O historico de alteracoes fica em `CHANGELOG.md`.
 
 ## Se voce ja tinha o aplicativo desktop instalado (versoes ate 1.3.x)
 

@@ -12,6 +12,7 @@ const {
 const { AppError } = require('./utils/errors');
 const { requireAuth } = require('./utils/auth');
 const { ensureApplicationSchema } = require('./utils/database-schema');
+const { isDatabaseConfigured } = require('./utils/database-config');
 
 const authRoutes = require('./routes/auth');
 const colaboradoresRoutes = require('./routes/colaboradores');
@@ -24,6 +25,7 @@ const escalaRoutes = require('./routes/escala');
 const jornadaSemanalRoutes = require('./routes/jornada-semanal');
 const configuracaoBancoRoutes = require('./routes/configuracao-banco');
 const sistemaRoutes = require('./routes/sistema');
+const usuariosRoutes = require('./routes/usuarios');
 
 const DEFAULT_HOST = '0.0.0.0';
 const DEFAULT_PORT = 4450;
@@ -254,7 +256,43 @@ app.get('/api/health', async (req, res, next) => {
 
 app.use('/api/auth', authRoutes);
 
-app.use('/api', requireAuth);
+// Estado do setup, publico de proposito: o front-end precisa saber, antes
+// de qualquer login, se deve mostrar a tela de configuracao inicial do
+// banco em vez da tela de login. Nao expoe nenhum dado da conexao.
+app.get('/api/setup/status', (req, res) => {
+    res.json({ databaseConfigured: isDatabaseConfigured() });
+});
+
+// Modo bootstrap: enquanto NENHUM banco estiver configurado (sem
+// database.local.json e sem .env), as rotas minimas de configuracao de
+// conexao ficam acessiveis sem login — sem banco nao ha dado a proteger,
+// e sem isso uma instalacao nova ficaria num impasse (o login exige banco,
+// e a tela de configurar banco exigia login). Assim que uma conexao valida
+// e salva, isDatabaseConfigured() vira true e o cadeado fecha sozinho.
+// Importante: banco configurado porem fora do ar NAO libera nada.
+function isBootstrapConfigRequest(req) {
+    if (isDatabaseConfigured()) {
+        return false;
+    }
+
+    const requestPath = req.path.replace(/\/+$/, '') || '/';
+
+    if (req.method === 'GET' && requestPath === '/configuracao-banco') {
+        return true;
+    }
+
+    return req.method === 'POST'
+        && (requestPath === '/configuracao-banco/testar' || requestPath === '/configuracao-banco/salvar');
+}
+
+app.use('/api', (req, res, next) => {
+    if (isBootstrapConfigRequest(req)) {
+        next();
+        return;
+    }
+
+    requireAuth(req, res, next);
+});
 
 app.get('/api/network/status', async (req, res) => {
     const database = await getDatabaseHealth();
@@ -283,6 +321,7 @@ app.use('/api/escala', escalaRoutes);
 app.use('/api/jornada-semanal', jornadaSemanalRoutes);
 app.use('/api/configuracao-banco', configuracaoBancoRoutes);
 app.use('/api/sistema', sistemaRoutes);
+app.use('/api/usuarios', usuariosRoutes);
 
 app.get(/^(?!\/api(?:\/|$)).*/, (req, res) => {
     res.sendFile(path.join(frontendPath, 'index.html'));

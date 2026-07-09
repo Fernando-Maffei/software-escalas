@@ -913,3 +913,162 @@ input:checked + .slider:before {
     border-color: var(--primary);
     box-shadow: 0 0 0 3px var(--primary-soft);
 }
+
+/* ================= CONFIGURACOES > USUARIOS ================= */
+.usuarios-novo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 14px;
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+  margin-bottom: 18px;
+}
+
+.usuarios-novo-campos {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  flex: 1;
+  min-width: 0;
+}
+
+.usuarios-novo-campos .form-control {
+  width: auto;
+  flex: 1;
+  min-width: 170px;
+}
+
+.usuarios-novo-admin {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text-light);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.usuarios-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.usuario-linha {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding: 12px 14px;
+  background: var(--card-dark);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.usuario-linha-inativa {
+  opacity: 0.62;
+}
+
+.usuario-info strong {
+  color: var(--text);
+  font-size: 14px;
+}
+
+.usuario-info strong small {
+  color: var(--text-light);
+  font-weight: 500;
+}
+
+.usuario-badges {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin: 5px 0;
+}
+
+.usuario-badge {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 3px 8px;
+  border-radius: 999px;
+}
+
+.badge-admin {
+  background: var(--primary-soft);
+  color: var(--primary-dark);
+}
+
+.badge-ativo {
+  background: rgba(34, 197, 94, 0.14);
+  color: #16a34a;
+}
+
+.badge-inativo {
+  background: rgba(148, 163, 184, 0.2);
+  color: var(--text-light);
+}
+
+.badge-pendente {
+  background: rgba(245, 158, 11, 0.16);
+  color: #b45309;
+}
+
+.usuario-ultimo-login {
+  color: var(--text-lighter);
+  font-size: 12px;
+}
+
+.usuario-acoes {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.btn-usuario-acao {
+  font-size: 12px;
+  padding: 7px 10px;
+}
+
+.btn-usuario-danger {
+  color: var(--danger, #dc2626);
+  border-color: rgba(220, 38, 38, 0.35);
+}
+
+.usuarios-senha-box {
+  border: 1px solid rgba(245, 158, 11, 0.5);
+  background: rgba(245, 158, 11, 0.1);
+  border-radius: 10px;
+  padding: 14px;
+  margin-bottom: 16px;
+}
+
+.usuarios-senha-box code {
+  font-size: 15px;
+  font-weight: 700;
+  margin-left: 6px;
+  user-select: all;
+}
+
+.usuarios-senha-box p {
+  font-size: 12px;
+  color: var(--text-light);
+  margin: 8px 0 10px;
+}
+
+#usuariosSenhaTemporaria.hidden {
+  display: none;
+}
+
+[data-theme="dark"] .badge-ativo {
+  color: #4ade80;
+}
+
+[data-theme="dark"] .badge-pendente {
+  color: #fbbf24;
+}

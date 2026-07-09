@@ -63,7 +63,10 @@ function mapUserRow(row) {
         passwordHash: row.PasswordHash,
         passwordSalt: row.PasswordSalt,
         deveTrocarSenha: Boolean(row.DeveTrocarSenha),
-        ativo: Boolean(row.Ativo)
+        ativo: Boolean(row.Ativo),
+        isAdmin: Boolean(row.IsAdmin),
+        criadoEm: row.CreatedAt || null,
+        ultimoLoginAt: row.UltimoLoginAt || null
     };
 }
 
@@ -88,7 +91,7 @@ async function findUserById(pool, id) {
     return mapUserRow(result.recordset[0]);
 }
 
-async function createUser(pool, { username, password, deveTrocarSenha = false }) {
+async function createUser(pool, { username, password, deveTrocarSenha = false, isAdmin = false }) {
     const normalizedUsername = normalizeUsername(username);
     const normalizedPassword = normalizePassword(password);
     const { hash, salt } = hashPassword(normalizedPassword);
@@ -98,12 +101,59 @@ async function createUser(pool, { username, password, deveTrocarSenha = false })
         .input('hash', sql.NVarChar(255), hash)
         .input('salt', sql.NVarChar(255), salt)
         .input('deveTrocarSenha', sql.Bit, deveTrocarSenha)
+        .input('isAdmin', sql.Bit, isAdmin)
         .query(`
-            INSERT INTO Usuarios (Username, PasswordHash, PasswordSalt, DeveTrocarSenha)
-            VALUES (@username, @hash, @salt, @deveTrocarSenha)
+            INSERT INTO Usuarios (Username, PasswordHash, PasswordSalt, DeveTrocarSenha, IsAdmin)
+            VALUES (@username, @hash, @salt, @deveTrocarSenha, @isAdmin)
         `);
 
     return findUserByUsername(pool, normalizedUsername);
+}
+
+async function listUsers(pool) {
+    const result = await pool.request().query(`
+        SELECT Id, Username, DeveTrocarSenha, Ativo, IsAdmin, CreatedAt, UltimoLoginAt
+        FROM Usuarios
+        ORDER BY Username
+    `);
+
+    return result.recordset.map(mapUserRow);
+}
+
+async function countOtherActiveAdmins(pool, excludedUserId) {
+    const result = await pool.request()
+        .input('id', sql.Int, excludedUserId)
+        .query('SELECT COUNT(*) AS total FROM Usuarios WHERE IsAdmin = 1 AND Ativo = 1 AND Id <> @id');
+
+    return result.recordset[0]?.total || 0;
+}
+
+async function updateUserFlags(pool, userId, { ativo, isAdmin }) {
+    const assignments = [];
+
+    if (ativo !== undefined) {
+        assignments.push('Ativo = @ativo');
+    }
+
+    if (isAdmin !== undefined) {
+        assignments.push('IsAdmin = @isAdmin');
+    }
+
+    if (assignments.length === 0) {
+        return;
+    }
+
+    const request = pool.request().input('id', sql.Int, userId);
+
+    if (ativo !== undefined) {
+        request.input('ativo', sql.Bit, Boolean(ativo));
+    }
+
+    if (isAdmin !== undefined) {
+        request.input('isAdmin', sql.Bit, Boolean(isAdmin));
+    }
+
+    await request.query(`UPDATE Usuarios SET ${assignments.join(', ')} WHERE Id = @id`);
 }
 
 async function updateUserPassword(pool, userId, newPassword, options = {}) {
@@ -145,7 +195,8 @@ async function ensureDefaultAdmin(pool) {
     await createUser(pool, {
         username,
         password,
-        deveTrocarSenha: !envPassword
+        deveTrocarSenha: !envPassword,
+        isAdmin: true
     });
 
     return { username, password, generated: !envPassword };
@@ -157,10 +208,27 @@ function createSession(user) {
     sessions.set(token, {
         userId: user.id,
         username: user.username,
+        isAdmin: Boolean(user.isAdmin),
         expiresAt: Date.now() + SESSION_TTL_MS
     });
 
     return token;
+}
+
+// Encerra imediatamente todas as sessoes ativas de um usuario — usado ao
+// desativar a conta, remover o papel de administrador ou resetar a senha,
+// para a mudanca valer na hora e nao so no proximo login.
+function revokeUserSessions(userId) {
+    let revoked = 0;
+
+    sessions.forEach((session, token) => {
+        if (session.userId === userId) {
+            sessions.delete(token);
+            revoked += 1;
+        }
+    });
+
+    return revoked;
 }
 
 function getSession(token) {
@@ -240,13 +308,23 @@ function requireAuth(req, res, next) {
         return;
     }
 
-    req.user = { id: session.userId, username: session.username };
+    req.user = { id: session.userId, username: session.username, isAdmin: Boolean(session.isAdmin) };
     setSessionCookie(res, token);
+    next();
+}
+
+function requireAdmin(req, res, next) {
+    if (!req.user?.isAdmin) {
+        next(new AppError(403, 'Apenas administradores podem executar esta acao.'));
+        return;
+    }
+
     next();
 }
 
 module.exports = {
     SESSION_COOKIE_NAME,
+    countOtherActiveAdmins,
     countUsers,
     createSession,
     createUser,
@@ -255,12 +333,17 @@ module.exports = {
     ensureDefaultAdmin,
     findUserById,
     findUserByUsername,
+    generateRandomPassword,
     getSessionTokenFromRequest,
+    listUsers,
     normalizePassword,
     normalizeUsername,
+    requireAdmin,
     requireAuth,
+    revokeUserSessions,
     setSessionCookie,
     touchLastLogin,
+    updateUserFlags,
     updateUserPassword,
     verifyPassword
 };

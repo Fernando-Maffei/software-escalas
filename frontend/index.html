@@ -39,6 +39,63 @@
   </div>
 </div>
 
+<div id="setupScreen" class="login-screen hidden">
+  <div class="login-card setup-card">
+    <div class="login-brand">
+      <img src="assets/branding/central-escalas-logo.png" alt="Central de Escalas" class="login-logo">
+      <h1>Configuração inicial</h1>
+      <p>Este servidor ainda não tem um banco de dados configurado. Informe a conexão com o SQL Server para começar.</p>
+    </div>
+    <form id="setupForm" class="login-form" autocomplete="off">
+      <div class="setup-grid">
+        <div class="form-group setup-col-2">
+          <label for="setupHost">Servidor / host</label>
+          <input type="text" id="setupHost" class="form-control" placeholder="ex.: NOME-DA-MAQUINA ou 192.168.0.10" required>
+        </div>
+        <div class="form-group">
+          <label for="setupInstance">Instância (opcional)</label>
+          <input type="text" id="setupInstance" class="form-control" placeholder="ex.: SQLEXPRESS">
+        </div>
+        <div class="form-group">
+          <label for="setupPort">Porta (opcional)</label>
+          <input type="number" id="setupPort" class="form-control" placeholder="ex.: 1433" min="1" max="65535">
+        </div>
+        <div class="form-group setup-col-2">
+          <label for="setupDatabase">Nome do banco</label>
+          <input type="text" id="setupDatabase" class="form-control" value="SoftwareEscalas" required>
+        </div>
+        <div class="form-group">
+          <label for="setupUser">Usuário SQL</label>
+          <input type="text" id="setupUser" class="form-control" autocomplete="off" required>
+        </div>
+        <div class="form-group">
+          <label for="setupPassword">Senha SQL</label>
+          <input type="password" id="setupPassword" class="form-control" autocomplete="new-password">
+        </div>
+      </div>
+      <p id="setupError" class="login-error hidden"></p>
+      <p id="setupSuccess" class="setup-success hidden"></p>
+      <div class="setup-actions">
+        <button type="button" id="setupTestarBtn" class="btn-secondary">
+          <i class="fas fa-plug"></i> Testar conexão
+        </button>
+        <button type="submit" id="setupSalvarBtn" class="btn-primary">
+          <i class="fas fa-save"></i> Salvar e continuar
+        </button>
+      </div>
+    </form>
+    <div id="setupAdminResultado" class="setup-admin-resultado hidden">
+      <h3><i class="fas fa-user-shield"></i> Administrador criado</h3>
+      <p>Anote estas credenciais agora — a senha não será exibida novamente. O sistema pedirá a troca dela no primeiro login.</p>
+      <div class="setup-credencial"><span>Usuário</span><strong id="setupAdminUsuario"></strong></div>
+      <div class="setup-credencial"><span>Senha</span><strong id="setupAdminSenha"></strong></div>
+      <button type="button" id="setupIrLoginBtn" class="btn-primary full-width">
+        <i class="fas fa-sign-in-alt"></i> Ir para o login
+      </button>
+    </div>
+  </div>
+</div>
+
 <div id="trocarSenhaScreen" class="login-screen hidden">
   <div class="login-card">
     <div class="login-brand">
@@ -165,7 +222,7 @@
       
       <div class="version-badge">
         <i class="fas fa-code-branch"></i>
-        <span>v1.4.0</span>
+        <span>v1.5.0</span>
       </div>
     </aside>
 
@@ -495,6 +552,7 @@
 <script src="Js/lancamentos.js?v=20260501j"></script>
 <script src="Js/escala-report-utils.js?v=20260531b"></script>
 <script src="Js/configuracoes-backup.js"></script>
+<script src="Js/configuracoes-usuarios.js"></script>
 <script src="Js/pdf-utils.js"></script>
 <script src="Js/escala-dia-shared.js"></script>
 <script src="Js/escala-dia-editor.js"></script>

@@ -24,7 +24,8 @@ function toPublicUser(user) {
     return {
         id: user.id,
         username: user.username,
-        deveTrocarSenha: user.deveTrocarSenha
+        deveTrocarSenha: user.deveTrocarSenha,
+        isAdmin: Boolean(user.isAdmin)
     };
 }
 

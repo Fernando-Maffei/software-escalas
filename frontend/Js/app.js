@@ -311,6 +311,12 @@ const CONFIGURACOES_SECOES = [
         description: 'Preferencias gerais'
     },
     {
+        id: 'usuarios',
+        label: 'Usuarios',
+        icon: 'users-cog',
+        description: 'Contas e acessos'
+    },
+    {
         id: 'banco',
         label: 'Conexao banco',
         icon: 'database',
@@ -2748,6 +2754,17 @@ function renderConfiguracoes() {
                 </div>
             </div>
 
+            <div class="config-card config-card-wide" data-config-section="usuarios">
+                <div class="config-card-header">
+                    <i class="fas fa-users-cog"></i>
+                    <h2>Usuarios do Sistema</h2>
+                </div>
+
+                <div class="config-card-body" id="usuariosCardConteudo">
+                    <p class="config-descricao">Carregando usuarios...</p>
+                </div>
+            </div>
+
             <div class="config-card config-card-tools" data-config-section="ferramentas">
                 <div class="config-card-header">
                     <i class="fas fa-tools"></i>
@@ -2808,6 +2825,10 @@ function renderConfiguracoes() {
 
     if (typeof window.inicializarBackupSistemaTela === 'function') {
         window.inicializarBackupSistemaTela();
+    }
+
+    if (typeof window.inicializarUsuariosTela === 'function') {
+        window.inicializarUsuariosTela();
     }
 
     inicializarDiagnosticoRede();

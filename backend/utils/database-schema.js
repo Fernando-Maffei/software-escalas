@@ -24,7 +24,8 @@ const SCHEMA_SCRIPT_PATHS = Object.freeze([
     path.join(__dirname, '..', '..', 'database', 'migrations', '2026-04-24-escala-dia.sql'),
     path.join(__dirname, '..', '..', 'database', 'migrations', '2026-05-21-setores-plantoes-almoco.sql'),
     path.join(__dirname, '..', '..', 'database', 'migrations', '2026-05-28-colaborador-jornada-semanal.sql'),
-    path.join(__dirname, '..', '..', 'database', 'migrations', '2026-07-08-usuarios.sql')
+    path.join(__dirname, '..', '..', 'database', 'migrations', '2026-07-08-usuarios.sql'),
+    path.join(__dirname, '..', '..', 'database', 'migrations', '2026-07-09-usuarios-admin.sql')
 ]);
 
 function splitSqlBatches(script) {
@@ -159,7 +160,17 @@ async function ensureApplicationSchema(pool) {
         createdTables,
         existingTables: REQUIRED_TABLES.filter((table) => before.includes(table)),
         addedColumns,
-        scriptsExecuted: SCHEMA_SCRIPT_PATHS.map((filePath) => path.basename(filePath))
+        scriptsExecuted: SCHEMA_SCRIPT_PATHS.map((filePath) => path.basename(filePath)),
+        // So expoe a senha quando ela foi gerada aleatoriamente agora (o
+        // destinatario e quem esta instalando o sistema); senha vinda do
+        // .env nunca e ecoada de volta.
+        bootstrappedAdmin: bootstrappedAdmin
+            ? {
+                username: bootstrappedAdmin.username,
+                generated: bootstrappedAdmin.generated,
+                password: bootstrappedAdmin.generated ? bootstrappedAdmin.password : null
+            }
+            : null
     };
 }
 

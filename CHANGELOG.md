@@ -2,6 +2,20 @@
 
 Todas as alteracoes relevantes deste projeto serao documentadas neste arquivo.
 
+## [1.5.0] - 2026-07-09
+
+### Adicionado
+- Tela de configuracao inicial do banco: numa instalacao nova (sem `database.local.json` e sem `.env`), o navegador abre direto um formulario de conexao com o SQL Server, sem exigir login — resolvendo o impasse em que o login dependia do banco e a tela de banco dependia do login. Assim que a conexao e salva, as rotas voltam a exigir autenticacao.
+- Gestao de usuarios (Configuracoes > Usuarios, visivel apenas para administradores): criar contas com senha temporaria (troca obrigatoria no primeiro acesso), ativar/desativar, promover/remover administrador e resetar senha.
+- Papel de administrador (`Usuarios.IsAdmin`): somente admins gerenciam contas. Em bancos existentes, o usuario mais antigo e promovido automaticamente na migracao.
+
+### Alterado
+- Salvar a configuracao do banco agora verifica/cria as tabelas e o usuario administrador imediatamente (antes so acontecia no reinicio do servidor).
+- Desativar um usuario, remover o papel de admin ou resetar a senha encerra as sessoes ativas dele na hora.
+
+### Seguranca
+- Protecoes na gestao de contas: ninguem desativa ou rebaixa a propria conta, e o ultimo administrador ativo nao pode ser desativado nem rebaixado.
+
 ## [1.4.0] - 2026-07-08
 
 ### Removido

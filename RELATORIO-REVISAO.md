@@ -678,3 +678,112 @@ justo o que a Fase 2 tirou. O `.vbs` entrega o mesmo comportamento (duplo
 clique, sem terminal, abre a aplicação) sem nenhuma dependência nova. Se no
 futuro o usuário quiser um ícone `.exe` fixável, dá para converter o `.vbs`
 com `ps2exe`, ao custo de instalar essa ferramenta.
+
+---
+
+## Melhoria — Configuração inicial sem login e gestão de usuários (2026-07-09, v1.5.0)
+
+### Contexto
+
+Ao instalar o sistema numa máquina nova, o usuário caiu num impasse criado
+sem querer pela Fase 1: o login exige o banco funcionando, mas a tela que
+configura o banco estava atrás do login — e o `database.local.json` não
+acompanha a cópia do projeto (está no `.gitignore` por conter senha). A
+primeira proposta do usuário foi um login fixo embutido no código; foi
+desaconselhada (senha mestra visível no GitHub para sempre, impossível de
+trocar sem redistribuir código, backdoor clássico — CWE-798) em favor de
+duas peças que resolvem o problema real: um modo bootstrap para a
+configuração do banco e uma tela de gestão de usuários.
+
+### Parte 1 — Modo bootstrap da conexão
+
+- `GET /api/setup/status` (público): informa apenas se existe banco
+  configurado — é o que o front-end consulta antes de decidir entre a tela
+  de login e a de configuração inicial.
+- Enquanto **nenhum** banco estiver configurado (sem arquivo e sem `.env`),
+  apenas 3 rotas ficam liberadas sem login: `GET /api/configuracao-banco`,
+  `POST /testar` e `POST /salvar`. Todo o resto continua respondendo 401.
+  A chave da segurança: "configurado" é decidido pela **existência** de
+  credenciais usáveis, não pela conectividade — banco configurado porém
+  fora do ar não libera nada (derrubar o banco não vira vetor de sequestro
+  da configuração).
+- Salvar a conexão passou a rodar `ensureApplicationSchema` imediatamente
+  (cria tabelas e o admin inicial num banco novo — antes disso só
+  acontecia no reinício do servidor, o que quebraria o fluxo). Se o admin
+  foi criado com senha gerada, a senha volta na resposta e é exibida uma
+  única vez na tela — necessário porque com o `iniciar-sem-terminal.vbs`
+  ninguém vê o console.
+- Nova tela "Configuração inicial" (`index.html` + `auth.js` + `auth.css`):
+  formulário de servidor/instância/porta/banco/credenciais com Testar e
+  Salvar, mensagens de erro amigáveis e o bloco de credenciais do admin.
+
+### Parte 2 — Gestão de usuários com papel de administrador
+
+- Migration `2026-07-09-usuarios-admin.sql`: coluna `Usuarios.IsAdmin`
+  (default 0); se nenhum admin existe, promove o usuário ativo mais antigo
+  — em instalações existentes isso promove o admin do bootstrap da 1.3.0.
+- `backend/routes/usuarios.js` (novo), tudo restrito a administradores
+  (`requireAdmin`): listar, criar (senha temporária, informada ou gerada,
+  sempre com troca obrigatória no primeiro acesso), ativar/desativar,
+  promover/remover admin e resetar senha.
+- Proteções: ninguém desativa/rebaixa a própria conta; o último
+  administrador ativo não pode ser desativado nem rebaixado; ações
+  restritivas (desativar, rebaixar, resetar senha) revogam as sessões
+  ativas do alvo na hora.
+- Front-end: nova seção "Usuarios" em Configurações
+  (`frontend/Js/configuracoes-usuarios.js`, novo) com lista, badges de
+  estado, criação e ações por linha; a senha temporária aparece numa caixa
+  destacada com aviso de anotação única. Para não-admins, a seção inteira
+  some do menu (e o backend nega com 403 de qualquer forma).
+
+### Bug encontrado e corrigido durante a verificação
+
+Com a tela de configuração inicial aberta, as cargas de dados do `app.js`
+(que disparam no carregamento da página) recebem 401 e o handler global de
+`auth:expired` puxava o usuário de volta para a tela de login, por cima da
+tela de setup — o sintoma era a tela de setup "não aparecer" apesar do
+código correto ter executado (diagnosticado via `performance
+.getEntriesByType('resource')`, confirmando que o `/api/setup/status` fora
+consultado e a tela exibida antes de ser sobrescrita). Corrigido ignorando
+`auth:expired` enquanto o modo setup está ativo.
+
+### Verificação realizada (navegador + API reais)
+
+- Migration no boot: coluna `IsAdmin` criada e admin existente promovido.
+- Como admin: seção Usuarios visível, usuário de teste criado com senha
+  temporária exibida; logout; login como o novo usuário (com a senha
+  temporária), troca obrigatória cumprida, `GET /api/usuarios` respondendo
+  403 e a seção Usuarios ausente do menu para ele.
+- Guards via API: desativar a própria conta → 400; remover o próprio admin
+  (único) → 400; desativar o usuário de teste → 200 e login dele passou a
+  falhar (401).
+- Bootstrap de ponta a ponta: `database.local.json` renomeado + servidor
+  reiniciado → `setup/status` false, `GET /api/colaboradores` 401 (cadeado
+  geral mantido), tela de configuração inicial exibida; teste de conexão
+  com senha errada → mensagem amigável; salvar com a config real (via
+  script, sem ecoar a senha) → 200, schema verificado, e a **segunda**
+  chamada a `/salvar` sem login já respondeu 401 (cadeado refechado);
+  arquivo regravado equivalente ao original; reload → tela de login →
+  login funcionando.
+- Limpeza: usuário de teste removido do banco e `.bak` da config apagado.
+- `npm run smoke` e `npm test` (45 testes) verdes; versão 1.5.0 no
+  `package.json`, badge do sidebar, `CHANGELOG.md` e `README.md`.
+
+### Arquivos modificados/criados
+
+| Arquivo | O que mudou |
+|---|---|
+| `database/migrations/2026-07-09-usuarios-admin.sql` (novo) | Coluna IsAdmin + promoção do primeiro admin |
+| `backend/utils/database-config.js` | `isDatabaseConfigured()` |
+| `backend/utils/database-schema.js` | Nova migration na lista; retorna `bootstrappedAdmin` |
+| `backend/utils/auth.js` | IsAdmin no fluxo todo, `requireAdmin`, `revokeUserSessions`, `listUsers`, `updateUserFlags`, `countOtherActiveAdmins` |
+| `backend/routes/usuarios.js` (novo) | CRUD de contas restrito a admins, com os guards |
+| `backend/routes/auth.js` | `isAdmin` no usuário público (`/me`, login) |
+| `backend/routes/configuracao-banco.js` | `/salvar` roda o schema e devolve o admin criado |
+| `backend/server.js` | `GET /api/setup/status` público; gate com exceção de bootstrap; monta `/api/usuarios` |
+| `frontend/index.html` | Tela de configuração inicial; script novo; badge v1.5.0 |
+| `frontend/Js/auth.js` | Checagem de setup antes do login, handlers da tela, fix do `auth:expired` em modo setup |
+| `frontend/Js/configuracoes-usuarios.js` (novo) | Tela de gestão de usuários |
+| `frontend/Js/app.js` | Seção "Usuarios" no menu de Configurações + card + inicializador |
+| `frontend/css/auth.css`, `frontend/css/configuracoes.css` | Estilos das duas telas novas |
+| `package.json`, `CHANGELOG.md`, `README.md` | Versão 1.5.0 e documentação |
