@@ -352,6 +352,123 @@ mantêm vivo).
 
 ---
 
+## Fase 3b, parte 2 — Extração do editor e do motor de relatório (2026-07-09)
+
+### Contexto
+
+Com o código morto fora do caminho (parte 1), o restante de
+`runtime-fixes.js` (8224 linhas, um único IIFE gigante de 4520 linhas
+guardado por `window.__escalaDiaUiFixLoaded`) foi mapeado função por função
+para extrair o editor de Escala do Dia (drag-and-drop) e o motor de
+Relatório de Escala para arquivos próprios. O mapeamento confirmou um
+achado já registrado na Fase 3: o motor de relatório **não é um bloco
+contíguo** — está dividido em "Parte A" (submodo Quadro Mensal) e "Parte B"
+(submodo Detalhado + geração de PDF), com o editor de arrasta-e-solta
+inteiro fisicamente entre as duas partes no arquivo original.
+
+### Descoberta que mudou a arquitetura da extração
+
+Antes de mover qualquer linha, foi checado (nas duas direções) se o código
+a extrair chama, ou é chamado por, o código de roteamento de página e o
+Relatório de Plantões que ficam para trás em `runtime-fixes.js`. Resultado:
+nenhuma dependência reversa (editor/relatório não chamam de volta para o
+que fica), mas **quatro funções do código que fica** chamam funções
+internas (não expostas em `window.*`) do editor e do relatório por nome
+solto — `refreshEscalaViewEscala` chama `carregarEscalaDiaEscala`,
+`obterDataSelecionadaEscala`, `atualizarAcoesCabecalhoEscala` e
+`abrirEditorNaEscala`; `restoreRelatoriosStateEscala` e o Relatório de
+Plantões chamam `toggleEscalaReportModeFilters`,
+`buildSetorOptionsRelatorioEscala`, `buildTipoOptionsEscala` e
+`buildColaboradorOptionsEscala`.
+
+Isso significa que os arquivos extraídos **não podem** ser envolvidos numa
+IIFE própria isolada (o padrão usual de "módulo" neste projeto) — isso
+esconderia essas funções do código que precisa chamá-las. Em vez disso,
+`escala-dia-shared.js`, `escala-dia-editor.js` e `escala-relatorio.js`
+foram escritos como scripts globais simples, sem IIFE, no mesmo estilo já
+usado em `app.js`: cada `function nome() {}` de nível superior vira uma
+função global de verdade, acessível por nome solto de qualquer script
+carregado depois — preservando exatamente o comportamento que já existia
+quando tudo estava dentro de uma única IIFE compartilhada.
+
+### O que foi criado
+
+- **`frontend/Js/escala-dia-shared.js`** (206 linhas, novo): constantes
+  (`DIA_LABELS`, `TIPO_LABELS`, `RELATORIO_ESCALA_MODOS`, `MESES_LABELS`,
+  `ESCALA_QUADRO_WEEKDAY_HEADERS`, `HORA_INICIAL`/`HORA_FINAL`,
+  `ESCALA_EDITOR_*`) e helpers de data/hora (`escapeHtmlEscala`,
+  `toISODateEscala`, `formatDatePtBrEscala`, `formatTimeInputEscala`,
+  `formatTimeRangeEscala`, `getTimeMinutesEscala`,
+  `formatMinutesToTimeEscala`, `clampMinutesEscala`, `roundMinutesEscala`,
+  `formatDurationEscala`, `getIsoDayOfWeekEscala`, `getDayLabelEscala`,
+  `getMonthBoundsEscala`, `buildEscalaMonthOptions`) usados pelo editor,
+  pelo motor de relatório e pelo Relatório de Plantões que fica em
+  `runtime-fixes.js`.
+- **`frontend/Js/escala-dia-editor.js`** (1745 linhas, novo): editor de
+  Escala do Dia completo — grade de horários, arrasta-e-solta do almoço,
+  editor lateral, salvar/restaurar almoço, `window.renderEscalaDia`.
+- **`frontend/Js/escala-relatorio.js`** (1822 linhas, novo): as duas partes
+  do motor de relatório reunidas num único arquivo lógico — Quadro Mensal
+  e Detalhado, mais a geração de PDF/export compartilhada entre os dois
+  submodos, `window.gerarRelatorioEscala`, `window.exportarRelatorioEscala`.
+- **`frontend/Js/runtime-fixes.js`** caiu de 8224 para 4475 linhas: sobrou
+  o guard `__escalaDiaUiFixLoaded`, o código de roteamento de página
+  (`refreshEscalaViewEscala`, `refreshColaboradoresViewEscala`,
+  `refreshRelatoriosViewEscala`, `window.__refreshVisibleViews`) e o
+  Relatório de Plantões inteiro (engine + export), que não fazia parte do
+  pedido desta fatia.
+- `frontend/index.html`: os 3 novos arquivos inseridos entre `pdf-utils.js`
+  e `runtime-fixes.js`, na ordem `shared` → `editor` → `relatorio`, já que
+  `runtime-fixes.js` (código de roteamento) depende dos três já carregados.
+- `package.json`: `smoke` cobre os 3 novos arquivos.
+
+### Verificação realizada
+
+- `node --check` nos 4 arquivos afetados e `npm run smoke`/`npm test` (45
+  testes) verdes antes de tocar no navegador.
+- Testado no navegador, autenticado, com reload completo: as 7 páginas
+  renderizando os mesmos tamanhos de conteúdo de antes da extração (sem
+  regressão); editor da Escala do Dia abrindo e `restaurarAlmocoPadraoEscala`
+  funcionando (exercita o cluster drag-track mantido na Fase 3b parte 1,
+  agora chamado através de dois arquivos diferentes); `window.__refreshVisibleViews`
+  chamado diretamente (exercita a dependência reversa
+  `refreshEscalaViewEscala` → funções internas do editor); Relatório de
+  Escala nos dois submodos (Quadro Mensal e Detalhado, com título e
+  conteúdo corretos em cada um) e Relatório de Plantões (exercita a
+  dependência reversa do Relatório de Plantões para as funções internas do
+  motor de relatório); exportação de PDF do Relatório de Escala disparada
+  e concluída sem erro (processo é lento por natureza — renderização via
+  `html2canvas` de um relatório grande — característica de performance já
+  existente, não uma regressão desta fatia).
+- Nenhum erro no console em nenhum dos testes acima.
+
+### Arquivos modificados/criados
+
+| Arquivo | O que mudou |
+|---|---|
+| `frontend/Js/escala-dia-shared.js` (novo) | Constantes e helpers de data/hora compartilhados |
+| `frontend/Js/escala-dia-editor.js` (novo) | Editor de Escala do Dia (arrasta-e-solta) |
+| `frontend/Js/escala-relatorio.js` (novo) | Motor de Relatório de Escala (Quadro Mensal + Detalhado) |
+| `frontend/Js/runtime-fixes.js` | -3749 linhas (8224 → 4475): sobra roteamento de página + Relatório de Plantões |
+| `frontend/index.html` | 3 novos `<script>` entre `pdf-utils.js` e `runtime-fixes.js` |
+| `package.json` | `smoke` cobre os 3 novos arquivos |
+
+### Fora de escopo (fica para uma fatia futura)
+
+- Cluster "drag-track" de 10 funções dentro de `escala-dia-editor.js`
+  (chamado por `restaurarAlmocoPadraoEscala`/`restaurarAlmocosCadastroDiaEscala`
+  mas funcionalmente um no-op, ver Fase 3b parte 1) — decisão pendente
+  entre reativar (recriar os ids de DOM que faltam) ou remover de vez.
+- Extração de Colaboradores + Jornada Semanal + Banco de Horas e Plantões
+  para arquivos próprios, e consolidação das implementações paralelas de
+  relatório mensal e dos 2 editores de colaborador — ainda pendentes desde
+  a Fase 3, fatia 1.
+- `runtime-fixes.js` continua com 4475 linhas (Relatório de Plantões +
+  roteamento de página); pode valer uma fatia futura para extrair o
+  Relatório de Plantões também, seguindo o mesmo padrão.
+
+---
+
 ## Fase 4 — Design system, fundação (parcial, em andamento) (2026-07-09)
 
 ### Contexto
