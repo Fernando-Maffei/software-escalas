@@ -1,26 +1,9 @@
 /* =========================================================
-   CENTRAL DE ESCALAS - SIDEBAR REFORMULADA
-   Substitua todo o conteúdo atual do sidebar.css por este arquivo.
+   CENTRAL DE ESCALAS - SIDEBAR
    Estado recolhido controlado pela classe: body.main-sidebar-collapsed
+   Tokens (--main-sidebar-width, --sidebar-*) vivem em themes.css junto
+   do resto do design system.
 ========================================================= */
-
-:root {
-  --main-sidebar-width: clamp(280px, 24vw, 340px);
-  --main-sidebar-collapsed-width: 104px;
-
-  --sidebar-bg-top: #1a1f35;
-  --sidebar-bg-bottom: #0c1126;
-  --sidebar-border: rgba(99, 102, 241, 0.22);
-
-  --sidebar-text: #ffffff;
-  --sidebar-text-muted: rgba(255, 255, 255, 0.62);
-  --sidebar-text-soft: rgba(255, 255, 255, 0.72);
-
-  --sidebar-item-size: 64px;
-  --sidebar-icon-size: 32px;
-  --sidebar-radius: 18px;
-  --sidebar-transition: 0.26s ease;
-}
 
 /* ===========================
    LAYOUT BASE
@@ -88,7 +71,7 @@ main,
 
 .sidebar::-webkit-scrollbar-thumb {
   background: rgba(129, 140, 248, 0.28);
-  border-radius: 999px;
+  border-radius: var(--radius-full);
 }
 
 /* ===========================
@@ -219,7 +202,7 @@ main,
   margin: 0 0 14px 0;
 
   border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 999px;
+  border-radius: var(--radius-full);
 
   background: rgba(255, 255, 255, 0.08);
   color: #ffffff;
@@ -324,7 +307,7 @@ main,
 }
 
 .sidebar-btn.active {
-  background: linear-gradient(135deg, var(--primary) 0%, #4f52e0 100%);
+  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
   color: #ffffff;
   border-color: rgba(255, 255, 255, 0.22);
   box-shadow: 0 10px 22px -6px rgba(99, 102, 241, 0.68);
@@ -434,7 +417,7 @@ main,
   max-width: 80px;
 
   padding: 4px 10px;
-  border-radius: 999px;
+  border-radius: var(--radius-full);
 
   background: rgba(99, 102, 241, 0.15);
   border: 1px solid rgba(99, 102, 241, 0.3);
@@ -501,7 +484,7 @@ main,
 
   background: rgba(0, 0, 0, 0.22);
   border: 1px solid rgba(255, 255, 255, 0.04);
-  border-radius: 999px;
+  border-radius: var(--radius-full);
 
   color: rgba(255, 255, 255, 0.46);
 
@@ -549,46 +532,44 @@ body.main-sidebar-collapsed .sidebar {
   width: var(--main-sidebar-collapsed-width);
   min-width: var(--main-sidebar-collapsed-width);
   max-width: var(--main-sidebar-collapsed-width);
-  padding: 26px 18px;
+  padding: 18px 12px;
   align-items: center;
 }
 
 /* Header recolhido: todos os itens usam a mesma largura visual */
 body.main-sidebar-collapsed .sidebar-header {
-  width: 68px;
-  min-width: 68px;
-  max-width: 68px;
+  width: 100%;
+  min-width: 0;
+  max-width: none;
 
   justify-content: center;
+  align-items: center;
   gap: 0;
 
-  padding: 0 0 22px 0;
-  margin: 0 0 18px 0;
+  padding: 0 0 18px 0;
+  margin: 0 0 14px 0;
 
   border-bottom: 1px solid rgba(99, 102, 241, 0.28);
 }
 
 body.main-sidebar-collapsed .logo-container {
-  width: 44px;
-  min-width: 44px;
-  height: 44px;
-  flex-basis: 44px;
+  width: 42px;
+  min-width: 42px;
+  height: 42px;
+  flex-basis: 42px;
+  margin: 0 auto;
 }
 
 body.main-sidebar-collapsed .sidebar-brand-copy {
-  max-width: 0;
-  flex: 0 0 0;
-  opacity: 0;
-  visibility: hidden;
-  pointer-events: none;
+  display: none;
 }
 
 /* Botão de recolher recolhido */
 body.main-sidebar-collapsed .sidebar-main-toggle {
-  width: 68px;
-  min-width: 68px;
+  width: 56px;
+  min-width: 56px;
   height: 30px;
-  margin: 0 auto 18px auto;
+  margin: 0 auto 12px auto;
 }
 
 body.main-sidebar-collapsed #toggleMainSidebar i {
@@ -597,16 +578,16 @@ body.main-sidebar-collapsed #toggleMainSidebar i {
 
 /* Botões recolhidos */
 body.main-sidebar-collapsed .sidebar-btn {
-  width: 68px;
-  min-width: 68px;
-  max-width: 68px;
-  height: 58px;
-  min-height: 58px;
+  width: 56px;
+  min-width: 56px;
+  max-width: 56px;
+  height: 56px;
+  min-height: 56px;
 
   justify-content: center;
 
   padding: 0;
-  margin: 0 auto 8px auto;
+  margin: 0 auto 6px auto;
 }
 
 body.main-sidebar-collapsed .btn-content {
@@ -614,6 +595,7 @@ body.main-sidebar-collapsed .btn-content {
   height: 100%;
 
   justify-content: center;
+  align-items: center;
   gap: 0;
 }
 
@@ -632,21 +614,21 @@ body.main-sidebar-collapsed .icon-wrapper {
 }
 
 body.main-sidebar-collapsed .sidebar-divider {
-  width: 68px;
-  margin: 18px auto;
+  width: 56px;
+  margin: 14px auto;
 }
 
 body.main-sidebar-collapsed .version-badge {
-  width: 68px;
-  min-height: 58px;
-  height: 58px;
+  width: 56px;
+  min-height: 56px;
+  height: 56px;
 
   justify-content: center;
 
   padding: 0;
-  margin: 14px auto 0 auto;
+  margin: 12px auto 0 auto;
 
-  border-radius: 50%;
+  border-radius: var(--radius-full);
 }
 
 body.main-sidebar-collapsed .version-badge span {
@@ -748,96 +730,4 @@ body.sidebar-no-transition .sidebar * {
   #appContent {
     min-height: 0;
   }
-}
-/* ===========================
-   AJUSTE FINO - SIDEBAR RECOLHIDA
-=========================== */
-
-body.main-sidebar-collapsed .sidebar {
-  width: 88px !important;
-  min-width: 88px !important;
-  max-width: 88px !important;
-  padding: 18px 12px !important;
-  gap: 8px !important;
-}
-
-/* Remove o espaço exagerado no topo */
-body.main-sidebar-collapsed .sidebar-header {
-  width: 100% !important;
-  padding: 0 0 18px 0 !important;
-  margin: 0 0 14px 0 !important;
-  min-height: auto !important;
-  height: auto !important;
-  justify-content: center !important;
-  align-items: center !important;
-  border-bottom: 1px solid rgba(99, 102, 241, 0.28) !important;
-}
-
-/* Logo menor e centralizada */
-body.main-sidebar-collapsed .logo-container {
-  width: 42px !important;
-  height: 42px !important;
-  min-width: 42px !important;
-  margin: 0 auto !important;
-}
-
-body.main-sidebar-collapsed .logo-image {
-  width: 42px !important;
-  height: 42px !important;
-  object-fit: contain !important;
-}
-
-/* Esconde o texto da marca sem deixar espaço */
-body.main-sidebar-collapsed .sidebar-brand-copy {
-  display: none !important;
-}
-
-/* Botão de recolher */
-body.main-sidebar-collapsed .sidebar-main-toggle {
-  width: 56px !important;
-  min-width: 56px !important;
-  height: 30px !important;
-  margin: 0 auto 12px auto !important;
-}
-
-/* Botões do menu */
-body.main-sidebar-collapsed .sidebar-btn {
-  width: 56px !important;
-  min-width: 56px !important;
-  max-width: 56px !important;
-  height: 56px !important;
-  padding: 0 !important;
-  margin: 0 auto 6px auto !important;
-}
-
-/* Conteúdo dos botões centralizado */
-body.main-sidebar-collapsed .btn-content {
-  width: 100% !important;
-  height: 100% !important;
-  justify-content: center !important;
-  align-items: center !important;
-  gap: 0 !important;
-}
-
-/* Ícones */
-body.main-sidebar-collapsed .icon-wrapper {
-  width: 32px !important;
-  height: 32px !important;
-  margin: 0 auto !important;
-}
-
-/* Divisores menores */
-body.main-sidebar-collapsed .sidebar-divider {
-  width: 56px !important;
-  margin: 14px auto !important;
-}
-
-/* Badge versão */
-body.main-sidebar-collapsed .version-badge {
-  width: 56px !important;
-  min-width: 56px !important;
-  height: 56px !important;
-  padding: 0 !important;
-  margin: 12px auto 0 auto !important;
-  justify-content: center !important;
 }

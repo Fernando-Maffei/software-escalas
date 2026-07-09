@@ -3,33 +3,33 @@
   background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
   color: white;
   border: none;
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   padding: 12px 24px;
   cursor: pointer;
   transition: var(--transition);
-  font-weight: 600;
-  font-size: 14px;
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--text-base);
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+  box-shadow: var(--shadow-primary);
 }
 
 .btn-primary:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 20px rgba(99, 102, 241, 0.4);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px -2px rgba(99, 102, 241, 0.35);
 }
 
 .btn-secondary {
   background: var(--card);
   color: var(--text);
-  border: 2px solid var(--border);
-  border-radius: 12px;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-md);
   padding: 12px 24px;
   cursor: pointer;
   transition: var(--transition);
-  font-weight: 600;
-  font-size: 14px;
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--text-base);
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -38,35 +38,35 @@
 .btn-secondary:hover {
   border-color: var(--primary);
   color: var(--primary);
-  transform: translateY(-2px);
+  transform: translateY(-1px);
 }
 
 .btn-danger {
   background: linear-gradient(135deg, var(--danger) 0%, #dc2626 100%);
   color: white;
   border: none;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   padding: 8px 16px;
   cursor: pointer;
   transition: var(--transition);
-  font-weight: 500;
-  font-size: 13px;
+  font-weight: var(--font-weight-medium);
+  font-size: var(--text-sm);
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+  box-shadow: var(--shadow-danger);
 }
 
 .btn-danger:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 20px rgba(239, 68, 68, 0.4);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px -2px rgba(239, 68, 68, 0.35);
 }
 
 .btn-icon-sm {
     width: 28px;
     height: 28px;
     border: none;
-    border-radius: 6px;
+    border-radius: var(--radius-sm);
     background: var(--bg-secondary);
     color: var(--text-secondary);
     cursor: pointer;
@@ -95,9 +95,9 @@
 .form-control {
   width: 100%;
   padding: 12px;
-  border-radius: 12px;
-  border: 2px solid var(--border);
-  font-size: 14px;
+  border-radius: var(--radius-md);
+  border: 1.5px solid var(--border);
+  font-size: var(--text-base);
   transition: var(--transition);
   background: var(--card);
   color: var(--text);
@@ -239,9 +239,9 @@ select.form-control option:hover {
   background: var(--card);
   padding: 32px;
   width: 420px;
-  border-radius: 24px;
+  border-radius: var(--radius-xl);
   box-shadow: var(--shadow-xl);
-  transform: scale(0.9);
+  transform: scale(0.96);
   transition: var(--transition);
   border: 1px solid var(--border);
 }
@@ -267,7 +267,7 @@ select.form-control option:hover {
   width: 32px;
   height: 32px;
   border: none;
-  border-radius: 10px;
+  border-radius: var(--radius-sm);
   background: var(--danger-soft);
   color: var(--danger);
   cursor: pointer;
@@ -319,7 +319,7 @@ select.form-control option:hover {
     background: var(--card);
     color: var(--text);
     padding: 16px 24px;
-    border-radius: 12px;
+    border-radius: var(--radius-md);
     box-shadow: var(--shadow-lg);
     animation: slideIn 0.3s ease;
     border-left: 4px solid var(--success);
@@ -457,8 +457,8 @@ select.form-control option:hover {
     justify-content: center;
     min-height: 400px;
     color: var(--text-light);
-    background: #f8fafc;
-    border-radius: 20px;
+    background: var(--bg-soft);
+    border-radius: var(--radius-xl);
     padding: 40px;
     text-align: center;
     border: 1px dashed var(--border);
@@ -474,14 +474,14 @@ select.form-control option:hover {
 
 .loading-state p,
 .empty-state p {
-    font-size: 16px;
+    font-size: var(--text-md);
     margin-bottom: 4px;
     color: var(--text-light);
-    font-weight: 500;
+    font-weight: var(--font-weight-medium);
 }
 
 .empty-state small {
-    font-size: 12px;
+    font-size: var(--text-sm);
     color: var(--text-lighter);
 }
 
@@ -497,11 +497,78 @@ select.form-control option:hover {
 
 ::-webkit-scrollbar-thumb {
   background: var(--primary);
-  border-radius: 20px;
+  border-radius: var(--radius-full);
   border: 2px solid var(--card-dark);
 }
 
 ::-webkit-scrollbar-thumb:hover {
   background: var(--primary-dark);
 }
+
+/* ================= CARD GENÉRICO ================= */
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  padding: var(--space-5);
+  transition: var(--transition);
+}
+
+.card:hover {
+  box-shadow: var(--shadow-lg);
+}
+
+.card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.card-title {
+  font-size: var(--text-md);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text);
+}
+
+/* Ícone em "pill" — padrão repetido em várias telas (dashboard, cards de resumo) */
+.icon-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-md);
+  background: var(--primary-soft);
+  color: var(--primary);
+  font-size: var(--text-lg);
+  flex: 0 0 auto;
+}
+
+.icon-badge.success { background: var(--success-soft); color: var(--success); }
+.icon-badge.warning { background: var(--warning-soft); color: var(--warning); }
+.icon-badge.danger  { background: var(--danger-soft);  color: var(--danger); }
+
+/* ================= BADGE / CHIP GENÉRICO ================= */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+  font-size: var(--text-xs);
+  font-weight: var(--font-weight-semibold);
+  line-height: 1.4;
+  white-space: nowrap;
+  background: var(--border);
+  color: var(--text-secondary);
+}
+
+.badge.primary { background: var(--primary-soft); color: var(--primary); }
+.badge.success { background: var(--success-soft); color: var(--success); }
+.badge.warning { background: var(--warning-soft); color: var(--warning); }
+.badge.danger  { background: var(--danger-soft);  color: var(--danger); }
+.badge.neutral { background: var(--bg-soft); color: var(--text-light); border: 1px solid var(--border); }
 

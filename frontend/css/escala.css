@@ -15,9 +15,9 @@
 
 .escala-sector-tab {
     border: 1px solid var(--border);
-    background: white;
+    background: var(--card);
     color: var(--text-light);
-    border-radius: 999px;
+    border-radius: var(--radius-full);
     padding: 8px 14px;
     font-size: 13px;
     font-weight: 600;
@@ -34,10 +34,11 @@
 
 .timeline-container {
     flex: 1;
-    background: white;
-    border-radius: 24px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-xl);
     padding: 20px;
-    box-shadow: var(--shadow-lg);
+    box-shadow: var(--shadow-md);
     overflow-x: auto;
 }
 
@@ -45,7 +46,7 @@
     display: grid;
     grid-template-columns: 260px repeat(var(--escala-hour-columns, 12), 1fr);
     background: var(--card-dark);
-    border-radius: 16px;
+    border-radius: var(--radius-lg);
     margin-bottom: 16px;
     font-weight: 600;
     font-size: 12px;
@@ -69,7 +70,7 @@
 .timeline-row {
     display: grid;
     grid-template-columns: 260px repeat(var(--escala-hour-columns, 12), 1fr);
-    border-radius: 14px;
+    border-radius: var(--radius-lg);
     overflow: hidden;
     margin-bottom: 8px;
     background: var(--card-dark);
@@ -78,8 +79,8 @@
 }
 
 .timeline-row:hover {
-    transform: translateX(5px);
-    box-shadow: var(--shadow-md);
+    transform: translateX(3px);
+    box-shadow: var(--shadow-sm);
     border-color: var(--primary);
 }
 
@@ -100,9 +101,9 @@
     align-items: center;
     margin-left: 4px;
     padding: 3px 8px;
-    border-radius: 999px;
-    background: #eff6ff;
-    color: #1d4ed8;
+    border-radius: var(--radius-full);
+    background: var(--primary-soft);
+    color: var(--primary-dark);
     font-size: 10px;
     font-weight: 700;
     text-transform: uppercase;
@@ -155,8 +156,8 @@
     position: absolute;
     inset: 6px;
     background: linear-gradient(135deg, var(--escala-status-trabalhando, var(--primary)) 0%, var(--escala-status-trabalhando-strong, var(--primary-dark)) 100%);
-    border-radius: 12px;
-    box-shadow: 0 2px 8px rgba(99, 102, 241, 0.3);
+    border-radius: var(--radius-md);
+    box-shadow: 0 1px 4px rgba(99, 102, 241, 0.25);
 }
 
 .timeline-cell.almoco::after {
@@ -164,8 +165,8 @@
     position: absolute;
     inset: 6px;
     background: linear-gradient(135deg, var(--escala-status-almoco, var(--warning)) 0%, var(--escala-status-almoco-strong, #d97706) 100%);
-    border-radius: 12px;
-    box-shadow: 0 2px 8px rgba(245, 158, 11, 0.3);
+    border-radius: var(--radius-md);
+    box-shadow: 0 1px 4px rgba(245, 158, 11, 0.25);
 }
 
 .timeline-cell.fora-expediente {
@@ -188,8 +189,9 @@
 .editor-sidebar {
     width: 400px;
     background: var(--card);
-    border-radius: 24px;
-    box-shadow: var(--shadow-xl);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-xl);
+    box-shadow: var(--shadow-md);
     position: relative;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     overflow: visible; /* Mudado de hidden para visible */
@@ -215,16 +217,16 @@
     width: 28px;
     height: 48px;
     background: var(--primary);
-    border-radius: 12px 0 0 12px;
+    border-radius: var(--radius-md) 0 0 var(--radius-md);
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
     color: white;
-    box-shadow: var(--shadow-md);
+    box-shadow: var(--shadow-sm);
     z-index: 100;
     transition: all 0.3s ease;
-    border: 2px solid white;
+    border: 2px solid var(--card);
 }
 
 .editor-toggle:hover {
@@ -238,7 +240,7 @@
 
 .editor-sidebar.collapsed .editor-toggle {
     left: 0;
-    border-radius: 0 12px 12px 0;
+    border-radius: 0 var(--radius-md) var(--radius-md) 0;
 }
 
 .editor-content {
@@ -270,7 +272,7 @@
     width: 32px;
     height: 32px;
     border: none;
-    border-radius: 8px;
+    border-radius: var(--radius-sm);
     background: var(--danger-soft);
     color: var(--danger);
     cursor: pointer;
@@ -294,7 +296,7 @@
     margin-bottom: 24px;
     background: linear-gradient(135deg, var(--primary-soft) 0%, transparent 100%);
     padding: 16px;
-    border-radius: 16px;
+    border-radius: var(--radius-lg);
 }
 
 .editor-header h4 {
@@ -334,17 +336,17 @@
     gap: 10px;
     background: var(--card-dark);
     padding: 8px;
-    border-radius: 12px;
+    border-radius: var(--radius-md);
 }
 
 .time-inputs input {
     flex: 1;
-    border: 2px solid var(--border);
-    border-radius: 8px;
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius-sm);
     padding: 10px;
     font-size: 14px;
     transition: var(--transition);
-    background: white;
+    background: var(--card);
     color: var(--text);
 }
 
@@ -375,8 +377,8 @@
 }
 
 .timeline-pill.warning {
-    background: #fff7ed;
-    color: #c2410c;
+    background: var(--warning-soft);
+    color: var(--warning);
 }
 
 .escala-range-shell {
@@ -444,7 +446,7 @@
 .escala-range-track {
     position: relative;
     height: 16px;
-    border-radius: 999px;
+    border-radius: var(--radius-full);
     background: rgba(148, 163, 184, 0.2);
     overflow: visible;
     cursor: grab;
@@ -462,7 +464,7 @@
     position: absolute;
     top: 0;
     bottom: 0;
-    border-radius: 999px;
+    border-radius: var(--radius-full);
     cursor: grab;
     box-shadow: 0 10px 24px rgba(15, 23, 42, 0.16);
 }
@@ -636,7 +638,7 @@
 
 /* ================= RESUMO POR HORÁRIO MELHORADO ================= */
 .resumo-container {
-    background: white;
+    background: var(--card);
     border-radius: 24px;
     padding: 24px;
     margin-top: 24px;
@@ -756,7 +758,7 @@
     gap: 4px;
     padding: 4px 10px;
     border-radius: 30px;
-    background: white;
+    background: var(--card);
     font-size: 12px;
     font-weight: 500;
     box-shadow: var(--shadow-sm);
@@ -847,7 +849,7 @@
 }
 
 .legend-section, .stats-section {
-    background: white;
+    background: var(--card);
     border-radius: 20px;
     padding: 20px;
     box-shadow: var(--shadow-lg);
@@ -1501,7 +1503,7 @@
 }
 
 .total-row .total-cell[onclick]:hover .total-valor {
-    background: white;
+    background: var(--card);
     box-shadow: var(--shadow-sm);
 }
 
@@ -1615,14 +1617,13 @@
 }
 
 .total-geral-valor {
-    background: white !important;
+    background: var(--card) !important;
     color: var(--primary-dark) !important;
     font-size: 16px !important;
     font-weight: 800 !important;
 }
 
 [data-theme="dark"] .total-geral-valor {
-    background: var(--card) !important;
     color: var(--primary) !important;
 }
 /* Garantir que todas as linhas usem o mesmo grid */
@@ -1664,7 +1665,7 @@
     font-size: 16px;
     font-weight: 800;
     color: var(--primary-dark);
-    background: white;
+    background: var(--card);
     padding: 4px 12px;
     border-radius: 20px;
     box-shadow: var(--shadow-sm);
@@ -1701,7 +1702,7 @@
 
 /* Células de total */
 .total-row .total-cell {
-    background: white;
+    background: var(--card);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1856,7 +1857,7 @@
     display: inline-flex;
     align-items: center;
     padding: 2px 8px;
-    border-radius: 999px;
+    border-radius: var(--radius-full);
     background: rgba(148, 163, 184, 0.18);
     color: var(--text-light);
     font-size: 11px;
@@ -2241,7 +2242,7 @@
 
 .escala-page .escala-scroll::-webkit-scrollbar-thumb {
     background: rgba(124, 124, 255, 0.45);
-    border-radius: 999px;
+    border-radius: var(--radius-full);
 }
 
 .escala-page .timeline-container {
@@ -2631,7 +2632,7 @@
     min-width: 32px;
     width: auto;
     height: 32px;
-    border-radius: 999px;
+    border-radius: var(--radius-full);
     background: rgba(124, 124, 255, 0.18);
     border: 1px solid rgba(124, 124, 255, 0.25);
     color: #dbeafe;

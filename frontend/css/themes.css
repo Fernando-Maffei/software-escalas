@@ -3,6 +3,7 @@
   /* Cores principais */
   --bg: #0b1120;
   --bg-soft: #f8fafc;
+  --bg-secondary: var(--bg-soft);
   --sidebar: #1a1f2f;
   --card: #ffffff;
   --card-dark: #f8fafc;
@@ -21,13 +22,68 @@
   --text-lighter: #94a3b8;
   --border: #e2e8f0;
   --border-dark: #cbd5e1;
-  
-  /* Sombras */
-  --shadow-sm: 0 2px 4px rgba(0,0,0,0.02), 0 1px 2px rgba(0,0,0,0.03);
-  --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -1px rgba(0,0,0,0.03);
-  --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.05), 0 4px 6px -2px rgba(0,0,0,0.02);
-  --shadow-xl: 0 20px 25px -5px rgba(0,0,0,0.05), 0 10px 10px -5px rgba(0,0,0,0.02);
-  
+
+  /* Sombras neutras (elevação) */
+  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.04), 0 1px 1px rgba(15, 23, 42, 0.03);
+  --shadow-md: 0 2px 6px -1px rgba(15, 23, 42, 0.06), 0 1px 3px -1px rgba(15, 23, 42, 0.04);
+  --shadow-lg: 0 8px 16px -4px rgba(15, 23, 42, 0.08), 0 3px 6px -2px rgba(15, 23, 42, 0.04);
+  --shadow-xl: 0 16px 28px -8px rgba(15, 23, 42, 0.1), 0 6px 10px -4px rgba(15, 23, 42, 0.05);
+
+  /* Sombras de marca (só para estados de ação/destaque) */
+  --shadow-primary: 0 4px 10px -2px rgba(99, 102, 241, 0.25);
+  --shadow-danger: 0 4px 10px -2px rgba(239, 68, 68, 0.25);
+
+  /* Raios de borda */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
+  --radius-full: 999px;
+
+  /* Espaçamento (grid de 4px) */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-7: 32px;
+  --space-8: 40px;
+
+  /* Tipografia */
+  --text-xs: 11px;
+  --text-sm: 12px;
+  --text-base: 14px;
+  --text-md: 16px;
+  --text-lg: 18px;
+  --text-xl: 22px;
+  --text-2xl: 28px;
+  --text-3xl: 34px;
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+
+  /* Breakpoints (referência — @media não aceita var(), usar o valor em px direto) */
+  --bp-sm: 640px;
+  --bp-md: 768px;
+  --bp-lg: 1024px;
+  --bp-xl: 1280px;
+
+  /* Sidebar (cores fixas, não variam por tema) */
+  --main-sidebar-width: clamp(280px, 24vw, 340px);
+  --main-sidebar-collapsed-width: 88px;
+  --sidebar-bg-top: #1a1f35;
+  --sidebar-bg-bottom: #0c1126;
+  --sidebar-border: rgba(99, 102, 241, 0.22);
+  --sidebar-text: #ffffff;
+  --sidebar-text-muted: rgba(255, 255, 255, 0.62);
+  --sidebar-text-soft: rgba(255, 255, 255, 0.72);
+  --sidebar-item-size: 64px;
+  --sidebar-icon-size: 32px;
+  --sidebar-radius: 18px;
+  --sidebar-transition: 0.26s ease;
+
   /* Transições */
   --transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
@@ -54,10 +110,12 @@
   --text-lighter: #64748b;
   --border: #334155;
   --border-dark: #475569;
-  
+
   /* Sombras - mais suaves no escuro */
   --shadow-sm: 0 2px 4px rgba(0,0,0,0.3);
   --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.4);
   --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.4);
   --shadow-xl: 0 20px 25px -5px rgba(0,0,0,0.5);
+  --shadow-primary: 0 4px 12px -2px rgba(129, 140, 248, 0.35);
+  --shadow-danger: 0 4px 12px -2px rgba(248, 113, 113, 0.3);
 }
