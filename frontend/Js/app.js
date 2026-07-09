@@ -101,12 +101,6 @@ window.aplicarCoresEscala = aplicarCoresEscala;
 
 
 
-// Substituir as funções antigas de abrir modal
-// Função para abrir modal de ausência (chamada pelo botão)
-function abrirModalAusencia(dataISO = null) {
-    console.log("Abrindo modal de ausência pelo botão...");
-    window.abrirModalLancamento('pessoal', null, false);
-}
 window.abrirModalFeriado = function(dataISO) {
     window.abrirModalLancamento('feriados', dataISO);
 };
@@ -462,8 +456,8 @@ async function testarComunicacaoRede(options = {}) {
             ? 'banco conectado'
             : 'banco indisponivel';
         const corsText = payload.cors?.mode === 'restricted'
-            ? 'CORS restrito por configuracao'
-            : 'CORS aberto para compatibilidade local';
+            ? 'CORS restrito por configuracao (CORS_ORIGINS)'
+            : 'CORS liberado apenas para a mesma origem';
 
         renderizarUrlsComunicacaoRede(payload);
         definirStatusComunicacaoRede(
@@ -545,6 +539,24 @@ function definirStatusServidorSegundoPlano(variant, message, detail = '') {
     detailNode.textContent = detail;
 }
 
+const BACKGROUND_SERVER_ACTION_ROUTES = {
+    install: 'instalar',
+    start: 'iniciar',
+    stop: 'parar',
+    uninstall: 'desinstalar'
+};
+
+async function chamarApiServidorSegundoPlano(path, options = {}) {
+    const response = await fetch(`/api/sistema/servidor-background/${path}`, options);
+    const data = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+        throw new Error(data.error || 'Nao foi possivel comunicar com o servidor.');
+    }
+
+    return data;
+}
+
 function renderizarServidorSegundoPlanoStatus(status = {}) {
     const panel = document.getElementById('backgroundServerPanel');
     const urlNode = document.getElementById('backgroundServerRecommendedUrl');
@@ -554,7 +566,7 @@ function renderizarServidorSegundoPlanoStatus(status = {}) {
         return;
     }
 
-    if (!window.desktopBackgroundServer || status.available === false) {
+    if (status.available === false) {
         panel.classList.add('is-hidden');
         return;
     }
@@ -586,13 +598,8 @@ function renderizarServidorSegundoPlanoStatus(status = {}) {
 }
 
 async function carregarServidorSegundoPlanoStatus() {
-    if (!window.desktopBackgroundServer) {
-        renderizarServidorSegundoPlanoStatus({ available: false });
-        return null;
-    }
-
     try {
-        const status = await window.desktopBackgroundServer.status();
+        const status = await chamarApiServidorSegundoPlano('status');
         renderizarServidorSegundoPlanoStatus(status);
         return status;
     } catch (error) {
@@ -606,8 +613,9 @@ async function carregarServidorSegundoPlanoStatus() {
 }
 
 async function executarAcaoServidorSegundoPlano(action) {
-    if (!window.desktopBackgroundServer?.[action]) {
-        mostrarToast('Recurso disponivel apenas no aplicativo desktop.', 'warning');
+    const routePath = BACKGROUND_SERVER_ACTION_ROUTES[action];
+
+    if (!routePath) {
         return;
     }
 
@@ -621,7 +629,7 @@ async function executarAcaoServidorSegundoPlano(action) {
     definirStatusServidorSegundoPlano('loading', labels[action] || 'Processando...', '');
 
     try {
-        const status = await window.desktopBackgroundServer[action]();
+        const status = await chamarApiServidorSegundoPlano(routePath, { method: 'POST' });
         renderizarServidorSegundoPlanoStatus(status);
         mostrarToast('Acao concluida.', 'success');
     } catch (error) {
@@ -638,11 +646,6 @@ function inicializarServidorSegundoPlano() {
     const panel = document.getElementById('backgroundServerPanel');
 
     if (!panel) {
-        return;
-    }
-
-    if (!window.desktopBackgroundServer) {
-        panel.classList.add('is-hidden');
         return;
     }
 
@@ -716,38 +719,6 @@ function inicializarAplicacaoUmaVez() {
 }
 document.addEventListener("DOMContentLoaded", async () => {
     inicializarAplicacaoUmaVez();
-    return;
-    console.log("Inicializando aplicação...");
-    
-    const temaSalvo = localStorage.getItem('tema') || 'light';
-    document.documentElement.setAttribute('data-theme', temaSalvo);
-
-    try {
-        await carregarColaboradores();
-        console.log("Colaboradores carregados:", colaboradores.length);
-        
-        await carregarAusencias();
-        console.log("Ausências carregadas:", ausencias.length);
-        
-        await carregarFeriadosLocais();
-        console.log("Feriados locais carregados:", feriadosLocais.length);
-        
-    } catch (error) {
-        console.error("Erro ao carregar dados:", error);
-        mostrarToast("Erro ao carregar dados do servidor", "error");
-    }
-    
-    configurarNavegacao();
-    configurarModais();
-    configurarObservers();
-    renderDashboard();
-
-
-    setTimeout(() => {
-            if (typeof window.setActiveButton === 'function') {
-                window.setActiveButton('dashboard');
-            }
-        }, 100);
 });
 
 
@@ -782,62 +753,6 @@ window.testarConexaoBackend = testarConexaoBackend;
 /* ===========================
    CONFIGURAÇÃO DE MODAIS
 =========================== */
-function configurarModais() {
-    console.log("Configurando modais...");
-    
-    // Botão de lançamento ajuste (delegação de eventos)
-    document.addEventListener('click', function(e) {
-        if (e.target.id === 'btnLancamentoAjuste' || e.target.closest('#btnLancamentoAjuste')) {
-            e.preventDefault();
-            abrirModalAusencia();
-        }
-    });
-    
-    // Fechar modal de lançamento (botão X)
-    const fecharModalBtn = document.getElementById('fecharModalBtn');
-    if (fecharModalBtn) {
-        fecharModalBtn.addEventListener('click', function() {
-            fecharModal('modal');
-        });
-    }
-    
-    // Fechar modal de horário (botão X)
-    const fecharModalHorarioBtn = document.getElementById('fecharModalHorarioBtn');
-    if (fecharModalHorarioBtn) {
-        fecharModalHorarioBtn.addEventListener('click', function() {
-            fecharModal('modalHorario');
-        });
-    }
-    
-    // Fechar modal de horário (botão Cancelar)
-    const fecharModalHorarioBtn2 = document.getElementById('fecharModalHorarioBtn2');
-    if (fecharModalHorarioBtn2) {
-        fecharModalHorarioBtn2.addEventListener('click', function() {
-            fecharModal('modalHorario');
-        });
-    }
-    
-    // Fechar ao clicar fora do modal
-    window.addEventListener('click', function(e) {
-        if (e.target.classList.contains('modal')) {
-            e.target.classList.add('hidden');
-            e.target.classList.remove('active');
-        }
-    });
-    
-    // Botão salvar ausência
-    const salvarAusenciaBtn = document.getElementById('salvarAusenciaBtn');
-    if (salvarAusenciaBtn) {
-        salvarAusenciaBtn.addEventListener('click', salvarAusencia);
-    }
-    
-    // Botão cancelar edição
-    const cancelarEdicaoBtn = document.getElementById('cancelarEdicaoLancamentoBtn');
-    if (cancelarEdicaoBtn) {
-        cancelarEdicaoBtn.addEventListener('click', cancelarEdicaoAusencia);
-    }
-}
-
 // Função para fechar modal
 function fecharModal(modalId) {
     const modal = document.getElementById(modalId);
@@ -848,63 +763,6 @@ function fecharModal(modalId) {
 }
 
 let dataSelecionada = null;
-
-/* ===========================
-   FUNÇÕES DE AUSÊNCIA
-=========================== */
-function abrirModalAusencia(dataISO = null) {
-    console.log("Abrindo modal de ausência...", dataISO);
-    
-    const modal = document.getElementById("modal");
-    if (!modal) {
-        console.error("Modal não encontrado!");
-        return;
-    }
-    
-    // Armazena a data selecionada (agora usado APENAS para referência)
-    dataSelecionada = dataISO;
-    
-    // MOSTRA APENAS O LOADING, ESCONDE OS OUTROS
-    document.getElementById("loadingAusencias").classList.remove("hidden");
-    document.getElementById("emptyAusencias").classList.add("hidden");
-    document.getElementById("listaAusencias").classList.add("hidden");
-    
-    // Limpa formulário
-    document.getElementById("colaboradorSelect").value = "";
-    document.getElementById("tipoSelect").value = "folga";
-    
-    if (dataISO) {
-
-        let dataFormatada = dataISO;
-        
-        if (dataISO.includes('T')) {
-            dataFormatada = dataISO.split('T')[0];
-        }
-        
-        console.log("Data sugerida para input:", dataFormatada);
-        
-        document.getElementById("dataInicio").value = dataFormatada;
-        document.getElementById("dataFim").value = dataFormatada;
-    } else {
-        document.getElementById("dataInicio").value = "";
-        document.getElementById("dataFim").value = "";
-    }
-    
-    // Reseta modo de edição
-    editandoAusenciaId = null;
-    document.getElementById("salvarAusenciaBtn").innerHTML = '<i class="fas fa-save"></i> Salvar';
-    document.getElementById("cancelarEdicaoLancamentoBtn").classList.add("hidden");
-    
-    // Carrega colaboradores no select
-    carregarColaboradoresNoSelect();
-    
-    // Carrega listagem de ausências APENAS DO DIA SELECIONADO (para mostrar lançamentos existentes)
-    carregarAusenciasDoDia(dataISO);
-    
-    // Abre o modal
-    modal.classList.remove("hidden");
-    modal.classList.add("active");
-}
 
 // Função para abrir modal de horário
 function abrirModalHorario(colaborador) {
@@ -1058,154 +916,6 @@ function carregarColaboradoresNoSelect() {
 
 
 
-
-// Atualize a função configurarModais para incluir o novo modal
-function configurarModais() {
-    console.log("Configurando modais...");
-    
-    // Botão de lançamento ajuste
-    document.addEventListener('click', function(e) {
-        if (e.target.id === 'btnLancamentoAjuste' || e.target.closest('#btnLancamentoAjuste')) {
-            e.preventDefault();
-            abrirModalAusencia();
-        }
-    });
-    
-    // Fechar modal de lançamento (botão X)
-    const fecharModalBtn = document.getElementById('fecharModalBtn');
-    if (fecharModalBtn) {
-        fecharModalBtn.addEventListener('click', function() {
-            fecharModal('modal');
-        });
-    }
-    
-    // Fechar modal de confirmação (botão X)
-    const fecharModalConfirmacaoBtn = document.getElementById('fecharModalConfirmacaoBtn');
-    if (fecharModalConfirmacaoBtn) {
-        fecharModalConfirmacaoBtn.addEventListener('click', function() {
-            fecharModal('modalConfirmacao');
-            exclusaoPendenteId = null;
-        });
-    }
-    
-    // Cancelar exclusão (botão Cancelar)
-    const cancelarExclusaoBtn = document.getElementById('cancelarExclusaoBtn');
-    if (cancelarExclusaoBtn) {
-        cancelarExclusaoBtn.addEventListener('click', function() {
-            fecharModal('modalConfirmacao');
-            exclusaoPendenteId = null;
-        });
-    }
-    
-    // Confirmar exclusão
-    const confirmarExclusaoBtn = document.getElementById('confirmarExclusaoBtn');
-    if (confirmarExclusaoBtn) {
-        confirmarExclusaoBtn.addEventListener('click', confirmarExclusao);
-    }
-    
-    // Fechar modal de horário (botão X)
-    const fecharModalHorarioBtn = document.getElementById('fecharModalHorarioBtn');
-    if (fecharModalHorarioBtn) {
-        fecharModalHorarioBtn.addEventListener('click', function() {
-            fecharModal('modalHorario');
-        });
-    }
-    
-    // Fechar modal de horário (botão Cancelar)
-    const fecharModalHorarioBtn2 = document.getElementById('fecharModalHorarioBtn2');
-    if (fecharModalHorarioBtn2) {
-        fecharModalHorarioBtn2.addEventListener('click', function() {
-            fecharModal('modalHorario');
-        });
-    }
-    
-    // Fechar ao clicar fora do modal
-    window.addEventListener('click', function(e) {
-        if (e.target.classList.contains('modal')) {
-            e.target.classList.add('hidden');
-            e.target.classList.remove('active');
-            if (e.target.id === 'modalConfirmacao') {
-                exclusaoPendenteId = null;
-            }
-        }
-    });
-    
-    // Botão salvar ausência
-    const salvarAusenciaBtn = document.getElementById('salvarAusenciaBtn');
-    if (salvarAusenciaBtn) {
-        salvarAusenciaBtn.addEventListener('click', salvarAusencia);
-    }
-    
-    // Botão cancelar edição
-    const cancelarEdicaoBtn = document.getElementById('cancelarEdicaoLancamentoBtn');
-    if (cancelarEdicaoBtn) {
-        cancelarEdicaoBtn.addEventListener('click', cancelarEdicaoAusencia);
-    }
-}
-
-
-async function confirmarExclusao() {
-    if (!exclusaoPendenteId) {
-        fecharModal('modalConfirmacao');
-        return;
-    }
-    
-    try {
-        console.log("Excluindo ID:", exclusaoPendenteId, "Tipo:", exclusaoTipo);
-        
-        let response;
-        let url;
-        
-        if (exclusaoTipo === 'feriado') {
-            url = `http://localhost:3000/api/feriados/${exclusaoPendenteId}`;
-        } else {
-            url = `http://localhost:3000/api/ausencias/${exclusaoPendenteId}`;
-        }
-        
-        console.log("URL:", url);
-        
-        response = await fetch(url, {
-            method: 'DELETE'
-        });
-        
-        if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(`Erro ${response.status}: ${errorText}`);
-        }
-        
-        // 🔥 ATUALIZAR TUDO
-        await atualizarTudo();
-        
-        // Se estava editando, cancelar edição
-        if (exclusaoTipo === 'feriado' && editandoFeriadoId === exclusaoPendenteId) {
-            cancelarEdicaoFeriado();
-        } else if (editandoAusenciaId === exclusaoPendenteId) {
-            cancelarEdicaoAusencia();
-        }
-        
-        // Se o modal de ausência estiver aberto, recarregar a listagem do dia
-        const modalAusencia = document.getElementById("modal");
-        if (modalAusencia && !modalAusencia.classList.contains('hidden') && dataSelecionada) {
-            await carregarAusenciasDoDia(dataSelecionada);
-        }
-        
-        // Se o modal de feriado estiver aberto, recarregar a listagem
-        const modalFeriado = document.getElementById("modalFeriado");
-        if (modalFeriado && !modalFeriado.classList.contains('hidden')) {
-            await carregarListaFeriados();
-        }
-        
-        mostrarToast("Excluído com sucesso!", "success");
-        
-    } catch (error) {
-        console.error("Erro ao excluir:", error);
-        mostrarToast(`Erro ao excluir: ${error.message}`, "error");
-    } finally {
-        fecharModal('modalConfirmacao');
-        exclusaoPendenteId = null;
-        exclusaoTipo = 'ausencia';
-    }
-}
 
 /* ===========================
    NAVEGAÇÃO
@@ -1365,103 +1075,6 @@ function renderColaboradores() {
     // Evento de busca
     document.getElementById('searchColaborador').addEventListener('input', function(e) {
         filtrarColaboradores(e.target.value);
-    });
-}
-
-function configurarToggleColaborador() {
-    const sidebar = document.getElementById('colaboradorEditor');
-    const toggleBtn = document.getElementById('toggleColaboradorEditor');
-    const toggleIcon = document.getElementById('toggleColaboradorIcon');
-
-    if (!sidebar || !toggleBtn) return;
-
-    // Remove eventos anteriores
-    toggleBtn.replaceWith(toggleBtn.cloneNode(true));
-    
-    // Pega os elementos novamente
-    const newToggleBtn = document.getElementById('toggleColaboradorEditor');
-    const newToggleIcon = document.getElementById('toggleColaboradorIcon');
-
-    newToggleBtn.addEventListener('click', function(e) {
-        e.preventDefault();
-        e.stopPropagation();
-        
-        sidebar.classList.toggle('collapsed');
-        
-        if (sidebar.classList.contains('collapsed')) {
-            newToggleIcon.className = 'fas fa-chevron-left';
-        } else {
-            newToggleIcon.className = 'fas fa-chevron-right';
-        }
-    });
-}
-
-function renderEditorForm(colaborador = null) {
-    const isEditing = colaborador !== null;
-    const colaboradorId = colaborador ? colaborador.Id : 'null';
-    
-    return `
-        <div class="editor-colaborador">
-            <div class="editor-form-group">
-                <label><i class="fas fa-user"></i> Nome</label>
-                <input type="text" id="editorNome" value="${colaborador?.Nome?.replace(/"/g, '&quot;') || ''}" placeholder="Nome completo" class="form-control">
-            </div>
-            
-            <div class="editor-form-group">
-                <label><i class="fas fa-briefcase"></i> Trabalho</label>
-                <div class="time-inputs">
-                    <input type="time" id="editorTrabInicio" value="${formatarHora(colaborador?.TrabalhoInicio) || ''}" class="form-control">
-                    <span>até</span>
-                    <input type="time" id="editorTrabFim" value="${formatarHora(colaborador?.TrabalhoFim) || ''}" class="form-control">
-                </div>
-            </div>
-            
-            <div class="editor-form-group">
-                <label><i class="fas fa-utensils"></i> Almoço</label>
-                <div class="time-inputs">
-                    <input type="time" id="editorAlmInicio" value="${formatarHora(colaborador?.AlmocoInicio) || ''}" class="form-control">
-                    <span>até</span>
-                    <input type="time" id="editorAlmFim" value="${formatarHora(colaborador?.AlmocoFim) || ''}" class="form-control">
-                </div>
-            </div>
-
-            ${buildBancoHorasEditorMarkup(colaborador)}
-            
-            <div class="editor-actions">
-                <button onclick="salvarColaboradorEditor(${colaboradorId})" class="btn-primary">
-                    <i class="fas fa-save"></i> ${isEditing ? 'Atualizar' : 'Salvar'}
-                </button>
-                <button onclick="fecharColaboradorEditor()" class="btn-secondary">
-                    <i class="fas fa-times"></i> Cancelar
-                </button>
-            </div>
-            
-            ${isEditing ? `
-                <div class="editor-footer">
-                    <button onclick="excluirColaborador(${colaborador.Id})" class="btn-danger" style="width: 100%;">
-                        <i class="fas fa-trash"></i> Excluir Colaborador
-                    </button>
-                </div>
-            ` : ''}
-        </div>
-    `;
-}
-
-function configurarColaboradorEditor() {
-    const sidebar = document.getElementById('colaboradorEditor');
-    const toggleBtn = document.getElementById('toggleColaboradorEditor');
-    const toggleIcon = document.getElementById('toggleColaboradorIcon');
-
-    if (!sidebar || !toggleBtn) return;
-
-    toggleBtn.addEventListener('click', () => {
-        sidebar.classList.toggle('collapsed');
-        
-        if (sidebar.classList.contains('collapsed')) {
-            toggleIcon.className = 'fas fa-chevron-left';
-        } else {
-            toggleIcon.className = 'fas fa-chevron-right';
-        }
     });
 }
 
@@ -1791,86 +1404,6 @@ function buildBancoHorasEditorMarkup(colaborador = null) {
     `;
 }
 
-async function salvarColaboradorEditor(id) {
-    console.log("Salvando colaborador ID:", id);
-    
-    const nome = document.getElementById('editorNome')?.value;
-    const trabalhoInicio = document.getElementById('editorTrabInicio')?.value;
-    const trabalhoFim = document.getElementById('editorTrabFim')?.value;
-    const almocoInicio = document.getElementById('editorAlmInicio')?.value;
-    const almocoFim = document.getElementById('editorAlmFim')?.value;
-    const bancoHorasSaldoInput = document.getElementById('editorBancoHorasSaldo');
-    const bancoHorasSaldo = (bancoHorasSaldoInput?.value || '').trim() || '+00:00';
-    const bancoHorasSaldoOriginal = (document.getElementById('editorBancoHorasSaldoOriginal')?.value || '').trim() || '+00:00';
-    const bancoHorasHabilitado = bancoHorasSaldoInput?.dataset?.enabled !== 'false';
-
-    if (bancoHorasHabilitado && !/^[+-]?\d+:\d{2}$/.test(bancoHorasSaldo)) {
-        mostrarToast("Saldo do banco de horas deve estar no formato +HH:MM ou -HH:MM.", "error");
-        return;
-    }
-
-    if (!nome) {
-        mostrarToast("Nome é obrigatório!", "error");
-        return;
-    }
-
-    try {
-        const metodo = id ? "PUT" : "POST";
-        const url = id 
-            ? `http://localhost:3000/api/colaboradores/${id}`
-            : `http://localhost:3000/api/colaboradores`;
-
-        const payload = {
-            nome,
-            trabalhoInicio,
-            trabalhoFim,
-            almocoInicio,
-            almocoFim
-        };
-
-        const response = await fetch(url, {
-            method: metodo,
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-        });
-        const data = await response.json().catch(() => null);
-
-        if (!response.ok) throw new Error(data?.error || data?.message || "Erro ao salvar");
-
-        const colaboradorId = Number(data?.data?.Id || data?.Id || id);
-
-        if (
-            bancoHorasHabilitado
-            && bancoHorasSaldo !== bancoHorasSaldoOriginal
-            && Number.isFinite(colaboradorId)
-            && colaboradorId > 0
-            && window.API?.atualizarBancoHorasSaldo
-        ) {
-            await window.API.atualizarBancoHorasSaldo(colaboradorId, {
-                saldo: bancoHorasSaldo
-            });
-        }
-
-        await carregarColaboradores();
-
-        if (typeof carregarBancoHorasResumo === 'function') {
-            await carregarBancoHorasResumo();
-        }
-
-        renderListaColaboradores();
-        fecharColaboradorEditor();
-        
-        mostrarToast(
-            id ? "Colaborador atualizado!" : "Colaborador salvo com sucesso!", 
-            "success"
-        );
-        
-    } catch (error) {
-        console.error("Erro ao salvar:", error);
-        mostrarToast(error.message || "Erro ao salvar colaborador", "error");
-    }
-}
-
 window.salvarColaboradorEditor = salvarColaboradorEditor = async function salvarColaboradorEditorAtualizado(id) {
     console.log("Salvando colaborador ID:", id);
 
@@ -1973,49 +1506,6 @@ function cancelarEdicao() {
     renderColaboradores();
 }
 
-async function salvarNovoColaborador() {
-    const nome = document.getElementById("novoNome")?.value;
-    const trabalhoInicio = document.getElementById("novoTrabInicio")?.value;
-    const trabalhoFim = document.getElementById("novoTrabFim")?.value;
-    const almocoInicio = document.getElementById("novoAlmInicio")?.value;
-    const almocoFim = document.getElementById("novoAlmFim")?.value;
-
-    if (!nome) {
-        mostrarToast("Nome é obrigatório!", "error");
-        return;
-    }
-
-    try {
-        const metodo = editandoId ? "PUT" : "POST";
-        const url = editandoId 
-            ? `http://localhost:3000/api/colaboradores/${editandoId}`
-            : `http://localhost:3000/api/colaboradores`;
-
-        const response = await fetch(url, {
-            method: metodo,
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                nome,
-                trabalhoInicio,
-                trabalhoFim,
-                almocoInicio,
-                almocoFim
-            })
-        });
-
-        if (!response.ok) throw new Error("Erro ao salvar");
-
-        editandoId = null;
-        await carregarColaboradores();
-        renderColaboradores();
-        mostrarToast("Colaborador salvo com sucesso!", "success");
-        
-    } catch (error) {
-        console.error("Erro ao salvar:", error);
-        mostrarToast("Erro ao salvar colaborador", "error");
-    }
-}
-
 function renderListaColaboradores(lista = colaboradores) {
     const container = document.getElementById("listaColaboradores");
     if (!container) return;
@@ -2065,22 +1555,6 @@ function renderListaColaboradores(lista = colaboradores) {
 
         container.appendChild(card);
     });
-}
-
-function editarColaborador(id) {
-    const c = colaboradores.find(x => x.Id === id);
-    if (!c) return;
-
-    editandoId = id;
-    renderColaboradores();
-
-    setTimeout(() => {
-        document.getElementById("novoNome").value = c.Nome || '';
-        document.getElementById("novoTrabInicio").value = formatarHora(c.TrabalhoInicio);
-        document.getElementById("novoTrabFim").value = formatarHora(c.TrabalhoFim);
-        document.getElementById("novoAlmInicio").value = formatarHora(c.AlmocoInicio);
-        document.getElementById("novoAlmFim").value = formatarHora(c.AlmocoFim);
-    }, 100);
 }
 
 async function excluirColaborador(id) {
@@ -2308,61 +1782,6 @@ async function carregarAusencias() {
     }
 }
 
-async function carregarFeriadosLocais() {
-    try {
-        console.log("Carregando feriados do backend...");
-        
-        // Tenta carregar do backend primeiro
-        const response = await fetch('http://localhost:3000/api/feriados');
-        
-        if (response.ok) {
-            const data = await response.json();
-            feriadosLocais = Array.isArray(data) ? data : [];
-            
-            // 🔥 Salva no localStorage como backup
-            localStorage.setItem('feriadosLocais', JSON.stringify(feriadosLocais));
-            
-            console.log(`Feriados locais carregados do backend: ${feriadosLocais.length}`);
-        } else {
-            // Se o backend falhar, carrega do localStorage
-            console.log("Backend não disponível, carregando do localStorage");
-            const feriadosSalvos = localStorage.getItem('feriadosLocais');
-            
-            if (feriadosSalvos) {
-                feriadosLocais = JSON.parse(feriadosSalvos);
-                console.log(`Feriados carregados do localStorage: ${feriadosLocais.length}`);
-            } else {
-                // Se não houver no localStorage, cria dados de exemplo
-                inicializarFeriadosExemplo();
-            }
-        }
-        
-        // 🔥 ATUALIZAR A VARIÁVEL GLOBAL
-        window.feriadosLocais = feriadosLocais;
-        
-        return feriadosLocais;
-        
-    } catch (error) {
-        console.error("Erro ao carregar feriados locais:", error);
-        
-        // Em caso de erro, tenta carregar do localStorage
-        try {
-            const feriadosSalvos = localStorage.getItem('feriadosLocais');
-            if (feriadosSalvos) {
-                feriadosLocais = JSON.parse(feriadosSalvos);
-                console.log(`Feriados recuperados do localStorage após erro: ${feriadosLocais.length}`);
-            } else {
-                inicializarFeriadosExemplo();
-            }
-        } catch (e) {
-            console.error("Erro ao recuperar do localStorage:", e);
-            feriadosLocais = [];
-        }
-        
-        window.feriadosLocais = feriadosLocais;
-        return feriadosLocais;
-    }
-}
 /* ===========================
    TELA ESCALA DO DIA
 =========================== */
@@ -2908,56 +2327,6 @@ function calcularHorasTrabalhadas(colaborador, dataSelecionada, ausenciasDoDia) 
     return Math.max(0, horasTrabalho);
 }
 
-function gerarTimelineVisual() {
-    const body = document.getElementById("timelineBody");
-    if (!body) return;
-
-    body.innerHTML = "";
-
-    if (!colaboradores || colaboradores.length === 0) {
-        body.innerHTML = '<div class="empty-state">Nenhum colaborador cadastrado</div>';
-        return;
-    }
-
-    colaboradores.forEach(c => {
-        const trabInicio = obterHoraNumerica(c.TrabalhoInicio);
-        const trabFim = obterHoraNumerica(c.TrabalhoFim);
-        const almInicio = obterHoraNumerica(c.AlmocoInicio);
-        const almFim = obterHoraNumerica(c.AlmocoFim);
-
-        const row = document.createElement("div");
-        row.classList.add("timeline-row");
-        row.setAttribute('data-colaborador-id', c.Id);
-
-        // 🔥 MUDANÇA AQUI: abrirEditorNaEscala em vez de abrirEditorColaborador
-        let html = `<div class="timeline-name" onclick="abrirEditorNaEscala(${c.Id})">
-            <i class="fas fa-user"></i> 
-            <span>${c.Nome || 'Sem nome'}</span>
-            <i class="fas fa-pen edit-indicator"></i>
-        </div>`;
-
-        for (let hora = 7; hora <= 18; hora++) {
-            let classe = "fora-expediente";
-            let tooltip = `${hora}:00 - Fora do expediente`;
-
-            if (trabInicio !== null && trabFim !== null && hora >= trabInicio && hora < trabFim) {
-                classe = "trabalhando";
-                tooltip = `${hora}:00 - Trabalhando`;
-            }
-
-            if (almInicio !== null && almFim !== null && hora >= almInicio && hora < almFim) {
-                classe = "almoco";
-                tooltip = `${hora}:00 - Horário de almoço`;
-            }
-
-            html += `<div class="timeline-cell ${classe}" title="${tooltip}"></div>`;
-        }
-
-        row.innerHTML = html;
-        body.appendChild(row);
-    });
-
-}
 function abrirEditorColaborador(id) {
     console.log("Abrindo editor para ID:", id);
     
@@ -3128,99 +2497,6 @@ function fecharEditor() {
     `;
 }
 
-function atualizarEstatisticas() {
-    const statsContainer = document.getElementById('statsContent');
-    if (!statsContainer || !colaboradores.length) return;
-
-    const agora = new Date();
-    const horaAtual = agora.getHours();
-
-    let trabalhandoAgora = 0;
-    let almocoAgora = 0;
-    let foraAgora = 0;
-
-    colaboradores.forEach(c => {
-        const trabInicio = obterHoraNumerica(c.TrabalhoInicio);
-        const trabFim = obterHoraNumerica(c.TrabalhoFim);
-        const almInicio = obterHoraNumerica(c.AlmocoInicio);
-        const almFim = obterHoraNumerica(c.AlmocoFim);
-
-        const noTrabalho = trabInicio !== null && trabFim !== null && 
-                          horaAtual >= trabInicio && horaAtual < trabFim;
-        
-        const noAlmoco = almInicio !== null && almFim !== null && 
-                        horaAtual >= almInicio && horaAtual < almFim;
-
-        if (noAlmoco) {
-            almocoAgora++;
-        } else if (noTrabalho) {
-            trabalhandoAgora++;
-        } else {
-            foraAgora++;
-        }
-    });
-
-    statsContainer.innerHTML = `
-        <div class="stat-item">
-            <span class="stat-label">Hora atual:</span>
-            <span class="stat-value">${horaAtual}:00</span>
-        </div>
-        <div class="stat-item">
-            <span class="stat-label trabalhando-text">👔 Trabalhando:</span>
-            <span class="stat-value">${trabalhandoAgora}</span>
-        </div>
-        <div class="stat-item">
-            <span class="stat-label almoco-text">🍽️ Em almoço:</span>
-            <span class="stat-value">${almocoAgora}</span>
-        </div>
-        <div class="stat-item">
-            <span class="stat-label fora-text">⚪ Fora:</span>
-            <span class="stat-value">${foraAgora}</span>
-        </div>
-        <div class="stat-item total">
-            <span class="stat-label">Total:</span>
-            <span class="stat-value">${colaboradores.length}</span>
-        </div>
-    `;
-}
-
-/* ===========================
-   TELA CALENDÁRIO
-=========================== */
-function renderCalendario() {
-    appContent.innerHTML = `
-        <div class="page-header">
-            <h1>Calendário Mensal</h1>
-            <button id="btnLancamentoAjuste" class="btn-primary">
-                <i class="fas fa-plus"></i> Lançamento ajuste
-            </button>
-        </div>
-
-        <div class="calendar-wrapper">
-            <div class="calendar-header">
-                <div class="month-nav">
-                    <button id="prevMonth" class="nav-btn">
-                        <i class="fas fa-chevron-left"></i>
-                    </button>
-                    <h2 id="monthTitle">Carregando...</h2>
-                    <button id="nextMonth" class="nav-btn">
-                        <i class="fas fa-chevron-right"></i>
-                    </button>
-                </div>
-            </div>
-
-            <div class="weekdays"></div>
-            <div id="calendar" class="calendar-grid"></div>
-        </div>
-    `;
-
-    setTimeout(() => {
-        if (typeof inicializarCalendario === 'function') {
-            inicializarCalendario();
-        }
-    }, 100);
-}
-
 /* ===========================
    UTILITÁRIOS
 =========================== */
@@ -3329,84 +2605,6 @@ function debugAusencias() {
         });
         console.log("Filtradas pelo dia:", filtradas);
     }
-}
-
-function gerarLinhaResumo() {
-    const body = document.getElementById("timelineBody");
-    if (!body) return;
-
-    // Verifica se já existe uma linha de resumo e remove
-    const linhaResumoExistente = document.getElementById('linhaResumo');
-    if (linhaResumoExistente) {
-        linhaResumoExistente.remove();
-    }
-
-    // Cria array para contar colaboradores por hora
-    const contagemPorHora = Array(12).fill(0).map(() => ({
-        trabalhando: 0,
-        almoco: 0,
-        fora: 0
-    }));
-
-    // Conta colaboradores em cada hora
-    colaboradores.forEach(c => {
-        const trabInicio = obterHoraNumerica(c.TrabalhoInicio);
-        const trabFim = obterHoraNumerica(c.TrabalhoFim);
-        const almInicio = obterHoraNumerica(c.AlmocoInicio);
-        const almFim = obterHoraNumerica(c.AlmocoFim);
-
-        for (let hora = 7; hora <= 18; hora++) {
-            const index = hora - 7;
-            
-            const noAlmoco = almInicio !== null && almFim !== null && 
-                            hora >= almInicio && hora < almFim;
-            
-            const noTrabalho = trabInicio !== null && trabFim !== null && 
-                              hora >= trabInicio && hora < trabFim && !noAlmoco;
-
-            if (noAlmoco) {
-                contagemPorHora[index].almoco++;
-            } else if (noTrabalho) {
-                contagemPorHora[index].trabalhando++;
-            } else {
-                contagemPorHora[index].fora++;
-            }
-        }
-    });
-
-    // Cria a linha de resumo
-    const linhaResumo = document.createElement("div");
-    linhaResumo.id = 'linhaResumo';
-    linhaResumo.className = 'timeline-row resumo-row';
-
-    let html = `<div class="timeline-name resumo-nome">
-        <i class="fas fa-chart-bar"></i>
-        <span><strong>Resumo</strong></span>
-    </div>`;
-
-    for (let hora = 7; hora <= 18; hora++) {
-        const index = hora - 7;
-        const dados = contagemPorHora[index];
-        
-        html += `
-            <div class="timeline-cell resumo-cell" title="${hora}:00">
-                <div class="resumo-info">
-                    <span class="resumo-trabalhando" title="Trabalhando">
-                        <i class="fas fa-briefcase"></i> ${dados.trabalhando}
-                    </span>
-                    <span class="resumo-almoco" title="Almoço">
-                        <i class="fas fa-utensils"></i> ${dados.almoco}
-                    </span>
-                    <span class="resumo-fora" title="Fora">
-                        <i class="fas fa-clock"></i> ${dados.fora}
-                    </span>
-                </div>
-            </div>
-        `;
-    }
-
-    linhaResumo.innerHTML = html;
-    body.appendChild(linhaResumo);
 }
 
 function gerarResumoHorarios() {
@@ -4338,96 +3536,6 @@ function exportarDados() {
         mostrarToast('Erro ao exportar dados', 'error');
     }
 }
-function importarDados() {
-    // Cria input de arquivo invisível
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = '.json';
-    input.style.display = 'none';
-    
-    input.onchange = async (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-        
-        const reader = new FileReader();
-        
-        reader.onload = async (event) => {
-            try {
-                // Parse do JSON
-                const dados = JSON.parse(event.target.result);
-                
-                // Valida se é um arquivo válido
-                if (!dados.colaboradores || !dados.ausencias) {
-                    throw new Error('Arquivo inválido');
-                }
-                
-                // Confirmação do usuário
-                if (!confirm('A importação irá substituir todos os dados atuais. Deseja continuar?')) {
-                    return;
-                }
-                
-                mostrarToast('Importando dados...', 'warning');
-                
-                // Importar colaboradores
-                for (const colab of dados.colaboradores) {
-                    await fetch('http://localhost:3000/api/colaboradores', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(colab)
-                    });
-                }
-                
-                // Importar ausências
-                for (const aus of dados.ausencias) {
-                    await fetch('http://localhost:3000/api/ausencias', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(aus)
-                    });
-                }
-                
-                // Importar preferências (opcional)
-                if (dados.preferencias) {
-                    if (dados.preferencias.tema) {
-                        localStorage.setItem('tema', dados.preferencias.tema);
-                        document.documentElement.setAttribute('data-theme', dados.preferencias.tema);
-                    }
-                    if (dados.preferencias.primeiroDiaSemana) {
-                        localStorage.setItem('primeiroDiaSemana', dados.preferencias.primeiroDiaSemana);
-                    }
-                    if (dados.preferencias.formatoHora) {
-                        localStorage.setItem('formatoHora', dados.preferencias.formatoHora);
-                    }
-                    if (dados.preferencias.notificacoes !== undefined) {
-                        localStorage.setItem('notificacoes', dados.preferencias.notificacoes);
-                    }
-                }
-                
-                // Recarrega os dados no sistema
-                await carregarColaboradores();
-                await carregarAusencias();
-                
-                // Atualiza a interface se necessário
-                if (document.getElementById('calendar')) {
-                    gerarCalendario(mesAtual, anoAtual);
-                }
-                
-                mostrarToast('Dados importados com sucesso!', 'success');
-                
-            } catch (error) {
-                console.error('Erro ao importar:', error);
-                mostrarToast('Erro ao importar arquivo', 'error');
-            }
-        };
-        
-        reader.readAsText(file);
-    };
-    
-    document.body.appendChild(input);
-    input.click();
-    document.body.removeChild(input);
-}
-
 function aplicarPreferenciasImportadas(preferencias = {}) {
     if (!preferencias || typeof preferencias !== 'object') {
         return;
@@ -4530,43 +3638,6 @@ function resetarSistema() {
         } else {
             mostrarToast('Operação cancelada', 'error');
         }
-    }
-}
-
-async function carregarPlantoes() {
-    try {
-        const res = await fetch('http://localhost:3000/api/plantoes');
-        if (!res.ok) throw new Error("Erro na requisição");
-        const data = await res.json();
-        
-        console.log("📦 Dados brutos dos plantões:", data);
-        
-        // 🔥 MAPEAMENTO CORRETO
-        plantoesLancados = data.map(p => {
-            // Extrair a data corretamente
-            let dataISO = p.dataISO;
-            
-            // Se não tiver dataISO, usar data_plantao
-            if (!dataISO && p.data_plantao) {
-                if (p.data_plantao instanceof Date) {
-                    dataISO = p.data_plantao.toISOString().split('T')[0];
-                } else {
-                    dataISO = p.data_plantao.split('T')[0];
-                }
-            }
-            
-            return {
-                ...p,
-                dataISO: dataISO, // Garantir formato YYYY-MM-DD
-                colaboradores: p.colaboradores || []
-            };
-        });
-        
-        console.log("✅ Plantões carregados e mapeados:", plantoesLancados);
-        
-    } catch (error) {
-        console.error("Erro ao carregar plantões:", error);
-        plantoesLancados = [];
     }
 }
 
@@ -4735,28 +3806,6 @@ function carregarPlantoesLancadosNaTela() {
     if (container) {
         container.innerHTML = renderPlantoesLancados();
     }
-}
-
-// Função para renderizar colaboradores do plantão
-function renderColaboradoresPlantao(colaboradoresIds) {
-    if (!colaboradoresIds || colaboradoresIds.length === 0) {
-        return '<span class="sem-colaboradores">Nenhum colaborador selecionado</span>';
-    }
-    
-    let html = '';
-    
-    colaboradoresIds.forEach(id => {
-        const colaborador = colaboradores.find(c => c.Id === id);
-        if (colaborador) {
-            html += `
-                <span class="colaborador-tag">
-                    <i class="fas fa-user"></i> ${colaborador.Nome}
-                </span>
-            `;
-        }
-    });
-    
-    return html;
 }
 
 function renderColaboradoresPlantao(colaboradoresIds) {
@@ -5945,319 +4994,12 @@ function formatarDataBR(dataISO) {
     return `${dia}/${mes}/${ano}`;
 }
 
-async function exportarRelatorioPDF() {
-    const elemento = document.querySelector('.relatorio-calendario');
-    const titulo = document.getElementById('relatorioTitulo').innerText;
-    
-    if (!elemento) {
-        mostrarToast('Relatório não encontrado!', 'error');
-        return;
-    }
-    
-    mostrarToast('Gerando PDF...', 'warning');
-    
-    try {
-        const canvas = await html2canvas(elemento, {
-            scale: 2,
-            backgroundColor: '#ffffff'
-        });
-        
-        const imgData = canvas.toDataURL('image/png');
-        const pdf = new jspdf.jsPDF({
-            orientation: 'landscape',
-            unit: 'px',
-            format: [canvas.width * 0.75, canvas.height * 0.75]
-        });
-        
-        pdf.addImage(imgData, 'PNG', 0, 0, canvas.width * 0.75, canvas.height * 0.75);
-        pdf.save(`${titulo.replace(/ /g, '_')}.pdf`);
-        
-        mostrarToast('PDF gerado com sucesso!', 'success');
-        
-    } catch (error) {
-        console.error('Erro ao gerar PDF:', error);
-        mostrarToast('Erro ao gerar PDF', 'error');
-    }
-}
-
 function exportarRelatorioEscala() {
     alert('Função de exportação será implementada em breve!');
 }
 
 function exportarRelatorioPlantoes() {
     alert('Função de exportação será implementada em breve!');
-}
-
-function gerarRelatorioCalendario(mes, ano) {
-    // Agora usa mes e ano que vieram como parâmetro
-    const diasNoMes = new Date(ano, mes + 1, 0).getDate();
-    const primeiroDia = new Date(ano, mes, 1).getDay(); // 0 = Domingo
-    
-    const meses = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 
-                   'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
-    
-    // Mapear eventos por data
-    const eventosPorData = {};
-    const ferias = [];
-    const folgas = [];
-    const ausencias = [];
-    const feriadosLista = [];
-    
-    for (let dia = 1; dia <= diasNoMes; dia++) {
-        const dataISO = `${ano}-${String(mes+1).padStart(2,'0')}-${String(dia).padStart(2,'0')}`;
-        eventosPorData[dataISO] = {
-            feriado: null,
-            colaboradores: []
-        };
-        
-        // Verifica feriado
-        const feriado = feriados?.find(f => f.date === dataISO);
-        if (feriado) {
-            eventosPorData[dataISO].feriado = feriado.name;
-            feriadosLista.push({
-                data: dataISO,
-                nome: feriado.name
-            });
-        }
-        
-        // Verifica ausências do dia
-        const ausenciasDoDia = ausencias.filter(a => {
-            const dataInicio = new Date(a.DataInicio).toISOString().split('T')[0];
-            const dataFim = new Date(a.DataFim).toISOString().split('T')[0];
-            return dataISO >= dataInicio && dataISO <= dataFim;
-        });
-        
-        ausenciasDoDia.forEach(a => {
-            const colaborador = colaboradores.find(c => c.Id === (a.colaboradorId || a.ColaboradorId));
-            if (colaborador) {
-                eventosPorData[dataISO].colaboradores.push({
-                    nome: colaborador.Nome,
-                    tipo: a.tipo
-                });
-                
-                if (a.tipo === 'ferias') {
-                    ferias.push({
-                        colaborador: colaborador.Nome,
-                        data: dataISO
-                    });
-                } else if (a.tipo === 'folga') {
-                    folgas.push({
-                        colaborador: colaborador.Nome,
-                        data: dataISO
-                    });
-                } else if (a.tipo === 'ausencia') {
-                    ausencias.push({
-                        colaborador: colaborador.Nome,
-                        data: dataISO
-                    });
-                }
-            }
-        });
-    }
-    
-    mostrarRelatorioCalendario(meses[mes], ano, primeiroDia, diasNoMes, eventosPorData, ferias, folgas, ausencias, feriadosLista, mes);
-}
-
-
-function mostrarRelatorioCalendario(mesNome, ano, primeiroDia, diasNoMes, eventosPorData, ferias, folgas, ausencias, feriados, mes) {
-    const diasSemana = ['DOM', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SÁB'];
-    
-    let html = `
-        <div class="relatorio-calendario">
-            <div class="calendario-titulo">
-                <h2>${ano}</h2>
-                <h3>${mesNome.toUpperCase()}</h3>
-            </div>
-            
-            <table class="calendario-tabela">
-                <thead>
-                    <tr>
-                        ${diasSemana.map(dia => `<th>${dia}</th>`).join('')}
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-    `;
-    
-    // Preencher dias vazios do início
-    for (let i = 0; i < primeiroDia; i++) {
-        html += '<td class="vazio"></td>';
-    }
-    
-    // Preencher os dias do mês
-    for (let dia = 1; dia <= diasNoMes; dia++) {
-        const dataISO = `${ano}-${String(mes + 1).padStart(2, '0')}-${String(dia).padStart(2, '0')}`;
-        const eventos = eventosPorData[dataISO];
-        const isFeriado = eventos?.feriado;
-        
-        // Coletar colaboradores por tipo para este dia
-        const colaboradoresDia = eventos?.colaboradores || [];
-        const folgasDia = colaboradoresDia.filter(c => c.tipo === 'folga').map(c => c.nome);
-        const feriasDia = colaboradoresDia.filter(c => c.tipo === 'ferias').map(c => c.nome);
-        const ausenciasDia = colaboradoresDia.filter(c => c.tipo === 'ausencia').map(c => c.nome);
-        
-        html += `<td class="${isFeriado ? 'feriado' : ''}">`;
-        html += `<div class="dia-numero">${dia}</div>`;
-        
-        // Mostrar feriado se houver
-        if (isFeriado) {
-            html += `<div class="dia-feriado">${eventos.feriado}</div>`;
-        }
-        
-        // Mostrar folgas
-        if (folgasDia.length > 0) {
-            html += `<div class="dia-folgas">`;
-            folgasDia.forEach(nome => {
-                html += `<span class="folga-tag">${nome}</span>`;
-            });
-            html += `</div>`;
-        }
-        
-        // Mostrar férias
-        if (feriasDia.length > 0) {
-            html += `<div class="dia-ferias">`;
-            feriasDia.forEach(nome => {
-                html += `<span class="ferias-tag">${nome}</span>`;
-            });
-            html += `</div>`;
-        }
-        
-        // Mostrar ausências
-        if (ausenciasDia.length > 0) {
-            html += `<div class="dia-ausencias">`;
-            ausenciasDia.forEach(nome => {
-                html += `<span class="ausencia-tag">${nome}</span>`;
-            });
-            html += `</div>`;
-        }
-        
-        html += '</td>';
-        
-        // Quebrar linha no sábado
-        if ((primeiroDia + dia) % 7 === 0) {
-            html += '</tr><tr>';
-        }
-    }
-    
-    // Preencher dias vazios do final
-    const totalCelulas = Math.ceil((primeiroDia + diasNoMes) / 7) * 7;
-    const celulasRestantes = totalCelulas - (primeiroDia + diasNoMes);
-    for (let i = 0; i < celulasRestantes; i++) {
-        html += '<td class="vazio"></td>';
-    }
-    
-    html += `
-                    </tr>
-                </tbody>
-            </table>
-            
-            <!-- LEGENDAS -->
-            <div class="calendario-legendas">
-                <div class="legenda-item">
-                    <span class="legenda-cor ferias-cor"></span>
-                    <span>Férias</span>
-                </div>
-                <div class="legenda-item">
-                    <span class="legenda-cor folga-cor"></span>
-                    <span>Folga</span>
-                </div>
-                <div class="legenda-item">
-                    <span class="legenda-cor ausencia-cor"></span>
-                    <span>Ausência</span>
-                </div>
-                <div class="legenda-item">
-                    <span class="legenda-cor feriado-cor"></span>
-                    <span>Feriado</span>
-                </div>
-            </div>
-    `;
-    
-    // LISTAS RESUMO
-    html += `
-            <div class="calendario-resumo">
-                <div class="resumo-coluna">
-                    <h4>Férias</h4>
-                    <table class="resumo-tabela">
-                        <thead>
-                            <tr>
-                                <th>Colaborador</th>
-                                <th>Início</th>
-                                <th>Fim</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-    `;
-    
-    // Agrupar férias por colaborador
-    const feriasAgrupadas = {};
-    ferias.forEach(f => {
-        if (!feriasAgrupadas[f.colaborador]) {
-            feriasAgrupadas[f.colaborador] = [];
-        }
-        feriasAgrupadas[f.colaborador].push(f.data);
-    });
-    
-    // Mostrar períodos de férias
-    Object.keys(feriasAgrupadas).forEach(colab => {
-        const datas = feriasAgrupadas[colab].sort();
-        if (datas.length > 0) {
-            html += `
-                <tr>
-                    <td><strong>${colab}</strong></td>
-                    <td>${formatarData(datas[0])}</td>
-                    <td>${formatarData(datas[datas.length-1])}</td>
-                </tr>
-            `;
-        }
-    });
-    
-    html += `
-                        </tbody>
-                    </table>
-                </div>
-                
-                <div class="resumo-coluna">
-                    <h4>Ausências</h4>
-                    <table class="resumo-tabela">
-                        <thead>
-                            <tr>
-                                <th>Colaborador</th>
-                                <th>Data</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-    `;
-    
-    // Mostrar ausências pontuais
-    ausencias.slice(0, 10).forEach(a => {
-        html += `
-            <tr>
-                <td>${a.colaborador}</td>
-                <td>${formatarData(a.data)}</td>
-            </tr>
-        `;
-    });
-    
-    if (ausencias.length > 10) {
-        html += `<tr><td colspan="2">... e mais ${ausencias.length - 10} ausências</td></tr>`;
-    }
-    
-    html += `
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-    `;
-    
-    document.getElementById('relatorioTitulo').innerText = `Relatório de ${mesNome} ${ano}`;
-    document.getElementById('relatorioConteudo').innerHTML = html;
-    document.getElementById('relatorioVisualizacao').style.display = 'block';
-}
-
-function formatarData(dataISO) {
-    const [ano, mes, dia] = dataISO.split('-');
-    return `${dia}/${mes}/${ano}`;
 }
 
 async function exportarRelatorioPDF() {
@@ -6843,112 +5585,6 @@ function coletarDadosParaJSON(mes, ano) {
             return dataInicio.getMonth() === mes || dataFim.getMonth() === mes;
         })
     };
-}
-
-function gerarEstiloPDF() {
-    return `
-        <style>
-            body { font-family: Arial, sans-serif; margin: 20px; }
-            h1 { color: #6366f1; text-align: center; font-size: 32px; margin-bottom: 5px; }
-            h2 { color: #1e293b; text-align: center; font-size: 24px; text-transform: uppercase; margin-top: 0; margin-bottom: 30px; }
-            
-            .calendario-pdf {
-                width: 100%;
-                border-collapse: collapse;
-                margin-bottom: 30px;
-            }
-            
-            .calendario-pdf th {
-                background: #6366f1;
-                color: white;
-                padding: 12px;
-                font-weight: 600;
-                font-size: 14px;
-                border: 1px solid #cbd5e1;
-            }
-            
-            .calendario-pdf td {
-                border: 1px solid #cbd5e1;
-                vertical-align: top;
-                height: 100px;
-                width: 14.28%;
-                padding: 6px;
-            }
-            
-            .calendario-pdf td.vazio {
-                background: #f8fafc;
-            }
-            
-            .calendario-pdf td.feriado {
-                background: #fee2e2;
-            }
-            
-            .dia-numero {
-                font-weight: bold;
-                font-size: 16px;
-                margin-bottom: 5px;
-            }
-            
-            .dia-feriado {
-                font-size: 9px;
-                color: #ef4444;
-                font-weight: 600;
-                margin-bottom: 5px;
-            }
-            
-            .evento-tag {
-                font-size: 8px;
-                padding: 2px 4px;
-                border-radius: 3px;
-                margin-top: 2px;
-                white-space: nowrap;
-                overflow: hidden;
-                text-overflow: ellipsis;
-            }
-            
-            .folga-tag {
-                background: #d1fae5;
-                color: #10b981;
-            }
-            
-            .ferias-tag {
-                background: #e0e7ff;
-                color: #4f52e0;
-            }
-            
-            .ausencia-tag {
-                background: #fee2e2;
-                color: #ef4444;
-            }
-            
-            .legendas-pdf {
-                display: flex;
-                gap: 20px;
-                margin-top: 20px;
-                padding: 10px;
-                background: #f8fafc;
-                border-radius: 8px;
-            }
-            
-            .legenda-item {
-                display: flex;
-                align-items: center;
-                gap: 8px;
-                font-size: 12px;
-            }
-            
-            .legenda-cor {
-                width: 16px;
-                height: 16px;
-                border-radius: 4px;
-            }
-            
-            .legenda-folga { background: #d1fae5; border: 1px solid #10b981; }
-            .legenda-ferias { background: #e0e7ff; border: 1px solid #4f52e0; }
-            .legenda-ausencia { background: #fee2e2; border: 1px solid #ef4444; }
-            .legenda-feriado { background: #fee2e2; border: 1px solid #ef4444; }
-        </style>
-    `;
 }
 
 // ========== FUNÇÃO PARA GERAR HTML COMPLETO DO PDF ==========
@@ -8248,39 +6884,6 @@ function configurarModais() {
 }
 
 
-// Atualizar carregamento inicial
-document.addEventListener("DOMContentLoaded", async () => {
-    inicializarAplicacaoUmaVez();
-    return;
-    console.log("Inicializando aplicação...");
-    
-    const temaSalvo = localStorage.getItem('tema') || 'light';
-    document.documentElement.setAttribute('data-theme', temaSalvo);
-
-    try {
-        await carregarColaboradores();
-        await carregarAusencias();
-        await carregarFeriadosLocais();
-        await carregarPlantoes(); // 🔥 IMPORTANTE: Carregar plantões
-        
-        console.log("✅ Todos os dados carregados!");
-        
-    } catch (error) {
-        console.error("❌ Erro ao carregar dados:", error);
-        mostrarToast("Erro ao carregar dados do servidor", "error");
-    }
-    
-    configurarNavegacao();
-    configurarModais();
-    configurarObservers();
-    
-    setTimeout(() => {
-        const paginaInicial = getPaginaFromURL();
-        console.log("Carregando página inicial:", paginaInicial);
-        carregarPagina(paginaInicial);
-    }, 100);
-});
-
 // ================= FUNÇÕES DE DEBUG =================
 function debugDados() {
     console.log("=== DEBUG DO SISTEMA ===");
@@ -8291,52 +6894,6 @@ function debugDados() {
     
     if (ausencias.length > 0) {
         console.log("Primeira ausência:", ausencias[0]);
-    }
-}
-
-// ================= FUNÇÃO PARA ATUALIZAR TUDO =================
-async function atualizarTudo() {
-    console.log("Atualizando todos os dados...");
-    
-    try {
-        // Recarregar todos os dados do backend com tratamento de erro individual
-        const resultados = await Promise.allSettled([
-            carregarColaboradores(),
-            carregarAusencias(),
-            carregarFeriadosLocais()
-        ]);
-        
-        resultados.forEach((resultado, index) => {
-            const nomes = ['Colaboradores', 'Ausências', 'Feriados'];
-            if (resultado.status === 'fulfilled') {
-                console.log(`✅ ${nomes[index]} atualizados`);
-            } else {
-                console.error(`❌ Erro ao atualizar ${nomes[index]}:`, resultado.reason);
-            }
-        });
-        
-        // Se o calendário estiver visível, atualizar
-        if (document.getElementById("calendar")) {
-            gerarCalendario(mesAtual, anoAtual);
-        }
-        
-        // Atualizar a legenda mensal
-        gerarLegendaMensal();
-        
-        // Se o modal de ausência estiver aberto, atualizar a listagem
-        const modalAusencia = document.getElementById("modal");
-        if (modalAusencia && !modalAusencia.classList.contains('hidden')) {
-            if (dataSelecionada) {
-                await carregarAusenciasDoDia(dataSelecionada);
-            }
-        }
-        
-        console.log("Atualização completa!");
-        mostrarToast("Dados atualizados!", "success");
-        
-    } catch (error) {
-        console.error("Erro ao atualizar dados:", error);
-        mostrarToast("Erro ao atualizar dados", "error");
     }
 }
 
@@ -8398,35 +6955,6 @@ function getPaginaFromURL() {
     
     return 'dashboard';
 }
-
-// Modifique o DOMContentLoaded para usar essa função
-document.addEventListener("DOMContentLoaded", async () => {
-    inicializarAplicacaoUmaVez();
-    return;
-    console.log("Inicializando aplicação...");
-    
-    const temaSalvo = localStorage.getItem('tema') || 'light';
-    document.documentElement.setAttribute('data-theme', temaSalvo);
-
-    try {
-        await carregarColaboradores();
-        await carregarAusencias();
-        await carregarFeriadosLocais();
-        await carregarPlantoes();
-        
-    } catch (error) {
-        console.error("Erro ao carregar dados:", error);
-        mostrarToast("Erro ao carregar dados do servidor", "error");
-    }
-    
-    configurarNavegacao();
-    configurarModais();
-    configurarObservers();
-    
-    const paginaInicial = getPaginaFromURL();
-    carregarPagina(paginaInicial);
-})
-
 
 window.addEventListener('popstate', () => {
     const pagina = getPaginaFromURL();
