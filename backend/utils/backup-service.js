@@ -27,23 +27,32 @@ const {
 const AUSENCIA_TIPOS = Object.freeze(['folga', 'ausencia', 'ferias']);
 const AUSENCIA_PERIODO_TIPOS = Object.freeze(['dia_inteiro', 'horas']);
 const ESCALA_DIA_TIPOS = Object.freeze(['normal', 'plantao', 'folga', 'ferias', 'ausencia', 'ajuste']);
+// Ordem respeitando as foreign keys. Grafo: tudo referencia Colaboradores, e
+// Colaboradores referencia Setores. Ao apagar, filhos primeiro; ao inserir,
+// pais primeiro. AlmocosPersonalizados e Setores faltavam nas duas listas — o
+// backup capturava ambas, mas a restauracao quebrava na FK de
+// AlmocosPersonalizados->Colaboradores e nunca reinseria essas duas tabelas.
 const BACKUP_DELETE_ORDER = Object.freeze([
     'BancoHorasMovimentos',
     'escala_dia',
+    'AlmocosPersonalizados',
     'ColaboradorJornadaSemanal',
     'Ausencias',
     'plantoes',
     'Feriados',
-    'Colaboradores'
+    'Colaboradores',
+    'Setores'
 ]);
 const BACKUP_INSERT_ORDER = Object.freeze([
+    'Setores',
     'Colaboradores',
     'ColaboradorJornadaSemanal',
     'Feriados',
     'Ausencias',
     'plantoes',
     'BancoHorasMovimentos',
-    'escala_dia'
+    'escala_dia',
+    'AlmocosPersonalizados'
 ]);
 const TABLE_INSERT_SPECS = Object.freeze({
     Colaboradores: {
@@ -54,7 +63,11 @@ const TABLE_INSERT_SPECS = Object.freeze({
             ['TrabalhoInicio', sql.Time],
             ['TrabalhoFim', sql.Time],
             ['AlmocoInicio', sql.Time],
-            ['AlmocoFim', sql.Time]
+            ['AlmocoFim', sql.Time],
+            // SetorId e DataCadastro faltavam: o backup perdia a lotacao por
+            // setor e a data de cadastro de cada colaborador na restauracao.
+            ['SetorId', sql.Int],
+            ['DataCadastro', sql.DateTime]
         ]
     },
     ColaboradorJornadaSemanal: {
@@ -70,6 +83,29 @@ const TABLE_INSERT_SPECS = Object.freeze({
             ['Ativo', sql.Bit],
             ['DataCadastro', sql.DateTime],
             ['DataAtualizacao', sql.DateTime]
+        ]
+    },
+    Setores: {
+        identityColumn: 'Id',
+        columns: [
+            ['Id', sql.Int],
+            ['Nome', sql.NVarChar(120)],
+            ['Ativo', sql.Bit],
+            ['Ordem', sql.Int],
+            ['CriadoEm', sql.DateTime],
+            ['AtualizadoEm', sql.DateTime]
+        ]
+    },
+    AlmocosPersonalizados: {
+        identityColumn: 'Id',
+        columns: [
+            ['Id', sql.Int],
+            ['ColaboradorId', sql.Int],
+            ['Data', sql.Date],
+            ['AlmocoInicio', sql.Time],
+            ['AlmocoFim', sql.Time],
+            ['CriadoEm', sql.DateTime],
+            ['AtualizadoEm', sql.DateTime]
         ]
     },
     Feriados: {
@@ -389,7 +425,11 @@ function normalizeColaboradorRow(row) {
         AlmocoFim: normalizeBackupTimeValue(
             getFirstDefinedValue(row, ['AlmocoFim', 'almocoFim']),
             'Fim do almoco'
-        )
+        ),
+        // Sem estes dois o backup perdia a lotacao por setor e a data de
+        // cadastro na restauracao.
+        SetorId: normalizeNullablePositiveInt(getFirstDefinedValue(row, ['SetorId', 'setorId']), 'Setor do colaborador'),
+        DataCadastro: normalizeBackupDateTime(getFirstDefinedValue(row, ['DataCadastro', 'dataCadastro']), 'Data de cadastro')
     };
 
     if (!normalized.Nome) {
@@ -460,6 +500,37 @@ function normalizeJornadaSemanalRow(row) {
             'Data de atualizacao da jornada semanal',
             new Date()
         )
+    };
+}
+
+function normalizeSetorRow(row) {
+    const nome = normalizeRequiredText(getFirstDefinedValue(row, ['Nome', 'nome']), 'Nome do setor', { maxLength: 120 });
+    const ativoBruto = getFirstDefinedValue(row, ['Ativo', 'ativo']);
+    const ordem = Number.parseInt(String(getFirstDefinedValue(row, ['Ordem', 'ordem']) ?? ''), 10);
+
+    return {
+        Id: normalizeNullablePositiveInt(getFirstDefinedValue(row, ['Id', 'id']), 'Id do setor'),
+        Nome: nome,
+        // Bit: aceita true/1/"1"; ausente vira ativo (padrao do cadastro).
+        Ativo: ativoBruto === undefined || ativoBruto === null ? true : Boolean(ativoBruto === true || ativoBruto === 1 || ativoBruto === '1' || ativoBruto === 'true'),
+        Ordem: Number.isInteger(ordem) ? ordem : 0,
+        CriadoEm: normalizeBackupDateTime(getFirstDefinedValue(row, ['CriadoEm', 'criadoEm']), 'Criacao do setor'),
+        AtualizadoEm: normalizeBackupDateTime(getFirstDefinedValue(row, ['AtualizadoEm', 'atualizadoEm']), 'Atualizacao do setor')
+    };
+}
+
+function normalizeAlmocoPersonalizadoRow(row) {
+    return {
+        Id: normalizeNullablePositiveInt(getFirstDefinedValue(row, ['Id', 'id']), 'Id do almoco personalizado'),
+        ColaboradorId: ensurePositiveInt(
+            getFirstDefinedValue(row, ['ColaboradorId', 'colaboradorId']),
+            'Colaborador do almoco personalizado'
+        ),
+        Data: normalizeBackupDate(getFirstDefinedValue(row, ['Data', 'data']), 'Data do almoco personalizado'),
+        AlmocoInicio: normalizeBackupTimeValue(getFirstDefinedValue(row, ['AlmocoInicio', 'almocoInicio']), 'Inicio do almoco'),
+        AlmocoFim: normalizeBackupTimeValue(getFirstDefinedValue(row, ['AlmocoFim', 'almocoFim']), 'Fim do almoco'),
+        CriadoEm: normalizeBackupDateTime(getFirstDefinedValue(row, ['CriadoEm', 'criadoEm']), 'Criacao do almoco personalizado'),
+        AtualizadoEm: normalizeBackupDateTime(getFirstDefinedValue(row, ['AtualizadoEm', 'atualizadoEm']), 'Atualizacao do almoco personalizado')
     };
 }
 
@@ -711,13 +782,15 @@ function coerceBackupPayload(rawPayload = {}) {
         metadata: isPlainObject(payload.metadata) ? payload.metadata : {},
         preferences: isPlainObject(payload.preferencias) ? payload.preferencias : {},
         data: {
+            Setores: [],
             Colaboradores: [],
             ColaboradorJornadaSemanal: [],
             Ausencias: [],
             Feriados: [],
             plantoes: [],
             BancoHorasMovimentos: [],
-            escala_dia: []
+            escala_dia: [],
+            AlmocosPersonalizados: []
         }
     };
 
@@ -760,6 +833,11 @@ function coerceBackupPayload(rawPayload = {}) {
         return snapshot;
     }
 
+    snapshot.data.Setores = normalizeRows(
+        getBackupArray(dataSource, ['Setores']),
+        normalizeSetorRow,
+        'Tabela Setores'
+    );
     snapshot.data.Colaboradores = normalizeRows(
         getBackupArray(dataSource, ['Colaboradores']),
         normalizeColaboradorRow,
@@ -794,6 +872,11 @@ function coerceBackupPayload(rawPayload = {}) {
         getBackupArray(dataSource, ['escala_dia']),
         normalizeEscalaDiaRow,
         'Tabela escala_dia'
+    );
+    snapshot.data.AlmocosPersonalizados = normalizeRows(
+        getBackupArray(dataSource, ['AlmocosPersonalizados']),
+        normalizeAlmocoPersonalizadoRow,
+        'Tabela AlmocosPersonalizados'
     );
 
     return snapshot;
@@ -840,29 +923,29 @@ async function insertTableRows(transaction, tableName, rows) {
 
     const columnSpecs = spec.columns.filter(([columnName]) => includeIdentity || columnName !== spec.identityColumn);
     const columnNames = columnSpecs.map(([columnName]) => columnName);
-    const insertSql = `
+    const insertStatement = `
         INSERT INTO [dbo].[${tableName}] (${columnNames.map((columnName) => `[${columnName}]`).join(', ')})
         VALUES (${columnNames.map((_, index) => `@p${index}`).join(', ')})
     `;
 
-    if (includeIdentity) {
-        await transaction.request().query(`SET IDENTITY_INSERT [dbo].[${tableName}] ON`);
-    }
+    // IMPORTANTE: neste ambiente (mssql/tedious) o SET IDENTITY_INSERT nao
+    // persiste entre requests separadas — cada .query() e um batch isolado, e
+    // a flag volta a OFF no batch seguinte. Por isso o SET precisa ir no MESMO
+    // batch do INSERT. Sem isso a restauracao com preservacao de Id falhava
+    // com "Cannot insert explicit value for identity column ... IDENTITY_INSERT
+    // is set to OFF" — valia para todas as tabelas, nao so as novas.
+    const insertSql = includeIdentity
+        ? `SET IDENTITY_INSERT [dbo].[${tableName}] ON; ${insertStatement}; SET IDENTITY_INSERT [dbo].[${tableName}] OFF;`
+        : insertStatement;
 
-    try {
-        for (const row of rows) {
-            const request = transaction.request();
+    for (const row of rows) {
+        const request = transaction.request();
 
-            columnSpecs.forEach(([columnName, sqlType], index) => {
-                request.input(`p${index}`, sqlType, row[columnName]);
-            });
+        columnSpecs.forEach(([columnName, sqlType], index) => {
+            request.input(`p${index}`, sqlType, row[columnName]);
+        });
 
-            await request.query(insertSql);
-        }
-    } finally {
-        if (includeIdentity) {
-            await transaction.request().query(`SET IDENTITY_INSERT [dbo].[${tableName}] OFF`);
-        }
+        await request.query(insertSql);
     }
 
     await reseedIdentity(transaction, tableName, spec.identityColumn);

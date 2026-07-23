@@ -30,6 +30,12 @@ Todas as alteracoes relevantes deste projeto serao documentadas neste arquivo.
 ### Seguranca
 - Rate limiting no login: 5 tentativas erradas por IP+usuario numa janela de 15 min bloqueiam novas tentativas por 15 min (HTTP 429 com mensagem clara). Em memoria, sem dependencia nova. Login valido zera a contagem, e a chave por IP+usuario isola as tentativas de contas e maquinas diferentes.
 
+### Corrigido (backup/restauracao)
+- Restauracao de backup nunca funcionava com preservacao de Id: neste ambiente (mssql/tedious) o `SET IDENTITY_INSERT ON` numa request nao persiste para o INSERT da request seguinte, entao falhava com "Cannot insert explicit value for identity column ... IDENTITY_INSERT is set to OFF". Corrigido pondo o SET no mesmo batch do INSERT. Valia para todas as tabelas.
+- Restauracao quebrava por foreign key (`FK_AlmocosPersonalizados_Colaboradores`) e/ou perdia dados: as tabelas `Setores` e `AlmocosPersonalizados` eram capturadas no backup mas nao constavam nas ordens de limpeza/insercao — a restauracao falhava ao apagar Colaboradores e nunca reinseria essas duas.
+- Backup perdia a lotacao por setor e a data de cadastro: o mapa de colunas de `Colaboradores` omitia `SetorId` e `DataCadastro`.
+- Verificado de ponta a ponta contra o SQL Server real: ciclo backup->restore idempotente (nenhuma tabela perdida nem duplicada) e recuperacao real (apagados os almocos personalizados, restaurados os 4, com o setor do colaborador preservado).
+
 ## [1.6.0] - 2026-07-22
 
 ### Adicionado
