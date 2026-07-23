@@ -109,6 +109,20 @@
   background: white;
 }
 
+/* Aplicada por Js/calendar.js quando o usuario logado nao e admin: o dia
+   continua legivel, mas perde as pistas visuais de que e clicavel, porque
+   nesse perfil nao ha modal de lancamento para abrir. */
+.day.calendario-somente-leitura {
+  cursor: default;
+}
+
+.day.calendario-somente-leitura:hover {
+  transform: none;
+  box-shadow: var(--shadow-sm);
+  border-color: transparent;
+  background: var(--card-dark);
+}
+
 .today {
   background: linear-gradient(135deg, var(--primary-soft) 0%, white 100%);
   border: 2px solid var(--primary);

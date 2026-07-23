@@ -226,6 +226,14 @@ function gerarCalendario(mes, ano) {
             cell.appendChild(tag);
         });
 
+        // Usuario comum enxerga o calendario da equipe, mas nao lanca nada:
+        // sem o clique, nao ha modal de lancamento que resultaria em 403.
+        if (typeof window.usuarioEhAdmin === 'function' && !window.usuarioEhAdmin()) {
+            cell.classList.add('calendario-somente-leitura');
+            calendar.appendChild(cell);
+            continue;
+        }
+
         cell.addEventListener('click', (event) => {
             event.stopPropagation();
 

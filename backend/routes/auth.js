@@ -75,6 +75,13 @@ router.get('/me', requireAuth, async (req, res, next) => {
 
 router.post('/trocar-senha', requireAuth, async (req, res, next) => {
     try {
+        // A conta de visualizacao e compartilhada pela equipe: se uma pessoa
+        // trocar a senha, tranca todas as outras. Só o administrador altera
+        // essa senha, pela tela de Usuarios.
+        if (!req.user.isAdmin) {
+            throw new AppError(403, 'A senha da conta de visualizacao e alterada apenas pelo administrador.');
+        }
+
         const novaSenha = normalizePassword(req.body?.novaSenha, 'Nova senha');
         const pool = await conectar();
 

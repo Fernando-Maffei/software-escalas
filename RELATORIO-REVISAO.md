@@ -787,3 +787,116 @@ consultado e a tela exibida antes de ser sobrescrita). Corrigido ignorando
 | `frontend/Js/app.js` | Seção "Usuarios" no menu de Configurações + card + inicializador |
 | `frontend/css/auth.css`, `frontend/css/configuracoes.css` | Estilos das duas telas novas |
 | `package.json`, `CHANGELOG.md`, `README.md` | Versão 1.5.0 e documentação |
+
+---
+
+## Fase 5 — Perfil de visualização e aplicação real dos perfis (2026-07-22, v1.6.0)
+
+Branch: `feat/perfil-visualizacao`.
+
+### Contexto
+
+O item "perfis/papéis de usuário" estava listado como melhoria futura desde a
+Fase 1. A investigação mostrou que a v1.5.0 já tinha criado **metade** do
+mecanismo — coluna `Usuarios.IsAdmin`, `isAdmin` na sessão e o middleware
+`requireAdmin` — mas ele era aplicado em **um único lugar**
+(`backend/routes/usuarios.js:24`). Todo o resto da API exigia apenas estar
+autenticado.
+
+O pedido do usuário definiu o formato: só administradores fazem lançamentos, e
+os demais entram numa tela apenas de visualização, com o calendário de folgas e
+férias da equipe.
+
+### Bugs e riscos encontrados
+
+| # | Achado | Gravidade | Onde |
+|---|---|---|---|
+| 1 | Qualquer usuário autenticado podia trocar a configuração do banco (`POST /api/configuracao-banco/salvar`), restaurar backup por cima dos dados (`/backup/restaurar`), mudar a pasta de backup, parar o servidor de toda a equipe (`/api/sistema/servidor-background/parar`), excluir colaborador, ajustar saldo de banco de horas e reconstruir a escala. | **Alto** | `backend/server.js` (gate só de autenticação) |
+| 2 | `GET /api/configuracao-banco` expõe host e usuário do banco; `GET /api/usuarios` lista as contas. Ambos abertos a qualquer autenticado. | Médio | idem |
+| 3 | Bug introduzido e corrigido durante o desenvolvimento desta fase: a primeira versão do filtro de sidebar escondia todo `.sidebar-btn` fora da lista permitida, e "Alterar senha" e "Sair" **não têm `data-page`** — o usuário comum ficava sem conseguir sair nem trocar a senha. Corrigido restringindo o seletor a `.sidebar-btn[data-page]`. Encontrado na verificação visual, não no código. | Alto (só existiu durante o desenvolvimento) | `frontend/Js/permissoes.js` |
+| 4 | Bug introduzido e corrigido durante o desenvolvimento desta fase: o bootstrap chamava a função local `carregarPagina` (`app.js:720`), não `window.carregarPagina`, escapando do filtro de perfil — o dashboard chegava a renderizar antes de ser trocado pelo calendário. Corrigido fazendo o bootstrap esperar o perfil (`window.aguardarUsuarioAutenticado()`) e chamar a versão protegida. | Médio (só existiu durante o desenvolvimento) | `frontend/Js/app.js` |
+
+### Decisão de arquitetura
+
+O portão de permissão ficou **num único middleware** em `backend/server.js`, e
+não com `requireAdmin` espalhado pelos 11 arquivos de rota. O modelo espalhado
+foi justamente o que falhou na v1.5.0: é fácil adicionar um endpoint e esquecer
+o middleware. Com o portão central, rota nova nasce protegida por padrão.
+
+A regra em si foi extraída para `backend/utils/permissoes.js` como função pura
+(`checkAccess`), para poder ser testada sem subir servidor.
+
+Escopo do calendário: **equipe toda** (compartilhado), decidido com o usuário.
+Ver "Melhorias futuras" para a alternativa.
+
+### Melhorias realizadas
+
+**Backend:**
+- `backend/utils/permissoes.js` (novo): `checkAccess`, `isAdminOnlyPath`, `isReadOnlyMethod`.
+- `backend/server.js`: portão de permissão após `requireAuth`. Usuário comum só faz `GET`/`HEAD`/`OPTIONS` e é bloqueado em `/configuracao-banco`, `/sistema` e `/usuarios` inclusive para leitura. `/api/auth/*` fica fora (montado antes), para que trocar a própria senha e sair continuem funcionando. O modo bootstrap de instalação nova segue intacto.
+
+**Frontend:**
+- `frontend/Js/permissoes.js` (novo): `usuarioEhAdmin()`, filtro da sidebar e wrapper de `carregarPagina` — qualquer caminho de navegação (clique, hash na URL, chamada interna) cai na mesma checagem.
+- `frontend/Js/auth.js`: `window.aguardarUsuarioAutenticado()`, para o app só renderizar a primeira tela com o perfil já conhecido.
+- `frontend/Js/calendar.js`: célula sem handler de clique para não-admin.
+- `frontend/Js/app.js`: botão "Lançamento" da tela de calendário só para admin; bootstrap espera o perfil.
+- `frontend/css/sidebar.css`, `frontend/css/calendar.css`: `.sidebar-btn-oculto` e `.calendario-somente-leitura`.
+
+**Testes:** `tests/permissoes.test.js` (novo, 7 casos), incluindo guarda contra o
+bug clássico de `startsWith` (uma rota futura `/sistemas` ou
+`/usuarios-relatorio` não deve herdar a restrição de `/sistema` e `/usuarios`).
+
+### Verificação realizada
+
+- `npm run smoke` e `npm test` (52 testes) passando.
+- Testado via `curl` contra o SQL Server real, com um usuário comum temporário criado para isso: leitura de dados 200 (`/ausencias`, `/colaboradores`, `/feriados`), áreas administrativas 403 (`/configuracao-banco`, `/usuarios`, `/sistema/...`), escrita 403 (`DELETE /colaboradores/999`, `POST /escala/rebuild`, `POST /configuracao-banco/salvar`, `POST /sistema/servidor-background/parar`), `/api/auth/me` 200. O mesmo usuário promovido a admin voltou a receber 200 em tudo.
+- Testado visualmente no navegador nos dois perfis: usuário comum cai no calendário, vê só Calendário/Alterar senha/Sair, sem botão "Lançamento", 31 de 31 dias marcados como somente leitura, clique no dia não abre modal, tags de ausência e feriado renderizando, navegação entre meses funcionando, logout funcionando. Admin com sidebar completa, botão "Lançamento" presente, 0 dias somente leitura e o modal "Gerenciar Lançamentos" abrindo normalmente.
+- Console e rede sem erros novos (todas as chamadas 200).
+- O usuário temporário de teste foi **removido** do banco ao final; a tabela `Usuarios` voltou ao estado original (só `admin`).
+
+### Pontos críticos para o usuário
+
+1. **Cache-busting**: `app.js`, `auth.js` e `calendar.js` mudaram de comportamento. Todos os carimbos `?v=` foram para `1.6.0` — sem isso, os navegadores das máquinas da equipe continuariam servindo o JS antigo em cache.
+2. Esconder botão não é segurança: o controle real é o portão do backend. A camada do frontend existe só para não oferecer ações que resultariam em 403.
+3. Contas existentes: como todo usuário nasce com `IsAdmin = 0`, qualquer conta criada antes desta versão que não seja admin passa a cair no perfil de visualização. Hoje só existe o `admin`, então não há impacto — mas vale saber ao criar as contas da equipe.
+
+### Melhorias futuras recomendadas
+
+- **Vínculo `Usuarios` → `Colaboradores`**: hoje os dois cadastros são independentes, então o calendário só consegue ser compartilhado. Com o vínculo, daria para oferecer "ver apenas as minhas folgas/férias" — exige migration, campo na tela de usuários e uma decisão sobre usuário sem vínculo.
+- **Perfis intermediários**: hoje são só dois (admin e leitura). Se a equipe pedir "pode lançar mas não pode configurar", vale trocar o booleano `IsAdmin` por um campo de papel.
+- **Carregamento de dados antes do login**: o bootstrap do `app.js` dispara `carregarColaboradores`/`carregarAusencias` mesmo na tela de login, gerando erros 401 no console. É anterior a esta fase e inofensivo (o backend recusa), mas é ruído que confunde diagnóstico.
+- **Sessão guarda `isAdmin` do momento do login**: promover ou rebaixar alguém só vale na próxima sessão. `revokeUserSessions` já existe e é chamado ao rebaixar via tela de usuários — mas alterações feitas direto no banco não passam por ali.
+
+### Complemento — Conta de visualização compartilhada (2026-07-22)
+
+Decisão do usuário: a visualização é feita por **uma conta única compartilhada
+pela equipe**, não por contas individuais.
+
+**Armadilha encontrada:** `backend/routes/usuarios.js` criava toda conta com
+`deveTrocarSenha: true` fixo no código. Numa conta compartilhada isso é fatal —
+a primeira pessoa a entrar seria obrigada a trocar a senha e trancaria as
+outras quatro do lado de fora, sem possibilidade de combinar o contrário.
+
+**Regra adotada:** conta de administrador é pessoal (senha provisória, trocada
+no primeiro acesso); conta não-admin é a conta de visualização compartilhada
+(senha definida pelo administrador, vale como está).
+
+- `backend/routes/usuarios.js`: `deveTrocarSenha: isAdmin` na criação; no reset de senha, o papel é relido **depois** de `updateUserFlags`, para que promover e resetar na mesma requisição use o papel novo.
+- `backend/routes/auth.js`: `POST /trocar-senha` recusa não-admin (403) — sem isso, qualquer pessoa com a conta compartilhada trancaria as demais.
+- `frontend/Js/permissoes.js`: "Alterar senha" escondido para não-admin (o botão levaria a um 403). "Sair" continua visível.
+- `frontend/Js/configuracoes-usuarios.js`: textos da tela corrigidos — diziam que toda senha ali era temporária, o que deixou de ser verdade para contas de visualização.
+
+**Verificação:** contra o SQL Server real, criação de conta não-admin devolve
+`deveTrocarSenha: false` e de admin `true`; duas sessões simultâneas na mesma
+conta compartilhada funcionando; troca de senha pela conta compartilhada
+recusada (403); admin trocando a própria senha normalmente (200); reset em
+conta de visualização mantendo `deveTrocarSenha: false`; promover+resetar na
+mesma requisição resultando em `true`. Verificado visualmente nos dois perfis.
+Contas de teste removidas ao final — a tabela `Usuarios` está com o `admin`
+apenas.
+
+**Achado para a fase de visual (não corrigido aqui):** em Configurações >
+Usuários, o card fica com 226px dentro de um `appContent` de 614px, e o botão
+"Criar usuario" se sobrepõe ao campo de senha. É pré-existente (o CSS de
+`.usuarios-novo` está correto; o estrangulamento vem de `.config-card-body`) e
+não tem relação com as mudanças desta fase.

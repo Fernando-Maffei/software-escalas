@@ -11,6 +11,7 @@ const {
 } = require('./utils/backup-scheduler');
 const { AppError } = require('./utils/errors');
 const { requireAuth } = require('./utils/auth');
+const { checkAccess } = require('./utils/permissoes');
 const { ensureApplicationSchema } = require('./utils/database-schema');
 const { isDatabaseConfigured } = require('./utils/database-config');
 
@@ -292,6 +293,32 @@ app.use('/api', (req, res, next) => {
     }
 
     requireAuth(req, res, next);
+});
+
+// Portao de permissao central: usuario comum tem acesso somente de leitura.
+// Feito num unico ponto, e nao com requireAdmin espalhado por cada arquivo
+// de rota, para que rota nova nasca protegida por padrao — o risco do
+// modelo espalhado e alguem adicionar um endpoint e esquecer o middleware.
+// /api/auth/* fica de fora porque e montado antes deste portao (o usuario
+// precisa poder trocar a propria senha e sair).
+app.use('/api', (req, res, next) => {
+    if (isBootstrapConfigRequest(req)) {
+        next();
+        return;
+    }
+
+    const denial = checkAccess({
+        isAdmin: Boolean(req.user?.isAdmin),
+        method: req.method,
+        path: req.path
+    });
+
+    if (denial) {
+        next(new AppError(denial.status, denial.message));
+        return;
+    }
+
+    next();
 });
 
 app.get('/api/network/status', async (req, res) => {

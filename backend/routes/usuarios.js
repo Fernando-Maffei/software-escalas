@@ -67,9 +67,11 @@ router.post('/', async (req, res, next) => {
         const usuario = await createUser(pool, {
             username,
             password: senha,
-            // Senha definida por outra pessoa e sempre provisoria: o dono da
-            // conta troca no primeiro acesso.
-            deveTrocarSenha: true,
+            // Conta de administrador e pessoal: a senha definida por outra
+            // pessoa e provisoria e o dono troca no primeiro acesso. Conta
+            // de visualizacao e compartilhada pela equipe — forcar a troca
+            // faria a primeira pessoa a entrar trancar todas as outras.
+            deveTrocarSenha: isAdmin,
             isAdmin
         });
 
@@ -134,8 +136,16 @@ router.put('/:id', async (req, res, next) => {
         let senhaTemporaria = null;
 
         if (querResetarSenha) {
+            // Le o papel depois de updateUserFlags: se a mesma requisicao
+            // promoveu ou rebaixou o usuario, quem vale e o papel novo.
+            const alvoAtualizado = await findUserById(pool, alvo.id);
+
             senhaTemporaria = generateRandomPassword();
-            await updateUserPassword(pool, alvo.id, senhaTemporaria, { deveTrocarSenha: true });
+            await updateUserPassword(pool, alvo.id, senhaTemporaria, {
+                // Mesma razao da criacao: conta de visualizacao e
+                // compartilhada e nao pode exigir troca no primeiro acesso.
+                deveTrocarSenha: alvoAtualizado.isAdmin
+            });
         }
 
         // Mudancas restritivas valem imediatamente, nao so no proximo login.

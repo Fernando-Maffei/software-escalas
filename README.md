@@ -140,7 +140,7 @@ Sugestao simples de versionamento:
 - `1.1.0` para nova funcionalidade
 - `2.0.0` para mudanca grande ou quebra de fluxo
 
-Versao atual: `1.5.0`. O historico de alteracoes fica em `CHANGELOG.md`.
+Versao atual: `1.6.0`. O historico de alteracoes fica em `CHANGELOG.md`.
 
 ## Se voce ja tinha o aplicativo desktop instalado (versoes ate 1.3.x)
 

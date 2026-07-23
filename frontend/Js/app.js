@@ -716,8 +716,16 @@ function inicializarAplicacaoUmaVez() {
             ? getPaginaFromURL()
             : 'dashboard';
 
+        // Espera o perfil do usuario antes de renderizar: sem isso, um
+        // usuario comum veria o dashboard aparecer e so depois ser trocado
+        // pelo calendario. Usa window.carregarPagina (e nao a funcao local)
+        // porque e nela que Js/permissoes.js instala o filtro de perfil.
+        if (typeof window.aguardarUsuarioAutenticado === 'function') {
+            await window.aguardarUsuarioAutenticado();
+        }
+
         console.log("Carregando pÃ¡gina inicial:", paginaInicial);
-        carregarPagina(paginaInicial);
+        window.carregarPagina(paginaInicial);
     })();
 
     return window.__appBootstrapPromise;
@@ -3943,13 +3951,19 @@ function renderCalendario() {
         return;
     }
     
+    // Usuario comum abre esta tela apenas para consultar folgas e ferias da
+    // equipe; o botao de lancamento resultaria em 403 no back-end.
+    const podeLancar = typeof window.usuarioEhAdmin !== 'function' || window.usuarioEhAdmin();
+
     appContent.innerHTML = `
         <div class="page-header">
             <h1>Calendário Mensal</h1>
             <div class="header-actions">
+                ${podeLancar ? `
                 <button id="btnLancamentoAjuste" class="btn-primary">
                     <i class="fas fa-plus"></i> Lançamento
                 </button>
+                ` : ''}
             </div>
         </div>
 

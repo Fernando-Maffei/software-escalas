@@ -1,4 +1,17 @@
 (function () {
+    // Permite que o bootstrap do app.js espere o perfil do usuario antes de
+    // renderizar a primeira tela. Fica pendente enquanto ninguem estiver
+    // logado — o que e proposital: nao ha pagina a renderizar atras da tela
+    // de login.
+    let resolverUsuarioAutenticado = null;
+    const usuarioAutenticadoPromise = new Promise((resolve) => {
+        resolverUsuarioAutenticado = resolve;
+    });
+
+    window.aguardarUsuarioAutenticado = function aguardarUsuarioAutenticado() {
+        return usuarioAutenticadoPromise;
+    };
+
     const AUTH_ME_URL = '/api/auth/me';
     const AUTH_LOGIN_URL = '/api/auth/login';
     const AUTH_LOGOUT_URL = '/api/auth/logout';
@@ -113,6 +126,17 @@
         }
 
         showApp();
+
+        // Ajusta a interface ao perfil (esconde telas de admin do usuario
+        // comum). Checado com typeof porque permissoes.js e carregado depois
+        // deste arquivo — se por algum motivo ainda nao estiver pronto, o
+        // proprio permissoes.js reaplica no DOMContentLoaded.
+        if (typeof window.aplicarPermissoesUI === 'function') {
+            window.aplicarPermissoesUI();
+        }
+
+        // Libera o bootstrap do app so agora, com o perfil ja conhecido.
+        resolverUsuarioAutenticado(user || null);
     }
 
     async function isSetupPending() {

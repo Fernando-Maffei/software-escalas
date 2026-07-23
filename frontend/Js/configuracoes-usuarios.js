@@ -72,20 +72,28 @@
         }
     }
 
-    function mostrarSenhaTemporaria(container, username, senha) {
+    function mostrarSenhaTemporaria(container, username, senha, isAdmin) {
         const aviso = container.querySelector('#usuariosSenhaTemporaria');
 
         if (!aviso) {
             return;
         }
 
+        // Conta de administrador e pessoal (senha provisoria, trocada no
+        // primeiro acesso); conta de visualizacao e compartilhada pela
+        // equipe e a senha vale como esta.
+        const rotulo = isAdmin ? 'Senha temporaria' : 'Senha de acesso';
+        const explicacao = isAdmin
+            ? 'Anote e repasse agora — ela nao sera exibida novamente. O usuario define a senha definitiva no primeiro acesso.'
+            : 'Anote e repasse a equipe agora — ela nao sera exibida novamente. Esta senha vale como esta: quem usa a conta de visualizacao nao pode altera-la.';
+
         aviso.innerHTML = `
             <div class="usuarios-senha-box">
                 <div>
-                    <strong>Senha temporaria de ${esc(username)}:</strong>
+                    <strong>${rotulo} de ${esc(username)}:</strong>
                     <code>${esc(senha)}</code>
                 </div>
-                <p>Anote e repasse agora — ela nao sera exibida novamente. O usuario define a senha definitiva no primeiro acesso.</p>
+                <p>${explicacao}</p>
                 <button type="button" class="btn-secondary" data-fechar-senha>
                     <i class="fas fa-check"></i> Ja anotei
                 </button>
@@ -180,7 +188,7 @@
         const confirmacoes = {
             desativar: `Desativar o usuario "${nome}"? Ele perde o acesso imediatamente.`,
             'remover-admin': `Remover os poderes de administrador de "${nome}"?`,
-            resetar: `Gerar uma nova senha temporaria para "${nome}"? A senha atual deixa de valer na hora.`
+            resetar: `Gerar uma nova senha para "${nome}"? A senha atual deixa de valer na hora — numa conta de visualizacao, toda a equipe precisara da senha nova.`
         };
 
         if (confirmacoes[acao] && !window.confirm(confirmacoes[acao])) {
@@ -209,7 +217,7 @@
             }
 
             if (data.senhaTemporaria) {
-                mostrarSenhaTemporaria(container, nome, data.senhaTemporaria);
+                mostrarSenhaTemporaria(container, nome, data.senhaTemporaria, Boolean(data.usuario?.isAdmin));
             }
 
             toast(data.message || 'Usuario atualizado.');
@@ -252,7 +260,7 @@
             adminCheck.checked = false;
 
             if (data.senhaTemporaria) {
-                mostrarSenhaTemporaria(container, username, data.senhaTemporaria);
+                mostrarSenhaTemporaria(container, username, data.senhaTemporaria, Boolean(data.usuario?.isAdmin));
             }
 
             toast(data.message || 'Usuario criado.');
@@ -278,8 +286,11 @@
 
         container.innerHTML = `
             <p class="config-descricao">
-                Crie contas para a equipe e controle quem administra o sistema.
-                Toda senha definida aqui e temporaria: o usuario troca no primeiro acesso.
+                Contas de <strong>administrador</strong> sao pessoais e fazem lancamentos:
+                a senha definida aqui e temporaria e o dono troca no primeiro acesso.
+                A conta de <strong>visualizacao</strong> e compartilhada pela equipe e so
+                enxerga o calendario — a senha vale como definida e quem a usa nao pode
+                altera-la.
             </p>
 
             <div id="usuariosSenhaTemporaria" class="hidden"></div>
@@ -287,7 +298,7 @@
             <div class="usuarios-novo">
                 <div class="usuarios-novo-campos">
                     <input type="text" id="novoUsuarioNome" class="form-control" placeholder="Nome de usuario" autocomplete="off">
-                    <input type="password" id="novoUsuarioSenha" class="form-control" placeholder="Senha temporaria (vazio = gerar)" autocomplete="new-password">
+                    <input type="password" id="novoUsuarioSenha" class="form-control" placeholder="Senha (vazio = gerar)" autocomplete="new-password">
                     <label class="usuarios-novo-admin">
                         <input type="checkbox" id="novoUsuarioAdmin"> Administrador
                     </label>
