@@ -2,6 +2,19 @@
 
 Todas as alteracoes relevantes deste projeto serao documentadas neste arquivo.
 
+## [Nao lancado] - branch feat/redesign-visual
+
+### Alterado
+- Escala do Dia: cabecalho condensado de 404px para 186px (titulo na mesma faixa da data, acoes secundarias como icone, legenda sob demanda em vez de faixa fixa). Passam de 4 para 9 colaboradores visiveis sem rolar.
+- Abas de setor encolhem e rolam em vez de empurrar os filtros para outra faixa.
+
+### Adicionado
+- Escala do Dia: alternador de densidade das linhas (confortavel 54px / compacta 41px, 12 colaboradores visiveis), com a preferencia guardada no navegador.
+- Sombra na borda da coluna de colaboradores congelada, para separa-la visualmente da linha do tempo que rola por baixo.
+
+### Corrigido
+- Cabecalho da barra lateral (logo e nome do sistema) era cortado pela metade em qualquer janela com menos de ~900px de altura: a barra e flex column e o cabecalho encolhia junto com o resto.
+
 ## [1.6.0] - 2026-07-22
 
 ### Adicionado

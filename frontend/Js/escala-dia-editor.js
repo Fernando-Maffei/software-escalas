@@ -89,6 +89,41 @@
         return normalized;
     }
 
+    const DENSIDADES_ESCALA = ['confortavel', 'compacta'];
+    const DENSIDADE_ESCALA_STORAGE_KEY = 'escalaDensidade';
+
+    function lerDensidadeEscalaSalva() {
+        try {
+            const salva = localStorage.getItem(DENSIDADE_ESCALA_STORAGE_KEY);
+            return DENSIDADES_ESCALA.includes(salva) ? salva : 'confortavel';
+        } catch (error) {
+            // localStorage pode falhar (modo privativo, politica do navegador).
+            // A densidade e preferencia visual, entao cai no padrao em silencio.
+            return 'confortavel';
+        }
+    }
+
+    function aplicarDensidadeEscala(valor) {
+        const densidade = DENSIDADES_ESCALA.includes(valor) ? valor : 'confortavel';
+        const pagina = document.querySelector('.escala-page');
+
+        if (pagina) {
+            pagina.dataset.densidade = densidade;
+        }
+
+        document.querySelectorAll('.escala-densidade-btn').forEach((botao) => {
+            botao.classList.toggle('is-ativo', botao.dataset.densidade === densidade);
+        });
+
+        try {
+            localStorage.setItem(DENSIDADE_ESCALA_STORAGE_KEY, densidade);
+        } catch (error) {
+            // Sem persistencia a densidade vale so para esta sessao.
+        }
+
+        return densidade;
+    }
+
     function getScaleSectorFilterEscala() {
         return window.__escalaSectorFilterId || 'all';
     }
@@ -1619,12 +1654,9 @@
         appContent.innerHTML = `
             <div class="escala-page">
                 <div class="escala-sticky-panel">
-                <div class="escala-header">
-                    <h1>Escala do Dia</h1>
-                    <p>Visualize e gerencie a escala de trabalhos do dia selecionado.</p>
-                </div>
-
                 <div class="escala-toolbar">
+                    <h1 class="escala-titulo">Escala do Dia</h1>
+
                     <div class="toolbar-actions data-selector">
                         <button id="btnDiaAnteriorEscala" class="btn-secondary btn-day-nav" type="button" title="Dia anterior" aria-label="Dia anterior">
                             <i class="fas fa-chevron-left"></i>
@@ -1639,34 +1671,27 @@
                         <button id="btnDiaProximoEscala" class="btn-secondary btn-day-nav" type="button" title="Próximo dia" aria-label="Próximo dia">
                             <i class="fas fa-chevron-right"></i>
                         </button>
-                        <button id="btnNovoLancamentoEscala" class="btn-secondary">
+                        <!-- Acoes secundarias como icone: o rotulo delas
+                             empurrava a faixa para uma segunda linha em telas
+                             de ~1000px, que e o tamanho comum aqui. Vem antes
+                             da acao principal para que ela feche a faixa. -->
+                        <button id="btnAbrirPlantaoEscala" class="btn-secondary escala-acao-icone escala-acao-inicio" title="Abrir plantao" aria-label="Abrir plantao">
+                            <i class="fas fa-calendar-check"></i>
+                        </button>
+                        <button id="btnRestaurarAlmocosCadastroEscala" class="btn-secondary btn-reset-lunch escala-acao-icone" type="button" title="Resetar almocos para o cadastro" aria-label="Resetar almocos para o cadastro">
+                            <i class="fas fa-rotate-left"></i>
+                        </button>
+                        <button id="btnNovoLancamentoEscala" class="btn-primary escala-acao-principal">
                             <i class="fas fa-plus"></i> Novo lancamento
                         </button>
-                        <button id="btnAbrirPlantaoEscala" class="btn-secondary">
-                            <i class="fas fa-calendar-check"></i> Abrir plantao
-                        </button>
-                        <button id="btnRestaurarAlmocosCadastroEscala" class="btn-secondary btn-reset-lunch" type="button">
-                            <i class="fas fa-rotate-left"></i> Resetar almocos
-                        </button>
                     </div>
-
-                    <div class="legenda-timeline legenda">
-                        <span class="legenda-item"><span class="cor trabalhando"></span> Trabalhando</span>
-                        <span class="legenda-item"><span class="cor almoco"></span> Almoco</span>
-                        <span class="legenda-item"><span class="cor folga"></span> Folga</span>
-                        <span class="legenda-item"><span class="cor ferias"></span> Ferias</span>
-                        <span class="legenda-item"><span class="cor ausencia"></span> Ausencia</span>
-                        <span class="legenda-item"><span class="cor ausencia-parcial"></span> Ausencia parcial</span>
-                        <span class="legenda-item"><span class="cor fora"></span> Fora</span>
-                    </div>
-                </div>
-
                 </div>
 
                 <div class="escala-view-controls">
                     <div class="escala-sector-tabs" id="escalaSectorTabs"></div>
-                    <label class="escala-select-chip" for="escalaSortMode">
-                        <span>Organizar</span>
+                    <label class="escala-select-chip" for="escalaSortMode" title="Organizar a lista de colaboradores">
+                        <i class="fas fa-arrow-down-short-wide" aria-hidden="true"></i>
+                        <span class="sr-only">Organizar</span>
                         <select id="escalaSortMode" class="form-control">
                             <option value="alpha">Por nome</option>
                             <option value="work_start">Por inicio da jornada</option>
@@ -1674,10 +1699,36 @@
                             <option value="lunch_end">Por fim do almoco</option>
                         </select>
                     </label>
-                    <div class="escala-hint-chip">
-                        <i class="fas fa-hand-pointer"></i>
-                        <span>Clique em um colaborador para editar na barra lateral.</span>
+
+                    <div class="escala-densidade" role="group" aria-label="Densidade das linhas">
+                        <button type="button" class="escala-densidade-btn" data-densidade="compacta" title="Linhas compactas: mostra mais colaboradores de uma vez">
+                            <i class="fas fa-bars"></i>
+                        </button>
+                        <button type="button" class="escala-densidade-btn is-ativo" data-densidade="confortavel" title="Linhas confortaveis">
+                            <i class="fas fa-grip-lines"></i>
+                        </button>
                     </div>
+
+                    <!-- A legenda ficava aberta o tempo todo ocupando uma faixa
+                         inteira acima da grade. Como e uma consulta pontual,
+                         virou um botao que abre sob demanda. -->
+                    <details class="escala-legenda-toggle">
+                        <summary title="Ver o significado das cores">
+                            <i class="fas fa-palette"></i>
+                            <span>Legenda</span>
+                        </summary>
+                        <div class="legenda-timeline legenda">
+                            <span class="legenda-item"><span class="cor trabalhando"></span> Trabalhando</span>
+                            <span class="legenda-item"><span class="cor almoco"></span> Almoco</span>
+                            <span class="legenda-item"><span class="cor folga"></span> Folga</span>
+                            <span class="legenda-item"><span class="cor ferias"></span> Ferias</span>
+                            <span class="legenda-item"><span class="cor ausencia"></span> Ausencia</span>
+                            <span class="legenda-item"><span class="cor ausencia-parcial"></span> Ausencia parcial</span>
+                            <span class="legenda-item"><span class="cor fora"></span> Fora</span>
+                        </div>
+                    </details>
+
+                </div>
                 </div>
 
                 <div class="escala-layout">
@@ -1735,6 +1786,14 @@
             renderScaleRowsEscala(getCurrentScaleState());
         });
         setScaleSortModeEscala(getScaleSortModeEscala());
+
+        aplicarDensidadeEscala(lerDensidadeEscalaSalva());
+
+        document.querySelectorAll('.escala-densidade-btn').forEach((botao) => {
+            botao.addEventListener('click', () => {
+                aplicarDensidadeEscala(botao.dataset.densidade);
+            });
+        });
 
         try {
             await carregarEscalaSelecionadaEscala(todayISO);

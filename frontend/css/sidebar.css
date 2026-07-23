@@ -82,6 +82,12 @@ main,
   width: 100%;
   min-width: 0;
 
+  /* A .sidebar e flex column e o conteudo dela passa de 900px; em janelas
+     mais baixas os itens encolhiam, e este cabecalho (com overflow: hidden)
+     era achatado para ~27px, cortando o logo e o nome do sistema pela
+     metade. Sem encolher, ele mantem a altura do proprio conteudo. */
+  flex-shrink: 0;
+
   display: flex;
   align-items: center;
   justify-content: flex-start;

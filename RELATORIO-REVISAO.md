@@ -900,3 +900,88 @@ Usuários, o card fica com 226px dentro de um `appContent` de 614px, e o botão
 "Criar usuario" se sobrepõe ao campo de senha. É pré-existente (o CSS de
 `.usuarios-novo` está correto; o estrangulamento vem de `.config-card-body`) e
 não tem relação com as mudanças desta fase.
+
+---
+
+## Fase 6 — Redesign visual, fatia 1: Escala do Dia (2026-07-22)
+
+Branch: `feat/redesign-visual`.
+
+### Contexto
+
+Pedido do usuário: melhorar como as escalas são apresentadas e o visual do
+sistema, com liberdade para trocar layout. Antes de mexer em CSS, o estado
+atual foi medido no navegador (1000x760, que é o tamanho típico de uso aqui) e
+a direção foi checada contra material público sobre tabelas densas e telas de
+escala.
+
+### Medições do estado anterior
+
+| Métrica | Antes |
+|---|---|
+| Altura de cabeçalho antes da grade aparecer | **404px** de 760px (53% da tela) |
+| Faixas empilhadas acima da grade | 5 (título, subtítulo, botões, legenda, filtros) |
+| Colaboradores visíveis sem rolar | **4** |
+| Altura de linha | 54px |
+
+O princípio que guiou o corte veio da pesquisa: *"every pixel you spend on
+chrome is a pixel taken from data"*. A grade É o conteúdo desta tela.
+
+### Mudanças
+
+**Cabeçalho condensado (404px → 186px):**
+- Subtítulo removido (repetia o título) e título reduzido para 20px, agora na mesma faixa da navegação de data.
+- Ações secundárias ("Abrir plantão", "Resetar almoços") viraram ícones com tooltip; "Novo lançamento" ficou como ação principal destacada. As três alinhadas à direita.
+- Legenda saiu de faixa permanente para um `<details>` que **flutua sobre** a grade — aberta ou fechada, a altura útil é a mesma.
+- Chip de dica ("clique para editar") removido: o ícone de lápis em cada linha já é a afordância.
+- Rótulo "ORGANIZAR" virou ícone com `.sr-only` para leitor de tela (custava ~75px).
+- Abas de setor agora encolhem e rolam em vez de empurrar os controles para outra faixa — é a parte de largura imprevisível (o usuário pode cadastrar mais setores).
+
+**Densidade de linhas (novo):** botão alternando confortável (54px) / compacta
+(41px), preferência guardada em `localStorage`. O modo compacto oculta o chip de
+setor por linha (redundante com as abas de filtro), reduz avatar, badge de total
+e botão de ação. Descobriu-se durante o ajuste que reduzir `min-height` não
+bastava: o piso real da linha era o badge "8h" (32px + 16px de padding).
+
+**Coluna congelada:** sombra na borda direita da coluna de nomes, para ela se
+ler como camada sobre o que passa por baixo (metade das 32 colunas de meia hora
+fica fora da tela). Recomendação direta da pesquisa.
+
+**Larguras de coluna viraram variáveis** (`--esc-col-nome/total/hora`): estavam
+repetidas literalmente em três breakpoints, o que impedia qualquer ajuste
+central.
+
+### Bug pré-existente corrigido
+
+`.sidebar-header` era achatado para 27px e cortava o logo e o nome do sistema
+pela metade. Causa: `.sidebar` é flex column com ~902px de conteúdo; em janelas
+mais baixas os itens encolhiam, e o cabeçalho, tendo `overflow: hidden`, perdia
+o conteúdo. Corrigido com `flex-shrink: 0`. Aparecia em qualquer tela com altura
+de janela menor que ~900px — ou seja, quase sempre.
+
+### Resultado
+
+| Métrica | Antes | Depois |
+|---|---|---|
+| Cabeçalho | 404px | **186px** |
+| Faixas acima da grade | 5 | **2** |
+| Colaboradores visíveis | 4 | **9** (confortável) / **12** (compacta) |
+
+### Verificação realizada
+
+- `npm run smoke` e `npm test` (52 testes) passando.
+- Navegador: as 6 telas carregam sem erro de console; Escala do Dia conferida nos temas claro e escuro; alternância de densidade medida (54px/9 linhas ↔ 41px/12 linhas); persistência da densidade confirmada após reload; popover da legenda reancorado à direita depois de vazar para fora da janela na primeira tentativa.
+
+### Achado registrado, não corrigido
+
+Em Configurações > Usuários o card fica com 226px dentro de um `appContent` de
+614px e o botão "Criar usuario" se sobrepõe ao campo de senha. O CSS de
+`.usuarios-novo` está correto — o estrangulamento vem de `.config-card-body`.
+Fica para a próxima fatia (Configurações e Relatórios).
+
+### Melhorias futuras recomendadas
+
+- **Relatórios**: cada relatório é um card alto com muito espaço vazio; cabem só dois numa janela de 760px.
+- **Configurações**: corrigir o estrangulamento de `.config-card-body` descrito acima.
+- Estender os tokens de design aos 8 arquivos CSS ainda não migrados (pendência herdada da Fase 4).
+- Padrão responsivo para a grade: abaixo de certa largura, converter linha em cartão em vez de manter a grade encolhida.
