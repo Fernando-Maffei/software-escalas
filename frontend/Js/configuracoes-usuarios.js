@@ -297,15 +297,23 @@
 
             <div class="usuarios-novo">
                 <div class="usuarios-novo-campos">
-                    <input type="text" id="novoUsuarioNome" class="form-control" placeholder="Nome de usuario" autocomplete="off">
-                    <input type="password" id="novoUsuarioSenha" class="form-control" placeholder="Senha (vazio = gerar)" autocomplete="new-password">
+                    <label class="usuarios-campo">
+                        <span>Nome de usuario</span>
+                        <input type="text" id="novoUsuarioNome" class="form-control" placeholder="ex.: equipe" autocomplete="off">
+                    </label>
+                    <label class="usuarios-campo">
+                        <span>Senha</span>
+                        <input type="password" id="novoUsuarioSenha" class="form-control" placeholder="vazio = gerar automaticamente" autocomplete="new-password">
+                    </label>
+                </div>
+                <div class="usuarios-novo-acoes">
                     <label class="usuarios-novo-admin">
                         <input type="checkbox" id="novoUsuarioAdmin"> Administrador
                     </label>
+                    <button type="button" id="novoUsuarioBtn" class="btn-primary">
+                        <i class="fas fa-user-plus"></i> Criar usuario
+                    </button>
                 </div>
-                <button type="button" id="novoUsuarioBtn" class="btn-primary">
-                    <i class="fas fa-user-plus"></i> Criar usuario
-                </button>
             </div>
 
             <div id="usuariosLista" class="usuarios-lista"></div>

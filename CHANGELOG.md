@@ -20,6 +20,7 @@ Todas as alteracoes relevantes deste projeto serao documentadas neste arquivo.
 - Arquivos CSS continuavam sendo pedidos com `?v=1.5.0` dentro do `style.css` mesmo apos o bump para 1.6.0, entao o cache-busting nao valia para nenhum deles.
 - Relatorio mensal saia sem nenhum colaborador quando a lista global do front-end nao estava carregada (por exemplo apos falha de carregamento inicial ou sessao expirada): cada ausencia era descartada em silencio e o relatorio parecia correto, so que vazio. Agora recarrega colaboradores e ausencias antes de montar, avisa se ainda faltar, e identifica o registro em vez de omiti-lo.
 - Campo de busca em Colaboradores deixava uma fresta de 29px entre as duas barras fixas, por onde os cards apareciam ao rolar. O deslocamento era um valor fixo (88px) que nao correspondia a altura real do cabecalho; agora e medido e acompanha inclusive quando o cabecalho quebra em duas linhas.
+- Configuracoes > Usuarios: o formulario de novo usuario era uma unica linha flex em que os campos encolhiam ate ~165px e o botao "Criar usuario" chegava a cobrir o campo de senha em telas medias. Reestruturado em campos rotulados numa grade que quebra + uma faixa de acoes separada, previsivel em qualquer largura.
 
 ### Adicionado
 - Aviso na barra lateral do editor quando o almoco do dia e personalizado (nao segue o cadastro), para nao passar despercebido que aquele dia esta fora do padrao.

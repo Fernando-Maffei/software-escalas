@@ -915,30 +915,54 @@ input:checked + .slider:before {
 }
 
 /* ================= CONFIGURACOES > USUARIOS ================= */
+/* Formulario de novo usuario. Antes era uma unica linha flex com campos +
+   checkbox + botao disputando a largura: os campos encolhiam ate ~165px e o
+   botao "Criar usuario" chegava a cobrir o campo de senha em telas medias.
+   Agora sao duas faixas empilhadas: os campos (em grade que quebra) e uma
+   faixa de acoes, previsivel em qualquer largura. */
 .usuarios-novo {
   display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
-  padding: 14px;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px;
   border: 1px dashed var(--border);
   border-radius: 10px;
   margin-bottom: 18px;
 }
 
 .usuarios-novo-campos {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+}
+
+.usuarios-campo {
   display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-  flex: 1;
+  flex-direction: column;
+  gap: 6px;
   min-width: 0;
 }
 
+.usuarios-campo > span {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
 .usuarios-novo-campos .form-control {
-  width: auto;
-  flex: 1;
-  min-width: 170px;
+  width: 100%;
+}
+
+.usuarios-novo-acoes {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.usuarios-novo-acoes .btn-primary {
+  margin-left: auto;
 }
 
 .usuarios-novo-admin {
