@@ -5,7 +5,8 @@ const suites = [
     ...require('./jornadaSemanal.test.js'),
     ...require('./escala.test.js'),
     ...require('./backup.test.js'),
-    ...require('./permissoes.test.js')
+    ...require('./permissoes.test.js'),
+    ...require('./rate-limit.test.js')
 ];
 
 let passed = 0;

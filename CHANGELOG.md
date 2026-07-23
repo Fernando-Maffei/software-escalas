@@ -25,6 +25,9 @@ Todas as alteracoes relevantes deste projeto serao documentadas neste arquivo.
 ### Adicionado
 - Aviso na barra lateral do editor quando o almoco do dia e personalizado (nao segue o cadastro), para nao passar despercebido que aquele dia esta fora do padrao.
 
+### Seguranca
+- Rate limiting no login: 5 tentativas erradas por IP+usuario numa janela de 15 min bloqueiam novas tentativas por 15 min (HTTP 429 com mensagem clara). Em memoria, sem dependencia nova. Login valido zera a contagem, e a chave por IP+usuario isola as tentativas de contas e maquinas diferentes.
+
 ## [1.6.0] - 2026-07-22
 
 ### Adicionado

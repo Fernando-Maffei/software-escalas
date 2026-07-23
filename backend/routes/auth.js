@@ -18,7 +18,20 @@ const {
     verifyPassword
 } = require('../utils/auth');
 
+const { createRateLimiter } = require('../utils/rate-limit');
+
 const router = express.Router();
+
+// Limitador de forca bruta no login: por IP + usuario, para uma senha errada
+// repetida nao vazar para outras contas nem para a tentativa de outra pessoa
+// na mesma rede.
+const loginRateLimiter = createRateLimiter();
+
+function getClientIpFromRequest(req) {
+    const forwardedFor = String(req.headers['x-forwarded-for'] || '').split(',')[0].trim();
+    const rawIp = forwardedFor || req.socket?.remoteAddress || req.ip || '';
+    return String(rawIp).replace(/^::ffff:/, '');
+}
 
 function toPublicUser(user) {
     return {
@@ -34,12 +47,24 @@ router.post('/login', async (req, res, next) => {
         const username = normalizeUsername(req.body?.username);
         const password = normalizePassword(req.body?.password, 'Senha');
 
+        const rateKey = `${getClientIpFromRequest(req)}|${username.toLowerCase()}`;
+        const limite = loginRateLimiter.check(rateKey);
+
+        if (limite.blocked) {
+            const minutos = Math.ceil(limite.retryAfterMs / 60000);
+            throw new AppError(429, `Muitas tentativas de login. Tente novamente em ${minutos} minuto(s).`);
+        }
+
         const pool = await conectar();
         const user = await findUserByUsername(pool, username);
 
         if (!user || !user.ativo || !verifyPassword(password, user.passwordHash, user.passwordSalt)) {
+            loginRateLimiter.registerFailure(rateKey);
             throw new AppError(401, 'Usuario ou senha invalidos.');
         }
+
+        // Login valido zera o historico de falhas desta chave.
+        loginRateLimiter.reset(rateKey);
 
         const token = createSession(user);
         setSessionCookie(res, token);
