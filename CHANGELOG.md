@@ -36,6 +36,9 @@ Todas as alteracoes relevantes deste projeto serao documentadas neste arquivo.
 - Backup perdia a lotacao por setor e a data de cadastro: o mapa de colunas de `Colaboradores` omitia `SetorId` e `DataCadastro`.
 - Verificado de ponta a ponta contra o SQL Server real: ciclo backup->restore idempotente (nenhuma tabela perdida nem duplicada) e recuperacao real (apagados os almocos personalizados, restaurados os 4, com o setor do colaborador preservado).
 
+### Adicionado (backup)
+- Backup de seguranca automatico antes de restaurar: como a restauracao sobrescreve tudo, o sistema salva primeiro um backup do estado atual (na pasta configurada) e informa o nome do arquivo na confirmacao. E best-effort — se nao der para gravar, a restauracao segue e o usuario e avisado de que nao ha ponto de retorno.
+
 ## [1.6.0] - 2026-07-22
 
 ### Adicionado

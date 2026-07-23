@@ -3026,11 +3026,19 @@ importarDados = function importarDadosAtualizado() {
 
                 aplicarPreferenciasImportadas(response?.preferences || dados?.preferencias || {});
 
-                mostrarToast('Backup importado com sucesso! Recarregando a tela...', 'success');
+                if (response?.safetyBackup?.fileName) {
+                    mostrarToast(`Backup importado. O estado anterior foi salvo em "${response.safetyBackup.fileName}".`, 'success');
+                } else if (response?.safetyBackupError) {
+                    // Restauracao aconteceu, mas sem rede de seguranca: avisa
+                    // para o usuario nao supor que ha um ponto de retorno.
+                    mostrarToast('Backup importado, mas NAO foi possivel salvar o estado anterior. Verifique a pasta de backup.', 'warning');
+                } else {
+                    mostrarToast('Backup importado com sucesso! Recarregando a tela...', 'success');
+                }
 
                 setTimeout(() => {
                     window.location.reload();
-                }, 900);
+                }, 1400);
             } catch (error) {
                 console.error('Erro ao importar:', error);
                 mostrarToast(error.message || 'Erro ao importar arquivo', 'error');

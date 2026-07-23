@@ -217,6 +217,33 @@ router.post('/backup/restaurar', async (req, res, next) => {
 
         await ensureApplicationSchema(pool);
 
+        // Rede de seguranca: antes de sobrescrever tudo, tenta salvar um backup
+        // do estado ATUAL. Se a restauracao trouxer dados errados, o usuario
+        // tem como voltar. E best-effort — se nao der para gravar (pasta
+        // invalida, etc.), a restauracao segue mesmo assim, ja que o usuario
+        // confirmou a substituicao; a resposta avisa que a rede falhou.
+        let safetyBackup = null;
+        let safetyBackupError = null;
+
+        try {
+            const safetyDirectory = await ensureBackupDirectory(currentSettings.directory);
+            const databaseSettings = getPublicDatabaseSettings();
+            safetyBackup = await createSystemBackup(pool, {
+                directory: safetyDirectory,
+                generatedBy: 'pre-restauracao',
+                databaseInfo: {
+                    host: databaseSettings.host,
+                    instanceName: databaseSettings.instanceName,
+                    database: databaseSettings.database,
+                    source: databaseSettings.source
+                }
+            });
+        } catch (error) {
+            safetyBackupError = error instanceof AppError
+                ? error.message
+                : 'Nao foi possivel gerar o backup de seguranca antes de restaurar.';
+        }
+
         const result = await restoreSystemBackup(pool, backupData, {
             fileName: req.body?.fileName || ''
         });
@@ -227,9 +254,15 @@ router.post('/backup/restaurar', async (req, res, next) => {
 
         res.json({
             success: true,
-            message: 'Backup importado com sucesso.',
+            message: safetyBackup
+                ? 'Backup importado com sucesso. Um backup de seguranca do estado anterior foi salvo.'
+                : 'Backup importado com sucesso.',
             backup: getPublicBackupSettings(),
             result,
+            safetyBackup: safetyBackup
+                ? { fileName: safetyBackup.fileName, filePath: safetyBackup.filePath }
+                : null,
+            safetyBackupError,
             preferences: result.preferences || {}
         });
     } catch (error) {
