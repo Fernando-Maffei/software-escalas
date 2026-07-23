@@ -275,6 +275,12 @@
     transform: translateY(-50%);
     width: 28px;
     height: 48px;
+    /* Abaixo do cabecalho fixo (70) e acima da grade (ate 12). Hoje o
+       contexto de empilhamento ja mantem a alca atras do cabecalho mesmo
+       com o valor antigo (100), entao isto nao muda o que se ve — deixa
+       explicita a ordem pretendida para nao virar bug se o contexto mudar.
+       A colisao visual foi resolvida pela reserva de espaco no cabecalho. */
+    z-index: 60;
     background: var(--primary);
     border-radius: var(--radius-md) 0 0 var(--radius-md);
     display: flex;
@@ -283,7 +289,6 @@
     cursor: pointer;
     color: white;
     box-shadow: var(--shadow-sm);
-    z-index: 100;
     transition: all 0.3s ease;
     border: 2px solid var(--card);
 }
@@ -291,6 +296,38 @@
 .editor-toggle:hover {
     background: var(--primary-dark);
     width: 32px;
+}
+
+/* Aviso de almoco fora do cadastro, na barra lateral do editor. */
+.editor-aviso-almoco {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    margin-top: 10px;
+    padding: 10px 12px;
+    border-radius: var(--radius-md, 12px);
+    background: var(--warning-soft);
+    border: 1px solid var(--warning);
+    color: var(--text);
+}
+
+.editor-aviso-almoco i {
+    margin-top: 2px;
+    color: var(--warning);
+}
+
+.editor-aviso-almoco strong {
+    display: block;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.editor-aviso-almoco span {
+    display: block;
+    margin-top: 2px;
+    font-size: 11px;
+    line-height: 1.4;
+    color: var(--text-secondary);
 }
 
 .editor-toggle i {
@@ -2044,7 +2081,11 @@
     top: 0;
     z-index: 70;
     margin: -8px 0 12px;
-    padding: 8px 0 10px;
+    /* Reserva a direita a coluna ocupada pela alca de abrir/fechar o editor
+       (.editor-toggle, ~44px na barra recolhida). Sem isso o botao "Novo
+       lancamento", que fica no fim da faixa, divide a mesma coluna que a
+       alca e os dois colidem dependendo do tamanho da janela e da rolagem. */
+    padding: 8px 52px 10px 0;
     background: var(--bg-soft);
     border-bottom: 1px solid rgba(148, 163, 184, 0.14);
     box-shadow: 0 16px 24px -24px rgba(15, 23, 42, 0.45);
@@ -2074,6 +2115,14 @@
     height: 40px;
     padding: 0;
     flex: 0 0 auto;
+}
+
+/* Nao encolher: o botao tem min-width 170px mas o rotulo precisa de ~176px,
+   entao ao apertar a faixa ele era espremido ate cortar a palavra
+   ("Novo lancame..."). */
+.escala-page .toolbar-actions .escala-acao-principal {
+    flex: 0 0 auto;
+    white-space: nowrap;
 }
 
 .escala-densidade {

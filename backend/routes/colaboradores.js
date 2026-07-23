@@ -415,6 +415,15 @@ router.delete('/:id', async (req, res) => {
             .query('DELETE FROM ColaboradorJornadaSemanal WHERE ColaboradorId = @colaboradorId');
     }
 
+    // Almocos personalizados (o ajuste de almoco por dia/periodo) ficavam
+    // para tras quando o colaborador era excluido, virando linhas orfas
+    // apontando para um Id que nao existe mais.
+    if (hasTable(schema, 'AlmocosPersonalizados')) {
+        await pool.request()
+            .input('colaboradorId', sql.Int, id)
+            .query('DELETE FROM AlmocosPersonalizados WHERE ColaboradorId = @colaboradorId');
+    }
+
     await pool.request()
         .input('id', sql.Int, id)
         .query('DELETE FROM Colaboradores WHERE Id = @id');

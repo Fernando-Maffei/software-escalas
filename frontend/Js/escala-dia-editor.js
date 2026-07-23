@@ -1211,6 +1211,23 @@
 
         const lunchRange = formatTimeRangeEscala(record.almocoInicio, record.almocoFim);
 
+        // Almoco personalizado = veio de AlmocosPersonalizados (aplicacao por
+        // periodo ou ajuste manual), nao do cadastro do colaborador. Sem um
+        // aviso aqui o usuario nao tem como lembrar que aquele dia esta fora
+        // do padrao — o que so aparecia discretamente na barra da grade.
+        const almocoPersonalizado = Boolean(record.almocoPersonalizado || record.almocoAjustado);
+        const avisoAlmocoPersonalizado = almocoPersonalizado
+            ? `
+                <div class="editor-aviso-almoco">
+                    <i class="fas fa-circle-exclamation"></i>
+                    <div>
+                        <strong>Almoco personalizado neste dia</strong>
+                        <span>Este horario nao segue o cadastro do colaborador — foi aplicado por periodo ou ajustado a mao. Use "Resetar almocos" para voltar ao cadastro.</span>
+                    </div>
+                </div>
+            `
+            : '';
+
         sidebar.classList.remove('collapsed');
         if (toggleIcon) {
             toggleIcon.className = 'fas fa-chevron-right';
@@ -1245,6 +1262,7 @@
                         <input type="time" id="escalaAlmocoFim-${record.colaboradorId}" value="${escapeHtmlEscala(formatTimeInputEscala(record.almocoFim))}" class="form-control">
                     </div>
                     <small class="helper-text">Atual: ${escapeHtmlEscala(lunchRange)}</small>
+                    ${avisoAlmocoPersonalizado}
                 </div>
 
                 <div class="editor-form-group">
