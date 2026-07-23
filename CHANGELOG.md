@@ -8,6 +8,8 @@ Todas as alteracoes relevantes deste projeto serao documentadas neste arquivo.
 - Escala do Dia: cabecalho condensado de 404px para 186px (titulo na mesma faixa da data, acoes secundarias como icone, legenda sob demanda em vez de faixa fixa). Passam de 4 para 9 colaboradores visiveis sem rolar.
 - Abas de setor encolhem e rolam em vez de empurrar os filtros para outra faixa.
 - Relatorios: os tres relatorios viraram abas (um visivel por vez) em vez de tres cards empilhados que somavam 1405px e obrigavam a rolar. Agora cabem em 760px sem rolagem, e os filtros de cada um ficam lado a lado.
+- Dashboard: cartoes de metrica compactados (padding e sub-card de destaque menores) — gastavam 257px cada para exibir um numero.
+- Lancar Plantao: cartoes de sabado adensados (205px para ~137px de conteudo), reduzindo o espaco vazio da grade.
 
 ### Adicionado
 - Escala do Dia: alternador de densidade das linhas (confortavel 54px / compacta 41px, 12 colaboradores visiveis), com a preferencia guardada no navegador.

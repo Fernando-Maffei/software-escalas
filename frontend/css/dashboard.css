@@ -6,11 +6,14 @@
     margin-bottom: var(--space-6);
 }
 
-/* Cards de métricas */
+/* Cards de métricas. Compactados: cada card gastava 257px para exibir um
+   numero e um detalhe, entao os quatro mais a primeira secao ja estouravam a
+   tela. O respiro interno foi reduzido para caber a faixa de indicadores sem
+   rolar. */
 .dashboard-card {
     background: var(--card);
     border-radius: var(--radius-lg);
-    padding: var(--space-5);
+    padding: var(--space-4);
     box-shadow: var(--shadow-md);
     border: 1px solid var(--border);
     transition: var(--transition);
@@ -26,7 +29,7 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: var(--space-4);
+    margin-bottom: var(--space-2);
 }
 
 .dashboard-card-header h3 {
@@ -60,8 +63,8 @@
 /* Cards secundários */
 .dashboard-card-small {
     background: var(--card-dark);
-    border-radius: var(--radius-lg);
-    padding: var(--space-4);
+    border-radius: var(--radius-md);
+    padding: var(--space-2) var(--space-3);
     display: flex;
     align-items: center;
     gap: var(--space-3);
@@ -69,11 +72,11 @@
 }
 
 .dashboard-card-small i {
-    font-size: var(--text-xl);
+    font-size: var(--text-base);
     color: var(--primary);
     background: var(--primary-soft);
-    padding: 10px;
-    border-radius: var(--radius-md);
+    padding: 7px;
+    border-radius: var(--radius-sm);
 }
 
 .dashboard-card-small-info {

@@ -57,7 +57,9 @@
 .sabado-card {
     background: var(--card-dark);
     border-radius: 16px;
-    padding: 16px 8px;
+    /* Antes 16px vertical: o card ficava com 205px de altura para ~137px de
+       conteudo, muito esguio (106x205). Reduzido para adensar a grade. */
+    padding: 10px 8px;
     text-align: center;
     cursor: pointer;
     transition: var(--transition);
@@ -97,8 +99,8 @@
     display: flex;
     justify-content: space-between;
     gap: 6px;
-    min-height: 20px;
-    margin-bottom: 8px;
+    min-height: 18px;
+    margin-bottom: 4px;
 }
 
 .sabado-dia {
@@ -130,7 +132,7 @@
 }
 
 .sabado-status {
-    margin-top: 10px;
+    margin-top: 6px;
     font-size: 11px;
     color: var(--text-light);
 }
