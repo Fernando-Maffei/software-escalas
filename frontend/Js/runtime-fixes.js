@@ -559,6 +559,38 @@
             // ignore
         }
 
+        // Mesmo cuidado que ja existia para feriados, agora para colaboradores
+        // e ausencias: o relatorio le das listas globais e descarta em silencio
+        // toda ausencia cujo colaborador nao esteja nelas. Se o carregamento
+        // inicial tiver falhado (por exemplo sessao expirada), o relatorio saia
+        // completo na aparencia, porem sem nenhum colaborador.
+        try {
+            if (!Array.isArray(window.colaboradores) || window.colaboradores.length === 0) {
+                if (typeof carregarColaboradores === 'function') {
+                    await carregarColaboradores();
+                }
+            }
+        } catch (error) {
+            // Segue adiante: a checagem abaixo avisa se ainda faltar dado.
+        }
+
+        try {
+            if (!Array.isArray(window.ausencias) || window.ausencias.length === 0) {
+                if (typeof carregarAusencias === 'function') {
+                    await carregarAusencias();
+                }
+            }
+        } catch (error) {
+            // idem
+        }
+
+        // Se mesmo apos a tentativa de recarga nao houver colaboradores, avisa
+        // em vez de gerar um relatorio vazio que parece correto.
+        if ((!Array.isArray(window.colaboradores) || window.colaboradores.length === 0)
+            && typeof mostrarToast === 'function') {
+            mostrarToast('Nao foi possivel carregar os colaboradores. O relatorio pode sair incompleto.', 'error');
+        }
+
         (Array.isArray(window.feriadosAPI) ? window.feriadosAPI : []).forEach((item) => {
             const dataISO = obterDataIsoRelatorio(item.date);
 
@@ -598,12 +630,14 @@
             const colaboradorId = Number(item.ColaboradorId || item.colaboradorId);
             const colaborador = (window.colaboradores || []).find((entry) => Number(entry.Id) === colaboradorId);
 
-            if (!colaborador) {
-                return;
-            }
-
             const tipo = String(item.Tipo || item.tipo || '').toLowerCase();
-            const nomeColaborador = colaborador.Nome || 'Desconhecido';
+
+            // Colaborador ausente da lista global (excluido depois do
+            // lancamento, ou lista nao carregada) continua aparecendo no
+            // relatorio, identificado, em vez de a linha sumir sem rastro.
+            const nomeColaborador = colaborador
+                ? (colaborador.Nome || 'Desconhecido')
+                : `Colaborador #${colaboradorId} (removido)`;
             const inicioNoMes = dataInicioISO < primeiroDiaMesISO ? primeiroDiaMesISO : dataInicioISO;
             const fimNoMes = dataFimISO > ultimoDiaMesISO ? ultimoDiaMesISO : dataFimISO;
 

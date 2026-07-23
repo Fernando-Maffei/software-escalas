@@ -38,7 +38,10 @@
 
 .colaboradores-container .colaboradores-header {
     position: sticky;
-    top: 88px;
+    /* Medido em tempo de execucao por ajustarOffsetCabecalhoColaboradores()
+       (Js/app.js). O 88px fixo que havia aqui nao batia com a altura real do
+       cabecalho e abria uma fresta por onde os cards passavam ao rolar. */
+    top: var(--colaboradores-offset-topo, 88px);
     z-index: 55;
     margin: -20px -20px 20px;
     padding: 20px 20px 16px;

@@ -1018,6 +1018,58 @@ function renderColaboradores() {
     document.getElementById('searchColaborador').addEventListener('input', function(e) {
         filtrarColaboradores(e.target.value);
     });
+
+    ajustarOffsetCabecalhoColaboradores();
+}
+
+// A barra de busca e fixa logo abaixo do cabecalho da pagina, mas os dois
+// ficam em pais diferentes, entao o CSS precisava de um "top" fixo (88px)
+// que nao correspondia a altura real do cabecalho (83px). A diferenca abria
+// uma fresta por onde os cards apareciam ao rolar. Aqui a altura e medida e
+// publicada como variavel CSS, o que tambem acompanha o cabecalho quando ele
+// quebra em duas linhas em telas estreitas.
+function ajustarOffsetCabecalhoColaboradores() {
+    const cabecalho = document.querySelector('.colaboradores-page-header');
+    const layout = document.querySelector('.colaboradores-layout');
+
+    if (!cabecalho || !layout) {
+        return;
+    }
+
+    const aplicar = () => {
+        const alvo = document.querySelector('.colaboradores-page-header');
+        const destino = document.querySelector('.colaboradores-layout');
+
+        if (!alvo || !destino) {
+            return;
+        }
+
+        const altura = Math.round(alvo.getBoundingClientRect().height);
+
+        if (altura > 0) {
+            // 1px de sobreposicao evita fresta por arredondamento de subpixel.
+            destino.style.setProperty('--colaboradores-offset-topo', `${altura - 1}px`);
+        }
+    };
+
+    aplicar();
+
+    // A referencia do observer precisa ficar guardada: um ResizeObserver sem
+    // referencia forte pode ser coletado e simplesmente parar de disparar.
+    // O listener de resize cobre o caso de o observer nao estar disponivel.
+    if (window.__colaboradoresOffsetObserver) {
+        window.__colaboradoresOffsetObserver.disconnect();
+    }
+
+    if (typeof ResizeObserver === 'function') {
+        window.__colaboradoresOffsetObserver = new ResizeObserver(aplicar);
+        window.__colaboradoresOffsetObserver.observe(cabecalho);
+    }
+
+    if (!window.__colaboradoresOffsetResizeLigado) {
+        window.__colaboradoresOffsetResizeLigado = true;
+        window.addEventListener('resize', aplicar);
+    }
 }
 
 function fecharColaboradorEditor() {
