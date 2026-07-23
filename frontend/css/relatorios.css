@@ -1,9 +1,68 @@
 /* ================= RELATÓRIOS ================= */
+/* Barra de abas dos relatorios. Segue o mesmo desenho das abas de setor da
+   Escala do Dia, para a navegacao do sistema se ler como uma coisa so. */
+.relatorios-abas {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+}
+
+.relatorios-aba {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 16px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-full, 999px);
+    background: var(--card);
+    color: var(--text-light);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.relatorios-aba:hover {
+    color: var(--text);
+    border-color: var(--border-dark);
+}
+
+.relatorios-aba.is-ativa {
+    background: var(--primary);
+    border-color: var(--primary);
+    color: #fff;
+    box-shadow: var(--shadow-primary, none);
+}
+
+.relatorios-aba i {
+    font-size: 13px;
+}
+
 .relatorios-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+    grid-template-columns: minmax(0, 1fr);
     gap: 20px;
-    margin-bottom: 30px;
+    margin-bottom: 24px;
+}
+
+/* Somente o relatorio escolhido fica visivel; os demais permanecem no DOM. */
+.relatorios-grid > [data-relatorio-painel] {
+    display: none;
+}
+
+.relatorios-grid > [data-relatorio-painel].is-ativo {
+    display: block;
+}
+
+/* O card ativo nao precisa mais anunciar o proprio nome: a aba selecionada
+   ja diz qual relatorio e. */
+.relatorios-grid > [data-relatorio-painel] > .relatorio-card-header {
+    display: none;
+}
+
+.relatorio-card:hover {
+    transform: none;
 }
 
 .relatorio-card {
@@ -52,12 +111,18 @@
     line-height: 1.5;
 }
 
+/* Filtros lado a lado em vez de empilhados: cada um pedia uma faixa inteira,
+   o que alongava o card sem necessidade. Embrulham quando falta largura. */
 .relatorio-filtros {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
     margin-bottom: 20px;
 }
 
 .filtro-group {
-    margin-bottom: 15px;
+    flex: 1 1 220px;
+    min-width: 0;
 }
 
 .filtro-group label {

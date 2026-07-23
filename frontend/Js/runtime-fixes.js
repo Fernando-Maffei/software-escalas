@@ -4342,13 +4342,29 @@
         ]);
 
         appContent.innerHTML = `
-            <div class="page-header">
+            <div class="page-header relatorios-page-header">
                 <h1><i class="fas fa-chart-bar"></i> Relatorios</h1>
-                <p>Visualize e exporte relatorios do sistema</p>
+            </div>
+
+            <!-- Os tres relatorios sao tarefas excludentes: usa-se um de cada
+                 vez. Abertos ao mesmo tempo somavam 1253px e obrigavam a
+                 rolar sempre. Viraram abas — os tres continuam no DOM (so o
+                 inativo fica oculto), para que os handlers existentes sigam
+                 encontrando seus campos por id. -->
+            <div class="relatorios-abas" role="tablist">
+                <button type="button" class="relatorios-aba is-ativa" data-relatorio-aba="mensal" role="tab" aria-selected="true">
+                    <i class="fas fa-calendar-alt"></i> Mensal completo
+                </button>
+                <button type="button" class="relatorios-aba" data-relatorio-aba="escala" role="tab" aria-selected="false">
+                    <i class="fas fa-table"></i> Escala
+                </button>
+                <button type="button" class="relatorios-aba" data-relatorio-aba="plantoes" role="tab" aria-selected="false">
+                    <i class="fas fa-calendar-check"></i> Plantoes de sabado
+                </button>
             </div>
 
             <div class="relatorios-grid">
-                <div class="relatorio-card">
+                <div class="relatorio-card is-ativo" data-relatorio-painel="mensal">
                     <div class="relatorio-card-header">
                         <i class="fas fa-calendar-alt"></i>
                         <h2>Relatorio Mensal Completo</h2>
@@ -4379,7 +4395,7 @@
                     </div>
                 </div>
 
-                <div class="relatorio-card">
+                <div class="relatorio-card" data-relatorio-painel="escala">
                     <div class="relatorio-card-header">
                         <i class="fas fa-table"></i>
                         <h2>Relatorio de Escala</h2>
@@ -4447,7 +4463,7 @@
                     </div>
                 </div>
 
-                <div class="relatorio-card">
+                <div class="relatorio-card" data-relatorio-painel="plantoes">
                     <div class="relatorio-card-header">
                         <i class="fas fa-calendar-check"></i>
                         <h2>Relatorio de Plantoes de Sabado</h2>
@@ -4505,5 +4521,36 @@
 
         document.getElementById('relatorioEscalaModo')?.addEventListener('change', toggleEscalaReportModeFilters);
         toggleEscalaReportModeFilters();
+        ativarAbasRelatorios();
     };
+
+    // Alterna qual relatorio esta visivel. Os paineis inativos continuam no
+    // DOM (apenas ocultos), entao os handlers de gerar/exportar seguem
+    // encontrando seus campos por getElementById sem nenhuma alteracao.
+    function ativarAbasRelatorios() {
+        const abas = Array.from(document.querySelectorAll('.relatorios-aba'));
+        const paineis = Array.from(document.querySelectorAll('[data-relatorio-painel]'));
+
+        if (abas.length === 0 || paineis.length === 0) {
+            return;
+        }
+
+        const selecionar = (chave) => {
+            abas.forEach((aba) => {
+                const ativa = aba.dataset.relatorioAba === chave;
+                aba.classList.toggle('is-ativa', ativa);
+                aba.setAttribute('aria-selected', ativa ? 'true' : 'false');
+            });
+
+            paineis.forEach((painel) => {
+                painel.classList.toggle('is-ativo', painel.dataset.relatorioPainel === chave);
+            });
+        };
+
+        abas.forEach((aba) => {
+            aba.addEventListener('click', () => selecionar(aba.dataset.relatorioAba));
+        });
+
+        selecionar('mensal');
+    }
 })();

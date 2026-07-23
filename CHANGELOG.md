@@ -7,6 +7,7 @@ Todas as alteracoes relevantes deste projeto serao documentadas neste arquivo.
 ### Alterado
 - Escala do Dia: cabecalho condensado de 404px para 186px (titulo na mesma faixa da data, acoes secundarias como icone, legenda sob demanda em vez de faixa fixa). Passam de 4 para 9 colaboradores visiveis sem rolar.
 - Abas de setor encolhem e rolam em vez de empurrar os filtros para outra faixa.
+- Relatorios: os tres relatorios viraram abas (um visivel por vez) em vez de tres cards empilhados que somavam 1405px e obrigavam a rolar. Agora cabem em 760px sem rolagem, e os filtros de cada um ficam lado a lado.
 
 ### Adicionado
 - Escala do Dia: alternador de densidade das linhas (confortavel 54px / compacta 41px, 12 colaboradores visiveis), com a preferencia guardada no navegador.
