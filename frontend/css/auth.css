@@ -12,8 +12,9 @@ body.authenticated .login-screen {
   inset: 0;
   z-index: 10000;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
+  overflow-y: auto;
   background: var(--bg-soft);
   padding: 20px;
 }
@@ -29,6 +30,7 @@ body.authenticated .login-screen {
 .login-card {
   width: 100%;
   max-width: 380px;
+  margin: auto;
   background: var(--card);
   border-radius: 16px;
   box-shadow: var(--shadow-xl);
@@ -178,6 +180,8 @@ body.authenticated .login-screen {
   font-size: 15px;
   color: var(--text);
   user-select: all;
+  overflow-wrap: anywhere;
+  text-align: right;
 }
 
 .setup-admin-resultado .full-width {
