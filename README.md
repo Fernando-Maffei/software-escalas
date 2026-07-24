@@ -1,163 +1,135 @@
-# Software de Escalas
+# Central de Escalas
 
-Sistema para gestao de escalas de trabalho, colaboradores, ausencias e plantoes.
+![Versão](https://img.shields.io/badge/versão-1.6.0-6366f1)
+![Node](https://img.shields.io/badge/Node-20%2B-3c873a)
+![Licença](https://img.shields.io/badge/licença-proprietária-lightgrey)
+
+Sistema web para gestão de escalas de trabalho, colaboradores, ausências e plantões.
+Uma máquina roda o servidor; qualquer dispositivo da rede acessa pelo navegador, sem instalar nada.
+
+## Índice
+
+- [Funcionalidades](#funcionalidades)
+- [Tecnologias](#tecnologias)
+- [Início rápido](#início-rápido-desenvolvimento)
+- [Implantação](#implantação)
+- [Login e primeiro acesso](#login-e-primeiro-acesso)
+- [Configuração inicial do banco](#configuração-inicial-do-banco)
+- [Usuários do sistema](#usuários-do-sistema)
+- [Atualização](#atualização)
+- [Versionamento](#versionamento)
+- [Documentação](#documentação)
+- [Licença](#licença)
 
 ## Funcionalidades
 
-- Cadastro de colaboradores com horarios de trabalho e almoco
-- Lancamento de ausencias, ferias e folgas
-- Calendario mensal com feriados e eventos
-- Escala diaria com timeline visual
-- Resumo por horario
-- Plantoes de sabado
-- Relatorios e exportacao de dados
+- Cadastro de colaboradores com horários de trabalho e almoço
+- Lançamento de ausências, férias e folgas
+- Calendário mensal com feriados e eventos
+- Escala diária com timeline visual e resumo por horário
+- Plantões de sábado
+- Relatórios e exportação de dados (PDF)
+- Autenticação com perfis de usuário e controle de acesso
+- Backup automático (inclusive antes de restaurações)
 - Tema claro e escuro
+- Instalável como aplicativo (PWA)
 
 ## Tecnologias
 
-- Frontend: HTML, CSS e JavaScript
-- Backend: Node.js e Express
-- Banco de dados: SQL Server
+| Camada | Stack |
+|--------|-------|
+| Frontend | HTML, CSS e JavaScript |
+| Backend | Node.js 20+ e Express |
+| Banco de dados | SQL Server |
 
-## Login
+## Início rápido (desenvolvimento)
 
-A partir da versao 1.3.0 o sistema exige login. Na primeira execucao com um
-banco novo, se a tabela `Usuarios` estiver vazia, um usuario administrador e
-criado automaticamente:
+```bash
+npm install
+npm start
+```
 
-- Usuario: valor de `ADMIN_USERNAME` (padrao `admin`)
-- Senha: valor de `ADMIN_PASSWORD`, se definida no `.env`; caso contrario,
-  uma senha aleatoria e gerada e exibida **uma unica vez** (na tela de
-  configuracao inicial, ou no console do servidor). Anote essa senha, pois
-  nesse caso o sistema pede a troca no primeiro login.
+Acesse `http://localhost:4450`. Configure a conexão com o SQL Server pela própria
+tela de configuração inicial (veja [Configuração inicial do banco](#configuração-inicial-do-banco)).
 
-Veja `.env.example` para configurar `ADMIN_USERNAME`/`ADMIN_PASSWORD` e a
-lista de origens liberadas em `CORS_ORIGINS`.
+Testes:
 
-## Primeira configuracao do banco (instalacao nova)
+```bash
+npm test         # suíte de testes
+npm run smoke    # checagem rápida de sintaxe de todos os módulos
+```
 
-A partir da versao 1.5.0, numa maquina sem banco configurado (sem
-`backend/config/database.local.json` e sem `.env`), abrir o sistema no
-navegador mostra direto a tela **Configuracao inicial**: informe o servidor,
-instancia, banco e credenciais do SQL Server, teste e salve. O sistema cria
-as tabelas e o usuario administrador na hora — sem editar arquivo nenhum.
-Essa tela so existe enquanto nao ha banco configurado; depois disso, tudo
-volta a exigir login.
+## Implantação
 
-(Como alternativa, copiar um `database.local.json` pronto ou preencher o
-`.env` continua funcionando.)
+O modelo recomendado é **um servidor central na rede**; o time acessa pelo navegador.
 
-## Usuarios do sistema
+- **Montar o servidor** (serviço do Windows, firewall, IP fixo):
+  [`docs/SERVIDOR-COMO-INSTALAR.md`](docs/SERVIDOR-COMO-INSTALAR.md)
+- **Acessar e instalar o app** (para o time, Chrome/Edge):
+  [`docs/README-TIME.md`](docs/README-TIME.md)
 
-Administradores gerenciam as contas em **Configuracoes > Usuarios**: criar
-usuario (com senha temporaria e troca obrigatoria no primeiro acesso),
-ativar/desativar, promover/remover administrador e resetar senha. Usuarios
-comuns usam o sistema normalmente, mas nao veem essa tela. O sistema impede
-desativar/rebaixar a propria conta e o ultimo administrador ativo.
+Para uso local rápido em uma máquina Windows, também existem os atalhos
+`iniciar-servidor.bat` (com janela) e `iniciar-sem-terminal.vbs` (oculto);
+`parar-servidor.bat` encerra o servidor.
 
-## Como executar manualmente
+## Login e primeiro acesso
 
-1. Instale o Node.js 20 ou superior
-2. Abra a pasta do projeto
-3. Rode `npm install`
-4. Rode `npm start`
-5. Acesse `http://localhost:4450`
+A partir da versão 1.3.0 o sistema exige login. Na primeira execução com um banco
+novo, se a tabela `Usuarios` estiver vazia, um administrador é criado automaticamente:
 
-## Como iniciar o servidor (uma maquina na rede)
+- **Usuário:** valor de `ADMIN_USERNAME` (padrão `admin`)
+- **Senha:** valor de `ADMIN_PASSWORD` se definido no `.env`; caso contrário, uma
+  senha aleatória é gerada e exibida **uma única vez** (na tela de configuração
+  inicial ou no console do servidor), com troca obrigatória no primeiro login.
 
-Uma maquina roda o servidor; qualquer outro computador, notebook, tablet ou
-celular na mesma rede acessa pelo navegador, sem instalar nada.
+Veja [`.env.example`](.env.example) para `ADMIN_USERNAME`, `ADMIN_PASSWORD` e a lista
+de origens liberadas em `CORS_ORIGINS`.
 
-1. Instale o Node.js 20 ou superior nessa maquina
-2. Copie a pasta do projeto para ela
-3. Dê duplo clique em `iniciar-servidor.bat`
-4. Na primeira execucao o script instala as dependencias automaticamente
-5. Depois disso ele sobe o servidor e abre o navegador em `http://localhost:4450`
+## Configuração inicial do banco
 
-Observacoes:
+A partir da versão 1.5.0, numa máquina sem banco configurado (sem
+`backend/config/database.local.json` e sem `.env`), abrir o sistema no navegador
+mostra direto a tela **Configuração inicial**: informe servidor, instância, banco e
+credenciais do SQL Server, teste e salve. O sistema cria as tabelas e o administrador
+na hora — sem editar nenhum arquivo. Depois de configurado, tudo volta a exigir login.
 
-- O servidor fica ligado enquanto a janela do `.bat` estiver aberta
-- Para encerrar, feche a janela ou use `parar-servidor.bat`
-- Se precisar, configure a conexao com o SQL Server pela tela de configuracoes do sistema
-- Se voce ja tiver um `backend/config/database.local.json` configurado, pode copiar esse arquivo junto para evitar reconfigurar
+## Usuários do sistema
 
-## Como iniciar sem janela de terminal (duplo clique)
+Administradores gerenciam contas em **Configurações → Usuários**: criar usuário (com
+senha temporária e troca obrigatória no primeiro acesso), ativar/desativar,
+promover/remover administrador e resetar senha. Usuários comuns não veem essa tela. O
+sistema impede desativar ou rebaixar a própria conta e o último administrador ativo.
 
-Se voce nao quer ficar com a janela preta do terminal aberta, use o
-`iniciar-sem-terminal.vbs` em vez do `.bat`:
+## Atualização
 
-1. Dê duplo clique em `iniciar-sem-terminal.vbs`
-2. O servidor sobe **totalmente oculto** (nenhuma janela fica na tela)
-3. A aplicacao abre sozinha no navegador em `http://localhost:4450`
+1. Pare o servidor (`parar-servidor.bat` ou pelo serviço, se configurado)
+2. Atualize os arquivos do projeto (`git pull`)
+3. Rode `npm install` caso as dependências tenham mudado
+4. Suba o servidor novamente
 
-Como o servidor fica invisivel, para **encerrar** use o `parar-servidor.bat`
-(ele localiza e encerra apenas o processo que esta na porta 4450).
+As configurações de banco e backup ficam em `backend/config/`, fora do código, e não
+são afetadas pela atualização.
 
-Observacoes:
+## Versionamento
 
-- Na **primeira instalacao** (sem a pasta `node_modules`), use uma vez o
-  `iniciar-servidor.bat` normal — ele instala as dependencias mostrando o
-  andamento. Depois disso, o `iniciar-sem-terminal.vbs` funciona direto.
-  (O proprio `.vbs` detecta isso e chama o `.bat` visivel automaticamente
-  quando as dependencias ainda nao foram instaladas.)
-- Se ja estiver rodando, o `.vbs` so abre o navegador, sem subir um segundo servidor.
-- Voce pode criar um atalho para o `.vbs` na area de trabalho (e ate trocar
-  o icone do atalho) para ter um "botao" de iniciar o sistema.
-- A porta padrao (4450) esta no topo do arquivo `.vbs`, caso precise mudar.
+Versão atual: **1.6.0**. O histórico completo fica em [`CHANGELOG.md`](CHANGELOG.md).
+Segue [SemVer](https://semver.org/lang/pt-BR/): correção (`1.0.1`), funcionalidade
+(`1.1.0`), mudança que quebra fluxo (`2.0.0`).
 
-## Como acessar de outros dispositivos na rede
+> Desde a versão 1.4.0 o sistema deixou de ser distribuído como aplicativo desktop
+> (Electron/`.exe`). O modelo atual é um servidor web acessado pelo navegador.
 
-Depois que o servidor estiver rodando numa maquina (veja acima), qualquer
-outro dispositivo na mesma rede local acessa direto pelo navegador em
-`http://<nome-ou-ip-da-maquina-servidora>:4450` — nao precisa instalar nada
-nesses outros dispositivos.
+## Documentação
 
-## Servidor em segundo plano (iniciar com o Windows)
+- [`docs/SERVIDOR-COMO-INSTALAR.md`](docs/SERVIDOR-COMO-INSTALAR.md) — montar o servidor central
+- [`docs/README-TIME.md`](docs/README-TIME.md) — guia do time (acesso e instalação do app)
+- [`CONTRIBUTING.md`](CONTRIBUTING.md) — fluxo de branches, commits e testes
+- [`SECURITY.md`](SECURITY.md) — política de segurança
+- [`CHANGELOG.md`](CHANGELOG.md) — histórico de versões
 
-Para nao depender de deixar a janela do `.bat` aberta, a maquina que hospeda
-o servidor pode configurar uma inicializacao automatica pelo Agendador de
-Tarefas do Windows, direto pela tela **Configuracoes > Comunicacao em Rede**
-do proprio sistema (logado como administrador dessa maquina):
+## Licença
 
-- **Instalar inicio automatico**: cria uma tarefa que sobe `node backend/server.js`
-  automaticamente a cada login do Windows nessa maquina, sem precisar abrir o `.bat`
-- **Iniciar agora** / **Parar**: controla a tarefa sem esperar o proximo login
-- **Remover**: desfaz a inicializacao automatica
-
-## Como atualizar uma instalacao existente
-
-1. Pare o servidor (`parar-servidor.bat`, ou pela tela de segundo plano se estiver configurado)
-2. Substitua os arquivos do projeto pela nova versao (ou `git pull`)
-3. Rode `npm install` caso as dependencias tenham mudado
-4. Suba o servidor de novo (`iniciar-servidor.bat` ou a inicializacao automatica)
-
-As configuracoes de banco e backup ficam em `backend/config/`, fora do
-codigo do sistema, e nao sao afetadas pela atualizacao.
-
-Sugestao simples de versionamento:
-
-- `1.0.1` para correcao pequena
-- `1.1.0` para nova funcionalidade
-- `2.0.0` para mudanca grande ou quebra de fluxo
-
-Versao atual: `1.6.0`. O historico de alteracoes fica em `CHANGELOG.md`.
-
-## Se voce ja tinha o aplicativo desktop instalado (versoes ate 1.3.x)
-
-A partir da versao 1.4.0 o sistema deixou de ser distribuido como aplicativo
-desktop (Electron) com instalador `.exe`, pois esse formato deixava o
-sistema pesado e lento para instalar e atualizar. O modelo atual e mais
-leve: um servidor web numa maquina, acessado pelo navegador por qualquer
-dispositivo da rede.
-
-- Se voce ainda tem o app desktop instalado, ele continua funcionando
-  normalmente — nada foi desativado remotamente.
-- Ele nao vai mais receber atualizacoes por instalador. Para migrar, use o
-  fluxo acima (`iniciar-servidor.bat`) nesta mesma maquina ou em outra, e
-  reaproveite seu `backend/config/database.local.json` se ja tiver um.
-- Pode desinstalar o app desktop antigo pelo Painel de Controle do Windows
-  quando quiser, sem perder dados — os dados ficam no banco SQL Server, nao
-  no aplicativo.
+Software proprietário — uso interno, todos os direitos reservados. Veja [`LICENSE`](LICENSE).
 
 ## Autor
 
