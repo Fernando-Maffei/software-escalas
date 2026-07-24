@@ -2,7 +2,7 @@
 
 Todas as alteracoes relevantes deste projeto serao documentadas neste arquivo.
 
-## [Nao lancado] - branch feat/redesign-visual
+## [1.6.1] - 2026-07-24
 
 ### Alterado
 - Escala do Dia: cabecalho condensado de 404px para 186px (titulo na mesma faixa da data, acoes secundarias como icone, legenda sob demanda em vez de faixa fixa). Passam de 4 para 9 colaboradores visiveis sem rolar.
@@ -12,10 +12,12 @@ Todas as alteracoes relevantes deste projeto serao documentadas neste arquivo.
 - Lancar Plantao: cartoes de sabado adensados (205px para ~137px de conteudo), reduzindo o espaco vazio da grade.
 
 ### Adicionado
+- Instalacao como aplicativo (PWA): `manifest.json` e icones permitem "instalar" a Central de Escalas com icone e janela propria pelo Chrome/Edge. Em HTTPS o botao "Instalar" e automatico; em HTTP na rede local, via menu do navegador.
 - Escala do Dia: alternador de densidade das linhas (confortavel 54px / compacta 41px, 12 colaboradores visiveis), com a preferencia guardada no navegador.
 - Sombra na borda da coluna de colaboradores congelada, para separa-la visualmente da linha do tempo que rola por baixo.
 
 ### Corrigido
+- Telas de login e configuracao inicial eram cortadas em telas de baixa altura: o cartao centralizado nao rolava quando ficava mais alto que a viewport, escondendo a senha do admin gerada na primeira execucao (so alcancavel reduzindo o zoom). Agora o container rola e o cartao se desloca conforme a altura, mantendo a centralizacao quando cabe.
 - Cabecalho da barra lateral (logo e nome do sistema) era cortado pela metade em qualquer janela com menos de ~900px de altura: a barra e flex column e o cabecalho encolhia junto com o resto.
 - Excluir colaborador falhava com erro 500 quando ele tinha almoco personalizado (aplicado por periodo ou ajustado a mao): a rota limpava escala, banco de horas, jornada semanal e plantoes, mas nao a tabela `AlmocosPersonalizados`, e a foreign key barrava a exclusao.
 - Botao "Novo lancamento" colidia com a alca de abrir/fechar o editor lateral, que divide a mesma coluna a direita, e o rotulo podia ser cortado por poder encolher abaixo da largura do texto.
