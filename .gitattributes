@@ -1,0 +1,15 @@
+# Normaliza fim de linha automaticamente (armazenado como LF no repositorio)
+* text=auto eol=lf
+
+# Scripts do Windows precisam de CRLF para funcionar corretamente
+*.bat text eol=crlf
+*.vbs text eol=crlf
+*.ps1 text eol=crlf
+
+# Arquivos binarios: sem conversao de linha nem diff textual
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.ico  binary
+*.pdf  binary

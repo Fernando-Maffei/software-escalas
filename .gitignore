@@ -6,6 +6,7 @@ out/
 # Ambiente
 .env
 .vscode/
+.claude/
 .DS_Store
 
 # Backend
