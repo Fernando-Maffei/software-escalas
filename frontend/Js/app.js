@@ -2803,6 +2803,12 @@ function renderConfiguracoes() {
                                 Remover inicio automatico
                             </button>
                         </div>
+
+                        <small class="helper-text">
+                            O servidor passa a subir no boot da maquina, sem precisar
+                            que alguem faca login no Windows. Para instalar, abra o
+                            aplicativo como administrador (a tarefa roda na conta SYSTEM).
+                        </small>
                     </div>
 
                     <div class="config-actions-row">

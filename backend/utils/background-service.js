@@ -33,6 +33,15 @@ function assertAvailable() {
     }
 }
 
+// Detecta a falha tipica de "criar tarefa como SYSTEM sem estar elevado".
+// schtasks retorna "Access is denied" (ou "Acesso negado" em PT) quando o
+// processo nao esta rodando como administrador.
+function isAccessDeniedError(result) {
+    return /access is denied|acesso (foi )?negado|erro: acesso/i.test(
+        `${result.stdout} ${result.stderr} ${result.error}`
+    );
+}
+
 function buildServerTaskCommand() {
     return [
         quoteWindowsArgument(process.execPath),
@@ -87,6 +96,13 @@ function installBackgroundServerTask() {
     assertAvailable();
 
     const command = buildServerTaskCommand();
+    // ONSTART + conta SYSTEM: o servidor sobe no boot da maquina, ANTES e sem
+    // depender de alguem logar no Windows — que e o requisito do servidor
+    // central ("ligou a maquina, o sistema esta no ar"). Como SYSTEM roda sem
+    // sessao interativa, nao ha console para ler credenciais: a senha do admin
+    // precisa vir de ADMIN_PASSWORD (ver backend/utils/auth.js) definida no
+    // ambiente da maquina. Criar tarefa como SYSTEM exige privilegio de
+    // administrador — por isso o tratamento de "acesso negado" abaixo.
     const result = runWindowsCommand('schtasks.exe', [
         '/Create',
         '/TN',
@@ -94,13 +110,19 @@ function installBackgroundServerTask() {
         '/TR',
         command,
         '/SC',
-        'ONLOGON',
+        'ONSTART',
+        '/RU',
+        'SYSTEM',
         '/RL',
-        'LIMITED',
+        'HIGHEST',
         '/F'
     ]);
 
     if (!result.ok) {
+        if (isAccessDeniedError(result)) {
+            throw new AppError(403, 'Para instalar o inicio automatico no boot (conta SYSTEM), abra o aplicativo como administrador e tente novamente.');
+        }
+
         throw new AppError(500, result.stderr || result.stdout || result.error || 'Nao foi possivel criar a tarefa em segundo plano.');
     }
 
