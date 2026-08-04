@@ -2634,6 +2634,11 @@ function renderConfiguracoes() {
                             <i class="fas fa-table"></i>
                             Criar / Verificar Tabelas
                         </button>
+
+                        <button class="config-btn" id="carregarExemplosBancoBtn" type="button">
+                            <i class="fas fa-seedling"></i>
+                            Carregar Dados de Exemplo
+                        </button>
                     </div>
                 </div>
             </div>

@@ -194,6 +194,28 @@
         }
     }
 
+    async function carregarExemplosBanco() {
+        const confirmar = typeof window.confirm === 'function'
+            ? window.confirm('Carregar dados de exemplo (setores, colaboradores de demonstracao e feriados nacionais)?\n\nNenhum dado existente sera apagado — apenas o que ainda faltar sera adicionado.')
+            : true;
+
+        if (!confirmar) {
+            return;
+        }
+
+        definirStatusConfiguracaoBanco('loading', 'Carregando dados de exemplo...', 'Inserindo apenas registros ausentes, sem apagar dados existentes.');
+
+        const response = await window.API.carregarExemplosBanco();
+        const totals = response.totals || {};
+        const detalhe = `Totais no banco: ${totals.setores || 0} setores, ${totals.colaboradores || 0} colaboradores, ${totals.feriados || 0} feriados.`;
+
+        definirStatusConfiguracaoBanco('success', response.message || 'Dados de exemplo carregados.', detalhe);
+
+        if (typeof mostrarToast === 'function') {
+            mostrarToast(response.message || 'Dados de exemplo carregados.', 'success');
+        }
+    }
+
     async function carregarConfiguracaoBancoTela() {
         definirStatusConfiguracaoBanco('loading', 'Carregando configuracao do banco...', 'Buscando a configuracao atual salva no backend.');
 
@@ -474,6 +496,18 @@
 
                 if (typeof mostrarToast === 'function') {
                     mostrarToast(`Erro ao verificar tabelas: ${error.message}`, 'error');
+                }
+            }
+        });
+
+        document.getElementById('carregarExemplosBancoBtn')?.addEventListener('click', async () => {
+            try {
+                await carregarExemplosBanco();
+            } catch (error) {
+                definirStatusConfiguracaoBanco('error', error.message || 'Erro ao carregar os dados de exemplo.', 'Verifique a permissao do usuario para inserir dados no banco.');
+
+                if (typeof mostrarToast === 'function') {
+                    mostrarToast(`Erro ao carregar dados de exemplo: ${error.message}`, 'error');
                 }
             }
         });

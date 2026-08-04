@@ -28,6 +28,8 @@ const SCHEMA_SCRIPT_PATHS = Object.freeze([
     path.join(__dirname, '..', '..', 'database', 'migrations', '2026-07-09-usuarios-admin.sql')
 ]);
 
+const EXAMPLE_SEED_SCRIPT_PATH = path.join(__dirname, '..', '..', 'database', 'seeds', 'dados-exemplo.sql');
+
 function splitSqlBatches(script) {
     return String(script || '')
         .split(/^\s*GO\s*$/gim)
@@ -174,7 +176,38 @@ async function ensureApplicationSchema(pool) {
     };
 }
 
+// Carrega o template de dados de exemplo (setores, colaboradores de
+// demonstracao e feriados nacionais). O script SQL e idempotente e nunca
+// apaga/sobrescreve dados existentes, entao e seguro rodar num banco que ja
+// tem conteudo — apenas preenche o que ainda faltar. Serve para um banco
+// recem-instalado nao comecar totalmente vazio.
+async function applyExampleSeed(pool) {
+    // Garante que as tabelas existam antes de tentar inserir nelas.
+    await ensureApplicationSchema(pool);
+
+    await executeSqlScriptFile(pool, EXAMPLE_SEED_SCRIPT_PATH);
+
+    const counts = await pool.request().query(`
+        SELECT
+            (SELECT COUNT(*) FROM dbo.Setores) AS setores,
+            (SELECT COUNT(*) FROM dbo.Colaboradores) AS colaboradores,
+            (SELECT COUNT(*) FROM dbo.Feriados) AS feriados
+    `);
+
+    const row = counts.recordset[0] || {};
+
+    return {
+        seedApplied: true,
+        totals: {
+            setores: Number(row.setores) || 0,
+            colaboradores: Number(row.colaboradores) || 0,
+            feriados: Number(row.feriados) || 0
+        }
+    };
+}
+
 module.exports = {
     REQUIRED_TABLES,
-    ensureApplicationSchema
+    ensureApplicationSchema,
+    applyExampleSeed
 };

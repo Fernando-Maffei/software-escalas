@@ -21,7 +21,7 @@ const {
     normalizeDatabaseSettings,
     saveDatabaseSettings
 } = require('../utils/database-config');
-const { ensureApplicationSchema, REQUIRED_TABLES } = require('../utils/database-schema');
+const { ensureApplicationSchema, applyExampleSeed, REQUIRED_TABLES } = require('../utils/database-schema');
 const { clearSchemaCache } = require('../utils/schema');
 
 const router = express.Router();
@@ -120,6 +120,26 @@ router.post('/verificar-tabelas', async (req, res, next) => {
         });
     } catch (error) {
         next(mapDatabaseConnectionError(error, 'Erro ao verificar ou criar as tabelas da aplicacao.'));
+    }
+});
+
+router.post('/carregar-exemplos', async (req, res, next) => {
+    try {
+        const effectiveSettings = getEffectiveDatabaseSettings();
+        normalizeDatabaseSettings(effectiveSettings, {
+            currentSettings: getDefaultDatabaseSettings()
+        });
+
+        const pool = await conectar();
+        const result = await applyExampleSeed(pool);
+
+        res.json({
+            success: true,
+            message: 'Dados de exemplo carregados. Nenhum dado existente foi apagado.',
+            ...result
+        });
+    } catch (error) {
+        next(mapDatabaseConnectionError(error, 'Erro ao carregar os dados de exemplo no banco.'));
     }
 });
 

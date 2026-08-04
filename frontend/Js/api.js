@@ -216,6 +216,7 @@ const API = {
     salvarConfiguracaoBanco: (data) => API.post('/configuracao-banco/salvar', data),
     testarConfiguracaoBanco: (data) => API.post('/configuracao-banco/testar', data),
     verificarTabelasBanco: () => API.post('/configuracao-banco/verificar-tabelas', {}),
+    carregarExemplosBanco: () => API.post('/configuracao-banco/carregar-exemplos', {}),
     getConfiguracaoBackup: () => API.get('/configuracao-banco/backup'),
     selecionarDiretorioBackup: (data = {}) => API.post('/configuracao-banco/backup/selecionar-pasta', data),
     salvarConfiguracaoBackup: (data) => API.post('/configuracao-banco/backup/salvar', data),
