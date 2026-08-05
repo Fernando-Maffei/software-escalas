@@ -9,6 +9,9 @@ out/
 .claude/
 .DS_Store
 
+# Docker: override local de desenvolvimento (bind mount do frontend)
+docker-compose.override.yml
+
 # Backend
 backend/config.js
 backend/config/*.json
