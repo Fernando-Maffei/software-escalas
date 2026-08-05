@@ -1,0 +1,27 @@
+# O que NAO deve entrar na imagem Docker.
+# Motivos: imagem menor, build mais rapido e — o mais importante — nao vazar
+# segredos nem a config do banco da SUA maquina para dentro do container.
+
+node_modules
+npm-debug.log
+out
+
+# Segredos / config local (a config vem por variavel de ambiente no container)
+.env
+.env.*
+backend/config.js
+backend/config/*.json
+**/*.local.json
+
+# Metadados e coisas de desenvolvimento
+.git
+.gitignore
+.gitattributes
+.claude
+.vscode
+.editorconfig
+prototipos
+tests
+docs
+*.md
+*.log

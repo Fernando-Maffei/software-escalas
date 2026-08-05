@@ -1,0 +1,70 @@
+# Sobe o App de Escalas em containers: um para o SQL Server, um para criar o
+# banco na primeira vez, e um para o app.
+#
+# Uso:
+#   1. copie .env.docker.example para .env e troque as senhas
+#   2. docker compose up -d --build
+#   3. abra http://localhost:4450
+#
+# O "restart: always" faz o app e o banco subirem sozinhos quando a maquina
+# liga — sem ninguem precisar logar. E o que substitui a tarefa do Windows.
+
+name: app-de-escalas
+
+services:
+  # ---- Banco de dados (SQL Server, edicao Express/gratuita) ----------------
+  db:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: escalas-db
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: "${DB_PASSWORD}"
+      MSSQL_PID: "Express"
+    ports:
+      - "1433:1433"          # opcional: conectar com SSMS/Azure Data Studio de fora
+    volumes:
+      - db-data:/var/opt/mssql   # os dados do banco sobrevivem a reinicios
+    restart: always
+
+  # ---- Cria o banco "SoftwareEscalas" uma vez e sai ------------------------
+  db-init:
+    image: mcr.microsoft.com/mssql-tools:latest
+    container_name: escalas-db-init
+    depends_on:
+      - db
+    environment:
+      DB_PASSWORD: "${DB_PASSWORD}"
+    volumes:
+      - ./docker/init-db.sh:/init-db.sh:ro
+    entrypoint: ["/bin/bash", "/init-db.sh"]
+    restart: "no"
+
+  # ---- O app (Node/Express) ------------------------------------------------
+  app:
+    build: .
+    container_name: escalas-app
+    depends_on:
+      db-init:
+        condition: service_completed_successfully   # so sobe apos o banco existir
+    environment:
+      PORT: "4450"
+      DB_HOST: "db"            # nome do servico do banco acima
+      DB_PORT: "1433"
+      DB_DATABASE: "SoftwareEscalas"
+      DB_USER: "sa"
+      DB_PASSWORD: "${DB_PASSWORD}"
+      DB_AUTH_TYPE: "sql"
+      DB_ENCRYPT: "true"
+      DB_TRUST_CERT: "true"
+      ADMIN_USERNAME: "admin"
+      ADMIN_PASSWORD: "${ADMIN_PASSWORD}"
+      APP_DE_ESCALAS_DATA_DIR: "/data"
+    ports:
+      - "4450:4450"
+    volumes:
+      - app-data:/data         # backups e config do app persistem
+    restart: always
+
+volumes:
+  db-data:
+  app-data:
