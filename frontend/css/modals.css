@@ -825,6 +825,57 @@
     word-break: break-word;
 }
 
+/* Modal de exclusao com senha: herda a estrutura .modal e espelha o visual da
+   modal de confirmacao, somando o campo de senha e a mensagem de erro. */
+#modalSenhaExclusao .modal-body {
+    padding: 24px;
+    text-align: center;
+    background: var(--bg-soft);
+}
+
+#modalSenhaExclusao .modal-body > i {
+    font-size: 44px;
+    color: var(--danger);
+    margin-bottom: 14px;
+    opacity: 0.9;
+}
+
+#modalSenhaExclusao .modal-body p {
+    font-size: 15px;
+    color: var(--text);
+    margin-bottom: 16px;
+    font-weight: 500;
+}
+
+#modalSenhaExclusao .senha-exclusao-campo {
+    text-align: left;
+    margin-top: 4px;
+}
+
+#modalSenhaExclusao .senha-exclusao-campo label {
+    display: block;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 6px;
+}
+
+#modalSenhaExclusao .senha-exclusao-erro {
+    display: block;
+    margin-top: 8px;
+    color: var(--danger);
+    font-size: 12px;
+    font-weight: 600;
+}
+
+#modalSenhaExclusao .modal-actions {
+    display: flex;
+    gap: 12px;
+    padding: 20px 24px;
+    border-top: 2px solid var(--border);
+    background: var(--card);
+}
+
 #modalConfirmacao .modal-actions {
     display: flex;
     gap: 12px;

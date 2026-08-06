@@ -1290,8 +1290,106 @@ function cancelarEdicao() {
     renderColaboradores();
 }
 
+// Abre a modal #modalSenhaExclusao e resolve com a senha digitada quando o
+// usuario confirma E a verificacao (options.verificar) passa; resolve com null
+// se ele cancelar/fechar. Senha errada mantem a modal aberta com o erro — nada
+// e apagado. Interacao autocontida: nao mexe na modal generica de confirmacao.
+function solicitarSenhaModal(options = {}) {
+    return new Promise((resolve) => {
+        const modal = document.getElementById('modalSenhaExclusao');
+        const mensagem = document.getElementById('senhaExclusaoMensagem');
+        const input = document.getElementById('senhaExclusaoInput');
+        const erro = document.getElementById('senhaExclusaoErro');
+        const btnOk = document.getElementById('confirmarSenhaExclusaoBtn');
+        const btnCancelar = document.getElementById('cancelarSenhaExclusaoBtn');
+        const btnFechar = document.getElementById('fecharModalSenhaExclusaoBtn');
+
+        if (!modal || !input || !btnOk || !btnCancelar) {
+            resolve(null);
+            return;
+        }
+
+        if (mensagem) mensagem.textContent = options.mensagem || 'Esta ação não pode ser desfeita.';
+        input.value = '';
+        if (erro) { erro.textContent = ''; erro.hidden = true; }
+        modal.classList.remove('hidden');
+        setTimeout(() => input.focus(), 50);
+
+        let ocupado = false;
+
+        function limpar() {
+            btnOk.removeEventListener('click', aoConfirmar);
+            btnCancelar.removeEventListener('click', aoCancelar);
+            if (btnFechar) btnFechar.removeEventListener('click', aoCancelar);
+            input.removeEventListener('keydown', aoTeclar);
+            modal.classList.add('hidden');
+        }
+
+        function mostrarErro(texto) {
+            if (erro) { erro.textContent = texto; erro.hidden = false; }
+            input.focus();
+            input.select();
+        }
+
+        async function aoConfirmar() {
+            if (ocupado) return;
+            const senha = input.value;
+
+            if (!senha) {
+                mostrarErro('Informe sua senha.');
+                return;
+            }
+
+            ocupado = true;
+            btnOk.disabled = true;
+
+            try {
+                if (typeof options.verificar === 'function') {
+                    await options.verificar(senha);
+                }
+                limpar();
+                btnOk.disabled = false;
+                resolve(senha);
+            } catch (error) {
+                ocupado = false;
+                btnOk.disabled = false;
+                mostrarErro(error && error.status === 403
+                    ? 'Senha incorreta.'
+                    : (error?.message || 'Não foi possível verificar a senha.'));
+            }
+        }
+
+        function aoCancelar() {
+            limpar();
+            resolve(null);
+        }
+
+        function aoTeclar(event) {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                aoConfirmar();
+            } else if (event.key === 'Escape') {
+                aoCancelar();
+            }
+        }
+
+        btnOk.addEventListener('click', aoConfirmar);
+        btnCancelar.addEventListener('click', aoCancelar);
+        if (btnFechar) btnFechar.addEventListener('click', aoCancelar);
+        input.addEventListener('keydown', aoTeclar);
+    });
+}
+
 async function excluirColaborador(id) {
-    if (!confirm("Tem certeza que deseja excluir este colaborador?")) return;
+    // Portao de senha: nada e apagado a menos que o usuario confirme com a
+    // propria senha. A verificacao roda ANTES de qualquer exclusao, porque o
+    // fluxo abaixo apaga lancamentos relacionados antes do colaborador em si.
+    const senhaConfirmada = await solicitarSenhaModal({
+        mensagem: 'Excluir este colaborador e todos os lançamentos relacionados? Esta ação não pode ser desfeita.',
+        verificar: (senha) => window.API.verificarSenha(senha)
+    });
+
+    if (senhaConfirmada === null) return;
 
     mostrarToast("Excluindo colaborador e lançamentos relacionados...", "warning");
     

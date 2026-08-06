@@ -476,6 +476,36 @@
     </div>
 </div>
 
+<!-- MODAL DE EXCLUSAO COM SENHA (acoes sensiveis, ex.: excluir colaborador) -->
+<div id="modalSenhaExclusao" class="modal hidden">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3><i class="fas fa-shield-halved"></i> Confirmar com senha</h3>
+            <button class="modal-close" id="fecharModalSenhaExclusaoBtn" type="button">&times;</button>
+        </div>
+
+        <div class="modal-body">
+            <i class="fas fa-triangle-exclamation"></i>
+            <p id="senhaExclusaoMensagem">Esta ação não pode ser desfeita.</p>
+            <div class="form-group senha-exclusao-campo">
+                <label for="senhaExclusaoInput">Digite sua senha para confirmar</label>
+                <input type="password" id="senhaExclusaoInput" class="form-control"
+                       autocomplete="current-password" placeholder="Sua senha">
+                <small id="senhaExclusaoErro" class="senha-exclusao-erro" hidden></small>
+            </div>
+        </div>
+
+        <div class="modal-actions">
+            <button id="confirmarSenhaExclusaoBtn" class="btn-danger" type="button">
+                <i class="fas fa-trash"></i> Excluir
+            </button>
+            <button id="cancelarSenhaExclusaoBtn" class="btn-secondary" type="button">
+                <i class="fas fa-times"></i> Cancelar
+            </button>
+        </div>
+    </div>
+</div>
+
 <!-- MODAL DE ALTERAR SENHA -->
 <div id="modalTrocarSenha" class="modal">
     <div class="modal-content">

@@ -118,4 +118,39 @@ router.post('/trocar-senha', requireAuth, async (req, res, next) => {
     }
 });
 
+// Confirma a senha do PROPRIO usuario logado. Serve de "portao" para acoes
+// sensiveis (ex.: excluir um colaborador) sem alterar o contrato dessas rotas:
+// o front chama isto ANTES de agir e so prossegue se der 200. Usa o mesmo
+// limitador de forca bruta do login, com chave propria.
+router.post('/verify-password', requireAuth, async (req, res, next) => {
+    try {
+        const password = String(req.body?.password || '');
+
+        if (!password) {
+            throw new AppError(400, 'Informe a senha.');
+        }
+
+        const rateKey = `verify|${getClientIpFromRequest(req)}|${req.user.id}`;
+        const limite = loginRateLimiter.check(rateKey);
+
+        if (limite.blocked) {
+            const minutos = Math.ceil(limite.retryAfterMs / 60000);
+            throw new AppError(429, `Muitas tentativas. Tente novamente em ${minutos} minuto(s).`);
+        }
+
+        const pool = await conectar();
+        const user = await findUserById(pool, req.user.id);
+
+        if (!user || !user.ativo || !verifyPassword(password, user.passwordHash, user.passwordSalt)) {
+            loginRateLimiter.registerFailure(rateKey);
+            throw new AppError(403, 'Senha incorreta.');
+        }
+
+        loginRateLimiter.reset(rateKey);
+        res.json({ success: true });
+    } catch (error) {
+        next(error);
+    }
+});
+
 module.exports = router;

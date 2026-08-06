@@ -181,6 +181,9 @@ const API = {
     }),
     getJornadaSemanal: (params = {}) => API.get('/jornada-semanal', params),
     excluirColaborador: (id) => API.delete(`/colaboradores/${id}`),
+    // Confirma a senha do usuario logado antes de uma acao sensivel (ex.:
+    // excluir colaborador). Lanca erro com .status 403 se a senha estiver errada.
+    verificarSenha: (password) => API.post('/auth/verify-password', { password }),
 
     getAusencias: (params = {}) => API.get('/ausencias', params),
     salvarAusencia: (data) => data.id
