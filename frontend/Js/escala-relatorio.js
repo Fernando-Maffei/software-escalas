@@ -350,6 +350,55 @@
         `;
     }
 
+    // Config de colunas da tabela detalhada: UMA fonte de verdade para header
+    // e body. Antes os dois eram blocos de HTML separados e hardcoded, o que
+    // deixava fácil header e body divergirem (a causa-raiz de "colunas
+    // desalinhadas"). Aqui, adicionar/reordenar coluna é editar uma lista só.
+    const COLUNAS_ESCALA_DETALHADA = [
+        { titulo: 'Data', html: true, valor: (i) => `<strong>${escapeHtmlEscala(formatDatePtBrEscala(i.dataISO))}</strong>` },
+        { titulo: 'Dia', valor: (i) => i.diaSemana || getDayLabelEscala(i.dataISO) },
+        { titulo: 'Colaborador', truncar: true, valor: (i) => i.colaboradorNome || '--' },
+        { titulo: 'Entrada', valor: (i) => i.horaInicio || '--' },
+        { titulo: 'Saida', valor: (i) => i.horaFim || '--' },
+        { titulo: 'Almoco', valor: (i) => i.almoco || '--' },
+        { titulo: 'Tipo', html: true, valor: (i) => `<span class="evento-tipo badge-${escapeHtmlEscala(i.tipo)}">${escapeHtmlEscala(TIPO_LABELS[i.tipo] || i.tipo || '--')}</span>` },
+        { titulo: 'Observacoes', valor: (i) => i.observacao || '--' }
+    ];
+
+    // Helper genérico de tabela de relatório: header, `scope="col"` e body
+    // derivam da MESMA config de colunas. Só emite HTML quando `col.html` for
+    // true (ex.: o badge de tipo); nos demais casos, escapa o valor.
+    function renderTabelaRelatorio(config) {
+        const colunas = Array.isArray(config && config.colunas) ? config.colunas : [];
+        const linhas = Array.isArray(config && config.linhas) ? config.linhas : [];
+        const classeTabela = config && config.classe ? ` ${config.classe}` : '';
+
+        const head = colunas
+            .map((col) => `<th scope="col">${escapeHtmlEscala(col.titulo || '')}</th>`)
+            .join('');
+
+        const body = linhas.map((linha) => {
+            const celulas = colunas.map((col) => {
+                const bruto = typeof col.valor === 'function' ? col.valor(linha) : (linha ? linha[col.chave] : null);
+                const conteudo = col.html
+                    ? (bruto == null ? '' : String(bruto))
+                    : escapeHtmlEscala(bruto == null ? '--' : bruto);
+                const classe = col.truncar ? ' class="is-truncada"' : '';
+                return `<td${classe}>${conteudo}</td>`;
+            }).join('');
+            return `<tr>${celulas}</tr>`;
+        }).join('');
+
+        return `
+            <div class="relatorio-tabela-scroll">
+                <table class="relatorio-tabela${classeTabela}">
+                    <thead><tr>${head}</tr></thead>
+                    <tbody>${body}</tbody>
+                </table>
+            </div>
+        `;
+    }
+
     function renderDetailedEscalaReport(items, filters) {
         if (!items.length) {
             return `
@@ -427,34 +476,11 @@
                             <span><i class="fas fa-layer-group"></i> ${escapeHtmlEscala(group.setorNome)}</span>
                             <strong>${group.items.length} registro(s)</strong>
                         </div>
-                        <table class="relatorio-tabela escala-detalhada-tabela">
-                            <thead>
-                                <tr>
-                                    <th>Data</th>
-                                    <th>Dia</th>
-                                    <th>Colaborador</th>
-                                    <th>Entrada</th>
-                                    <th>Saida</th>
-                                    <th>Almoco</th>
-                                    <th>Tipo</th>
-                                    <th>Observacoes</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                ${group.items.map((item) => `
-                                    <tr>
-                                        <td><strong>${escapeHtmlEscala(formatDatePtBrEscala(item.dataISO))}</strong></td>
-                                        <td>${escapeHtmlEscala(item.diaSemana || getDayLabelEscala(item.dataISO))}</td>
-                                        <td>${escapeHtmlEscala(item.colaboradorNome || '--')}</td>
-                                        <td>${escapeHtmlEscala(item.horaInicio || '--')}</td>
-                                        <td>${escapeHtmlEscala(item.horaFim || '--')}</td>
-                                        <td>${escapeHtmlEscala(item.almoco || '--')}</td>
-                                        <td><span class="evento-tipo badge-${escapeHtmlEscala(item.tipo)}">${escapeHtmlEscala(TIPO_LABELS[item.tipo] || item.tipo || '--')}</span></td>
-                                        <td>${escapeHtmlEscala(item.observacao || '--')}</td>
-                                    </tr>
-                                `).join('')}
-                            </tbody>
-                        </table>
+                        ${renderTabelaRelatorio({
+                            classe: 'escala-detalhada-tabela',
+                            colunas: COLUNAS_ESCALA_DETALHADA,
+                            linhas: group.items
+                        })}
                     </section>
                 `).join('')}
             </div>

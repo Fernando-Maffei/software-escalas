@@ -193,6 +193,12 @@
     color: var(--primary);
 }
 
+/* 8 colunas: abaixo desta largura o wrapper .relatorio-tabela-scroll rola na
+   horizontal em vez de espremer as células (evita quebra de layout). */
+.escala-detalhada-tabela {
+    min-width: 720px;
+}
+
 .escala-detalhada-tabela td:last-child {
     min-width: 220px;
     white-space: normal;
@@ -278,19 +284,35 @@
     border-bottom: 2px solid var(--border);
 }
 
+/* Wrapper de rolagem: em telas estreitas rola na horizontal (em vez de
+   espremer as colunas) e em tabelas longas rola na vertical — e é este
+   contexto de rolagem que faz o cabeçalho sticky (abaixo) funcionar. */
+.relatorio-tabela-scroll {
+    overflow: auto;
+    max-height: 60vh;
+    border-radius: var(--radius-md, 8px);
+}
+
 .relatorio-tabela {
     width: 100%;
     border-collapse: collapse;
     font-size: 14px;
 }
 
+/* Cabeçalho fixo ao rolar a tabela. O `box-shadow` substitui a
+   `border-bottom` porque, com `border-collapse`, a borda de um `th` sticky
+   não acompanha o scroll (some) em vários navegadores — o shadow acompanha.
+   O fundo opaco impede as linhas de aparecerem através do cabeçalho. */
 .relatorio-tabela th {
+    position: sticky;
+    top: 0;
+    z-index: 2;
     text-align: left;
     padding: 12px;
     background: var(--card-dark);
     color: var(--text);
     font-weight: 600;
-    border-bottom: 2px solid var(--border);
+    box-shadow: inset 0 -2px 0 var(--border);
 }
 
 .relatorio-tabela td {
@@ -299,8 +321,24 @@
     color: var(--text);
 }
 
+/* Zebra sutil, derivada do texto para funcionar nos dois temas
+   (tinta escura no claro, tinta clara no escuro). */
+.relatorio-tabela tbody tr:nth-child(even) td {
+    background: color-mix(in srgb, var(--text) 4%, transparent);
+}
+
+/* Hover vence a zebra (especificidade maior). */
 .relatorio-tabela tr:hover td {
     background: var(--primary-soft);
+}
+
+/* Truncamento por coluna (config `truncar: true` no helper de tabela):
+   nome longo vira "..." em vez de empurrar/quebrar a coluna. */
+.relatorio-tabela td.is-truncada {
+    max-width: 220px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .relatorio-tabela tr.feriado {
