@@ -27,6 +27,19 @@
     box-shadow: 0 16px 24px -24px rgba(15, 23, 42, 0.45);
 }
 
+/* O appContent tem padding-top; o cabecalho sticky gruda ABAIXO desse padding,
+   deixando o primeiro card aparecer na fresta acima dele ("Ana no topo"). Esta
+   faixa, do mesmo tom, acompanha o cabecalho sticky e tampa esse vao. */
+.colaboradores-page-header::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 100%;
+    height: 26px;
+    background: var(--bg-soft);
+}
+
 .colaboradores-header {
     display: flex;
     justify-content: space-between;
@@ -675,6 +688,11 @@
     .colaboradores-page-header,
     .colaboradores-container .colaboradores-header {
         position: static;
+    }
+
+    /* Sem sticky aqui, nao ha fresta a tampar. */
+    .colaboradores-page-header::before {
+        display: none;
     }
 
     .colaboradores-layout {
