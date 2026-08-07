@@ -1710,8 +1710,11 @@
                         <button id="btnRestaurarAlmocosCadastroEscala" class="btn-secondary btn-reset-lunch escala-acao-icone" type="button" title="Resetar almocos para o cadastro" aria-label="Resetar almocos para o cadastro">
                             <i class="fas fa-rotate-left"></i>
                         </button>
-                        <button id="btnNovoLancamentoEscala" class="btn-primary escala-acao-principal">
-                            <i class="fas fa-plus"></i> Novo lancamento
+                        <button id="btnNovoLancamentoEscala" class="btn-secondary escala-acao-icone" type="button" title="Novo lancamento (ausencia/folga)" aria-label="Novo lancamento (ausencia/folga)">
+                            <i class="fas fa-calendar-plus"></i>
+                        </button>
+                        <button id="btnCriarColaboradorEscala" class="btn-primary escala-acao-principal" type="button">
+                            <i class="fas fa-user-plus"></i> Criar colaborador
                         </button>
                     </div>
                 </div>
@@ -1808,6 +1811,27 @@
         });
 
         document.getElementById('btnNovoLancamentoEscala')?.addEventListener('click', abrirLancamentoPessoalEscala);
+        document.getElementById('btnCriarColaboradorEscala')?.addEventListener('click', () => {
+            // O editor de colaborador vive na tela Colaboradores. Navega para
+            // la (clicando no item do menu) e, quando a tela montar, abre o
+            // cadastro de novo colaborador clicando no proprio botao dela.
+            const navColaboradores = document.querySelector('.sidebar-btn[data-page="colaboradores"]');
+            if (navColaboradores) {
+                navColaboradores.click();
+            }
+
+            let tentativas = 0;
+            const aguardarEditor = setInterval(() => {
+                tentativas += 1;
+                const btnNovo = document.getElementById('btnNovoColaborador');
+                if (btnNovo) {
+                    clearInterval(aguardarEditor);
+                    btnNovo.click();
+                } else if (tentativas > 40) {
+                    clearInterval(aguardarEditor); // desiste apos ~2s; ficou na tela Colaboradores
+                }
+            }, 50);
+        });
         document.getElementById('btnAbrirPlantaoEscala')?.addEventListener('click', abrirPlantaoDaEscala);
         document.getElementById('btnRestaurarAlmocosCadastroEscala')?.addEventListener('click', restaurarAlmocosCadastroDiaEscala);
         document.getElementById('escalaSortMode')?.addEventListener('change', (event) => {
