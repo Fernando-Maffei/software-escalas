@@ -90,9 +90,9 @@
   --radius-pill: 999px;/* pilulas, avatares redondos */
 
   /* ---- SOMBRA (3 papeis) ---- */
-  --shadow-rest:     0 1px 2px rgba(15, 23, 42, 0.05), 0 1px 1px rgba(15, 23, 42, 0.04);
-  --shadow-raised:   0 4px 10px -2px rgba(15, 23, 42, 0.10), 0 2px 4px -2px rgba(15, 23, 42, 0.06);
-  --shadow-floating: 0 16px 32px -10px rgba(15, 23, 42, 0.20), 0 6px 12px -6px rgba(15, 23, 42, 0.10);
+  --shadow-rest:     0 1px 2px rgba(23, 25, 28, 0.05), 0 1px 1px rgba(23, 25, 28, 0.04);
+  --shadow-raised:   0 4px 10px -2px rgba(23, 25, 28, 0.10), 0 2px 4px -2px rgba(23, 25, 28, 0.06);
+  --shadow-floating: 0 16px 32px -10px rgba(23, 25, 28, 0.20), 0 6px 12px -6px rgba(23, 25, 28, 0.10);
 
   /* ---- Z-INDEX (escala nomeada) ---- */
   --z-base:     1;

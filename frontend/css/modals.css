@@ -621,7 +621,7 @@
 
 #modalLancamento .info-horario.locked i {
     font-size: 10px;
-    color: #475569;
+    color: #52565c;
 }
 
 /* Separador visual na lista */
@@ -665,7 +665,7 @@
 }
 
 [data-theme="dark"] #modalLancamento .info-horario.locked {
-    background: #334155;
+    background: #3a3e43;
     color: #94a3b8;
 }
 /* ================= MODAL DE DETALHES DA HORA ================= */

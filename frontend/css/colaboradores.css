@@ -30,7 +30,7 @@
        fundo e aparecia como um bloco. */
     background: var(--card-dark);
     border-bottom: 1px solid rgba(148, 163, 184, 0.14);
-    box-shadow: 0 16px 24px -24px rgba(15, 23, 42, 0.45);
+    box-shadow: 0 16px 24px -24px rgba(23, 25, 28, 0.45);
 }
 
 /* Zera o padding-top do container SO nesta tela: assim o cabecalho sticky
@@ -831,7 +831,7 @@
 }
 
 [data-theme="dark"] #colaboradorEditor .jornada-semanal-shell {
-    background: rgba(15, 23, 42, 0.7);
+    background: rgba(23, 25, 28, 0.7);
     border-color: var(--border);
 }
 
@@ -850,7 +850,7 @@
 }
 
 [data-theme="dark"] #colaboradorEditor .banco-horas-editor-shell {
-    background: linear-gradient(180deg, rgba(15, 118, 110, 0.18) 0%, rgba(15, 23, 42, 0.9) 100%);
+    background: linear-gradient(180deg, rgba(15, 118, 110, 0.18) 0%, rgba(23, 25, 28, 0.9) 100%);
     border-color: var(--border);
 }
 
@@ -867,7 +867,7 @@
 }
 
 [data-theme="dark"] #colaboradorEditor .banco-horas-signal-toggle {
-    background: rgba(15, 23, 42, 0.82);
+    background: rgba(23, 25, 28, 0.82);
     border-color: var(--border);
 }
 

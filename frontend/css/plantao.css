@@ -163,7 +163,7 @@
     padding: 3px 8px;
     border-radius: 999px;
     background: #e2e8f0;
-    color: #475569;
+    color: #52565c;
     font-size: 9px;
     font-weight: 700;
     letter-spacing: 0.3px;
@@ -527,7 +527,7 @@
 }
 
 [data-theme="dark"] .sabado-card.passado {
-    background: linear-gradient(180deg, rgba(30, 41, 59, 0.9) 0%, var(--card-dark) 100%);
+    background: linear-gradient(180deg, rgba(34, 37, 41, 0.9) 0%, var(--card-dark) 100%);
 }
 
 [data-theme="dark"] .sabado-card:hover {
@@ -553,7 +553,7 @@
 }
 
 [data-theme="dark"] .badge-historico {
-    background: #334155;
+    background: #3a3e43;
     color: #cbd5e1;
 }
 

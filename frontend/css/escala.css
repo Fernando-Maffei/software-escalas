@@ -490,7 +490,7 @@
 .escala-range-card {
     padding: 14px;
     border-radius: 16px;
-    background: linear-gradient(180deg, rgba(15, 118, 110, 0.08) 0%, rgba(15, 23, 42, 0.02) 100%);
+    background: linear-gradient(180deg, rgba(15, 118, 110, 0.08) 0%, rgba(23, 25, 28, 0.02) 100%);
     border: 1px solid rgba(15, 118, 110, 0.14);
 }
 
@@ -567,7 +567,7 @@
     bottom: 0;
     border-radius: var(--radius-full);
     cursor: grab;
-    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.16);
+    box-shadow: 0 10px 24px rgba(23, 25, 28, 0.16);
 }
 
 .escala-range-selection.is-work {
@@ -585,9 +585,9 @@
     height: 18px;
     border-radius: 50%;
     border: 3px solid #fff;
-    background: #0f172a;
+    background: #17191c;
     transform: translateY(-50%);
-    box-shadow: 0 6px 18px rgba(15, 23, 42, 0.28);
+    box-shadow: 0 6px 18px rgba(23, 25, 28, 0.28);
     cursor: ew-resize;
 }
 
@@ -883,7 +883,7 @@
 
 .resumo-num.folga-num {
     background: #f1f5f9;
-    color: #475569;
+    color: #52565c;
     border: 1px solid #cbd5e1;
 }
 
@@ -925,9 +925,9 @@
 }
 
 [data-theme="dark"] .resumo-num.folga-num {
-    background: #334155;
+    background: #3a3e43;
     color: #cbd5e1;
-    border-color: #475569;
+    border-color: #52565c;
 }
 
 [data-theme="dark"] .resumo-num.ferias-num {
@@ -1809,7 +1809,7 @@
     border-right: 1px solid #e2e8f0;
     font-size: 15px;
     font-weight: 600;
-    color: #1e293b;
+    color: #222529;
 }
 
 .total-row .total-cell:last-child {
@@ -1834,24 +1834,24 @@
 
 /* ================= TEMA ESCURO ================= */
 [data-theme="dark"] .timeline-row.total-row {
-    background: #1e293b;
+    background: #222529;
     border-top-color: var(--accent);
-    border-bottom-color: #334155;
+    border-bottom-color: #3a3e43;
 }
 
 [data-theme="dark"] .timeline-name.total-nome {
     background: var(--accent);
-    color: #0f172a;
+    color: #17191c;
 }
 
 [data-theme="dark"] .total-row .total-cell {
-    background: #0f172a;
-    border-right-color: #334155;
+    background: #17191c;
+    border-right-color: #3a3e43;
     color: #f1f5f9;
 }
 
 [data-theme="dark"] .total-row .total-cell .total-valor {
-    background: #1e293b;
+    background: #222529;
     color: var(--accent);
 }
 
@@ -2093,7 +2093,7 @@
     padding: 8px 52px 10px 0;
     background: var(--bg-soft);
     border-bottom: 1px solid rgba(148, 163, 184, 0.14);
-    box-shadow: 0 16px 24px -24px rgba(15, 23, 42, 0.45);
+    box-shadow: 0 16px 24px -24px rgba(23, 25, 28, 0.45);
 }
 
 .escala-titulo {
@@ -2285,7 +2285,7 @@
     padding: 0 12px;
     border-radius: 12px;
     border: 1px solid rgba(148, 163, 184, 0.18);
-    background: rgba(15, 23, 42, 0.72);
+    background: rgba(23, 25, 28, 0.72);
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.02);
     cursor: pointer;
 }
@@ -2321,7 +2321,7 @@
     height: 50px;
     border-radius: 12px;
     border: 1px solid rgba(148, 163, 184, 0.18);
-    background: rgba(15, 23, 42, 0.72);
+    background: rgba(23, 25, 28, 0.72);
     color: #f8fafc;
     padding: 0 18px;
     font-size: 14px;
@@ -2390,7 +2390,7 @@
 
 .escala-page .toolbar-actions .btn-secondary:hover {
     border-color: rgba(45, 212, 191, 0.5);
-    background: rgba(30, 41, 59, 0.8);
+    background: rgba(34, 37, 41, 0.8);
 }
 
 .escala-page .toolbar-actions .btn-reset-lunch {
@@ -2427,14 +2427,14 @@
     padding: 12px 16px;
     border: 1px solid rgba(148, 163, 184, 0.18);
     border-radius: 12px;
-    background: rgba(15, 23, 42, 0.7);
+    background: rgba(23, 25, 28, 0.7);
     backdrop-filter: blur(12px);
     flex-wrap: wrap;
 }
 
 .escala-page .legenda-timeline {
     padding: 12px 16px;
-    background: rgba(15, 23, 42, 0.7);
+    background: rgba(23, 25, 28, 0.7);
     border: 1px solid rgba(148, 163, 184, 0.18);
 }
 
@@ -2482,7 +2482,7 @@
 }
 
 .escala-page .escala-card {
-    background: linear-gradient(180deg, rgba(30, 41, 59, 0.94), rgba(15, 23, 42, 0.96));
+    background: linear-gradient(180deg, rgba(34, 37, 41, 0.94), rgba(23, 25, 28, 0.96));
     border: 1px solid rgba(148, 163, 184, 0.18);
     border-radius: 18px;
     box-shadow: 0 18px 50px rgba(0, 0, 0, 0.35);
@@ -2522,7 +2522,7 @@
 }
 
 .escala-page .escala-scroll::-webkit-scrollbar-track {
-    background: rgba(15, 23, 42, 0.7);
+    background: rgba(23, 25, 28, 0.7);
 }
 
 .escala-page .escala-scroll::-webkit-scrollbar-thumb {
@@ -2558,7 +2558,7 @@
     margin-bottom: 14px;
     border-radius: 14px;
     overflow: hidden;
-    background: rgba(15, 23, 42, 0.72);
+    background: rgba(23, 25, 28, 0.72);
     border: 1px solid rgba(148, 163, 184, 0.18);
 }
 
@@ -2589,7 +2589,7 @@
     position: sticky;
     left: 0;
     z-index: 4;
-    background: rgb(20, 27, 46);
+    background: rgb(26, 28, 31);
 }
 
 .escala-page .timeline-header .total-header {
@@ -2614,15 +2614,15 @@
     min-height: var(--esc-linha-altura, 54px);
     border-right: 1px solid rgba(148, 163, 184, 0.18);
     border-bottom: 1px solid rgba(148, 163, 184, 0.13);
-    background: rgba(15, 23, 42, 0.48);
+    background: rgba(23, 25, 28, 0.48);
 }
 
 .escala-page .timeline-row:hover > div {
-    background: rgba(15, 23, 42, 0.48);
+    background: rgba(23, 25, 28, 0.48);
 }
 
 .escala-page .timeline-row.is-selected > div {
-    background: rgba(36, 51, 80, 0.92);
+    background: rgba(45, 48, 53, 0.92);
 }
 
 .escala-page .timeline-name {
@@ -2632,7 +2632,7 @@
     gap: 10px;
     font-weight: 800;
     color: #f8fafc;
-    background: rgba(15, 23, 42, 0.96);
+    background: rgba(23, 25, 28, 0.96);
     border-right: 1px solid rgba(148, 163, 184, 0.18);
     cursor: pointer;
     transition: background-color 0.18s ease, box-shadow 0.18s ease, color 0.18s ease;
@@ -2707,7 +2707,7 @@
 }
 
 .escala-page .timeline-name:hover {
-    background: rgba(48, 66, 104, 0.92);
+    background: rgba(58, 62, 68, 0.92);
     color: #f8fafc;
     box-shadow: inset 3px 0 0 var(--accent);
 }
@@ -2760,19 +2760,19 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    background: rgba(15, 23, 42, 0.48);
+    background: rgba(23, 25, 28, 0.48);
     border-right: 1px solid rgba(148, 163, 184, 0.18);
     transition: none;
 }
 
 .escala-page .timeline-cell:hover {
-    background: rgba(15, 23, 42, 0.48);
+    background: rgba(23, 25, 28, 0.48);
 }
 
 .escala-page .timeline-row.is-selected:hover > div,
 .escala-page .timeline-row.is-selected .timeline-name:hover,
 .escala-page .timeline-row.is-selected .timeline-cell:hover {
-    background: rgba(36, 51, 80, 0.92);
+    background: rgba(45, 48, 53, 0.92);
 }
 
 .escala-page .timeline-cell.is-lunch-draggable {
@@ -2883,7 +2883,7 @@
 }
 
 .escala-page .timeline-cell.fora-expediente {
-    background: rgba(15, 23, 42, 0.48);
+    background: rgba(23, 25, 28, 0.48);
 }
 
 .escala-page .timeline-cell.fora-expediente::before {
@@ -2905,7 +2905,7 @@
     height: 32px;
     padding: 0 8px;
     border-radius: 8px;
-    background: rgba(15, 23, 42, 0.86);
+    background: rgba(23, 25, 28, 0.86);
     border: 1px solid rgba(148, 163, 184, 0.22);
     display: grid;
     place-items: center;
@@ -2917,7 +2917,7 @@
 
 .escala-page .timeline-row.total-row > div {
     min-height: 58px;
-    background: rgba(15, 23, 42, 0.65);
+    background: rgba(23, 25, 28, 0.65);
 }
 
 .escala-page .timeline-row.total-row .timeline-name.total-nome {
@@ -2934,7 +2934,7 @@
 }
 
 .escala-page .timeline-row.total-row .total-cell:first-of-type {
-    background: rgba(15, 23, 42, 0.55);
+    background: rgba(23, 25, 28, 0.55);
 }
 
 .escala-page .timeline-row.total-row .timeline-cell.total-cell .total-valor {
@@ -2949,7 +2949,7 @@
 }
 
 .escala-page .timeline-row.mensagem-row > div {
-    background: rgba(15, 23, 42, 0.48);
+    background: rgba(23, 25, 28, 0.48);
 }
 
 .escala-page .sidebarEditor,
@@ -2961,8 +2961,8 @@
     width: clamp(312px, 22vw, 352px);
     border: 1px solid rgba(148, 163, 184, 0.18);
     background:
-        linear-gradient(180deg, rgba(33, 46, 72, 0.96) 0%, rgba(22, 32, 52, 0.98) 100%);
-    box-shadow: 0 22px 50px rgba(3, 7, 18, 0.34);
+        linear-gradient(180deg, rgba(41, 44, 49, 0.96) 0%, rgba(29, 31, 35, 0.98) 100%);
+    box-shadow: 0 22px 50px rgba(9, 10, 12, 0.34);
 }
 
 .escala-page .editor-sidebar.collapsed {
@@ -2991,7 +2991,7 @@
     height: 46px;
     border: none;
     border-radius: 0 12px 12px 0; /* reto a esquerda (colado no card), arredondado a direita */
-    box-shadow: 0 10px 24px rgba(3, 7, 18, 0.28);
+    box-shadow: 0 10px 24px rgba(9, 10, 12, 0.28);
 }
 
 .escala-page .editor-content {
@@ -3016,7 +3016,7 @@
     padding: 14px;
     border-radius: 16px;
     border: 1px solid rgba(45, 212, 191, 0.16);
-    background: linear-gradient(135deg, rgba(45, 212, 191, 0.12) 0%, rgba(15, 23, 42, 0.12) 100%);
+    background: linear-gradient(135deg, rgba(45, 212, 191, 0.12) 0%, rgba(23, 25, 28, 0.12) 100%);
 }
 
 .escala-page .editor-header h4 {
@@ -3056,7 +3056,7 @@
 .escala-page .time-inputs input {
     min-height: 48px;
     border: 1px solid rgba(148, 163, 184, 0.2);
-    background: rgba(15, 23, 42, 0.76);
+    background: rgba(23, 25, 28, 0.76);
     color: #f8fafc;
 }
 
@@ -3082,7 +3082,7 @@
     padding: 10px;
     border-radius: 14px;
     border: 1px solid rgba(148, 163, 184, 0.14);
-    background: rgba(8, 15, 30, 0.3);
+    background: rgba(15, 17, 19, 0.3);
 }
 
 .escala-page .time-inputs span {
@@ -3135,7 +3135,7 @@
     padding: 16px;
     border-radius: 18px;
     border: 1px solid rgba(148, 163, 184, 0.14);
-    background: linear-gradient(180deg, rgba(18, 27, 45, 0.72) 0%, rgba(11, 18, 33, 0.32) 100%);
+    background: linear-gradient(180deg, rgba(25, 27, 30, 0.72) 0%, rgba(18, 20, 22, 0.32) 100%);
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.02);
 }
 
@@ -3163,7 +3163,7 @@
 .escala-page .editor-empty {
     min-height: 320px;
     border: 1px dashed rgba(148, 163, 184, 0.18);
-    background: rgba(15, 23, 42, 0.42);
+    background: rgba(23, 25, 28, 0.42);
 }
 
 @media (max-width: 1500px) {
@@ -3361,12 +3361,12 @@
 }
 
 :root:not([data-theme="dark"]) .escala-page .timeline-header div {
-    color: #334155;
+    color: #3a3e43;
     border-right-color: rgba(226, 232, 240, 0.95);
 }
 
 :root:not([data-theme="dark"]) .escala-page .timeline-header .hora-header-half {
-    color: rgba(51, 65, 85, 0.55);
+    color: rgba(58, 62, 67, 0.55);
 }
 
 :root:not([data-theme="dark"]) .escala-page .timeline-name,
@@ -3434,7 +3434,7 @@
 :root:not([data-theme="dark"]) .escala-page .editor-sidebar {
     border-color: var(--border);
     background: linear-gradient(180deg, rgba(255, 255, 255, 0.99), rgba(248, 250, 252, 0.98));
-    box-shadow: 0 22px 50px rgba(15, 23, 42, 0.12);
+    box-shadow: 0 22px 50px rgba(23, 25, 28, 0.12);
 }
 
 :root:not([data-theme="dark"]) .escala-page .editor-content h3,
@@ -3546,7 +3546,7 @@
   height: 100%;
   transform: translateX(100%);
   pointer-events: none;
-  background: linear-gradient(to right, rgba(15, 23, 42, 0.10), transparent);
+  background: linear-gradient(to right, rgba(23, 25, 28, 0.10), transparent);
 }
 
 .timeline-header .timeline-name-header {
