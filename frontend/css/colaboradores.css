@@ -24,7 +24,11 @@
     /* O espaco do topo agora vem daqui (nao mais do padding do appContent),
        para o cabecalho sticky cobrir desde o topo real ao rolar. */
     padding: 24px 0 16px;
-    background: var(--bg-soft);
+    /* Mesmo tom do fundo do #appContent (--card-dark) para o cabecalho FUNDIR
+       com a area de conteudo em vez de virar um retangulo destacado ("caixa").
+       --bg-soft batia no tema claro, mas no escuro ficava mais claro que o
+       fundo e aparecia como um bloco. */
+    background: var(--card-dark);
     border-bottom: 1px solid rgba(148, 163, 184, 0.14);
     box-shadow: 0 16px 24px -24px rgba(15, 23, 42, 0.45);
 }
