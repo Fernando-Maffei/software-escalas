@@ -238,7 +238,17 @@ function getNetworkStatusPayload(req) {
 app.disable('x-powered-by');
 app.use(cors(corsOptionsDelegate));
 app.use(express.json({ limit: '25mb' }));
-app.use(express.static(frontendPath));
+// Sem cache nos arquivos do front-end: garante que o time sempre recebe a
+// versao atual (CSS/JS/HTML). Sem isso, o navegador segurava versoes velhas
+// e mudancas so apareciam com hard refresh — pior ainda com o ?v fixo dos
+// @import. App pequeno em rede local: o custo de rebaixar o cache e minimo.
+app.use(express.static(frontendPath, {
+    etag: false,
+    lastModified: false,
+    setHeaders: (res) => {
+        res.setHeader('Cache-Control', 'no-store, must-revalidate');
+    }
+}));
 
 app.get('/api/health', async (req, res, next) => {
     try {
@@ -351,6 +361,7 @@ app.use('/api/sistema', sistemaRoutes);
 app.use('/api/usuarios', usuariosRoutes);
 
 app.get(/^(?!\/api(?:\/|$)).*/, (req, res) => {
+    res.set('Cache-Control', 'no-store, must-revalidate');
     res.sendFile(path.join(frontendPath, 'index.html'));
 });
 
