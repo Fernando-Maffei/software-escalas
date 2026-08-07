@@ -51,7 +51,7 @@ function getTipoLancamentoMeta(tipo) {
             iconClass: 'fa-calendar-day',
             classe: 'feriado',
             texto: 'Feriado',
-            cor: '#f59e0b'
+            cor: '#e0973a'
         };
     }
 
@@ -466,7 +466,7 @@ async function carregarListaFeriadosPorDia(dataISO) {
                         tipo: f.Tipo || f.tipo || 'municipal',
                         origem: 'manual',
                         icone: '📝',
-                        cor: '#f59e0b'
+                        cor: '#e0973a'
                     });
                 }
             });
@@ -1217,7 +1217,7 @@ async function carregarListaFeriados() {
                 tipo: f.Tipo || f.tipo || 'municipal',
                 origem: 'manual',
                 icone: '📝',
-                cor: '#f59e0b',
+                cor: '#e0973a',
                 mes: mes - 1, // 0-11 (JS months)
                 ano: ano
             });
@@ -1247,7 +1247,7 @@ async function carregarListaFeriados() {
             const dataFormatada = f.data.toLocaleDateString('pt-BR');
             const isManual = f.origem === 'manual';
             const cor = f.cor;
-            const bgCor = isManual ? '#f59e0b20' : '#0d948820';
+            const bgCor = isManual ? '#e0973a20' : '#0d948820';
             const badgeMeta = getFeriadoOrigemMeta(f.tipo, f.origem);
             
             html += `

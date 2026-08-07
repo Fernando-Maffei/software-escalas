@@ -222,7 +222,7 @@
 }
 
 .config-status-card.is-loading {
-    border-color: #f59e0b;
+    border-color: #e0973a;
     background: rgba(245, 158, 11, 0.1);
 }
 

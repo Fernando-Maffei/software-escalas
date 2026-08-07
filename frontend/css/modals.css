@@ -194,7 +194,7 @@
 }
 
 #modalLancamento .lancamento-card.feriado {
-    border-left: 4px solid #f59e0b;
+    border-left: 4px solid #e0973a;
 }
 
 #modalLancamento .lancamento-header {
@@ -559,7 +559,7 @@
 [data-theme="dark"] #modalLancamento .lancamento-badge.ferias {
     background: #123a7a;
     color: #dceaff;
-    border-color: #2f80ed;
+    border-color: #3f74be;
 }
 
 /* ================= RESPONSIVIDADE ================= */
@@ -588,7 +588,7 @@
 
 /* Cards de feriado manual */
 #modalLancamento .lancamento-card.feriado-manual {
-    border-left: 4px solid #f59e0b;
+    border-left: 4px solid #e0973a;
     background: linear-gradient(to right, var(--card), #fffbeb);
 }
 
@@ -646,7 +646,7 @@
 }
 
 #modalLancamento .empty-state.feriados i {
-    color: #f59e0b;
+    color: #e0973a;
 }
 
 /* Tema escuro para feriados */

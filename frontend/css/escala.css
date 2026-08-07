@@ -575,7 +575,7 @@
 }
 
 .escala-range-selection.is-lunch {
-    background: linear-gradient(90deg, #f59e0b 0%, #fbbf24 100%);
+    background: linear-gradient(90deg, #e0973a 0%, #fbbf24 100%);
 }
 
 .escala-range-handle {
@@ -832,7 +832,7 @@
 }
 
 .resumo-barra.ferias {
-    background: #2f80ed;
+    background: #3f74be;
 }
 
 .resumo-barra.ausente {
@@ -890,7 +890,7 @@
 .resumo-num.ferias-num {
     background: #dceaff;
     color: #1d63ed;
-    border: 1px solid #2f80ed;
+    border: 1px solid #3f74be;
 }
 
 .resumo-num.ausente-num {
@@ -933,7 +933,7 @@
 [data-theme="dark"] .resumo-num.ferias-num {
     background: #123a7a;
     color: #bcd7ff;
-    border-color: #2f80ed;
+    border-color: #3f74be;
 }
 
 [data-theme="dark"] .resumo-num.ausente-num {
@@ -1420,7 +1420,7 @@
 }
 
 .legenda-item .cor.ferias {
-    background: var(--escala-status-ferias, #2f80ed);
+    background: var(--escala-status-ferias, #3f74be);
     opacity: 0.7;
 }
 
@@ -1457,7 +1457,7 @@
     content: "";
     position: absolute;
     inset: 6px;
-    background: var(--escala-status-ferias, #2f80ed);
+    background: var(--escala-status-ferias, #3f74be);
     border-radius: 12px;
     opacity: 0.7;
 }
@@ -1510,7 +1510,7 @@
 }
 
 .resumo-barra.ferias {
-    background: #2f80ed;
+    background: #3f74be;
 }
 
 .resumo-barra.ausente {
@@ -1523,7 +1523,7 @@
 }
 
 .ferias-num {
-    color: #2f80ed;
+    color: #3f74be;
     border: 1px solid #bcd7ff;
 }
 
@@ -1912,7 +1912,7 @@
 
 /* ================= BADGE DE PLANTÃO ================= */
 .plantao-badge {
-    background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+    background: linear-gradient(135deg, #e0973a 0%, #d97706 100%);
     color: white;
     font-size: 11px;
     font-weight: 600;
@@ -1931,12 +1931,12 @@
 }
 
 .timeline-row.plantao-row {
-    border-left: 4px solid #f59e0b;
+    border-left: 4px solid #e0973a;
     background: linear-gradient(to right, rgba(245, 158, 11, 0.05), transparent);
 }
 
 .timeline-row.plantao-row:hover {
-    border-color: #f59e0b;
+    border-color: #e0973a;
 }
 
 /* Tema escuro */
@@ -1949,7 +1949,7 @@
 }
 
 [data-theme="dark"] .plantao-badge {
-    background: linear-gradient(135deg, #f59e0b 0%, #b45309 100%);
+    background: linear-gradient(135deg, #e0973a 0%, #b45309 100%);
 }
 
 .escala-dia-tipo {
@@ -2383,7 +2383,7 @@
 }
 
 .escala-page .toolbar-actions .btn-primary {
-    background: linear-gradient(135deg, #4a9eff, #2f80ed);
+    background: linear-gradient(135deg, #4a9eff, #3f74be);
     border-color: rgba(74, 158, 255, 0.55);
     box-shadow: 0 14px 30px rgba(74, 158, 255, 0.32);
 }
@@ -2462,7 +2462,7 @@
 }
 
 .escala-page .legenda-item .cor.almoco {
-    background: var(--escala-status-almoco, #f59e0b);
+    background: var(--escala-status-almoco, #e0973a);
 }
 
 .escala-page .legenda-item .cor.folga {
@@ -2796,7 +2796,7 @@
     content: "";
     top: 10px;
     bottom: 10px;
-    background: linear-gradient(180deg, var(--escala-status-almoco, #fbbf24), var(--escala-status-almoco-strong, #f59e0b));
+    background: linear-gradient(180deg, var(--escala-status-almoco, #fbbf24), var(--escala-status-almoco-strong, #e0973a));
     border-radius: 9px;
     box-shadow: 0 0 0 2px rgba(188, 215, 255, 0.95), 0 8px 18px rgba(245, 158, 11, 0.25);
 }
@@ -2836,7 +2836,7 @@
     content: "";
     top: 10px;
     bottom: 10px;
-    background: linear-gradient(180deg, var(--escala-status-almoco, #fbbf24), var(--escala-status-almoco-strong, #f59e0b));
+    background: linear-gradient(180deg, var(--escala-status-almoco, #fbbf24), var(--escala-status-almoco-strong, #e0973a));
     border-radius: 9px;
     box-shadow: 0 8px 18px rgba(245, 158, 11, 0.25);
 }
@@ -2867,7 +2867,7 @@
     content: "";
     top: 10px;
     bottom: 10px;
-    background: linear-gradient(180deg, var(--escala-status-ferias, #2f80ed), var(--escala-status-ferias-strong, #1d63ed));
+    background: linear-gradient(180deg, var(--escala-status-ferias, #3f74be), var(--escala-status-ferias-strong, #1d63ed));
     border-radius: 9px;
 }
 

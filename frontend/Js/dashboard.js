@@ -568,7 +568,7 @@ function gerarGraficoOcupacao(dataHoje, jornadaSemanalIndex) {
         <div style="display: flex; align-items: flex-end; gap: 8px; height: 180px; padding: 10px 0;">
             ${ocupacao.map((item) => `
                 <div style="flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px;">
-                    <div style="width: 100%; height: ${(item.contagem / maxContagem) * 120}px; background: linear-gradient(0deg, #1d63ed, #2f80ed); border-radius: 8px 8px 0 0;"></div>
+                    <div style="width: 100%; height: ${(item.contagem / maxContagem) * 120}px; background: linear-gradient(0deg, #1d63ed, #3f74be); border-radius: 8px 8px 0 0;"></div>
                     <span style="font-size: 10px; color: var(--text-light);">${item.hora}h</span>
                     <span style="font-size: 10px; font-weight: 600;">${item.contagem}</span>
                 </div>

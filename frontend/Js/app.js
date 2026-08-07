@@ -35,7 +35,7 @@ const ESCALA_CORES_PADRAO = [
         label: 'Trabalhando',
         description: 'Faixa de trabalho normal',
         icon: 'briefcase',
-        color: '#2f80ed',
+        color: '#3f74be',
         cssVar: '--escala-status-trabalhando',
         strongVar: '--escala-status-trabalhando-strong'
     },
@@ -44,7 +44,7 @@ const ESCALA_CORES_PADRAO = [
         label: 'Almoco',
         description: 'Intervalo de almoco',
         icon: 'utensils',
-        color: '#f59e0b',
+        color: '#e0973a',
         cssVar: '--escala-status-almoco',
         strongVar: '--escala-status-almoco-strong'
     },
@@ -146,7 +146,7 @@ function normalizeLegacyApiUrl(url) {
     return suffix ? `${getApiBaseUrl()}${suffix}` : getApiBaseUrl();
 }
 
-function normalizarCorHex(value, fallback = '#2f80ed') {
+function normalizarCorHex(value, fallback = '#3f74be') {
     const raw = String(value || '').trim();
 
     if (/^#[0-9a-fA-F]{6}$/.test(raw)) {
@@ -3693,7 +3693,7 @@ async function carregarListaFeriados() {
                 tipo: f.Tipo || f.tipo || 'municipal',
                 origem: 'manual',
                 icone: '📝',
-                cor: '#f59e0b',
+                cor: '#e0973a',
                 mes: data.getMonth(),
                 ano: data.getFullYear()
             });
@@ -3723,7 +3723,7 @@ async function carregarListaFeriados() {
             const dataFormatada = f.data.toLocaleDateString('pt-BR');
             const isManual = f.origem === 'manual';
             const cor = f.cor;
-            const bgCor = isManual ? '#f59e0b20' : '#0d948820';
+            const bgCor = isManual ? '#e0973a20' : '#0d948820';
             
             html += `
                 <div class="lancamento-card" style="border-left: 4px solid ${cor}; margin-bottom: 10px;">

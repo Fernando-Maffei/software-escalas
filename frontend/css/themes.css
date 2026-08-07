@@ -44,7 +44,7 @@
   --success:      #15803d;
   --success-soft: #dcfce7;
   --success-text: #14532d;
-  --warning:      #f59e0b;
+  --warning:      #e0973a;
   --warning-soft: #fef3c7;
   --warning-text: #92500e;
   --danger:       #b91c1c;
@@ -158,20 +158,20 @@
 
   /* Acento azul (botao com texto branco em AA; sobrio, sem neon) */
   --accent:          #1f6fe0;
-  --accent-hover:    #3f86ef;
-  --accent-active:   #5a9bf5;
+  --accent-hover:    #3773c5;
+  --accent-active:   #5385cd;
   --accent-contrast: #ffffff;
   --accent-soft:     #14294a;
   --accent-ring:     rgba(63, 134, 239, 0.50);
 
   /* Semanticas (tons calmos) */
-  --success:      #4ade80;
+  --success:      #63ac84;
   --success-soft: #052e16;
   --success-text: #bbf7d0;
-  --warning:      #fbbf24;
+  --warning:      #dcab4b;
   --warning-soft: #3a2a07;
   --warning-text: #fde68a;
-  --danger:       #f87171;
+  --danger:       #dd6f6f;
   --danger-soft:  #3a1414;
   --danger-text:  #fecaca;
   --neutral-fill: #1c2836;
