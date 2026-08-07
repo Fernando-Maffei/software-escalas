@@ -509,8 +509,8 @@
 }
 
 #modalLancamento .lancamento-badge.ferias {
-    color: #2563eb;
-    border-color: #dbeafe;
+    color: #0d9488;
+    border-color: #ccfbf1;
     background: #eff6ff;
 }
 
@@ -557,9 +557,9 @@
 }
 
 [data-theme="dark"] #modalLancamento .lancamento-badge.ferias {
-    background: #1e3a8a;
-    color: #dbeafe;
-    border-color: #3b82f6;
+    background: #134e4a;
+    color: #ccfbf1;
+    border-color: #14b8a6;
 }
 
 /* ================= RESPONSIVIDADE ================= */
@@ -582,7 +582,7 @@
 
 /* Cards de feriado da API */
 #modalLancamento .lancamento-card.feriado-api {
-    border-left: 4px solid #2563eb;
+    border-left: 4px solid #0d9488;
     background: linear-gradient(to right, var(--card), #f0f9ff);
 }
 
@@ -594,8 +594,8 @@
 
 /* Badge para feriados federais */
 #modalLancamento .lancamento-badge.federal {
-    color: #2563eb;
-    border-color: #bfdbfe;
+    color: #0d9488;
+    border-color: #99f6e4;
     background: #eff6ff;
 }
 
@@ -651,7 +651,7 @@
 
 /* Tema escuro para feriados */
 [data-theme="dark"] #modalLancamento .lancamento-card.feriado-api {
-    background: linear-gradient(to right, var(--card), #1e3a8a20);
+    background: linear-gradient(to right, var(--card), #134e4a20);
 }
 
 [data-theme="dark"] #modalLancamento .lancamento-card.feriado-manual {
@@ -659,9 +659,9 @@
 }
 
 [data-theme="dark"] #modalLancamento .lancamento-badge.federal {
-    background: #1e3a8a;
-    color: #bfdbfe;
-    border-color: #2563eb;
+    background: #134e4a;
+    color: #99f6e4;
+    border-color: #0d9488;
 }
 
 [data-theme="dark"] #modalLancamento .info-horario.locked {

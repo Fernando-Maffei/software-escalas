@@ -832,7 +832,7 @@
 }
 
 .resumo-barra.ferias {
-    background: #3b82f6;
+    background: #14b8a6;
 }
 
 .resumo-barra.ausente {
@@ -888,9 +888,9 @@
 }
 
 .resumo-num.ferias-num {
-    background: #dbeafe;
+    background: #ccfbf1;
     color: #0f766e;
-    border: 1px solid #3b82f6;
+    border: 1px solid #14b8a6;
 }
 
 .resumo-num.ausente-num {
@@ -931,9 +931,9 @@
 }
 
 [data-theme="dark"] .resumo-num.ferias-num {
-    background: #1e3a8a;
-    color: #bfdbfe;
-    border-color: #3b82f6;
+    background: #134e4a;
+    color: #99f6e4;
+    border-color: #14b8a6;
 }
 
 [data-theme="dark"] .resumo-num.ausente-num {
@@ -1420,7 +1420,7 @@
 }
 
 .legenda-item .cor.ferias {
-    background: var(--escala-status-ferias, #3b82f6);
+    background: var(--escala-status-ferias, #14b8a6);
     opacity: 0.7;
 }
 
@@ -1457,7 +1457,7 @@
     content: "";
     position: absolute;
     inset: 6px;
-    background: var(--escala-status-ferias, #3b82f6);
+    background: var(--escala-status-ferias, #14b8a6);
     border-radius: 12px;
     opacity: 0.7;
 }
@@ -1510,7 +1510,7 @@
 }
 
 .resumo-barra.ferias {
-    background: #3b82f6;
+    background: #14b8a6;
 }
 
 .resumo-barra.ausente {
@@ -1523,8 +1523,8 @@
 }
 
 .ferias-num {
-    color: #3b82f6;
-    border: 1px solid #bfdbfe;
+    color: #14b8a6;
+    border: 1px solid #99f6e4;
 }
 
 .ausente-num {
@@ -2440,7 +2440,7 @@
 
 .escala-page .legenda-item {
     gap: 7px;
-    color: #dbeafe;
+    color: #ccfbf1;
     font-size: 13px;
     font-weight: 600;
     white-space: nowrap;
@@ -2465,7 +2465,7 @@
 }
 
 .escala-page .legenda-item .cor.ferias {
-    background: var(--escala-status-ferias, #2563eb);
+    background: var(--escala-status-ferias, #0d9488);
 }
 
 .escala-page .legenda-item .cor.ausencia {
@@ -2570,7 +2570,7 @@
     padding: 0 8px;
     border-right: 1px solid rgba(148, 163, 184, 0.18);
     border-bottom: none;
-    color: #bfdbfe;
+    color: #99f6e4;
     font-size: 12px;
     font-weight: 800;
     white-space: nowrap;
@@ -2578,7 +2578,7 @@
 }
 
 .escala-page .timeline-header .hora-header-half {
-    color: rgba(191, 219, 254, 0.55);
+    color: rgba(153, 246, 228, 0.55);
     font-weight: 600;
     font-size: 11px;
 }
@@ -2737,13 +2737,13 @@
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.08em;
-    color: #93c5fd;
+    color: #5eead4;
     opacity: 0.78;
 }
 
 .escala-page .timeline-name:hover .timeline-name-helper,
 .escala-page .timeline-row.is-selected .timeline-name-helper {
-    color: #dbeafe;
+    color: #ccfbf1;
     opacity: 1;
 }
 
@@ -2784,7 +2784,7 @@
 }
 
 .escala-page .timeline-cell.drop-target-over {
-    background: rgba(59, 130, 246, 0.16) !important;
+    background: rgba(20, 184, 166, 0.16) !important;
 }
 
 .escala-page .timeline-cell.drop-preview::after {
@@ -2793,7 +2793,7 @@
     bottom: 10px;
     background: linear-gradient(180deg, var(--escala-status-almoco, #fbbf24), var(--escala-status-almoco-strong, #f59e0b));
     border-radius: 9px;
-    box-shadow: 0 0 0 2px rgba(191, 219, 254, 0.95), 0 8px 18px rgba(245, 158, 11, 0.25);
+    box-shadow: 0 0 0 2px rgba(153, 246, 228, 0.95), 0 8px 18px rgba(245, 158, 11, 0.25);
 }
 
 .escala-page .timeline-row.is-saving-lunch .timeline-cell.drop-preview::after,
@@ -2862,7 +2862,7 @@
     content: "";
     top: 10px;
     bottom: 10px;
-    background: linear-gradient(180deg, var(--escala-status-ferias, #3b82f6), var(--escala-status-ferias-strong, #2563eb));
+    background: linear-gradient(180deg, var(--escala-status-ferias, #14b8a6), var(--escala-status-ferias-strong, #0d9488));
     border-radius: 9px;
 }
 
@@ -2944,7 +2944,7 @@
     border-radius: var(--radius-full);
     background: rgba(45, 212, 191, 0.18);
     border: 1px solid rgba(45, 212, 191, 0.25);
-    color: #dbeafe;
+    color: #ccfbf1;
     box-shadow: none;
 }
 
