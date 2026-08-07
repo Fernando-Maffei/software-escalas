@@ -251,7 +251,7 @@
 
 #modalFeriado .feriado-tipo-badge.estadual {
     color: var(--accent-hover);
-    border-color: #c4b5fd;
+    border-color: #99f6e4;
     background: #f5f3ff;
 }
 
@@ -444,8 +444,8 @@
 }
 
 [data-theme="dark"] #modalFeriado .feriado-tipo-badge.estadual {
-    background: #2e1065;
-    color: #c4b5fd;
+    background: #134e4a;
+    color: #99f6e4;
     border-color: var(--accent-hover);
 }
 

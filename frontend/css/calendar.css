@@ -173,7 +173,7 @@
 
 .ausencia-tag.ferias {
     border-left-color: #3b82f6;
-    color: #1e40af;
+    color: #0f766e;
     background: #eff6ff;
 }
 
@@ -206,7 +206,7 @@
 
 .holiday-tag.federal {
     border-left-color: #2563eb;
-    color: #1e40af;
+    color: #0f766e;
     background: #dbeafe;
 }
 
@@ -224,13 +224,13 @@
 
 /* MUNICIPAL */
 .holiday-municipal{
-    background: #4b6cff;
+    background: #14b8a6;
     color: white;
 }
 
 /* ESTADUAL */
 .holiday-estadual{
-    background: #9c4bff;
+    background: #14b8a6;
     color: white;
 }
 
@@ -253,9 +253,9 @@
 }
 
 [data-theme="dark"] .holiday-tag.estadual {
-    background: #4c1d95;
-    color: #ddd6fe;
-    border-left-color: #8b5cf6;
+    background: #134e4a;
+    color: #99f6e4;
+    border-left-color: #2dd4bf;
 }
 
 [data-theme="dark"] .holiday-tag.municipal {

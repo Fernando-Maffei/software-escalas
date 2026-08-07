@@ -4461,7 +4461,7 @@ function mostrarDetalhesHora(hora) {
                         <div style="display: flex; flex-direction: column; gap: 6px;">
                             ${colaboradoresFerias.map(nome => `
                                 <div style="background: #dbeafe; padding: 8px 12px; border-radius: 8px; border-left: 4px solid #3b82f6;">
-                                    <i class="fas fa-user" style="color: #1e40af; margin-right: 8px;"></i> ${nome}
+                                    <i class="fas fa-user" style="color: #0f766e; margin-right: 8px;"></i> ${nome}
                                 </div>
                             `).join('')}
                         </div>
