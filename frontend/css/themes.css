@@ -1,46 +1,79 @@
-/* ================= TEMA CLARO (PADRÃO) ================= */
+/* =====================================================================
+   TOKENS — Central de Escalas
+   ---------------------------------------------------------------------
+   Camada UNICA de decisao visual. Toda cor, sombra, raio, espaco, tipo e
+   movimento sai daqui. Os componentes NAO devem ter valores crus.
+
+   Organizacao:
+     1) Tokens por FUNCAO (surface/border/text/accent/semantica...)
+     2) Tipografia, espaco, raio, sombra, z-index, movimento
+     3) Apelidos de compatibilidade (nomes antigos -> novos) para o CSS
+        legado continuar funcionando enquanto migramos pagina a pagina.
+     4) Override do tema escuro (so cores/sombras — nunca dimensoes).
+
+   Identidade: neutros frios bem escalonados + UM acento TEAL (petroleo).
+   Fugimos de proposito do indigo/violeta saturado com gradiente (a cara
+   de "template gerado"). Sem gradientes na identidade; acento chapado.
+   Todos os pares texto/fundo passam em AA (ver ESTILOS.md / tabela).
+   ===================================================================== */
+
 :root {
-  /* Cores principais */
-  --bg: #0b1120;
-  --bg-soft: #f8fafc;
-  --bg-secondary: var(--bg-soft);
-  --sidebar: #1a1f2f;
-  --card: #ffffff;
-  --card-dark: #f8fafc;
-  --primary: #6366f1;
-  --primary-dark: #4f52e0;
-  --primary-soft: #e0e7ff;
-  --success: #10b981;
-  --success-soft: #d1fae5;
-  --danger: #ef4444;
-  --danger-soft: #fee2e2;
-  --warning: #f59e0b;
+  /* ---- SUPERFICIES (degraus reais de luminancia) ---- */
+  --surface-sunken:  #eceef1;  /* fundo atras dos cards (a pagina) */
+  --surface-base:    #f4f5f7;  /* area de conteudo principal */
+  --surface-raised:  #ffffff;  /* cards, tabelas, superficies elevadas */
+  --surface-overlay: #ffffff;  /* modais, popovers */
+
+  /* ---- BORDAS ---- */
+  --border-subtle: #e3e6ea;    /* separadores, bordas em repouso */
+  --border-strong: #8b9299;    /* bordas de componentes interativos (>=3:1) */
+
+  /* ---- TEXTO ---- */
+  --text-primary:   #1a1d21;   /* titulos e corpo */
+  --text-secondary: #454b52;   /* apoio */
+  --text-muted:     #616770;   /* rotulos, legendas (>=4.5:1 na base) */
+  --text-faint:     #8b9299;   /* so texto grande/decorativo */
+
+  /* ---- ACENTO (acao primaria e estado ativo) — TEAL ---- */
+  --accent:          #0f766e;
+  --accent-hover:    #0b5d56;
+  --accent-active:   #094e48;
+  --accent-contrast: #ffffff;  /* texto sobre o acento */
+  --accent-soft:     #d7f2ee;  /* fundo tenue de item selecionado/ativo */
+  --accent-ring:     rgba(15, 118, 110, 0.40); /* anel de foco */
+
+  /* ---- SEMANTICAS (independentes do acento; funcionam nos 2 temas) ---- */
+  /* Sucesso = saldo positivo */
+  --success:      #15803d;
+  --success-soft: #dcfce7;
+  --success-text: #14532d;
+  /* Atencao = intervalo/almoco (preenchimento forte + texto legivel) */
+  --warning:      #f59e0b;     /* preenchimento (ex.: celula de almoco) */
   --warning-soft: #fef3c7;
-  --text: #1e293b;
-  --text-secondary: #475569;
-  --text-light: #64748b;
-  --text-lighter: #94a3b8;
-  --border: #e2e8f0;
-  --border-dark: #cbd5e1;
+  --warning-text: #92500e;     /* texto sobre warning-soft (>=4.5:1) */
+  /* Erro/debito */
+  --danger:       #b91c1c;
+  --danger-soft:  #fee2e2;
+  --danger-text:  #7f1d1d;
+  /* Neutro = celula vazia / sem dado */
+  --neutral-fill: #e6e8eb;
 
-  /* Sombras neutras (elevação) */
-  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.04), 0 1px 1px rgba(15, 23, 42, 0.03);
-  --shadow-md: 0 2px 6px -1px rgba(15, 23, 42, 0.06), 0 1px 3px -1px rgba(15, 23, 42, 0.04);
-  --shadow-lg: 0 8px 16px -4px rgba(15, 23, 42, 0.08), 0 3px 6px -2px rgba(15, 23, 42, 0.04);
-  --shadow-xl: 0 16px 28px -8px rgba(15, 23, 42, 0.1), 0 6px 10px -4px rgba(15, 23, 42, 0.05);
+  /* ---- TIPOGRAFIA ---- */
+  --font-ui:   "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-mono: "Consolas", "SF Mono", "Courier New", monospace;
+  /* Escala (6 tamanhos) com line-height por degrau */
+  --text-xs:   12px;  --lh-xs:   1.4;
+  --text-sm:   13px;  --lh-sm:   1.45;
+  --text-base: 14px;  --lh-base: 1.5;
+  --text-lg:   16px;  --lh-lg:   1.5;
+  --text-xl:   20px;  --lh-xl:   1.35;
+  --text-2xl:  26px;  --lh-2xl:  1.25;
+  /* Pesos (3) */
+  --weight-regular: 400;
+  --weight-medium:  500;
+  --weight-semibold: 600;
 
-  /* Sombras de marca (só para estados de ação/destaque) */
-  --shadow-primary: 0 4px 10px -2px rgba(99, 102, 241, 0.25);
-  --shadow-danger: 0 4px 10px -2px rgba(239, 68, 68, 0.25);
-
-  /* Raios de borda */
-  --radius-sm: 6px;
-  --radius-md: 10px;
-  --radius-lg: 14px;
-  --radius-xl: 20px;
-  --radius-full: 999px;
-
-  /* Espaçamento (grid de 4px) */
+  /* ---- ESPACO (base 4px; todo padding/gap sai daqui) ---- */
   --space-1: 4px;
   --space-2: 8px;
   --space-3: 12px;
@@ -50,72 +83,146 @@
   --space-7: 32px;
   --space-8: 40px;
 
-  /* Tipografia */
-  --text-xs: 11px;
-  --text-sm: 12px;
-  --text-base: 14px;
-  --text-md: 16px;
-  --text-lg: 18px;
-  --text-xl: 22px;
-  --text-2xl: 28px;
-  --text-3xl: 34px;
-  --font-weight-normal: 400;
-  --font-weight-medium: 500;
-  --font-weight-semibold: 600;
-  --font-weight-bold: 700;
+  /* ---- RAIO (3 papeis + pill) ---- */
+  --radius-sm: 6px;    /* controles: inputs, botoes, chips */
+  --radius-md: 10px;   /* cards, celulas, superficies */
+  --radius-lg: 16px;   /* modais, paineis grandes */
+  --radius-pill: 999px;/* pilulas, avatares redondos */
 
-  /* Breakpoints (referência — @media não aceita var(), usar o valor em px direto) */
-  --bp-sm: 640px;
-  --bp-md: 768px;
-  --bp-lg: 1024px;
-  --bp-xl: 1280px;
+  /* ---- SOMBRA (3 papeis) ---- */
+  --shadow-rest:     0 1px 2px rgba(15, 23, 42, 0.05), 0 1px 1px rgba(15, 23, 42, 0.04);
+  --shadow-raised:   0 4px 10px -2px rgba(15, 23, 42, 0.10), 0 2px 4px -2px rgba(15, 23, 42, 0.06);
+  --shadow-floating: 0 16px 32px -10px rgba(15, 23, 42, 0.20), 0 6px 12px -6px rgba(15, 23, 42, 0.10);
 
-  /* Sidebar (cores fixas, não variam por tema) */
+  /* ---- Z-INDEX (escala nomeada) ---- */
+  --z-base:     1;
+  --z-sticky:   100;   /* cabecalho/coluna fixos da tabela */
+  --z-dropdown: 300;
+  --z-overlay:  1000;  /* fundo escurecido de modal */
+  --z-modal:    1100;
+  --z-popover:  1200;
+  --z-toast:    1300;
+
+  /* ---- MOVIMENTO (2 duracoes + 1 curva) ---- */
+  --dur-fast: 120ms;
+  --dur:      200ms;
+  --ease:     cubic-bezier(0.4, 0, 0.2, 1);
+  /* Conjunto seguro de transicao: SO propriedades que nao causam reflow.
+     Substitui o antigo "transition: all". Componentes que precisem de algo
+     alem disto devem listar as propriedades explicitamente. */
+  --transition:
+      background-color var(--dur) var(--ease),
+      border-color     var(--dur) var(--ease),
+      color            var(--dur) var(--ease),
+      box-shadow       var(--dur) var(--ease),
+      transform        var(--dur) var(--ease),
+      opacity          var(--dur) var(--ease),
+      outline-color    var(--dur) var(--ease);
+
+  /* ---- SIDEBAR (superficie escura fixa, nao varia por tema) ---- */
   --main-sidebar-width: clamp(280px, 24vw, 340px);
   --main-sidebar-collapsed-width: 88px;
-  --sidebar-bg-top: #1a1f35;
-  --sidebar-bg-bottom: #0c1126;
-  --sidebar-border: rgba(99, 102, 241, 0.22);
-  --sidebar-text: #ffffff;
+  --sidebar-bg-top:    #10201f;   /* topo (teal-petroleo bem escuro) */
+  --sidebar-bg-bottom: #0a1413;   /* base */
+  --sidebar-border:    rgba(45, 212, 191, 0.18); /* filete teal sutil */
+  --sidebar-text:       #ffffff;
   --sidebar-text-muted: rgba(255, 255, 255, 0.62);
-  --sidebar-text-soft: rgba(255, 255, 255, 0.72);
+  --sidebar-text-soft:  rgba(255, 255, 255, 0.72);
   --sidebar-item-size: 64px;
   --sidebar-icon-size: 32px;
   --sidebar-radius: 18px;
   --sidebar-transition: 0.26s ease;
 
-  /* Transições */
-  --transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  /* =================================================================
+     APELIDOS DE COMPATIBILIDADE (nomes antigos -> tokens novos)
+     Permitem que o CSS legado herde a paleta nova sem quebrar. Serao
+     removidos conforme cada pagina migrar para os nomes por funcao.
+     ================================================================= */
+  --bg:            var(--surface-sunken);
+  --bg-soft:       var(--surface-base);
+  --bg-secondary:  var(--surface-base);
+  --sidebar:       var(--sidebar-bg-top);
+  --card:          var(--surface-raised);
+  --card-dark:     var(--surface-base);
+  --text:          var(--text-primary);
+  --border:        var(--border-subtle);
+  --primary:       var(--accent);
+  --primary-dark:  var(--accent-hover);
+  --primary-soft:  var(--accent-soft);
+  --text-light:    var(--text-muted);
+  --text-lighter:  var(--text-faint);
+  --border-dark:   var(--border-strong);
+  /* semanticas antigas -> novas */
+  /* (--success/-soft, --danger/-soft, --warning/-soft ja existem acima) */
+  /* sombras antigas -> 3 papeis novos */
+  --shadow-sm: var(--shadow-rest);
+  --shadow-md: var(--shadow-rest);
+  --shadow-lg: var(--shadow-raised);
+  --shadow-xl: var(--shadow-floating);
+  --shadow-primary: 0 4px 10px -2px rgba(15, 118, 110, 0.28);
+  --shadow-danger:  0 4px 10px -2px rgba(185, 28, 28, 0.25);
+  /* raio antigo -> novo (xl e full mapeados) */
+  --radius-xl:   var(--radius-lg);
+  --radius-full: var(--radius-pill);
+  /* pesos antigos -> novos */
+  --font-weight-normal:   var(--weight-regular);
+  --font-weight-medium:   var(--weight-medium);
+  --font-weight-semibold: var(--weight-semibold);
+  --font-weight-bold:     var(--weight-semibold); /* aposentamos o 700 */
+  /* tamanhos antigos que sumiram da escala -> aproximacao */
+  --text-md:  var(--text-lg);
+  --text-3xl: var(--text-2xl);
 }
 
-/* ================= TEMA ESCURO ================= */
+/* =====================================================================
+   TEMA ESCURO — apenas cores e sombras mudam (nunca dimensoes),
+   para a troca de tema nao causar reflow.
+   ===================================================================== */
 [data-theme="dark"] {
-  --bg: #0f172a;
-  --bg-soft: #1e293b;
-  --sidebar: #0b1120;
-  --card: #1e293b;
-  --card-dark: #0f172a;
-  --primary: #818cf8;
-  --primary-dark: #6366f1;
-  --primary-soft: #1e1b4b;
-  --success: #34d399;
-  --success-soft: #064e3b;
-  --danger: #f87171;
-  --danger-soft: #7f1d1d;
-  --warning: #fbbf24;
-  --warning-soft: #78350f;
-  --text: #f1f5f9;
-  --text-secondary: #cbd5e1;
-  --text-light: #94a3b8;
-  --text-lighter: #64748b;
-  --border: #334155;
-  --border-dark: #475569;
+  /* Superficies */
+  --surface-sunken:  #0f1214;
+  --surface-base:    #15181b;
+  --surface-raised:  #1c2024;
+  --surface-overlay: #22272b;
 
-  /* Sombras - mais suaves no escuro */
-  --shadow-sm: 0 2px 4px rgba(0,0,0,0.3);
-  --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.4);
-  --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.4);
-  --shadow-xl: 0 20px 25px -5px rgba(0,0,0,0.5);
-  --shadow-primary: 0 4px 12px -2px rgba(129, 140, 248, 0.35);
-  --shadow-danger: 0 4px 12px -2px rgba(248, 113, 113, 0.3);
+  /* Bordas */
+  --border-subtle: #2b3036;
+  --border-strong: #6a717a;   /* >=3:1 sobre superficie elevada */
+
+  /* Texto */
+  --text-primary:   #eef0f2;
+  --text-secondary: #c3c8ce;
+  --text-muted:     #949aa1;
+  --text-faint:     #6d747b;
+
+  /* Acento (teal mais claro para brilhar no escuro) */
+  --accent:          #2dd4bf;
+  --accent-hover:    #5eead4;
+  --accent-active:   #99f6e4;
+  --accent-contrast: #06201d;  /* texto escuro sobre o teal claro */
+  --accent-soft:     #103b36;
+  --accent-ring:     rgba(45, 212, 191, 0.45);
+
+  /* Semanticas */
+  --success:      #4ade80;
+  --success-soft: #052e16;
+  --success-text: #bbf7d0;
+  --warning:      #fbbf24;
+  --warning-soft: #3a2a07;
+  --warning-text: #fde68a;
+  --danger:       #f87171;
+  --danger-soft:  #3a1414;
+  --danger-text:  #fecaca;
+  --neutral-fill: #262b30;
+
+  /* Sombras — mais suaves/escuras */
+  --shadow-rest:     0 1px 2px rgba(0, 0, 0, 0.35);
+  --shadow-raised:   0 4px 10px -2px rgba(0, 0, 0, 0.45);
+  --shadow-floating: 0 16px 32px -10px rgba(0, 0, 0, 0.55);
+  --shadow-primary:  0 4px 12px -2px rgba(45, 212, 191, 0.30);
+  --shadow-danger:   0 4px 12px -2px rgba(248, 113, 113, 0.28);
+
+  /* Sidebar no escuro: mantem a familia, um pouco mais fundo */
+  --sidebar-bg-top:    #0c1817;
+  --sidebar-bg-bottom: #060d0c;
 }
