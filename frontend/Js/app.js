@@ -205,7 +205,9 @@ function aplicarCoresEscala(cores = carregarCoresEscala()) {
         root.style.setProperty(item.cssVar, color);
 
         if (item.strongVar) {
-            root.style.setProperty(item.strongVar, ajustarCorHex(color, -18));
+            // "strong" = a propria cor base: o degrade das celulas (base ->
+            // strong) fica chapado, sem o "reflexo de luz"/aspecto glossy.
+            root.style.setProperty(item.strongVar, color);
         }
     });
 }

@@ -219,18 +219,16 @@
     content: "";
     position: absolute;
     inset: 6px;
-    background: linear-gradient(135deg, var(--escala-status-trabalhando, var(--primary)) 0%, var(--escala-status-trabalhando-strong, var(--primary-dark)) 100%);
+    background: var(--escala-status-trabalhando, var(--primary));
     border-radius: var(--radius-md);
-    box-shadow: 0 1px 4px rgba(29, 99, 237, 0.25);
 }
 
 .timeline-cell.almoco::after {
     content: "";
     position: absolute;
     inset: 6px;
-    background: linear-gradient(135deg, var(--escala-status-almoco, var(--warning)) 0%, var(--escala-status-almoco-strong, #d97706) 100%);
+    background: var(--escala-status-almoco, var(--warning));
     border-radius: var(--radius-md);
-    box-shadow: 0 1px 4px rgba(245, 158, 11, 0.25);
 }
 
 .timeline-cell.fora-expediente {
