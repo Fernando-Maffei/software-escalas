@@ -2074,6 +2074,11 @@
 /* ================= VISUAL NOVO DA ESCALA ================= */
 .escala-page {
     padding: 8px 0 0;
+    /* Full-bleed: a grade densa "fura" o padding lateral do <main> para usar
+       a largura ate mais perto da borda. -24px e seguro: o menor padding do
+       main e 24px (<=1200px), entao no pior caso fica rente sem estourar
+       (nada de scroll horizontal). */
+    margin-inline: -24px;
 }
 
 /* O cabecalho desta tela ocupava 404px antes da grade aparecer — mais da
