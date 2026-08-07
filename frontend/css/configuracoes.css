@@ -41,7 +41,7 @@
 }
 
 .config-section-menu::-webkit-scrollbar-thumb {
-    background: rgba(99, 102, 241, 0.28);
+    background: rgba(15, 118, 110, 0.28);
     border-radius: 999px;
 }
 
@@ -66,7 +66,7 @@
 .config-section-btn.is-active {
     background: var(--primary-soft);
     color: var(--primary);
-    border-color: rgba(99, 102, 241, 0.28);
+    border-color: rgba(15, 118, 110, 0.28);
 }
 
 .config-section-btn i {
@@ -145,7 +145,7 @@
     align-items: center;
     gap: 12px;
     padding: 22px 24px 18px;
-    background: linear-gradient(135deg, rgba(99, 102, 241, 0.14) 0%, rgba(99, 102, 241, 0.04) 42%, transparent 100%);
+    background: linear-gradient(135deg, rgba(15, 118, 110, 0.14) 0%, rgba(15, 118, 110, 0.04) 42%, transparent 100%);
     border-bottom: 1px solid rgba(148, 163, 184, 0.14);
 }
 
@@ -315,9 +315,9 @@
     display: grid;
     gap: 14px;
     padding: 16px;
-    border: 1px dashed rgba(99, 102, 241, 0.32);
+    border: 1px dashed rgba(15, 118, 110, 0.32);
     border-radius: 20px;
-    background: rgba(99, 102, 241, 0.06);
+    background: rgba(15, 118, 110, 0.06);
 }
 
 .background-server-panel.is-hidden {
@@ -631,7 +631,7 @@ label[for="autoBackupOnShutdownHidden"] + .helper-text {
 .config-item-info i {
     width: 38px;
     height: 38px;
-    background: linear-gradient(135deg, rgba(99, 102, 241, 0.18), rgba(99, 102, 241, 0.08));
+    background: linear-gradient(135deg, rgba(15, 118, 110, 0.18), rgba(15, 118, 110, 0.08));
     border-radius: 12px;
     display: flex;
     align-items: center;

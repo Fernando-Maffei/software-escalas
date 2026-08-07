@@ -211,8 +211,8 @@
 }
 
 .holiday-tag.estadual {
-    border-left-color: #7c3aed;
-    color: #5b21b6;
+    border-left-color: var(--accent);
+    color: var(--accent-hover);
     background: #ede9fe;
 }
 

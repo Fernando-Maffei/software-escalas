@@ -70,7 +70,7 @@ main,
 }
 
 .sidebar::-webkit-scrollbar-thumb {
-  background: rgba(129, 140, 248, 0.28);
+  background: rgba(45, 212, 191, 0.28);
   border-radius: var(--radius-full);
 }
 
@@ -96,7 +96,7 @@ main,
   padding: 0 8px 26px 8px;
   margin: 0 0 18px 0;
 
-  border-bottom: 1px solid rgba(99, 102, 241, 0.28);
+  border-bottom: 1px solid rgba(15, 118, 110, 0.28);
 
   overflow: hidden;
 
@@ -163,7 +163,7 @@ main,
   white-space: normal;
   overflow-wrap: anywhere;
 
-  background: linear-gradient(135deg, #ffffff 0%, #c7d2fe 100%);
+  background: linear-gradient(135deg, #ffffff 0%, var(--accent-soft) 100%);
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -232,7 +232,7 @@ main,
 
 .sidebar-main-toggle:focus-visible,
 .sidebar-btn:focus-visible {
-  outline: 2px solid rgba(129, 140, 248, 0.75);
+  outline: 2px solid rgba(45, 212, 191, 0.75);
   outline-offset: 3px;
 }
 
@@ -314,8 +314,8 @@ main,
 }
 
 .sidebar-btn:hover {
-  background: rgba(99, 102, 241, 0.15);
-  border-color: rgba(99, 102, 241, 0.42);
+  background: rgba(15, 118, 110, 0.15);
+  border-color: rgba(15, 118, 110, 0.42);
   color: #ffffff;
   box-shadow: 0 10px 22px rgba(0, 0, 0, 0.18);
 }
@@ -324,7 +324,7 @@ main,
   background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
   color: #ffffff;
   border-color: rgba(255, 255, 255, 0.22);
-  box-shadow: 0 10px 22px -6px rgba(99, 102, 241, 0.68);
+  box-shadow: 0 10px 22px -6px rgba(15, 118, 110, 0.68);
 }
 
 .btn-content {
@@ -381,7 +381,7 @@ main,
   z-index: 1;
 
   font-size: 32px;
-  color: rgba(99, 102, 241, 0.1);
+  color: rgba(15, 118, 110, 0.1);
 
   opacity: 0;
   transform: scale(0.5);
@@ -433,8 +433,8 @@ main,
   padding: 4px 10px;
   border-radius: var(--radius-full);
 
-  background: rgba(99, 102, 241, 0.15);
-  border: 1px solid rgba(99, 102, 241, 0.3);
+  background: rgba(15, 118, 110, 0.15);
+  border: 1px solid rgba(15, 118, 110, 0.3);
   color: var(--primary);
 
   font-size: 11px;
@@ -471,7 +471,7 @@ main,
 
   margin: 18px 0;
 
-  background: linear-gradient(90deg, transparent, rgba(99, 102, 241, 0.34), transparent);
+  background: linear-gradient(90deg, transparent, rgba(15, 118, 110, 0.34), transparent);
 
   transition:
     width var(--sidebar-transition),
@@ -563,7 +563,7 @@ body.main-sidebar-collapsed .sidebar-header {
   padding: 0 0 18px 0;
   margin: 0 0 14px 0;
 
-  border-bottom: 1px solid rgba(99, 102, 241, 0.28);
+  border-bottom: 1px solid rgba(15, 118, 110, 0.28);
 }
 
 body.main-sidebar-collapsed .logo-container {

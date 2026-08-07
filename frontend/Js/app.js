@@ -35,7 +35,7 @@ const ESCALA_CORES_PADRAO = [
         label: 'Trabalhando',
         description: 'Faixa de trabalho normal',
         icon: 'briefcase',
-        color: '#818cf8',
+        color: '#14b8a6',
         cssVar: '--escala-status-trabalhando',
         strongVar: '--escala-status-trabalhando-strong'
     },
@@ -146,7 +146,7 @@ function normalizeLegacyApiUrl(url) {
     return suffix ? `${getApiBaseUrl()}${suffix}` : getApiBaseUrl();
 }
 
-function normalizarCorHex(value, fallback = '#818cf8') {
+function normalizarCorHex(value, fallback = '#14b8a6') {
     const raw = String(value || '').trim();
 
     if (/^#[0-9a-fA-F]{6}$/.test(raw)) {

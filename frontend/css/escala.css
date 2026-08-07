@@ -29,7 +29,7 @@
 .escala-sector-tab.is-active {
     background: var(--primary-soft);
     color: var(--primary-dark);
-    border-color: rgba(99, 102, 241, 0.35);
+    border-color: rgba(15, 118, 110, 0.35);
 }
 
 .timeline-container {
@@ -221,7 +221,7 @@
     inset: 6px;
     background: linear-gradient(135deg, var(--escala-status-trabalhando, var(--primary)) 0%, var(--escala-status-trabalhando-strong, var(--primary-dark)) 100%);
     border-radius: var(--radius-md);
-    box-shadow: 0 1px 4px rgba(99, 102, 241, 0.25);
+    box-shadow: 0 1px 4px rgba(15, 118, 110, 0.25);
 }
 
 .timeline-cell.almoco::after {
@@ -490,8 +490,8 @@
 .escala-range-card {
     padding: 14px;
     border-radius: 16px;
-    background: linear-gradient(180deg, rgba(99, 102, 241, 0.08) 0%, rgba(15, 23, 42, 0.02) 100%);
-    border: 1px solid rgba(99, 102, 241, 0.14);
+    background: linear-gradient(180deg, rgba(15, 118, 110, 0.08) 0%, rgba(15, 23, 42, 0.02) 100%);
+    border: 1px solid rgba(15, 118, 110, 0.14);
 }
 
 .escala-range-card-header {
@@ -999,7 +999,7 @@
 
 .legend-color.trabalhando {
     background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
-    box-shadow: 0 2px 8px rgba(99, 102, 241, 0.3);
+    box-shadow: 0 2px 8px rgba(15, 118, 110, 0.3);
 }
 
 .legend-color.almoco {
@@ -1777,7 +1777,7 @@
 /* ================= LINHA DE TOTAL SIMPLES ================= */
 .timeline-row.total-row {
     background: #f8fafc;
-    border-top: 2px solid #6366f1;
+    border-top: 2px solid var(--accent);
     border-bottom: 1px solid #e2e8f0;
     margin-top: 16px;
     font-weight: 500;
@@ -1785,7 +1785,7 @@
 
 /* Nome da coluna */
 .timeline-name.total-nome {
-    background: #6366f1;
+    background: var(--accent);
     color: white;
     font-weight: 600;
     display: flex;
@@ -1823,7 +1823,7 @@
     border-radius: 20px;
     min-width: 30px;
     text-align: center;
-    color: #6366f1;
+    color: var(--accent);
     font-weight: 700;
 }
 
@@ -1835,12 +1835,12 @@
 /* ================= TEMA ESCURO ================= */
 [data-theme="dark"] .timeline-row.total-row {
     background: #1e293b;
-    border-top-color: #818cf8;
+    border-top-color: var(--accent);
     border-bottom-color: #334155;
 }
 
 [data-theme="dark"] .timeline-name.total-nome {
-    background: #818cf8;
+    background: var(--accent);
     color: #0f172a;
 }
 
@@ -1852,7 +1852,7 @@
 
 [data-theme="dark"] .total-row .total-cell .total-valor {
     background: #1e293b;
-    color: #818cf8;
+    color: var(--accent);
 }
 
 /* ================= MENSAGEM DE DOMINGO ================= */
@@ -2702,14 +2702,14 @@
 
 .escala-page .timeline-name:hover .timeline-name-action,
 .escala-page .timeline-row.is-selected .timeline-name-action {
-    background: rgba(129, 140, 248, 0.18);
+    background: rgba(45, 212, 191, 0.18);
     border-color: rgba(199, 210, 254, 0.28);
 }
 
 .escala-page .timeline-name:hover {
     background: rgba(48, 66, 104, 0.92);
     color: #f8fafc;
-    box-shadow: inset 3px 0 0 #818cf8;
+    box-shadow: inset 3px 0 0 var(--accent);
 }
 
 .escala-page .timeline-row:not(.total-row):not(.mensagem-row) .timeline-name > i:first-child {
@@ -2719,7 +2719,7 @@
     display: grid;
     place-items: center;
     background: linear-gradient(135deg, rgba(124, 124, 255, 0.45), rgba(91, 95, 240, 0.18));
-    color: #a5b4fc;
+    color: var(--accent-soft);
     font-size: 13px;
     flex-shrink: 0;
 }
@@ -2729,7 +2729,7 @@
     flex-shrink: 0;
     opacity: 0.75;
     transform: none;
-    color: #c7d2fe;
+    color: var(--accent-soft);
 }
 
 .escala-page .timeline-name-helper {
@@ -2750,7 +2750,7 @@
 .escala-page .timeline-name:hover .edit-indicator,
 .escala-page .timeline-row.is-selected .edit-indicator {
     opacity: 1;
-    color: #e0e7ff;
+    color: var(--accent-soft);
 }
 
 .escala-page .timeline-cell {
@@ -2822,9 +2822,9 @@
     content: "";
     top: 10px;
     bottom: 10px;
-    background: linear-gradient(180deg, var(--escala-status-trabalhando, #818cf8), var(--escala-status-trabalhando-strong, #6366f1));
+    background: linear-gradient(180deg, var(--escala-status-trabalhando, var(--accent)), var(--escala-status-trabalhando-strong, var(--accent)));
     border-radius: 9px;
-    box-shadow: 0 8px 18px rgba(99, 102, 241, 0.28);
+    box-shadow: 0 8px 18px rgba(15, 118, 110, 0.28);
 }
 
 .escala-page .timeline-cell.almoco::after {
@@ -3352,7 +3352,7 @@
 }
 
 :root:not([data-theme="dark"]) .escala-page .escala-scroll::-webkit-scrollbar-thumb {
-    background: rgba(99, 102, 241, 0.32);
+    background: rgba(15, 118, 110, 0.32);
 }
 
 :root:not([data-theme="dark"]) .escala-page .timeline-header {
@@ -3426,8 +3426,8 @@
 }
 
 :root:not([data-theme="dark"]) .escala-page .timeline-row.total-row .timeline-cell.total-cell .total-valor {
-    background: rgba(99, 102, 241, 0.12);
-    border-color: rgba(99, 102, 241, 0.2);
+    background: rgba(15, 118, 110, 0.12);
+    border-color: rgba(15, 118, 110, 0.2);
     color: var(--primary-dark);
 }
 
@@ -3447,8 +3447,8 @@
 }
 
 :root:not([data-theme="dark"]) .escala-page .editor-header {
-    border-color: rgba(99, 102, 241, 0.12);
-    background: linear-gradient(135deg, rgba(99, 102, 241, 0.08) 0%, rgba(224, 231, 255, 0.38) 100%);
+    border-color: rgba(15, 118, 110, 0.12);
+    background: linear-gradient(135deg, rgba(15, 118, 110, 0.08) 0%, rgba(224, 231, 255, 0.38) 100%);
 }
 
 :root:not([data-theme="dark"]) .escala-page .editor-header small,

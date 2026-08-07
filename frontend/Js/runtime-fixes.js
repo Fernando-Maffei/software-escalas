@@ -887,10 +887,10 @@
                 <style>
                     * { box-sizing: border-box; margin: 0; padding: 0; }
                     body { font-family: 'Inter', Arial, sans-serif; margin: 15px; background: white; color: #1e293b; width: 1200px; }
-                    h1 { color: #6366f1; text-align: center; font-size: 28px; margin-bottom: 5px; }
+                    h1 { color: #0f766e; text-align: center; font-size: 28px; margin-bottom: 5px; }
                     h2 { color: #1e293b; text-align: center; font-size: 20px; text-transform: uppercase; margin-bottom: 15px; }
                     .calendario-pdf { width: 100%; border-collapse: collapse; margin-bottom: 15px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); table-layout: fixed; }
-                    .calendario-pdf th { background: #6366f1; color: white; padding: 8px; font-weight: 600; font-size: 12px; border: 1px solid #cbd5e1; text-align: center; width: 14.28%; }
+                    .calendario-pdf th { background: #0f766e; color: white; padding: 8px; font-weight: 600; font-size: 12px; border: 1px solid #cbd5e1; text-align: center; width: 14.28%; }
                     .calendario-pdf td { border: 1px solid #cbd5e1; vertical-align: top; height: 70px; padding: 4px; font-size: 10px; background: white; overflow: hidden; }
                     .calendario-pdf td.vazio { background: #f8fafc; }
                     .calendario-pdf td.domingo { background-color: #fef9c3 !important; }
@@ -899,13 +899,13 @@
                     .dia-feriado { font-size: 8px; color: #dc2626; font-weight: 600; margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; background: #fee2e2; padding: 1px 3px; border-radius: 3px; }
                     .evento-tag { font-size: 7px; padding: 1px 3px; border-radius: 3px; margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 500; }
                     .folga-tag { background: #d1fae5; color: #059669; border-left: 2px solid #10b981; }
-                    .ferias-tag { background: #e0e7ff; color: #4f52e0; border-left: 2px solid #6366f1; }
+                    .ferias-tag { background: #d7f2ee; color: #0b5d56; border-left: 2px solid #0f766e; }
                     .ausencia-tag { background: #fee2e2; color: #dc2626; border-left: 2px solid #ef4444; }
                     .legendas-pdf { display: flex; gap: 15px; margin: 10px 0; padding: 8px 12px; background: #f8fafc; border-radius: 6px; flex-wrap: wrap; border: 1px solid #e2e8f0; font-size: 10px; }
                     .legenda-item { display: flex; align-items: center; gap: 5px; }
                     .legenda-cor { width: 12px; height: 12px; border-radius: 3px; }
                     .legenda-folga { background: #d1fae5; border: 1px solid #059669; }
-                    .legenda-ferias { background: #e0e7ff; border: 1px solid #4f52e0; }
+                    .legenda-ferias { background: #d7f2ee; border: 1px solid #0b5d56; }
                     .legenda-ausencia { background: #fee2e2; border: 1px solid #dc2626; }
                     .legenda-feriado { background: #fee2e2; border: 1px solid #dc2626; }
                     .legenda-domingo { background: #fef9c3; border: 1px solid #b45309; }
@@ -918,7 +918,7 @@
                     .lista-card td { padding: 2px 3px; border-bottom: 1px solid #e2e8f0; vertical-align: top; }
                     .lista-card tr:last-child td { border-bottom: none; }
                     .empty-message { text-align: center; color: #64748b; font-size: 9px; padding: 10px; font-style: italic; }
-                    .resumo-rodape { margin-top: 15px; padding: 10px; background: linear-gradient(135deg, #6366f1 0%, #4f52e0 100%); border-radius: 6px; text-align: center; color: white; }
+                    .resumo-rodape { margin-top: 15px; padding: 10px; background: linear-gradient(135deg, #0f766e 0%, #0b5d56 100%); border-radius: 6px; text-align: center; color: white; }
                     .resumo-rodape strong { font-size: 14px; }
                     .resumo-rodape small { display: block; margin-top: 3px; font-size: 10px; opacity: 0.9; }
                 </style>
@@ -1154,7 +1154,7 @@
                         margin-bottom: 12px;
                     }
                     .cabecalho-principal h1 {
-                        color: #4f46e5;
+                        color: #0b5d56;
                         font-size: 44px;
                         line-height: 1.1;
                         margin-bottom: 4px;
@@ -1201,7 +1201,7 @@
                         border: 1px solid #cbd5e1;
                     }
                     .calendario-pdf th {
-                        background: #4f46e5;
+                        background: #0b5d56;
                         color: white;
                         padding: 13px 8px;
                         font-weight: 700;
@@ -1266,9 +1266,9 @@
                         border-left: 3px solid #10b981;
                     }
                     .ferias-tag {
-                        background: #e0e7ff;
+                        background: #d7f2ee;
                         color: #4338ca;
-                        border-left: 3px solid #6366f1;
+                        border-left: 3px solid #0f766e;
                     }
                     .ausencia-tag {
                         background: #fee2e2;
@@ -1304,7 +1304,7 @@
                         border-radius: 4px;
                     }
                     .legenda-folga { background: #d1fae5; border: 1px solid #059669; }
-                    .legenda-ferias { background: #e0e7ff; border: 1px solid #4f46e5; }
+                    .legenda-ferias { background: #d7f2ee; border: 1px solid #0b5d56; }
                     .legenda-ausencia { background: #fee2e2; border: 1px solid #dc2626; }
                     .legenda-feriado { background: #fee2e2; border: 1px solid #dc2626; }
                     .legenda-domingo { background: #fef3c7; border: 1px solid #d97706; }
@@ -1363,7 +1363,7 @@
                     .resumo-rodape {
                         margin-top: 18px;
                         padding: 14px;
-                        background: linear-gradient(135deg, #4f46e5 0%, #3730a3 100%);
+                        background: linear-gradient(135deg, #0b5d56 0%, #3730a3 100%);
                         border-radius: 12px;
                         text-align: center;
                         color: white;
@@ -4071,7 +4071,7 @@
                         background: #f8fafc;
                     }
                     .resumo-card-estatistica i {
-                        color: #6366f1;
+                        color: #0f766e;
                         font-size: 18px;
                     }
                     .resumo-card-estatistica strong {

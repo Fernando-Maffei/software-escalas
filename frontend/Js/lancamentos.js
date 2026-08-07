@@ -59,7 +59,7 @@ function getTipoLancamentoMeta(tipo) {
         iconClass: 'fa-calendar-day',
         classe: '',
         texto: normalized || 'Lançamento',
-        cor: '#6366f1'
+        cor: '#0f766e'
     };
 }
 
@@ -975,7 +975,7 @@ async function carregarListaPessoal() {
             let icone = '📅';
             let classe = '';
             let texto = tipo;
-            let cor = '#6366f1';
+            let cor = '#0f766e';
             
             if (tipo === 'folga') {
                 icone = '🌸';
