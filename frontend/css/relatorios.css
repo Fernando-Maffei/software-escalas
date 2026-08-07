@@ -389,7 +389,7 @@
 
 .badge-normal {
     background: #e2e8f0;
-    color: #3a3e43;
+    color: #263243;
 }
 
 .badge-ajuste {
@@ -398,12 +398,12 @@
 }
 
 [data-theme="dark"] .badge-normal {
-    background: #3a3e43;
+    background: #263243;
     color: #e2e8f0;
 }
 
 [data-theme="dark"] .badge-ajuste {
-    background: #134e4a;
+    background: #123a7a;
     color: #e9d5ff;
 }
 
@@ -534,7 +534,7 @@
     border-radius: 16px;
     overflow: hidden;
     background: var(--card);
-    box-shadow: 0 8px 18px rgba(23, 25, 28, 0.05);
+    box-shadow: 0 8px 18px rgba(12, 20, 32, 0.05);
 }
 
 .escala-quadro-grid-calendario .escala-quadro-dia {
@@ -555,7 +555,7 @@
 
 .escala-quadro-dia-header {
     padding: 10px 12px;
-    background: linear-gradient(135deg, #3a3f45 0%, #4c5158 100%);
+    background: linear-gradient(135deg, #263243 0%, #3a4a5f 100%);
     color: #f8fafc;
     font-size: 15px;
     font-weight: 700;
@@ -579,7 +579,7 @@
 
 .escala-quadro-tabela th {
     background: #edf3f8;
-    color: #262a2f;
+    color: #101a28;
     font-weight: 700;
     text-align: center;
 }
@@ -598,7 +598,7 @@
     vertical-align: middle;
     background: #f8fbfe;
     font-weight: 600;
-    color: #32363c;
+    color: #1a2636;
 }
 
 .escala-quadro-sem-escala {

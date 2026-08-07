@@ -30,7 +30,7 @@
        fundo e aparecia como um bloco. */
     background: var(--card-dark);
     border-bottom: 1px solid rgba(148, 163, 184, 0.14);
-    box-shadow: 0 16px 24px -24px rgba(23, 25, 28, 0.45);
+    box-shadow: 0 16px 24px -24px rgba(12, 20, 32, 0.45);
 }
 
 /* Zera o padding-top do container SO nesta tela: assim o cabecalho sticky
@@ -162,7 +162,7 @@
     color: white;
     font-weight: 700;
     font-size: 18px;
-    box-shadow: 0 4px 12px rgba(15, 118, 110, 0.3);
+    box-shadow: 0 4px 12px rgba(29, 99, 237, 0.3);
     flex-shrink: 0;
 }
 
@@ -190,10 +190,10 @@
     padding: 4px 10px;
     border-radius: 999px;
     background: #eff6ff;
-    color: #0f766e;
+    color: #1d63ed;
     font-size: 12px;
     font-weight: 600;
-    border: 1px solid #99f6e4;
+    border: 1px solid #bcd7ff;
 }
 
 .banco-horas-card {
@@ -448,8 +448,8 @@
 }
 
 #colaboradorEditor .jornada-semanal-row.is-selected {
-    border-color: rgba(15, 118, 110, 0.35);
-    background: rgba(15, 118, 110, 0.08);
+    border-color: rgba(29, 99, 237, 0.35);
+    background: rgba(29, 99, 237, 0.08);
 }
 
 #colaboradorEditor .jornada-semanal-day-toggle {
@@ -532,7 +532,7 @@
     padding: 16px;
     border-radius: 18px;
     border: 1px solid var(--border);
-    background: linear-gradient(180deg, rgba(15, 118, 110, 0.08) 0%, rgba(248, 250, 252, 0.92) 100%);
+    background: linear-gradient(180deg, rgba(29, 99, 237, 0.08) 0%, rgba(248, 250, 252, 0.92) 100%);
 }
 
 #colaboradorEditor .banco-horas-editor-shell.is-disabled {
@@ -600,7 +600,7 @@
 
 #colaboradorEditor .banco-horas-signal-btn:hover:not(:disabled) {
     color: var(--text);
-    background: rgba(15, 118, 110, 0.08);
+    background: rgba(29, 99, 237, 0.08);
 }
 
 #colaboradorEditor .banco-horas-signal-btn.is-active.is-positive {
@@ -808,7 +808,7 @@
 [data-theme="dark"] #colaboradorEditor .form-control:focus,
 [data-theme="dark"] #colaboradorEditor textarea.form-control:focus {
     border-color: var(--primary);
-    box-shadow: 0 0 0 3px rgba(45, 212, 191, 0.22);
+    box-shadow: 0 0 0 3px rgba(74, 158, 255, 0.22);
 }
 
 [data-theme="dark"] #colaboradorEditor .time-inputs {
@@ -831,7 +831,7 @@
 }
 
 [data-theme="dark"] #colaboradorEditor .jornada-semanal-shell {
-    background: rgba(23, 25, 28, 0.7);
+    background: rgba(12, 20, 32, 0.7);
     border-color: var(--border);
 }
 
@@ -841,8 +841,8 @@
 }
 
 [data-theme="dark"] #colaboradorEditor .jornada-semanal-row.is-selected {
-    background: rgba(15, 118, 110, 0.2);
-    border-color: rgba(45, 212, 191, 0.4);
+    background: rgba(29, 99, 237, 0.2);
+    border-color: rgba(74, 158, 255, 0.4);
 }
 
 [data-theme="dark"] #colaboradorEditor .jornada-semanal-day-toggle {
@@ -850,7 +850,7 @@
 }
 
 [data-theme="dark"] #colaboradorEditor .banco-horas-editor-shell {
-    background: linear-gradient(180deg, rgba(15, 118, 110, 0.18) 0%, rgba(23, 25, 28, 0.9) 100%);
+    background: linear-gradient(180deg, rgba(29, 99, 237, 0.18) 0%, rgba(12, 20, 32, 0.9) 100%);
     border-color: var(--border);
 }
 
@@ -867,7 +867,7 @@
 }
 
 [data-theme="dark"] #colaboradorEditor .banco-horas-signal-toggle {
-    background: rgba(23, 25, 28, 0.82);
+    background: rgba(12, 20, 32, 0.82);
     border-color: var(--border);
 }
 

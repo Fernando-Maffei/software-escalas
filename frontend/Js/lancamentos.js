@@ -42,7 +42,7 @@ function getTipoLancamentoMeta(tipo) {
             iconClass: 'fa-umbrella-beach',
             classe: 'ferias',
             texto: 'Férias',
-            cor: '#3b82f6'
+            cor: '#0d9488'
         };
     }
 
@@ -59,7 +59,7 @@ function getTipoLancamentoMeta(tipo) {
         iconClass: 'fa-calendar-day',
         classe: '',
         texto: normalized || 'Lançamento',
-        cor: '#0f766e'
+        cor: '#1d63ed'
     };
 }
 
@@ -448,7 +448,7 @@ async function carregarListaFeriadosPorDia(dataISO) {
                         tipo: 'federal',
                         origem: 'api',
                         icone: '🇧🇷',
-                        cor: '#2563eb'
+                        cor: '#0d9488'
                     });
                 }
             });
@@ -975,7 +975,7 @@ async function carregarListaPessoal() {
             let icone = '📅';
             let classe = '';
             let texto = tipo;
-            let cor = '#0f766e';
+            let cor = '#1d63ed';
             
             if (tipo === 'folga') {
                 icone = '🌸';
@@ -991,7 +991,7 @@ async function carregarListaPessoal() {
                 icone = '🏖️';
                 classe = 'ferias';
                 texto = 'Férias';
-                cor = '#3b82f6';
+                cor = '#0d9488';
             }
 
             const meta = getTipoLancamentoMeta(tipo);
@@ -1187,7 +1187,7 @@ async function carregarListaFeriados() {
                 tipo: 'federal',
                 origem: 'api',
                 icone: '🇧🇷',
-                cor: '#2563eb',
+                cor: '#0d9488',
                 mes: data.getMonth(),
                 ano: data.getFullYear()
             });
@@ -1247,7 +1247,7 @@ async function carregarListaFeriados() {
             const dataFormatada = f.data.toLocaleDateString('pt-BR');
             const isManual = f.origem === 'manual';
             const cor = f.cor;
-            const bgCor = isManual ? '#f59e0b20' : '#2563eb20';
+            const bgCor = isManual ? '#f59e0b20' : '#0d948820';
             const badgeMeta = getFeriadoOrigemMeta(f.tipo, f.origem);
             
             html += `

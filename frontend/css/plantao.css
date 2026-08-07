@@ -86,7 +86,7 @@
 }
 
 .sabado-card.hoje {
-    box-shadow: 0 0 0 2px rgba(15, 118, 110, 0.18);
+    box-shadow: 0 0 0 2px rgba(29, 99, 237, 0.18);
 }
 
 .sabado-card.is-active {
@@ -151,7 +151,7 @@
 
 .sabado-card .badge-plantao {
     position: static;
-    background: #0f766e;
+    background: #1d63ed;
     font-size: 9px;
     padding: 3px 8px;
 }
@@ -163,7 +163,7 @@
     padding: 3px 8px;
     border-radius: 999px;
     background: #e2e8f0;
-    color: #52565c;
+    color: #3a4a5f;
     font-size: 9px;
     font-weight: 700;
     letter-spacing: 0.3px;
@@ -527,7 +527,7 @@
 }
 
 [data-theme="dark"] .sabado-card.passado {
-    background: linear-gradient(180deg, rgba(34, 37, 41, 0.9) 0%, var(--card-dark) 100%);
+    background: linear-gradient(180deg, rgba(18, 30, 46, 0.9) 0%, var(--card-dark) 100%);
 }
 
 [data-theme="dark"] .sabado-card:hover {
@@ -553,7 +553,7 @@
 }
 
 [data-theme="dark"] .badge-historico {
-    background: #3a3e43;
+    background: #263243;
     color: #cbd5e1;
 }
 

@@ -471,7 +471,7 @@
 
 #modalLancamento .btn-primary.full-width:hover {
     transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(15, 118, 110, 0.3);
+    box-shadow: 0 4px 12px rgba(29, 99, 237, 0.3);
 }
 
 #modalLancamento .btn-secondary.full-width {
@@ -509,8 +509,8 @@
 }
 
 #modalLancamento .lancamento-badge.ferias {
-    color: #0d9488;
-    border-color: #ccfbf1;
+    color: #1d63ed;
+    border-color: #dceaff;
     background: #eff6ff;
 }
 
@@ -523,7 +523,7 @@
 
 #modalLancamento .lancamento-badge.estadual {
     color: var(--accent-hover);
-    border-color: #99f6e4;
+    border-color: #bcd7ff;
     background: #f5f3ff;
 }
 
@@ -557,9 +557,9 @@
 }
 
 [data-theme="dark"] #modalLancamento .lancamento-badge.ferias {
-    background: #134e4a;
-    color: #ccfbf1;
-    border-color: #14b8a6;
+    background: #123a7a;
+    color: #dceaff;
+    border-color: #2f80ed;
 }
 
 /* ================= RESPONSIVIDADE ================= */
@@ -582,7 +582,7 @@
 
 /* Cards de feriado da API */
 #modalLancamento .lancamento-card.feriado-api {
-    border-left: 4px solid #0d9488;
+    border-left: 4px solid #1d63ed;
     background: linear-gradient(to right, var(--card), #f0f9ff);
 }
 
@@ -594,8 +594,8 @@
 
 /* Badge para feriados federais */
 #modalLancamento .lancamento-badge.federal {
-    color: #0d9488;
-    border-color: #99f6e4;
+    color: #1d63ed;
+    border-color: #bcd7ff;
     background: #eff6ff;
 }
 
@@ -621,7 +621,7 @@
 
 #modalLancamento .info-horario.locked i {
     font-size: 10px;
-    color: #52565c;
+    color: #3a4a5f;
 }
 
 /* Separador visual na lista */
@@ -651,7 +651,7 @@
 
 /* Tema escuro para feriados */
 [data-theme="dark"] #modalLancamento .lancamento-card.feriado-api {
-    background: linear-gradient(to right, var(--card), #134e4a20);
+    background: linear-gradient(to right, var(--card), #123a7a20);
 }
 
 [data-theme="dark"] #modalLancamento .lancamento-card.feriado-manual {
@@ -659,13 +659,13 @@
 }
 
 [data-theme="dark"] #modalLancamento .lancamento-badge.federal {
-    background: #134e4a;
-    color: #99f6e4;
-    border-color: #0d9488;
+    background: #123a7a;
+    color: #bcd7ff;
+    border-color: #1d63ed;
 }
 
 [data-theme="dark"] #modalLancamento .info-horario.locked {
-    background: #3a3e43;
+    background: #263243;
     color: #94a3b8;
 }
 /* ================= MODAL DE DETALHES DA HORA ================= */

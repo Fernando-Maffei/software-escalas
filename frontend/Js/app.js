@@ -35,7 +35,7 @@ const ESCALA_CORES_PADRAO = [
         label: 'Trabalhando',
         description: 'Faixa de trabalho normal',
         icon: 'briefcase',
-        color: '#14b8a6',
+        color: '#2f80ed',
         cssVar: '--escala-status-trabalhando',
         strongVar: '--escala-status-trabalhando-strong'
     },
@@ -62,7 +62,7 @@ const ESCALA_CORES_PADRAO = [
         label: 'Ferias',
         description: 'Periodo de ferias',
         icon: 'umbrella-beach',
-        color: '#2563eb',
+        color: '#0d9488',
         cssVar: '--escala-status-ferias',
         strongVar: '--escala-status-ferias-strong'
     },
@@ -146,7 +146,7 @@ function normalizeLegacyApiUrl(url) {
     return suffix ? `${getApiBaseUrl()}${suffix}` : getApiBaseUrl();
 }
 
-function normalizarCorHex(value, fallback = '#14b8a6') {
+function normalizarCorHex(value, fallback = '#2f80ed') {
     const raw = String(value || '').trim();
 
     if (/^#[0-9a-fA-F]{6}$/.test(raw)) {
@@ -3669,7 +3669,7 @@ async function carregarListaFeriados() {
                 tipo: 'federal',
                 origem: 'api',
                 icone: '🇧🇷',
-                cor: '#2563eb',
+                cor: '#0d9488',
                 mes: data.getMonth(),
                 ano: data.getFullYear()
             });
@@ -3723,7 +3723,7 @@ async function carregarListaFeriados() {
             const dataFormatada = f.data.toLocaleDateString('pt-BR');
             const isManual = f.origem === 'manual';
             const cor = f.cor;
-            const bgCor = isManual ? '#f59e0b20' : '#2563eb20';
+            const bgCor = isManual ? '#f59e0b20' : '#0d948820';
             
             html += `
                 <div class="lancamento-card" style="border-left: 4px solid ${cor}; margin-bottom: 10px;">
@@ -4455,13 +4455,13 @@ function mostrarDetalhesHora(hora) {
                 
                 ${colaboradoresFerias.length > 0 ? `
                     <div style="margin-bottom: 20px;">
-                        <h4 style="color: #3b82f6; margin-bottom: 10px; display: flex; align-items: center; gap: 8px;">
+                        <h4 style="color: #0d9488; margin-bottom: 10px; display: flex; align-items: center; gap: 8px;">
                             <i class="fas fa-umbrella-beach"></i> Férias (${colaboradoresFerias.length})
                         </h4>
                         <div style="display: flex; flex-direction: column; gap: 6px;">
                             ${colaboradoresFerias.map(nome => `
-                                <div style="background: #dbeafe; padding: 8px 12px; border-radius: 8px; border-left: 4px solid #3b82f6;">
-                                    <i class="fas fa-user" style="color: #0f766e; margin-right: 8px;"></i> ${nome}
+                                <div style="background: #dbeafe; padding: 8px 12px; border-radius: 8px; border-left: 4px solid #0d9488;">
+                                    <i class="fas fa-user" style="color: #1d63ed; margin-right: 8px;"></i> ${nome}
                                 </div>
                             `).join('')}
                         </div>

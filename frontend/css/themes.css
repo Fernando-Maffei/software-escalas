@@ -4,127 +4,99 @@
    Camada UNICA de decisao visual. Toda cor, sombra, raio, espaco, tipo e
    movimento sai daqui. Os componentes NAO devem ter valores crus.
 
-   Organizacao:
-     1) Tokens por FUNCAO (surface/border/text/accent/semantica...)
-     2) Tipografia, espaco, raio, sombra, z-index, movimento
-     3) Apelidos de compatibilidade (nomes antigos -> novos) para o CSS
-        legado continuar funcionando enquanto migramos pagina a pagina.
-     4) Override do tema escuro (so cores/sombras — nunca dimensoes).
+   Identidade: inspirada no Docker Desktop — superficies NAVY profundas no
+   escuro (e claras/limpas no claro) + UM acento AZUL sobrio, chapado, SEM
+   neon e sem gradiente. Semanticas (verde/ambar/vermelho) separadas do
+   acento. Todos os pares texto/fundo passam em AA nos dois temas.
 
-   Identidade: neutros frios bem escalonados + UM acento TEAL (petroleo).
-   Fugimos de proposito do indigo/violeta saturado com gradiente (a cara
-   de "template gerado"). Sem gradientes na identidade; acento chapado.
-   Todos os pares texto/fundo passam em AA (ver ESTILOS.md / tabela).
+   Organizacao:
+     1) Tokens por FUNCAO   2) Tipografia/espaco/raio/sombra/z/movimento
+     3) Apelidos de compatibilidade (nomes antigos -> novos)
+     4) Override do tema escuro (so cores/sombras — nunca dimensoes).
    ===================================================================== */
 
 :root {
-  /* ---- SUPERFICIES (degraus reais de luminancia) ---- */
-  --surface-sunken:  #eceef1;  /* fundo atras dos cards (a pagina) */
-  --surface-base:    #f4f5f7;  /* area de conteudo principal */
+  /* ---- SUPERFICIES (claro: branco/cinza-claro, estilo Docker light) ---- */
+  --surface-sunken:  #eef1f5;  /* fundo atras dos cards (a pagina) */
+  --surface-base:    #f6f8fa;  /* area de conteudo principal */
   --surface-raised:  #ffffff;  /* cards, tabelas, superficies elevadas */
   --surface-overlay: #ffffff;  /* modais, popovers */
 
   /* ---- BORDAS ---- */
-  --border-subtle: #e3e6ea;    /* separadores, bordas em repouso */
-  --border-strong: #8b9299;    /* bordas de componentes interativos (>=3:1) */
+  --border-subtle: #e1e6ec;    /* separadores, bordas em repouso */
+  --border-strong: #8a94a3;    /* bordas de componentes interativos (>=3:1) */
 
   /* ---- TEXTO ---- */
-  --text-primary:   #1a1d21;   /* titulos e corpo */
-  --text-secondary: #454b52;   /* apoio */
-  --text-muted:     #616770;   /* rotulos, legendas (>=4.5:1 na base) */
-  --text-faint:     #8b9299;   /* so texto grande/decorativo */
+  --text-primary:   #1b2430;
+  --text-secondary: #44505f;
+  --text-muted:     #5f6b7a;   /* >=4.5:1 na base */
+  --text-faint:     #8a94a3;   /* so texto grande/decorativo */
 
-  /* ---- ACENTO (acao primaria e estado ativo) — TEAL ---- */
-  --accent:          #0f766e;
-  --accent-hover:    #0b5d56;
-  --accent-active:   #094e48;
+  /* ---- ACENTO (azul Docker) ---- */
+  --accent:          #1d63ed;
+  --accent-hover:    #1857cc;
+  --accent-active:   #1449a8;
   --accent-contrast: #ffffff;  /* texto sobre o acento */
-  --accent-soft:     #d7f2ee;  /* fundo tenue de item selecionado/ativo */
-  --accent-ring:     rgba(15, 118, 110, 0.40); /* anel de foco */
+  --accent-soft:     #dceaff;  /* fundo tenue de item selecionado/ativo */
+  --accent-ring:     rgba(29, 99, 237, 0.40);
 
-  /* ---- SEMANTICAS (independentes do acento; funcionam nos 2 temas) ---- */
-  /* Sucesso = saldo positivo */
+  /* ---- SEMANTICAS (independentes do acento) ---- */
   --success:      #15803d;
   --success-soft: #dcfce7;
   --success-text: #14532d;
-  /* Atencao = intervalo/almoco (preenchimento forte + texto legivel) */
-  --warning:      #f59e0b;     /* preenchimento (ex.: celula de almoco) */
+  --warning:      #f59e0b;
   --warning-soft: #fef3c7;
-  --warning-text: #92500e;     /* texto sobre warning-soft (>=4.5:1) */
-  /* Erro/debito */
+  --warning-text: #92500e;
   --danger:       #b91c1c;
   --danger-soft:  #fee2e2;
   --danger-text:  #7f1d1d;
-  /* Neutro = celula vazia / sem dado */
   --neutral-fill: #e6e8eb;
 
   /* ---- TIPOGRAFIA ---- */
   --font-ui:   "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
   --font-mono: "Consolas", "SF Mono", "Courier New", monospace;
-  /* Escala (6 tamanhos) com line-height por degrau */
   --text-xs:   12px;  --lh-xs:   1.4;
   --text-sm:   13px;  --lh-sm:   1.45;
   --text-base: 14px;  --lh-base: 1.5;
   --text-lg:   16px;  --lh-lg:   1.5;
   --text-xl:   20px;  --lh-xl:   1.35;
   --text-2xl:  26px;  --lh-2xl:  1.25;
-  /* Pesos (3) */
   --weight-regular: 400;
   --weight-medium:  500;
   --weight-semibold: 600;
 
-  /* ---- ESPACO (base 4px; todo padding/gap sai daqui) ---- */
-  --space-1: 4px;
-  --space-2: 8px;
-  --space-3: 12px;
-  --space-4: 16px;
-  --space-5: 20px;
-  --space-6: 24px;
-  --space-7: 32px;
-  --space-8: 40px;
+  /* ---- ESPACO (base 4px) ---- */
+  --space-1: 4px;  --space-2: 8px;  --space-3: 12px; --space-4: 16px;
+  --space-5: 20px; --space-6: 24px; --space-7: 32px; --space-8: 40px;
 
-  /* ---- RAIO (3 papeis + pill) ---- */
-  --radius-sm: 6px;    /* controles: inputs, botoes, chips */
-  --radius-md: 10px;   /* cards, celulas, superficies */
-  --radius-lg: 16px;   /* modais, paineis grandes */
-  --radius-pill: 999px;/* pilulas, avatares redondos */
+  /* ---- RAIO ---- */
+  --radius-sm: 6px; --radius-md: 10px; --radius-lg: 16px; --radius-pill: 999px;
 
-  /* ---- SOMBRA (3 papeis) ---- */
-  --shadow-rest:     0 1px 2px rgba(23, 25, 28, 0.05), 0 1px 1px rgba(23, 25, 28, 0.04);
-  --shadow-raised:   0 4px 10px -2px rgba(23, 25, 28, 0.10), 0 2px 4px -2px rgba(23, 25, 28, 0.06);
-  --shadow-floating: 0 16px 32px -10px rgba(23, 25, 28, 0.20), 0 6px 12px -6px rgba(23, 25, 28, 0.10);
+  /* ---- SOMBRA ---- */
+  --shadow-rest:     0 1px 2px rgba(16, 24, 40, 0.05), 0 1px 1px rgba(16, 24, 40, 0.04);
+  --shadow-raised:   0 4px 10px -2px rgba(16, 24, 40, 0.10), 0 2px 4px -2px rgba(16, 24, 40, 0.06);
+  --shadow-floating: 0 16px 32px -10px rgba(16, 24, 40, 0.20), 0 6px 12px -6px rgba(16, 24, 40, 0.10);
 
-  /* ---- Z-INDEX (escala nomeada) ---- */
-  --z-base:     1;
-  --z-sticky:   100;   /* cabecalho/coluna fixos da tabela */
-  --z-dropdown: 300;
-  --z-overlay:  1000;  /* fundo escurecido de modal */
-  --z-modal:    1100;
-  --z-popover:  1200;
-  --z-toast:    1300;
+  /* ---- Z-INDEX ---- */
+  --z-base: 1; --z-sticky: 100; --z-dropdown: 300;
+  --z-overlay: 1000; --z-modal: 1100; --z-popover: 1200; --z-toast: 1300;
 
-  /* ---- MOVIMENTO (2 duracoes + 1 curva) ---- */
+  /* ---- MOVIMENTO ---- */
   --dur-fast: 120ms;
   --dur:      200ms;
   --ease:     cubic-bezier(0.4, 0, 0.2, 1);
-  /* Conjunto seguro de transicao: SO propriedades que nao causam reflow.
-     Substitui o antigo "transition: all". Componentes que precisem de algo
-     alem disto devem listar as propriedades explicitamente. */
   --transition:
-      background-color var(--dur) var(--ease),
-      border-color     var(--dur) var(--ease),
-      color            var(--dur) var(--ease),
-      box-shadow       var(--dur) var(--ease),
-      transform        var(--dur) var(--ease),
-      opacity          var(--dur) var(--ease),
-      outline-color    var(--dur) var(--ease);
+      background-color var(--dur) var(--ease), border-color var(--dur) var(--ease),
+      color var(--dur) var(--ease), box-shadow var(--dur) var(--ease),
+      transform var(--dur) var(--ease), opacity var(--dur) var(--ease),
+      outline-color var(--dur) var(--ease);
 
-  /* ---- SIDEBAR (superficie escura fixa, nao varia por tema) ---- */
+  /* ---- SIDEBAR (superficie escura navy fixa, estilo Docker) ---- */
   --main-sidebar-width: clamp(280px, 24vw, 340px);
   --main-sidebar-collapsed-width: 88px;
-  --sidebar-bg-top:    #10201f;   /* topo (teal-petroleo bem escuro) */
-  --sidebar-bg-bottom: #0a1413;   /* base */
-  --sidebar-border:    rgba(45, 212, 191, 0.18); /* filete teal sutil */
+  --sidebar-bg-top:    #0e1826;
+  --sidebar-bg-bottom: #0a111c;
+  --sidebar-border:    rgba(56, 122, 234, 0.18);
   --sidebar-text:       #ffffff;
   --sidebar-text-muted: rgba(255, 255, 255, 0.62);
   --sidebar-text-soft:  rgba(255, 255, 255, 0.72);
@@ -133,11 +105,7 @@
   --sidebar-radius: 18px;
   --sidebar-transition: 0.26s ease;
 
-  /* =================================================================
-     APELIDOS DE COMPATIBILIDADE (nomes antigos -> tokens novos)
-     Permitem que o CSS legado herde a paleta nova sem quebrar. Serao
-     removidos conforme cada pagina migrar para os nomes por funcao.
-     ================================================================= */
+  /* ===== APELIDOS DE COMPATIBILIDADE (nomes antigos -> novos) ===== */
   --bg:            var(--surface-sunken);
   --bg-soft:       var(--surface-base);
   --bg-secondary:  var(--surface-base);
@@ -152,58 +120,51 @@
   --text-light:    var(--text-muted);
   --text-lighter:  var(--text-faint);
   --border-dark:   var(--border-strong);
-  /* semanticas antigas -> novas */
-  /* (--success/-soft, --danger/-soft, --warning/-soft ja existem acima) */
-  /* sombras antigas -> 3 papeis novos */
   --shadow-sm: var(--shadow-rest);
   --shadow-md: var(--shadow-rest);
   --shadow-lg: var(--shadow-raised);
   --shadow-xl: var(--shadow-floating);
-  --shadow-primary: 0 4px 10px -2px rgba(15, 118, 110, 0.28);
+  --shadow-primary: 0 4px 10px -2px rgba(29, 99, 237, 0.28);
   --shadow-danger:  0 4px 10px -2px rgba(185, 28, 28, 0.25);
-  /* raio antigo -> novo (xl e full mapeados) */
   --radius-xl:   var(--radius-lg);
   --radius-full: var(--radius-pill);
-  /* pesos antigos -> novos */
   --font-weight-normal:   var(--weight-regular);
   --font-weight-medium:   var(--weight-medium);
   --font-weight-semibold: var(--weight-semibold);
-  --font-weight-bold:     var(--weight-semibold); /* aposentamos o 700 */
-  /* tamanhos antigos que sumiram da escala -> aproximacao */
+  --font-weight-bold:     var(--weight-semibold);
   --text-md:  var(--text-lg);
   --text-3xl: var(--text-2xl);
 }
 
 /* =====================================================================
-   TEMA ESCURO — apenas cores e sombras mudam (nunca dimensoes),
-   para a troca de tema nao causar reflow.
+   TEMA ESCURO — NAVY (estilo Docker Desktop). So cores/sombras mudam.
    ===================================================================== */
 [data-theme="dark"] {
-  /* Superficies */
-  --surface-sunken:  #0f1214;
-  --surface-base:    #15181b;
-  --surface-raised:  #1c2024;
-  --surface-overlay: #22272b;
+  /* Superficies navy profundas */
+  --surface-sunken:  #080d14;
+  --surface-base:    #0c1420;
+  --surface-raised:  #121e2e;
+  --surface-overlay: #17212f;
 
-  /* Bordas */
-  --border-subtle: #2b3036;
-  --border-strong: #6a717a;   /* >=3:1 sobre superficie elevada */
+  /* Bordas navy */
+  --border-subtle: #1e2a3a;
+  --border-strong: #647a92;   /* >=3:1 sobre superficie elevada */
 
-  /* Texto */
-  --text-primary:   #eef0f2;
-  --text-secondary: #c3c8ce;
-  --text-muted:     #949aa1;
-  --text-faint:     #6d747b;
+  /* Texto (cinza-azulado claro) */
+  --text-primary:   #e6edf3;
+  --text-secondary: #b3c0cf;
+  --text-muted:     #8593a3;
+  --text-faint:     #5f6d7d;
 
-  /* Acento (teal mais claro para brilhar no escuro) */
-  --accent:          #2dd4bf;
-  --accent-hover:    #5eead4;
-  --accent-active:   #99f6e4;
-  --accent-contrast: #06201d;  /* texto escuro sobre o teal claro */
-  --accent-soft:     #103b36;
-  --accent-ring:     rgba(45, 212, 191, 0.45);
+  /* Acento azul (botao com texto branco em AA; sobrio, sem neon) */
+  --accent:          #1f6fe0;
+  --accent-hover:    #3f86ef;
+  --accent-active:   #5a9bf5;
+  --accent-contrast: #ffffff;
+  --accent-soft:     #14294a;
+  --accent-ring:     rgba(63, 134, 239, 0.50);
 
-  /* Semanticas */
+  /* Semanticas (tons calmos) */
   --success:      #4ade80;
   --success-soft: #052e16;
   --success-text: #bbf7d0;
@@ -213,16 +174,16 @@
   --danger:       #f87171;
   --danger-soft:  #3a1414;
   --danger-text:  #fecaca;
-  --neutral-fill: #262b30;
+  --neutral-fill: #1c2836;
 
-  /* Sombras — mais suaves/escuras */
-  --shadow-rest:     0 1px 2px rgba(0, 0, 0, 0.35);
-  --shadow-raised:   0 4px 10px -2px rgba(0, 0, 0, 0.45);
-  --shadow-floating: 0 16px 32px -10px rgba(0, 0, 0, 0.55);
-  --shadow-primary:  0 4px 12px -2px rgba(45, 212, 191, 0.30);
+  /* Sombras */
+  --shadow-rest:     0 1px 2px rgba(0, 0, 0, 0.40);
+  --shadow-raised:   0 4px 10px -2px rgba(0, 0, 0, 0.50);
+  --shadow-floating: 0 16px 32px -10px rgba(0, 0, 0, 0.60);
+  --shadow-primary:  0 4px 12px -2px rgba(31, 111, 224, 0.35);
   --shadow-danger:   0 4px 12px -2px rgba(248, 113, 113, 0.28);
 
-  /* Sidebar no escuro: mantem a familia, um pouco mais fundo */
-  --sidebar-bg-top:    #0c1817;
-  --sidebar-bg-bottom: #060d0c;
+  /* Sidebar mais profunda no escuro */
+  --sidebar-bg-top:    #0b1420;
+  --sidebar-bg-bottom: #070d16;
 }
