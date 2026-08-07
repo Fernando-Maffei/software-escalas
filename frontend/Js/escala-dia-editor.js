@@ -724,14 +724,19 @@
         });
     }
 
-    function renderScaleHeaderEscala() {
+    function renderScaleHeaderEscala(items) {
         const header = document.getElementById('timelineHeader');
 
         if (!header) {
             return;
         }
 
-        const bounds = applyScaleHourBoundsCssEscala();
+        // O cabecalho precisa usar os MESMOS itens visiveis (filtrados por
+        // setor) que as linhas. Antes ele usava todos os colaboradores; ao
+        // filtrar um setor de jornada mais curta, o numero de colunas divergia
+        // do das linhas e o cabecalho quebrava para uma segunda linha.
+        const visibleItems = items || filterScaleItemsBySectorEscala(getCurrentScaleState().items || []);
+        const bounds = applyScaleHourBoundsCssEscala(visibleItems);
 
         header.innerHTML = '<div class="timeline-name-header">Colaborador</div>'
             + '<div class="hora-header total-header" title="Total de horas no dia">Total</div>'
@@ -835,6 +840,12 @@
         const items = filterScaleItemsBySectorEscala(state.items || []).sort(compareScaleRecordsEscala);
         const selectedColaboradorId = Number(window.__escalaEditorColaboradorId || 0);
         const bounds = applyScaleHourBoundsCssEscala(items);
+
+        // Regenera o cabecalho a partir dos MESMOS itens filtrados, sempre que
+        // as linhas mudam (troca de setor, edicao, etc.). Isso mantem o numero
+        // de colunas do cabecalho e das linhas identico e evita a quebra de
+        // linha no cabecalho.
+        renderScaleHeaderEscala(items);
 
         body.innerHTML = '';
 
