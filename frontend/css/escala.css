@@ -997,12 +997,12 @@
 
 .legend-color.trabalhando {
     background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
-    box-shadow: 0 2px 8px rgba(29, 99, 237, 0.3);
+    box-shadow: none;
 }
 
 .legend-color.almoco {
     background: linear-gradient(135deg, var(--warning) 0%, #d97706 100%);
-    box-shadow: 0 2px 8px rgba(245, 158, 11, 0.3);
+    box-shadow: none;
 }
 
 .legend-color.fora-expediente {
@@ -1920,7 +1920,7 @@
     display: inline-flex;
     align-items: center;
     gap: 4px;
-    box-shadow: 0 2px 8px rgba(245, 158, 11, 0.3);
+    box-shadow: none;
 }
 
 .plantao-badge i {
