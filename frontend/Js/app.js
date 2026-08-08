@@ -1314,7 +1314,11 @@ function solicitarSenhaModal(options = {}) {
         if (mensagem) mensagem.textContent = options.mensagem || 'Esta ação não pode ser desfeita.';
         input.value = '';
         if (erro) { erro.textContent = ''; erro.hidden = true; }
+        // O CSS mostra os modais via .modal.active (opacity/visibility). Sem
+        // adicionar .active o modal ficava display:flex porem opacity:0 —
+        // invisivel — dando a impressao de que "clicar nao faz nada".
         modal.classList.remove('hidden');
+        modal.classList.add('active');
         setTimeout(() => input.focus(), 50);
 
         let ocupado = false;
@@ -1324,6 +1328,7 @@ function solicitarSenhaModal(options = {}) {
             btnCancelar.removeEventListener('click', aoCancelar);
             if (btnFechar) btnFechar.removeEventListener('click', aoCancelar);
             input.removeEventListener('keydown', aoTeclar);
+            modal.classList.remove('active');
             modal.classList.add('hidden');
         }
 
