@@ -1,6 +1,6 @@
 {
   "name": "app-de-escalas",
-  "version": "1.6.2",
+  "version": "1.6.3",
   "description": "Sistema web para gestao de escalas de trabalho.",
   "productName": "App de Escalas",
   "scripts": {
