@@ -2381,14 +2381,14 @@
 }
 
 .escala-page .toolbar-actions .btn-primary {
-    background: linear-gradient(135deg, #4a9eff, #3f74be);
-    border-color: rgba(74, 158, 255, 0.55);
-    box-shadow: 0 14px 30px rgba(74, 158, 255, 0.32);
+    background: var(--accent);
+    border-color: var(--accent);
+    box-shadow: var(--shadow-rest);
 }
 
 .escala-page .toolbar-actions .btn-primary:hover {
     transform: translateY(-1px);
-    box-shadow: 0 18px 38px rgba(74, 158, 255, 0.42);
+    box-shadow: var(--shadow-raised);
 }
 
 .escala-page .toolbar-actions .btn-secondary:hover {
@@ -2794,9 +2794,9 @@
     content: "";
     top: 10px;
     bottom: 10px;
-    background: linear-gradient(180deg, var(--escala-status-almoco, #fbbf24), var(--escala-status-almoco-strong, #e0973a));
+    background: var(--escala-status-almoco, #fbbf24);
     border-radius: 9px;
-    box-shadow: 0 0 0 2px rgba(188, 215, 255, 0.95), 0 8px 18px rgba(245, 158, 11, 0.25);
+    box-shadow: 0 0 0 2px var(--accent);
 }
 
 .escala-page .timeline-row.is-saving-lunch .timeline-cell.drop-preview::after,
@@ -2825,22 +2825,21 @@
     content: "";
     top: 10px;
     bottom: 10px;
-    background: linear-gradient(180deg, var(--escala-status-trabalhando, var(--accent)), var(--escala-status-trabalhando-strong, var(--accent)));
+    background: var(--escala-status-trabalhando, var(--accent));
     border-radius: 9px;
-    box-shadow: 0 8px 18px rgba(29, 99, 237, 0.28);
 }
 
 .escala-page .timeline-cell.almoco::after {
     content: "";
     top: 10px;
     bottom: 10px;
-    background: linear-gradient(180deg, var(--escala-status-almoco, #fbbf24), var(--escala-status-almoco-strong, #e0973a));
+    background: var(--escala-status-almoco, #fbbf24);
     border-radius: 9px;
-    box-shadow: 0 8px 18px rgba(245, 158, 11, 0.25);
 }
 
 .escala-page .timeline-cell.almoco-ajustado::after {
-    box-shadow: 0 0 0 1px rgba(255, 248, 196, 0.92), 0 8px 18px rgba(245, 158, 11, 0.32);
+    /* estado "almoco ajustado": um filete solido, sem glow/brilho */
+    box-shadow: 0 0 0 1px var(--accent-hover);
 }
 
 .escala-page .timeline-cell.almoco-cadastro-hint::before {
