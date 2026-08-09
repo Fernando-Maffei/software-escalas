@@ -747,6 +747,72 @@
             }).join('');
     }
 
+    // Cobertura por faixa de 30 min: quantas pessoas estao trabalhando (count) e
+    // quantas estao escaladas naquele slot (potential = trabalhando, almoco ou
+    // ausencia parcial). O "vale" e o menor count considerando apenas slots do
+    // expediente (potential > 0), para nao alarmar faixas em que ninguem trabalha.
+    function computeCoverageEscala(items = []) {
+        const list = Array.isArray(items) ? items : [];
+        const bounds = getScaleHourBoundsEscala(list);
+        const slots = [];
+        let min = null;
+        let minSlot = bounds.startSlot;
+
+        for (let index = 0; index < bounds.columnCount; index += 1) {
+            const slot = bounds.startSlot + index;
+            let count = 0;
+            let potential = 0;
+
+            list.forEach((record) => {
+                const className = getCellStateEscala(record, slot).className;
+                const working = hasCellClassEscala(className, 'trabalhando');
+                const onShift = working
+                    || hasCellClassEscala(className, 'almoco')
+                    || hasCellClassEscala(className, 'ausencia-parcial');
+
+                if (working) {
+                    count += 1;
+                }
+
+                if (onShift) {
+                    potential += 1;
+                }
+            });
+
+            slots.push({ slot, count, potential });
+
+            if (potential > 0 && (min === null || count < min)) {
+                min = count;
+                minSlot = slot;
+            }
+        }
+
+        return {
+            bounds,
+            slots,
+            hasExpediente: min !== null,
+            min: min === null ? 0 : min,
+            minSlot,
+            minTime: formatMinutesToTimeEscala(minSlot * SLOT_MINUTES)
+        };
+    }
+
+    function getCoverageLevelEscala(item) {
+        if (item.potential === 0) {
+            return 'total-fora';
+        }
+
+        if (item.count <= 1) {
+            return 'total-critico';
+        }
+
+        if (item.count === 2) {
+            return 'total-atencao';
+        }
+
+        return 'total-ok';
+    }
+
     function renderTotalRowEscala(items) {
         const body = document.getElementById('timelineBody');
 
@@ -754,20 +820,8 @@
             return;
         }
 
-        const bounds = getScaleHourBoundsEscala(items);
-        const counts = Array.from({ length: bounds.columnCount }, (_, index) => ({
-            slot: bounds.startSlot + index,
-            count: 0
-        }));
-
-        items.forEach((record) => {
-            counts.forEach((item) => {
-                if (hasCellClassEscala(getCellStateEscala(record, item.slot).className, 'trabalhando')) {
-                    item.count += 1;
-                }
-            });
-        });
-
+        const coverage = computeCoverageEscala(items);
+        const maxCount = Math.max(1, ...coverage.slots.map((item) => item.count));
         const row = document.createElement('div');
         row.className = 'timeline-row total-row';
         row.innerHTML = `
@@ -776,11 +830,21 @@
                 <span><strong>TRABALHANDO</strong></span>
             </div>
             <div class="timeline-cell total-cell"></div>
-            ${counts.map((item) => `
-                <div class="timeline-cell total-cell" title="${formatMinutesToTimeEscala(item.slot * SLOT_MINUTES)} - ${item.count} trabalhando">
-                    <span class="total-valor">${item.count}</span>
-                </div>
-            `).join('')}
+            ${coverage.slots.map((item) => {
+                const nivel = getCoverageLevelEscala(item);
+                const isVale = coverage.hasExpediente && item.slot === coverage.minSlot && item.potential > 0;
+                const horaLabel = formatMinutesToTimeEscala(item.slot * SLOT_MINUTES);
+                const titulo = item.potential === 0
+                    ? `${horaLabel} - fora do expediente`
+                    : `${horaLabel} - ${item.count} trabalhando`;
+                const altura = Math.max(3, Math.round((item.count / maxCount) * 34));
+                return `
+                    <div class="timeline-cell total-cell cov-col ${nivel}${isVale ? ' total-vale' : ''}" title="${titulo}">
+                        ${item.potential === 0 ? '' : `<span class="cov-bar" style="height:${altura}px"></span>`}
+                        <span class="total-valor">${item.potential === 0 ? '' : item.count}</span>
+                    </div>
+                `;
+            }).join('')}
         `;
 
         body.appendChild(row);
@@ -830,6 +894,293 @@
         `;
     }
 
+    // ===== Previa da semana (faixa dos 7 dias) =====
+    // Uma unica chamada ao relatorio traz a semana inteira. O dia selecionado
+    // sempre usa o estado ao vivo (fica correto ate enquanto se arrasta o
+    // almoco); os demais dias usam o cache da semana. Nao aplica filtro de
+    // setor: a faixa e uma visao geral do dia inteiro.
+    function getWeekBoundsEscala(dataISO) {
+        const iso = toISODateEscala(dataISO) || toISODateEscala(new Date());
+        const weekday = getIsoDayOfWeekEscala(iso);
+        const start = shiftIsoDateEscala(iso, -weekday);
+        const days = [];
+
+        for (let index = 0; index < 7; index += 1) {
+            days.push(shiftIsoDateEscala(start, index));
+        }
+
+        return { start, end: days[6], days };
+    }
+
+    function getWeekStatusEscala(coverage) {
+        if (!coverage || !coverage.hasExpediente) {
+            return 'vazio';
+        }
+
+        if (coverage.min <= 1) {
+            return 'critico';
+        }
+
+        if (coverage.min === 2) {
+            return 'atencao';
+        }
+
+        return 'ok';
+    }
+
+    async function ensureWeekDataEscala(weekStart, weekEnd, { force = false } = {}) {
+        const cache = window.__escalaWeekCache;
+
+        if (!force && cache && cache.key === weekStart) {
+            return cache.byDay;
+        }
+
+        const payload = await window.API.getEscalaRelatorio({ dataInicio: weekStart, dataFim: weekEnd });
+        const items = Array.isArray(payload?.items) ? payload.items : [];
+        const byDay = {};
+
+        items.forEach((item) => {
+            const dia = toISODateEscala(item.dataISO || item.data);
+
+            if (!dia) {
+                return;
+            }
+
+            (byDay[dia] = byDay[dia] || []).push(item);
+        });
+
+        window.__escalaWeekCache = { key: weekStart, byDay };
+        return byDay;
+    }
+
+    const WEEK_STATUS_LABEL_ESCALA = {
+        ok: 'cobertura tranquila',
+        atencao: 'cobertura no limite',
+        critico: 'cobertura no talo',
+        vazio: 'sem expediente',
+        load: 'carregando'
+    };
+
+    function renderWeekStripPillsEscala(dataISO, byDay) {
+        const container = document.getElementById('escalaWeekStrip');
+
+        if (!container) {
+            return;
+        }
+
+        const iso = toISODateEscala(dataISO) || toISODateEscala(new Date());
+        const { days } = getWeekBoundsEscala(iso);
+        const todayISO = toISODateEscala(new Date());
+        const liveState = getCurrentScaleState();
+        const liveISO = toISODateEscala(liveState.dataISO);
+
+        container.innerHTML = days.map((dia) => {
+            let status = 'load';
+
+            if (dia === liveISO) {
+                status = getWeekStatusEscala(computeCoverageEscala(liveState.items || []));
+            } else if (byDay && Object.prototype.hasOwnProperty.call(byDay, dia)) {
+                status = getWeekStatusEscala(computeCoverageEscala(byDay[dia]));
+            } else if (byDay) {
+                status = 'vazio';
+            }
+
+            const dow = (DIA_LABELS[getIsoDayOfWeekEscala(dia)] || '').slice(0, 3);
+            const dayNum = Number(dia.split('-')[2]);
+            const classes = ['escala-week-pill', `is-${status}`];
+
+            if (dia === iso) {
+                classes.push('is-selected');
+            }
+
+            if (dia === todayISO) {
+                classes.push('is-today');
+            }
+
+            return `<button type="button" class="${classes.join(' ')}" data-dia="${dia}" title="${dow} ${dayNum} - ${WEEK_STATUS_LABEL_ESCALA[status] || ''}">
+                <span class="wp-dow">${dow}</span>
+                <span class="wp-num">${dayNum}</span>
+                <span class="wp-dot" aria-hidden="true"></span>
+            </button>`;
+        }).join('');
+
+        container.querySelectorAll('[data-dia]').forEach((button) => {
+            button.addEventListener('click', () => {
+                const dia = button.getAttribute('data-dia');
+
+                if (dia && dia !== toISODateEscala(getCurrentScaleState().dataISO)) {
+                    carregarEscalaSelecionadaEscala(dia);
+                }
+            });
+        });
+    }
+
+    function refreshWeekStripLiveEscala() {
+        const iso = toISODateEscala(getCurrentScaleState().dataISO);
+
+        if (!iso) {
+            return;
+        }
+
+        const { start } = getWeekBoundsEscala(iso);
+        const cache = window.__escalaWeekCache;
+        const byDay = (cache && cache.key === start) ? cache.byDay : null;
+        renderWeekStripPillsEscala(iso, byDay);
+    }
+
+    async function renderWeekStripEscala(dataISO, { force = false } = {}) {
+        const container = document.getElementById('escalaWeekStrip');
+
+        if (!container) {
+            return;
+        }
+
+        const iso = toISODateEscala(dataISO) || toISODateEscala(new Date());
+        const { start, end } = getWeekBoundsEscala(iso);
+        const cache = window.__escalaWeekCache;
+        const cachedByDay = (cache && cache.key === start) ? cache.byDay : null;
+
+        // Render imediato (cache ou placeholder), depois hidrata com o fetch.
+        renderWeekStripPillsEscala(iso, cachedByDay);
+
+        try {
+            const byDay = await ensureWeekDataEscala(start, end, { force });
+            renderWeekStripPillsEscala(iso, byDay);
+        } catch (error) {
+            // A previa e apoio: se o fetch falhar, a tela do dia continua util.
+        }
+    }
+
+    // Barra de contexto do dia: resume os fatos que impactam a escala (quantos
+    // escalados, de ferias, ausentes) e destaca o pior momento de cobertura no
+    // chip de status, usando os mesmos itens visiveis (respeita o filtro de setor).
+    function renderDayContextEscala(state) {
+        const fatosEl = document.getElementById('escalaDaybarFatos');
+        const statusEl = document.getElementById('escalaDaybarStatus');
+
+        if (!fatosEl || !statusEl) {
+            return;
+        }
+
+        const scale = state || getCurrentScaleState();
+        const visibleItems = filterScaleItemsBySectorEscala(scale.items || []);
+
+        let escalados = 0;
+        let folgas = 0;
+        let ferias = 0;
+        let ausencias = 0;
+
+        visibleItems.forEach((record) => {
+            const tipo = String(record.tipo || '').toLowerCase();
+            const partial = getPartialAbsenceEscala(record.colaboradorId, record.dataISO);
+
+            if (tipo === 'ferias' && !partial) {
+                ferias += 1;
+            } else if (tipo === 'folga' && !partial) {
+                folgas += 1;
+            } else if (tipo === 'ausencia' && !partial) {
+                ausencias += 1;
+            } else {
+                escalados += 1;
+            }
+        });
+
+        const fatos = [
+            `<span class="escala-fato escala-fato-escalados"><i class="fas fa-user-clock"></i> ${escalados} escalado${escalados === 1 ? '' : 's'}</span>`
+        ];
+
+        if (ferias > 0) {
+            fatos.push(`<span class="escala-fato escala-fato-ferias"><i class="fas fa-umbrella-beach"></i> ${ferias} de ferias</span>`);
+        }
+
+        if (ausencias > 0) {
+            fatos.push(`<span class="escala-fato escala-fato-ausencia"><i class="fas fa-user-slash"></i> ${ausencias} ausencia${ausencias === 1 ? '' : 's'}</span>`);
+        }
+
+        if (folgas > 0) {
+            fatos.push(`<span class="escala-fato escala-fato-folga"><i class="fas fa-mug-hot"></i> ${folgas} de folga</span>`);
+        }
+
+        fatosEl.innerHTML = fatos.join('');
+
+        const coverage = computeCoverageEscala(visibleItems);
+        let nivel;
+        let icon;
+        let texto;
+
+        if (!coverage.hasExpediente) {
+            nivel = 'is-neutro';
+            icon = 'fa-circle-info';
+            texto = 'Sem expediente neste dia';
+        } else if (coverage.min <= 1) {
+            nivel = 'is-critico';
+            icon = 'fa-triangle-exclamation';
+            texto = `No talo: ${coverage.min} às ${coverage.minTime}`;
+        } else if (coverage.min === 2) {
+            nivel = 'is-atencao';
+            icon = 'fa-circle-exclamation';
+            texto = `Cobertura mínima ${coverage.min} às ${coverage.minTime}`;
+        } else {
+            nivel = 'is-ok';
+            icon = 'fa-circle-check';
+            texto = `Cobertura mínima ${coverage.min}`;
+        }
+
+        statusEl.className = `escala-daybar-status ${nivel}`;
+        statusEl.innerHTML = `<i class="fas ${icon}"></i> <span>${escapeHtmlEscala(texto)}</span>`;
+    }
+
+    // Camada de barras no estilo do prototipo: desenha, por cima das celulas,
+    // uma barra unica e arredondada com o horario, o almoco hachurado e (para
+    // dias sem expediente) uma faixa com o motivo. Fica com pointer-events:none
+    // para o arrasto do almoco continuar acontecendo nas celulas por baixo.
+    function buildRowOverlayEscala(record, bounds) {
+        const spanStart = bounds.startSlot * SLOT_MINUTES;
+        const spanEnd = (bounds.startSlot + bounds.columnCount) * SLOT_MINUTES;
+        const span = Math.max(1, spanEnd - spanStart);
+        const pct = (minutes) => ((minutes - spanStart) / span) * 100;
+        const type = String(record.tipo || '').toLowerCase();
+
+        if (isFullDayOffEscala(record)) {
+            const label = TIPO_LABELS[type] || 'Ausencia';
+            const motivo = record.observacao ? escapeHtmlEscala(record.observacao) : '';
+            const bandType = ['ferias', 'folga', 'ausencia'].includes(type) ? type : 'ausencia';
+            return `<div class="escala-overlay">
+                <div class="escala-band escala-band-${bandType}">
+                    <span class="escala-band-label">${escapeHtmlEscala(label)}</span>
+                    ${motivo ? `<span class="escala-band-motivo">${motivo}</span>` : ''}
+                </div>
+            </div>`;
+        }
+
+        const start = getTimeMinutesEscala(record.horaInicio);
+        const end = getTimeMinutesEscala(record.horaFim);
+
+        if (start === null || end === null || end <= start) {
+            return '<div class="escala-overlay"></div>';
+        }
+
+        const left = Math.max(0, pct(start));
+        const right = Math.min(100, pct(end));
+        const barLabel = `${formatTimeInputEscala(record.horaInicio)}–${formatTimeInputEscala(record.horaFim)}`;
+        const isPlantao = type === 'plantao';
+
+        const lunchStart = getTimeMinutesEscala(record.almocoInicio);
+        const lunchEnd = getTimeMinutesEscala(record.almocoFim);
+        let lunch = '';
+
+        if (lunchStart !== null && lunchEnd !== null && lunchEnd > lunchStart) {
+            lunch = `<div class="escala-lunch" style="left:${pct(lunchStart)}%;width:${pct(lunchEnd) - pct(lunchStart)}%" title="Almoco ${formatTimeInputEscala(record.almocoInicio)}–${formatTimeInputEscala(record.almocoFim)}"></div>`;
+        }
+
+        return `<div class="escala-overlay">
+            <div class="escala-bar${isPlantao ? ' escala-bar-plantao' : ''}" style="left:${left}%;width:${Math.max(0, right - left)}%">
+                <span class="escala-bar-label">${escapeHtmlEscala(barLabel)}</span>
+            </div>
+            ${lunch}
+        </div>`;
+    }
+
     function renderScaleRowsEscala(state) {
         const body = document.getElementById('timelineBody');
 
@@ -851,6 +1202,8 @@
 
         if (items.length === 0) {
             renderScaleEmptyMessageEscala(state.dataISO);
+            renderDayContextEscala(state);
+            refreshWeekStripLiveEscala();
             atualizarBotaoRestaurarAlmocosEscala();
             return;
         }
@@ -866,12 +1219,11 @@
 
             row.innerHTML = `
                 <div class="timeline-name" data-colaborador-id="${record.colaboradorId}" title="Editar escala de ${escapeHtmlEscala(record.colaboradorNome || 'colaborador')}">
-                    <i class="fas fa-user"></i>
                     <span class="timeline-name-main">
                         <strong class="timeline-name-text">${escapeHtmlEscala(record.colaboradorNome || 'Sem nome')}</strong>
                         <span class="timeline-name-meta">
                             ${record.setorNome ? `<small class="escala-sector-chip">${escapeHtmlEscala(record.setorNome)}</small>` : ''}
-                            ${type === 'plantao' ? '<span class="plantao-badge"><i class="fas fa-calendar-check"></i> Plantao</span>' : ''}
+                            ${type === 'plantao' ? '<span class="plantao-badge">Plantao</span>' : ''}
                             ${type !== 'normal' && type !== 'plantao' ? `<small class="escala-dia-tipo">${escapeHtmlEscala(typeLabel)}</small>` : ''}
                         </span>
                     </span>
@@ -887,6 +1239,7 @@
                     const cellState = getCellStateEscala(record, slot);
                     return `<div class="timeline-cell ${cellState.className}" data-slot="${slot}" data-colaborador-id="${record.colaboradorId}"></div>`;
                 }).join('')}
+                ${buildRowOverlayEscala(record, bounds)}
             `;
 
             row.querySelector('.timeline-name')?.addEventListener('click', (event) => {
@@ -900,6 +1253,8 @@
         });
 
         renderTotalRowEscala(items);
+        renderDayContextEscala(state);
+        refreshWeekStripLiveEscala();
         atualizarBotaoRestaurarAlmocosEscala();
     }
 
@@ -1338,6 +1693,7 @@
         renderScaleHeaderEscala();
         renderScaleSectorTabsEscala(state.items || []);
         renderScaleRowsEscala(state);
+        renderWeekStripEscala(normalized);
 
         return state;
     }
@@ -1469,6 +1825,9 @@
             await window.API.aplicarAlmocoPeriodo(payload);
             await atualizarTudo({ silent: true, source: 'escala' });
             abrirEditorNaEscala(colaboradorId);
+            // Aplicacao em lote muda varios dias: refaz a previa da semana.
+            window.__escalaWeekCache = null;
+            renderWeekStripEscala(state.dataISO, { force: true });
 
             if (typeof mostrarToast === 'function') {
                 mostrarToast('Almoco aplicado no periodo com sucesso!', 'success');
@@ -1717,6 +2076,13 @@
                             <i class="fas fa-user-plus"></i> Criar colaborador
                         </button>
                     </div>
+                </div>
+
+                <div class="escala-week-strip" id="escalaWeekStrip" aria-label="Previa da semana"></div>
+
+                <div class="escala-daybar" id="escalaDaybar">
+                    <div class="escala-daybar-fatos" id="escalaDaybarFatos"></div>
+                    <div class="escala-daybar-status" id="escalaDaybarStatus"></div>
                 </div>
 
                 <div class="escala-view-controls">

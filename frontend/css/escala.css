@@ -3651,3 +3651,230 @@
     min-width: 920px;
   }
 }
+
+/* ============================================================
+   Escala do Dia — cobertura inteligente, contexto do dia,
+   previa da semana e timeline estilo prototipo.
+   Portado para a base refatoracao-visual: usa os tokens novos
+   (--accent, --escala-status-*, --card/--text/--border), flat.
+   ============================================================ */
+
+/* ----- Barra de contexto do dia (fatos + status de cobertura) ----- */
+.escala-page .escala-daybar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    padding: 6px 0 10px;
+}
+
+.escala-page .escala-daybar-fatos {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.escala-page .escala-fato {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 11px;
+    border-radius: 999px;
+    font-size: 12.5px;
+    font-weight: 600;
+    border: 1px solid var(--border);
+    background: var(--card);
+    color: var(--text-light);
+    white-space: nowrap;
+}
+
+.escala-page .escala-fato i {
+    font-size: 12px;
+    opacity: 0.9;
+}
+
+.escala-page .escala-fato-escalados {
+    color: var(--accent);
+    border-color: var(--accent);
+    background: var(--accent-soft);
+}
+
+.escala-page .escala-fato-ferias {
+    color: var(--escala-status-ferias, #3f74be);
+    border-color: var(--escala-status-ferias, #3f74be);
+}
+
+.escala-page .escala-fato-ausencia {
+    color: var(--escala-status-ausencia, #ef4444);
+    border-color: var(--escala-status-ausencia, #ef4444);
+}
+
+.escala-page .escala-daybar-status {
+    margin-left: auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 14px;
+    border-radius: 10px;
+    font-size: 13px;
+    font-weight: 700;
+    border: 1px solid transparent;
+}
+
+.escala-page .escala-daybar-status.is-ok { background: rgba(16, 185, 129, 0.16); border-color: rgba(16, 185, 129, 0.3); color: #6ee7b7; }
+.escala-page .escala-daybar-status.is-atencao { background: rgba(245, 158, 11, 0.18); border-color: rgba(245, 158, 11, 0.34); color: #fcd34d; }
+.escala-page .escala-daybar-status.is-critico { background: rgba(239, 68, 68, 0.18); border-color: rgba(239, 68, 68, 0.4); color: #fca5a5; }
+.escala-page .escala-daybar-status.is-neutro { background: var(--card); border-color: var(--border); color: var(--text-light); }
+
+:root:not([data-theme="dark"]) .escala-page .escala-daybar-status.is-ok { color: #0f9d6e; }
+:root:not([data-theme="dark"]) .escala-page .escala-daybar-status.is-atencao { color: #b45309; }
+:root:not([data-theme="dark"]) .escala-page .escala-daybar-status.is-critico { color: #dc2626; }
+
+/* ----- Previa da semana (faixa dos 7 dias) ----- */
+.escala-page .escala-week-strip {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    padding: 4px 0 8px;
+}
+
+.escala-page .escala-week-pill {
+    flex: 1 1 0;
+    min-width: 62px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    padding: 6px 4px 7px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: var(--card);
+    color: var(--text-light);
+    cursor: pointer;
+    font-family: inherit;
+}
+
+.escala-page .escala-week-pill:hover { border-color: var(--accent); }
+.escala-page .escala-week-pill .wp-dow { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; opacity: 0.8; }
+.escala-page .escala-week-pill .wp-num { font-size: 15px; font-weight: 800; color: var(--text); }
+.escala-page .escala-week-pill .wp-dot { width: 7px; height: 7px; border-radius: 50%; background: #94a3b8; }
+.escala-page .escala-week-pill.is-ok .wp-dot { background: #10b981; }
+.escala-page .escala-week-pill.is-atencao .wp-dot { background: #f59e0b; }
+.escala-page .escala-week-pill.is-critico .wp-dot { background: #ef4444; }
+.escala-page .escala-week-pill.is-vazio .wp-dot { background: rgba(148, 163, 184, 0.35); }
+.escala-page .escala-week-pill.is-load .wp-dot { background: rgba(148, 163, 184, 0.35); animation: escalaWeekPulse 1s ease-in-out infinite; }
+.escala-page .escala-week-pill.is-selected { border-color: var(--accent); background: var(--accent-soft); }
+.escala-page .escala-week-pill.is-selected .wp-num { color: var(--accent); }
+.escala-page .escala-week-pill.is-today .wp-dow { color: var(--accent); opacity: 1; }
+
+@keyframes escalaWeekPulse { 0%, 100% { opacity: 0.35; } 50% { opacity: 0.9; } }
+@media (prefers-reduced-motion: reduce) { .escala-page .escala-week-pill.is-load .wp-dot { animation: none; } }
+
+/* ----- Divisor entre a zona de resumo e a de controles ----- */
+.escala-page .escala-view-controls {
+    padding-top: 10px;
+    border-top: 1px solid var(--border);
+}
+
+/* ----- Cobertura inteligente: barrinhas embaixo (mini grafico) ----- */
+.escala-page .timeline-row.total-row .timeline-cell.total-cell.cov-col {
+    flex-direction: column;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 3px;
+    padding: 6px 2px 7px;
+}
+
+.escala-page .timeline-row.total-row .cov-col .cov-bar { width: 62%; min-height: 3px; border-radius: 3px 3px 0 0; background: #94a3b8; }
+.escala-page .timeline-row.total-row .cov-col.total-ok .cov-bar { background: #10b981; }
+.escala-page .timeline-row.total-row .cov-col.total-atencao .cov-bar { background: #f59e0b; }
+.escala-page .timeline-row.total-row .cov-col.total-critico .cov-bar { background: #ef4444; }
+
+.escala-page .timeline-row.total-row .cov-col .total-valor {
+    width: auto;
+    min-width: 0;
+    height: auto;
+    padding: 0;
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text-light);
+}
+
+.escala-page .timeline-row.total-row .cov-col.total-critico .total-valor { color: #ef4444; }
+.escala-page .timeline-row.total-row .cov-col.total-vale { background: rgba(239, 68, 68, 0.1); border-radius: 6px; }
+
+/* ----- Timeline estilo prototipo: barras por cima das celulas ----- */
+/* Esconde o desenho por-celula; o estado vira uma barra unica no overlay. */
+.escala-page .timeline-row:not(.total-row):not(.mensagem-row) .timeline-cell.trabalhando::after,
+.escala-page .timeline-row:not(.total-row):not(.mensagem-row) .timeline-cell.almoco::after,
+.escala-page .timeline-row:not(.total-row):not(.mensagem-row) .timeline-cell.almoco::before,
+.escala-page .timeline-row:not(.total-row):not(.mensagem-row) .timeline-cell.folga::after,
+.escala-page .timeline-row:not(.total-row):not(.mensagem-row) .timeline-cell.ferias::after,
+.escala-page .timeline-row:not(.total-row):not(.mensagem-row) .timeline-cell.ausencia::after,
+.escala-page .timeline-row:not(.total-row):not(.mensagem-row) .timeline-cell.ausencia-parcial::after {
+    display: none;
+}
+
+.escala-page .timeline-row { position: relative; }
+
+.escala-page .timeline-row .escala-overlay {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    /* Comeca em nome+total e cobre a area de horas usando as MESMAS variaveis
+       da grade -> alinha exatamente com as colunas em qualquer largura. */
+    left: calc(var(--esc-col-nome, 240px) + var(--esc-col-total, 80px));
+    width: calc(var(--escala-hour-columns, 12) * var(--esc-col-hora, 42px));
+    pointer-events: none;
+    z-index: 3;
+}
+
+.escala-page .escala-bar {
+    position: absolute;
+    top: 9px;
+    bottom: 9px;
+    border-radius: 9px;
+    background: var(--escala-status-trabalhando, var(--accent));
+    display: flex;
+    align-items: center;
+    padding: 0 10px;
+    color: #fff;
+    font-size: 11.5px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    white-space: nowrap;
+    overflow: hidden;
+}
+
+.escala-page .escala-bar-plantao { background: #0ea5a4; }
+
+.escala-page .escala-lunch {
+    position: absolute;
+    top: 7px;
+    bottom: 7px;
+    border-radius: 7px;
+    background: repeating-linear-gradient(45deg, var(--escala-status-almoco, #fbbf24) 0, var(--escala-status-almoco, #fbbf24) 5px, #c77f0a 5px, #c77f0a 10px);
+    border: 1px solid rgba(0, 0, 0, 0.14);
+    z-index: 2;
+}
+
+.escala-page .escala-band {
+    position: absolute;
+    inset: 8px 4px;
+    border-radius: 9px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 14px;
+    font-size: 12.5px;
+    font-weight: 700;
+    color: #fff;
+}
+
+.escala-page .escala-band-motivo { margin-left: auto; font-weight: 500; opacity: 0.85; font-size: 11px; }
+.escala-page .escala-band-ferias { background: var(--escala-status-ferias, #3f74be); }
+.escala-page .escala-band-ausencia { background: var(--escala-status-ausencia, #ef4444); }
+.escala-page .escala-band-folga { background: var(--escala-status-folga, #94a3b8); color: #1e293b; }
