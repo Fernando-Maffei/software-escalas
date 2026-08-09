@@ -742,6 +742,72 @@
             }).join('');
     }
 
+    // Cobertura por faixa de 30 min: quantas pessoas estao trabalhando (count) e
+    // quantas estao escaladas naquele slot (potential = trabalhando, almoco ou
+    // ausencia parcial). O "vale" e o menor count considerando apenas slots do
+    // expediente (potential > 0), para nao alarmar faixas em que ninguem trabalha.
+    function computeCoverageEscala(items = []) {
+        const list = Array.isArray(items) ? items : [];
+        const bounds = getScaleHourBoundsEscala(list);
+        const slots = [];
+        let min = null;
+        let minSlot = bounds.startSlot;
+
+        for (let index = 0; index < bounds.columnCount; index += 1) {
+            const slot = bounds.startSlot + index;
+            let count = 0;
+            let potential = 0;
+
+            list.forEach((record) => {
+                const className = getCellStateEscala(record, slot).className;
+                const working = hasCellClassEscala(className, 'trabalhando');
+                const onShift = working
+                    || hasCellClassEscala(className, 'almoco')
+                    || hasCellClassEscala(className, 'ausencia-parcial');
+
+                if (working) {
+                    count += 1;
+                }
+
+                if (onShift) {
+                    potential += 1;
+                }
+            });
+
+            slots.push({ slot, count, potential });
+
+            if (potential > 0 && (min === null || count < min)) {
+                min = count;
+                minSlot = slot;
+            }
+        }
+
+        return {
+            bounds,
+            slots,
+            hasExpediente: min !== null,
+            min: min === null ? 0 : min,
+            minSlot,
+            minTime: formatMinutesToTimeEscala(minSlot * SLOT_MINUTES)
+        };
+    }
+
+    function getCoverageLevelEscala(item) {
+        if (item.potential === 0) {
+            return 'total-fora';
+        }
+
+        if (item.count <= 1) {
+            return 'total-critico';
+        }
+
+        if (item.count === 2) {
+            return 'total-atencao';
+        }
+
+        return 'total-ok';
+    }
+
     function renderTotalRowEscala(items) {
         const body = document.getElementById('timelineBody');
 
@@ -749,20 +815,7 @@
             return;
         }
 
-        const bounds = getScaleHourBoundsEscala(items);
-        const counts = Array.from({ length: bounds.columnCount }, (_, index) => ({
-            slot: bounds.startSlot + index,
-            count: 0
-        }));
-
-        items.forEach((record) => {
-            counts.forEach((item) => {
-                if (hasCellClassEscala(getCellStateEscala(record, item.slot).className, 'trabalhando')) {
-                    item.count += 1;
-                }
-            });
-        });
-
+        const coverage = computeCoverageEscala(items);
         const row = document.createElement('div');
         row.className = 'timeline-row total-row';
         row.innerHTML = `
@@ -771,11 +824,19 @@
                 <span><strong>TRABALHANDO</strong></span>
             </div>
             <div class="timeline-cell total-cell"></div>
-            ${counts.map((item) => `
-                <div class="timeline-cell total-cell" title="${formatMinutesToTimeEscala(item.slot * SLOT_MINUTES)} - ${item.count} trabalhando">
-                    <span class="total-valor">${item.count}</span>
-                </div>
-            `).join('')}
+            ${coverage.slots.map((item) => {
+                const nivel = getCoverageLevelEscala(item);
+                const isVale = coverage.hasExpediente && item.slot === coverage.minSlot && item.potential > 0;
+                const horaLabel = formatMinutesToTimeEscala(item.slot * SLOT_MINUTES);
+                const titulo = item.potential === 0
+                    ? `${horaLabel} - fora do expediente`
+                    : `${horaLabel} - ${item.count} trabalhando`;
+                return `
+                    <div class="timeline-cell total-cell ${nivel}${isVale ? ' total-vale' : ''}" title="${titulo}">
+                        <span class="total-valor">${item.potential === 0 ? '' : item.count}</span>
+                    </div>
+                `;
+            }).join('')}
         `;
 
         body.appendChild(row);
