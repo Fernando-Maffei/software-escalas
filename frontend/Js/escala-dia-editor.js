@@ -886,6 +886,163 @@
         `;
     }
 
+    // ===== Previa da semana (faixa dos 7 dias) =====
+    // Uma unica chamada ao relatorio traz a semana inteira. O dia selecionado
+    // sempre usa o estado ao vivo (fica correto ate enquanto se arrasta o
+    // almoco); os demais dias usam o cache da semana. Nao aplica filtro de
+    // setor: a faixa e uma visao geral do dia inteiro.
+    function getWeekBoundsEscala(dataISO) {
+        const iso = toISODateEscala(dataISO) || toISODateEscala(new Date());
+        const weekday = getIsoDayOfWeekEscala(iso);
+        const start = shiftIsoDateEscala(iso, -weekday);
+        const days = [];
+
+        for (let index = 0; index < 7; index += 1) {
+            days.push(shiftIsoDateEscala(start, index));
+        }
+
+        return { start, end: days[6], days };
+    }
+
+    function getWeekStatusEscala(coverage) {
+        if (!coverage || !coverage.hasExpediente) {
+            return 'vazio';
+        }
+
+        if (coverage.min <= 1) {
+            return 'critico';
+        }
+
+        if (coverage.min === 2) {
+            return 'atencao';
+        }
+
+        return 'ok';
+    }
+
+    async function ensureWeekDataEscala(weekStart, weekEnd, { force = false } = {}) {
+        const cache = window.__escalaWeekCache;
+
+        if (!force && cache && cache.key === weekStart) {
+            return cache.byDay;
+        }
+
+        const payload = await window.API.getEscalaRelatorio({ dataInicio: weekStart, dataFim: weekEnd });
+        const items = Array.isArray(payload?.items) ? payload.items : [];
+        const byDay = {};
+
+        items.forEach((item) => {
+            const dia = toISODateEscala(item.dataISO || item.data);
+
+            if (!dia) {
+                return;
+            }
+
+            (byDay[dia] = byDay[dia] || []).push(item);
+        });
+
+        window.__escalaWeekCache = { key: weekStart, byDay };
+        return byDay;
+    }
+
+    const WEEK_STATUS_LABEL_ESCALA = {
+        ok: 'cobertura tranquila',
+        atencao: 'cobertura no limite',
+        critico: 'cobertura no talo',
+        vazio: 'sem expediente',
+        load: 'carregando'
+    };
+
+    function renderWeekStripPillsEscala(dataISO, byDay) {
+        const container = document.getElementById('escalaWeekStrip');
+
+        if (!container) {
+            return;
+        }
+
+        const iso = toISODateEscala(dataISO) || toISODateEscala(new Date());
+        const { days } = getWeekBoundsEscala(iso);
+        const todayISO = toISODateEscala(new Date());
+        const liveState = getCurrentScaleState();
+        const liveISO = toISODateEscala(liveState.dataISO);
+
+        container.innerHTML = days.map((dia) => {
+            let status = 'load';
+
+            if (dia === liveISO) {
+                status = getWeekStatusEscala(computeCoverageEscala(liveState.items || []));
+            } else if (byDay && Object.prototype.hasOwnProperty.call(byDay, dia)) {
+                status = getWeekStatusEscala(computeCoverageEscala(byDay[dia]));
+            } else if (byDay) {
+                status = 'vazio';
+            }
+
+            const dow = (DIA_LABELS[getIsoDayOfWeekEscala(dia)] || '').slice(0, 3);
+            const dayNum = Number(dia.split('-')[2]);
+            const classes = ['escala-week-pill', `is-${status}`];
+
+            if (dia === iso) {
+                classes.push('is-selected');
+            }
+
+            if (dia === todayISO) {
+                classes.push('is-today');
+            }
+
+            return `<button type="button" class="${classes.join(' ')}" data-dia="${dia}" title="${dow} ${dayNum} - ${WEEK_STATUS_LABEL_ESCALA[status] || ''}">
+                <span class="wp-dow">${dow}</span>
+                <span class="wp-num">${dayNum}</span>
+                <span class="wp-dot" aria-hidden="true"></span>
+            </button>`;
+        }).join('');
+
+        container.querySelectorAll('[data-dia]').forEach((button) => {
+            button.addEventListener('click', () => {
+                const dia = button.getAttribute('data-dia');
+
+                if (dia && dia !== toISODateEscala(getCurrentScaleState().dataISO)) {
+                    carregarEscalaSelecionadaEscala(dia);
+                }
+            });
+        });
+    }
+
+    function refreshWeekStripLiveEscala() {
+        const iso = toISODateEscala(getCurrentScaleState().dataISO);
+
+        if (!iso) {
+            return;
+        }
+
+        const { start } = getWeekBoundsEscala(iso);
+        const cache = window.__escalaWeekCache;
+        const byDay = (cache && cache.key === start) ? cache.byDay : null;
+        renderWeekStripPillsEscala(iso, byDay);
+    }
+
+    async function renderWeekStripEscala(dataISO, { force = false } = {}) {
+        const container = document.getElementById('escalaWeekStrip');
+
+        if (!container) {
+            return;
+        }
+
+        const iso = toISODateEscala(dataISO) || toISODateEscala(new Date());
+        const { start, end } = getWeekBoundsEscala(iso);
+        const cache = window.__escalaWeekCache;
+        const cachedByDay = (cache && cache.key === start) ? cache.byDay : null;
+
+        // Render imediato (cache ou placeholder), depois hidrata com o fetch.
+        renderWeekStripPillsEscala(iso, cachedByDay);
+
+        try {
+            const byDay = await ensureWeekDataEscala(start, end, { force });
+            renderWeekStripPillsEscala(iso, byDay);
+        } catch (error) {
+            // A previa e apoio: se o fetch falhar, a tela do dia continua util.
+        }
+    }
+
     // Barra de contexto do dia: resume os fatos que impactam a escala (quantos
     // escalados, de ferias, ausentes) e destaca o pior momento de cobertura no
     // chip de status, usando os mesmos itens visiveis (respeita o filtro de setor).
@@ -981,6 +1138,7 @@
         if (items.length === 0) {
             renderScaleEmptyMessageEscala(state.dataISO);
             renderDayContextEscala(state);
+            refreshWeekStripLiveEscala();
             atualizarBotaoRestaurarAlmocosEscala();
             return;
         }
@@ -1031,6 +1189,7 @@
 
         renderTotalRowEscala(items);
         renderDayContextEscala(state);
+        refreshWeekStripLiveEscala();
         atualizarBotaoRestaurarAlmocosEscala();
     }
 
@@ -1469,6 +1628,7 @@
         renderScaleHeaderEscala();
         renderScaleSectorTabsEscala(state.items || []);
         renderScaleRowsEscala(state);
+        renderWeekStripEscala(normalized);
 
         return state;
     }
@@ -1600,6 +1760,9 @@
             await window.API.aplicarAlmocoPeriodo(payload);
             await atualizarTudo({ silent: true, source: 'escala' });
             abrirEditorNaEscala(colaboradorId);
+            // Aplicacao em lote muda varios dias: refaz a previa da semana.
+            window.__escalaWeekCache = null;
+            renderWeekStripEscala(state.dataISO, { force: true });
 
             if (typeof mostrarToast === 'function') {
                 mostrarToast('Almoco aplicado no periodo com sucesso!', 'success');
@@ -1846,6 +2009,8 @@
                         </button>
                     </div>
                 </div>
+
+                <div class="escala-week-strip" id="escalaWeekStrip" aria-label="Previa da semana"></div>
 
                 <div class="escala-daybar" id="escalaDaybar">
                     <div class="escala-daybar-fatos" id="escalaDaybarFatos"></div>

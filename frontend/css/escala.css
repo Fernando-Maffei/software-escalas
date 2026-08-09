@@ -2206,6 +2206,118 @@
     color: #dc2626;
 }
 
+/* ===== Previa da semana (faixa dos 7 dias) ===== */
+.escala-page .escala-week-strip {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    padding: 4px 0 8px;
+}
+
+.escala-page .escala-week-pill {
+    flex: 1 1 0;
+    min-width: 62px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    padding: 6px 4px 7px;
+    border-radius: var(--radius-md, 12px);
+    border: 1px solid rgba(148, 163, 184, 0.2);
+    background: rgba(148, 163, 184, 0.08);
+    color: var(--text-light);
+    cursor: pointer;
+    font-family: inherit;
+    transition: var(--transition);
+}
+
+.escala-page .escala-week-pill:hover {
+    border-color: rgba(124, 124, 255, 0.4);
+    background: rgba(124, 124, 255, 0.1);
+}
+
+.escala-page .escala-week-pill .wp-dow {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    opacity: 0.8;
+}
+
+.escala-page .escala-week-pill .wp-num {
+    font-size: 15px;
+    font-weight: 800;
+    letter-spacing: -0.01em;
+    color: var(--text);
+}
+
+.escala-page .escala-week-pill .wp-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: rgba(148, 163, 184, 0.5);
+}
+
+.escala-page .escala-week-pill.is-ok .wp-dot {
+    background: #10b981;
+}
+
+.escala-page .escala-week-pill.is-atencao .wp-dot {
+    background: #f59e0b;
+}
+
+.escala-page .escala-week-pill.is-critico .wp-dot {
+    background: #ef4444;
+}
+
+.escala-page .escala-week-pill.is-vazio .wp-dot {
+    background: rgba(148, 163, 184, 0.35);
+}
+
+.escala-page .escala-week-pill.is-load .wp-dot {
+    background: rgba(148, 163, 184, 0.35);
+    animation: escalaWeekPulse 1s ease-in-out infinite;
+}
+
+.escala-page .escala-week-pill.is-selected {
+    border-color: rgba(124, 124, 255, 0.7);
+    background: rgba(124, 124, 255, 0.16);
+}
+
+.escala-page .escala-week-pill.is-selected .wp-num {
+    color: #c7d2fe;
+}
+
+.escala-page .escala-week-pill.is-today .wp-dow {
+    color: #a5b4fc;
+    opacity: 1;
+}
+
+@keyframes escalaWeekPulse {
+    0%, 100% { opacity: 0.35; }
+    50% { opacity: 0.9; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .escala-page .escala-week-pill.is-load .wp-dot {
+        animation: none;
+    }
+}
+
+/* Tema claro */
+:root:not([data-theme="dark"]) .escala-page .escala-week-pill.is-selected {
+    border-color: rgba(99, 102, 241, 0.6);
+    background: rgba(99, 102, 241, 0.1);
+}
+
+:root:not([data-theme="dark"]) .escala-page .escala-week-pill.is-selected .wp-num {
+    color: var(--primary-dark);
+}
+
+:root:not([data-theme="dark"]) .escala-page .escala-week-pill.is-today .wp-dow {
+    color: var(--primary);
+}
+
 .escala-titulo {
     margin: 0;
     font-size: var(--text-xl, 20px);
