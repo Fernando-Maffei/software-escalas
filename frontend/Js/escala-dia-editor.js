@@ -886,6 +886,85 @@
         `;
     }
 
+    // Barra de contexto do dia: resume os fatos que impactam a escala (quantos
+    // escalados, de ferias, ausentes) e destaca o pior momento de cobertura no
+    // chip de status, usando os mesmos itens visiveis (respeita o filtro de setor).
+    function renderDayContextEscala(state) {
+        const fatosEl = document.getElementById('escalaDaybarFatos');
+        const statusEl = document.getElementById('escalaDaybarStatus');
+
+        if (!fatosEl || !statusEl) {
+            return;
+        }
+
+        const scale = state || getCurrentScaleState();
+        const visibleItems = filterScaleItemsBySectorEscala(scale.items || []);
+
+        let escalados = 0;
+        let folgas = 0;
+        let ferias = 0;
+        let ausencias = 0;
+
+        visibleItems.forEach((record) => {
+            const tipo = String(record.tipo || '').toLowerCase();
+            const partial = getPartialAbsenceEscala(record.colaboradorId, record.dataISO);
+
+            if (tipo === 'ferias' && !partial) {
+                ferias += 1;
+            } else if (tipo === 'folga' && !partial) {
+                folgas += 1;
+            } else if (tipo === 'ausencia' && !partial) {
+                ausencias += 1;
+            } else {
+                escalados += 1;
+            }
+        });
+
+        const fatos = [
+            `<span class="escala-fato escala-fato-escalados"><i class="fas fa-user-clock"></i> ${escalados} escalado${escalados === 1 ? '' : 's'}</span>`
+        ];
+
+        if (ferias > 0) {
+            fatos.push(`<span class="escala-fato escala-fato-ferias"><i class="fas fa-umbrella-beach"></i> ${ferias} de ferias</span>`);
+        }
+
+        if (ausencias > 0) {
+            fatos.push(`<span class="escala-fato escala-fato-ausencia"><i class="fas fa-user-slash"></i> ${ausencias} ausencia${ausencias === 1 ? '' : 's'}</span>`);
+        }
+
+        if (folgas > 0) {
+            fatos.push(`<span class="escala-fato escala-fato-folga"><i class="fas fa-mug-hot"></i> ${folgas} de folga</span>`);
+        }
+
+        fatosEl.innerHTML = fatos.join('');
+
+        const coverage = computeCoverageEscala(visibleItems);
+        let nivel;
+        let icon;
+        let texto;
+
+        if (!coverage.hasExpediente) {
+            nivel = 'is-neutro';
+            icon = 'fa-circle-info';
+            texto = 'Sem expediente neste dia';
+        } else if (coverage.min <= 1) {
+            nivel = 'is-critico';
+            icon = 'fa-triangle-exclamation';
+            texto = `No talo: ${coverage.min} às ${coverage.minTime}`;
+        } else if (coverage.min === 2) {
+            nivel = 'is-atencao';
+            icon = 'fa-circle-exclamation';
+            texto = `Cobertura mínima ${coverage.min} às ${coverage.minTime}`;
+        } else {
+            nivel = 'is-ok';
+            icon = 'fa-circle-check';
+            texto = `Cobertura mínima ${coverage.min}`;
+        }
+
+        statusEl.className = `escala-daybar-status ${nivel}`;
+        statusEl.innerHTML = `<i class="fas ${icon}"></i> <span>${escapeHtmlEscala(texto)}</span>`;
+    }
+
     function renderScaleRowsEscala(state) {
         const body = document.getElementById('timelineBody');
 
@@ -901,6 +980,7 @@
 
         if (items.length === 0) {
             renderScaleEmptyMessageEscala(state.dataISO);
+            renderDayContextEscala(state);
             atualizarBotaoRestaurarAlmocosEscala();
             return;
         }
@@ -950,6 +1030,7 @@
         });
 
         renderTotalRowEscala(items);
+        renderDayContextEscala(state);
         atualizarBotaoRestaurarAlmocosEscala();
     }
 
@@ -1764,6 +1845,11 @@
                             <i class="fas fa-plus"></i> Novo lancamento
                         </button>
                     </div>
+                </div>
+
+                <div class="escala-daybar" id="escalaDaybar">
+                    <div class="escala-daybar-fatos" id="escalaDaybarFatos"></div>
+                    <div class="escala-daybar-status" id="escalaDaybarStatus"></div>
                 </div>
 
                 <div class="escala-view-controls">
