@@ -2318,6 +2318,13 @@
     color: var(--primary);
 }
 
+/* Separa a zona de resumo (semana + fatos do dia) da zona de controles
+   (setor, ordenacao, densidade), agora que o painel fixo empilha mais faixas. */
+.escala-page .escala-view-controls {
+    padding-top: 10px;
+    border-top: 1px solid rgba(148, 163, 184, 0.14);
+}
+
 .escala-titulo {
     margin: 0;
     font-size: var(--text-xl, 20px);
