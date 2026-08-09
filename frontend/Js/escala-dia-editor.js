@@ -816,6 +816,7 @@
         }
 
         const coverage = computeCoverageEscala(items);
+        const maxCount = Math.max(1, ...coverage.slots.map((item) => item.count));
         const row = document.createElement('div');
         row.className = 'timeline-row total-row';
         row.innerHTML = `
@@ -831,8 +832,10 @@
                 const titulo = item.potential === 0
                     ? `${horaLabel} - fora do expediente`
                     : `${horaLabel} - ${item.count} trabalhando`;
+                const altura = Math.max(3, Math.round((item.count / maxCount) * 34));
                 return `
-                    <div class="timeline-cell total-cell ${nivel}${isVale ? ' total-vale' : ''}" title="${titulo}">
+                    <div class="timeline-cell total-cell cov-col ${nivel}${isVale ? ' total-vale' : ''}" title="${titulo}">
+                        ${item.potential === 0 ? '' : `<span class="cov-bar" style="height:${altura}px"></span>`}
                         <span class="total-valor">${item.potential === 0 ? '' : item.count}</span>
                     </div>
                 `;
@@ -1122,6 +1125,57 @@
         statusEl.innerHTML = `<i class="fas ${icon}"></i> <span>${escapeHtmlEscala(texto)}</span>`;
     }
 
+    // Camada de barras no estilo do prototipo: desenha, por cima das celulas,
+    // uma barra unica e arredondada com o horario, o almoco hachurado e (para
+    // dias sem expediente) uma faixa com o motivo. Fica com pointer-events:none
+    // para o arrasto do almoco continuar acontecendo nas celulas por baixo.
+    function buildRowOverlayEscala(record, bounds) {
+        const spanStart = bounds.startSlot * SLOT_MINUTES;
+        const spanEnd = (bounds.startSlot + bounds.columnCount) * SLOT_MINUTES;
+        const span = Math.max(1, spanEnd - spanStart);
+        const pct = (minutes) => ((minutes - spanStart) / span) * 100;
+        const type = String(record.tipo || '').toLowerCase();
+
+        if (isFullDayOffEscala(record)) {
+            const label = TIPO_LABELS[type] || 'Ausencia';
+            const motivo = record.observacao ? escapeHtmlEscala(record.observacao) : '';
+            const bandType = ['ferias', 'folga', 'ausencia'].includes(type) ? type : 'ausencia';
+            return `<div class="escala-overlay">
+                <div class="escala-band escala-band-${bandType}">
+                    <span class="escala-band-label">${escapeHtmlEscala(label)}</span>
+                    ${motivo ? `<span class="escala-band-motivo">${motivo}</span>` : ''}
+                </div>
+            </div>`;
+        }
+
+        const start = getTimeMinutesEscala(record.horaInicio);
+        const end = getTimeMinutesEscala(record.horaFim);
+
+        if (start === null || end === null || end <= start) {
+            return '<div class="escala-overlay"></div>';
+        }
+
+        const left = Math.max(0, pct(start));
+        const right = Math.min(100, pct(end));
+        const barLabel = `${formatTimeInputEscala(record.horaInicio)}–${formatTimeInputEscala(record.horaFim)}`;
+        const isPlantao = type === 'plantao';
+
+        const lunchStart = getTimeMinutesEscala(record.almocoInicio);
+        const lunchEnd = getTimeMinutesEscala(record.almocoFim);
+        let lunch = '';
+
+        if (lunchStart !== null && lunchEnd !== null && lunchEnd > lunchStart) {
+            lunch = `<div class="escala-lunch" style="left:${pct(lunchStart)}%;width:${pct(lunchEnd) - pct(lunchStart)}%" title="Almoco ${formatTimeInputEscala(record.almocoInicio)}–${formatTimeInputEscala(record.almocoFim)}"></div>`;
+        }
+
+        return `<div class="escala-overlay">
+            <div class="escala-bar${isPlantao ? ' escala-bar-plantao' : ''}" style="left:${left}%;width:${Math.max(0, right - left)}%">
+                <span class="escala-bar-label">${escapeHtmlEscala(barLabel)}</span>
+            </div>
+            ${lunch}
+        </div>`;
+    }
+
     function renderScaleRowsEscala(state) {
         const body = document.getElementById('timelineBody');
 
@@ -1154,12 +1208,11 @@
 
             row.innerHTML = `
                 <div class="timeline-name" data-colaborador-id="${record.colaboradorId}" title="Editar escala de ${escapeHtmlEscala(record.colaboradorNome || 'colaborador')}">
-                    <i class="fas fa-user"></i>
                     <span class="timeline-name-main">
                         <strong class="timeline-name-text">${escapeHtmlEscala(record.colaboradorNome || 'Sem nome')}</strong>
                         <span class="timeline-name-meta">
                             ${record.setorNome ? `<small class="escala-sector-chip">${escapeHtmlEscala(record.setorNome)}</small>` : ''}
-                            ${type === 'plantao' ? '<span class="plantao-badge"><i class="fas fa-calendar-check"></i> Plantao</span>' : ''}
+                            ${type === 'plantao' ? '<span class="plantao-badge">Plantao</span>' : ''}
                             ${type !== 'normal' && type !== 'plantao' ? `<small class="escala-dia-tipo">${escapeHtmlEscala(typeLabel)}</small>` : ''}
                         </span>
                     </span>
@@ -1175,6 +1228,7 @@
                     const cellState = getCellStateEscala(record, slot);
                     return `<div class="timeline-cell ${cellState.className}" data-slot="${slot}" data-colaborador-id="${record.colaboradorId}"></div>`;
                 }).join('')}
+                ${buildRowOverlayEscala(record, bounds)}
             `;
 
             row.querySelector('.timeline-name')?.addEventListener('click', (event) => {

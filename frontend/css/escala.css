@@ -2814,6 +2814,7 @@
 }
 
 .escala-page .timeline-row {
+    position: relative;
     margin-bottom: 0;
     border-radius: 0;
     overflow: visible;
@@ -3912,4 +3913,128 @@
   .timeline-container {
     min-width: 920px;
   }
+}
+
+/* ===== Timeline no estilo do prototipo: barras por cima das celulas ===== */
+/* As celulas continuam existindo (para o arrasto do almoco, a contagem de
+   cobertura e as linhas de grade), mas o desenho do estado agora e uma barra
+   unica e arredondada por linha, desenhada nesta camada de overlay. */
+.escala-page .timeline-row:not(.total-row):not(.mensagem-row) .timeline-cell.trabalhando::after,
+.escala-page .timeline-row:not(.total-row):not(.mensagem-row) .timeline-cell.almoco::after,
+.escala-page .timeline-row:not(.total-row):not(.mensagem-row) .timeline-cell.almoco::before,
+.escala-page .timeline-row:not(.total-row):not(.mensagem-row) .timeline-cell.folga::after,
+.escala-page .timeline-row:not(.total-row):not(.mensagem-row) .timeline-cell.ferias::after,
+.escala-page .timeline-row:not(.total-row):not(.mensagem-row) .timeline-cell.ausencia::after,
+.escala-page .timeline-row:not(.total-row):not(.mensagem-row) .timeline-cell.ausencia-parcial::after {
+    display: none;
+}
+
+.escala-page .timeline-row .escala-overlay {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    /* Comeca exatamente onde as colunas de hora comecam (nome + total) e tem a
+       largura exata da area de horas, usando as MESMAS variaveis da grade.
+       Assim as barras alinham perfeitamente com as colunas em qualquer largura. */
+    left: calc(var(--esc-col-nome, 240px) + var(--esc-col-total, 80px));
+    width: calc(var(--escala-hour-columns, 12) * var(--esc-col-hora, 42px));
+    pointer-events: none;
+    z-index: 3;
+}
+
+.escala-page .escala-bar {
+    position: absolute;
+    top: 9px;
+    bottom: 9px;
+    border-radius: 9px;
+    background: linear-gradient(180deg, #818cf8, #6366f1);
+    display: flex;
+    align-items: center;
+    padding: 0 10px;
+    color: #fff;
+    font-size: 11.5px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    white-space: nowrap;
+    overflow: hidden;
+    box-shadow: 0 6px 16px rgba(99, 102, 241, 0.28);
+}
+
+.escala-page .escala-bar-plantao {
+    background: linear-gradient(180deg, #2dd4bf, #0ea5a4);
+    box-shadow: 0 6px 16px rgba(14, 165, 164, 0.28);
+}
+
+.escala-page .escala-lunch {
+    position: absolute;
+    top: 7px;
+    bottom: 7px;
+    border-radius: 7px;
+    background: repeating-linear-gradient(45deg, #fbbf24 0, #fbbf24 5px, #c77f0a 5px, #c77f0a 10px);
+    border: 1px solid rgba(0, 0, 0, 0.14);
+    z-index: 2;
+}
+
+.escala-page .escala-band {
+    position: absolute;
+    inset: 8px 4px;
+    border-radius: 9px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 14px;
+    font-size: 12.5px;
+    font-weight: 700;
+    color: #fff;
+}
+
+.escala-page .escala-band-motivo {
+    margin-left: auto;
+    font-weight: 500;
+    opacity: 0.85;
+    font-size: 11px;
+}
+
+.escala-page .escala-band-ferias { background: linear-gradient(180deg, #3b82f6, #2563eb); }
+.escala-page .escala-band-ausencia { background: linear-gradient(180deg, #fb7185, #ef4444); }
+.escala-page .escala-band-folga { background: linear-gradient(180deg, #cbd5e1, #94a3b8); color: #1e293b; }
+
+/* ===== Cobertura como barrinhas embaixo (mini grafico), como no prototipo ===== */
+.escala-page .timeline-row.total-row .timeline-cell.total-cell.cov-col {
+    flex-direction: column;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 3px;
+    padding: 6px 2px 7px;
+}
+
+.escala-page .timeline-row.total-row .cov-col .cov-bar {
+    width: 62%;
+    min-height: 3px;
+    border-radius: 3px 3px 0 0;
+    background: #94a3b8;
+}
+
+.escala-page .timeline-row.total-row .cov-col.total-ok .cov-bar { background: #10b981; }
+.escala-page .timeline-row.total-row .cov-col.total-atencao .cov-bar { background: #f59e0b; }
+.escala-page .timeline-row.total-row .cov-col.total-critico .cov-bar { background: #ef4444; }
+
+.escala-page .timeline-row.total-row .cov-col .total-valor {
+    width: auto;
+    min-width: 0;
+    height: auto;
+    padding: 0;
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text-light);
+}
+
+.escala-page .timeline-row.total-row .cov-col.total-critico .total-valor { color: #ef4444; }
+
+.escala-page .timeline-row.total-row .cov-col.total-vale {
+    background: rgba(239, 68, 68, 0.1);
+    border-radius: 6px;
 }
