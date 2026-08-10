@@ -64,10 +64,12 @@ const TABLE_INSERT_SPECS = Object.freeze({
             ['TrabalhoFim', sql.Time],
             ['AlmocoInicio', sql.Time],
             ['AlmocoFim', sql.Time],
-            // SetorId e DataCadastro faltavam: o backup perdia a lotacao por
-            // setor e a data de cadastro de cada colaborador na restauracao.
-            ['SetorId', sql.Int],
-            ['DataCadastro', sql.DateTime]
+            // SetorId faltava: sem ele o backup perdia a lotacao por setor de
+            // cada colaborador na restauracao. A tabela Colaboradores NAO tem
+            // coluna DataCadastro (so Ausencias e ColaboradorJornadaSemanal
+            // tem), entao ela nao pode entrar aqui: inserir nela dava
+            // "Invalid column name 'DataCadastro'" e quebrava toda restauracao.
+            ['SetorId', sql.Int]
         ]
     },
     ColaboradorJornadaSemanal: {
@@ -426,10 +428,10 @@ function normalizeColaboradorRow(row) {
             getFirstDefinedValue(row, ['AlmocoFim', 'almocoFim']),
             'Fim do almoco'
         ),
-        // Sem estes dois o backup perdia a lotacao por setor e a data de
-        // cadastro na restauracao.
-        SetorId: normalizeNullablePositiveInt(getFirstDefinedValue(row, ['SetorId', 'setorId']), 'Setor do colaborador'),
-        DataCadastro: normalizeBackupDateTime(getFirstDefinedValue(row, ['DataCadastro', 'dataCadastro']), 'Data de cadastro')
+        // Sem o SetorId o backup perdia a lotacao por setor na restauracao.
+        // (A tabela Colaboradores nao tem coluna DataCadastro, entao nao ha o
+        // que normalizar aqui.)
+        SetorId: normalizeNullablePositiveInt(getFirstDefinedValue(row, ['SetorId', 'setorId']), 'Setor do colaborador')
     };
 
     if (!normalized.Nome) {
