@@ -882,8 +882,7 @@
                     <i class="fas ${icon}"></i>
                     <span>${label}</span>
                 </div>
-                <div class="timeline-cell total-cell"></div>
-                <div class="timeline-cell mensagem-cell" style="grid-column: span ${bounds.columnCount};">
+                <div class="timeline-cell mensagem-cell" style="grid-column: span ${bounds.columnCount + 1};">
                     <div class="mensagem-conteudo">
                         <i class="fas ${icon}"></i>
                         <h3>${escapeHtmlEscala(title)}</h3>
