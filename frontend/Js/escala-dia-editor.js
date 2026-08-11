@@ -1246,8 +1246,11 @@
 
             const onMove = (moveEvent) => {
                 const deltaMinutes = (moveEvent.clientX - startX) * minutesPerPx;
-                currentStart = Math.min(maxStart, Math.max(minStart, lunchStart0 + deltaMinutes));
-                setTime(currentStart); // segue livre e suave enquanto arrasta
+                // Encaixa de 30 em 30 min enquanto arrasta (passos de meia hora):
+                // o bloco "clica" em cada :00/:30, que e onde os almocos caem.
+                const snappedLive = Math.round((lunchStart0 + deltaMinutes) / SLOT_MINUTES) * SLOT_MINUTES;
+                currentStart = Math.min(maxStart, Math.max(minStart, snappedLive));
+                setTime(currentStart);
             };
 
             const onUp = async () => {
@@ -1263,8 +1266,9 @@
                     // ignora: a captura ja pode ter sido liberada.
                 }
 
-                // Arredonda ao passo so ao soltar (durante o arrasto e livre).
-                let snapped = Math.round(currentStart / ESCALA_EDITOR_PASSO_MINUTOS) * ESCALA_EDITOR_PASSO_MINUTOS;
+                // Ja esta encaixado de 30 em 30 (o arrasto snapa ao vivo); aqui
+                // so garante o passo de meia hora tambem no valor final salvo.
+                let snapped = Math.round(currentStart / SLOT_MINUTES) * SLOT_MINUTES;
                 snapped = Math.min(maxStart, Math.max(minStart, snapped));
                 setTime(snapped);
 
