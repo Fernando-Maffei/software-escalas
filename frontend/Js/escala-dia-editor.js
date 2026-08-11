@@ -124,14 +124,33 @@
         return densidade;
     }
 
-    function getScaleSectorFilterEscala() {
-        return window.__escalaSectorFilterId || 'all';
+    // Selecao de setores agora e MULTIPLA: um conjunto de ids. Conjunto vazio =
+    // "Todos" (sem filtro). O gestor liga o(s) setor(es) dele e a escala + o %
+    // de cobertura passam a considerar so esses.
+    function getScaleSectorSelectionEscala() {
+        if (!(window.__escalaSectorSelection instanceof Set)) {
+            window.__escalaSectorSelection = new Set();
+        }
+        return window.__escalaSectorSelection;
     }
 
-    function setScaleSectorFilterEscala(value) {
-        const normalized = value === 'all' || !value ? 'all' : String(value);
-        window.__escalaSectorFilterId = normalized;
-        return normalized;
+    function toggleScaleSectorEscala(id) {
+        const selecao = getScaleSectorSelectionEscala();
+
+        if (id === 'all' || !id) {
+            selecao.clear(); // "Todos" = nenhum filtro
+            return selecao;
+        }
+
+        const chave = String(id);
+
+        if (selecao.has(chave)) {
+            selecao.delete(chave);
+        } else {
+            selecao.add(chave);
+        }
+
+        return selecao;
     }
 
     function buildScaleSectorFiltersEscala(items = []) {
@@ -160,13 +179,13 @@
     }
 
     function filterScaleItemsBySectorEscala(items = []) {
-        const filterId = getScaleSectorFilterEscala();
+        const selecao = getScaleSectorSelectionEscala();
 
-        if (filterId === 'all') {
-            return [...items];
+        if (selecao.size === 0) {
+            return [...items]; // Todos
         }
 
-        return (items || []).filter((item) => String(item.setorId || '') === String(filterId));
+        return (items || []).filter((item) => selecao.has(String(item.setorId || '')));
     }
 
     function renderScaleSectorTabsEscala(items = []) {
@@ -176,28 +195,35 @@
             return;
         }
 
-        const currentFilter = getScaleSectorFilterEscala();
         const filters = buildScaleSectorFiltersEscala(items);
-        const hasCurrentFilter = filters.some((item) => String(item.id) === String(currentFilter));
-        const safeFilter = hasCurrentFilter ? currentFilter : 'all';
+        const selecao = getScaleSectorSelectionEscala();
 
-        if (!hasCurrentFilter) {
-            setScaleSectorFilterEscala(safeFilter);
-        }
+        // Limpa da selecao setores que sumiram (evita filtro "fantasma" que
+        // esconderia todo mundo).
+        const idsValidos = new Set(filters.filter((item) => item.id !== 'all').map((item) => String(item.id)));
+        [...selecao].forEach((id) => {
+            if (!idsValidos.has(id)) {
+                selecao.delete(id);
+            }
+        });
 
-        container.innerHTML = filters.map((setor) => `
+        container.innerHTML = filters.map((setor) => {
+            const ehTodos = setor.id === 'all';
+            const ativo = ehTodos ? selecao.size === 0 : selecao.has(String(setor.id));
+            return `
             <button
                 type="button"
-                class="escala-sector-tab ${String(setor.id) === String(safeFilter) ? 'is-active' : ''}"
+                class="escala-sector-tab ${ativo ? 'is-active' : ''}"
                 data-escala-setor="${escapeHtmlEscala(String(setor.id))}"
+                aria-pressed="${ativo ? 'true' : 'false'}"
             >
                 ${escapeHtmlEscala(setor.nome)}
-            </button>
-        `).join('');
+            </button>`;
+        }).join('');
 
         container.querySelectorAll('[data-escala-setor]').forEach((button) => {
             button.addEventListener('click', () => {
-                setScaleSectorFilterEscala(button.getAttribute('data-escala-setor'));
+                toggleScaleSectorEscala(button.getAttribute('data-escala-setor'));
                 renderScaleSectorTabsEscala(getCurrentScaleState().items || []);
                 renderScaleRowsEscala(getCurrentScaleState());
             });
@@ -2051,15 +2077,18 @@
     }
 
     function getSelectedScaleSectorContextEscala() {
-        const filterId = getScaleSectorFilterEscala();
+        const selecao = getScaleSectorSelectionEscala();
 
-        if (filterId === 'all') {
+        // Restaurar almocos age por 1 setor ou "todos". Com varios selecionados,
+        // cai em "todos" (a API aceita 1 setorId ou nenhum).
+        if (selecao.size !== 1) {
             return {
                 setorId: null,
-                setorNome: 'todos os setores'
+                setorNome: selecao.size === 0 ? 'todos os setores' : 'setores selecionados'
             };
         }
 
+        const filterId = [...selecao][0];
         const selected = buildScaleSectorFiltersEscala(getCurrentScaleState().items || [])
             .find((item) => String(item.id) === String(filterId));
 
