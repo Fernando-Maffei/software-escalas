@@ -760,8 +760,10 @@
         const COMERCIAL_INICIO_MIN = 8 * 60;
         const COMERCIAL_FIM_MIN = 18 * 60;
         const slots = [];
-        let min = null;
+        let minPct = null;   // menor cobertura como fracao (count/potential)
         let minSlot = bounds.startSlot;
+        let minCount = 0;
+        let minPotential = 0;
 
         for (let index = 0; index < bounds.columnCount; index += 1) {
             const slot = bounds.startSlot + index;
@@ -784,22 +786,31 @@
                 }
             });
 
-            slots.push({ slot, count, potential });
+            // Cobertura RELATIVA: quantos no balcao / quantos escalados naquela
+            // hora (dentro do setor filtrado). Nao pune time pequeno: 2 de 2 =
+            // 100%, 2 de 4 = 50%. O gargalo e o menor % do horario comercial.
+            const pct = potential > 0 ? count / potential : null;
+            slots.push({ slot, count, potential, pct });
 
             const slotMinuto = slot * SLOT_MINUTES;
             const dentroComercial = slotMinuto >= COMERCIAL_INICIO_MIN && slotMinuto < COMERCIAL_FIM_MIN;
 
-            if (potential > 0 && dentroComercial && (min === null || count < min)) {
-                min = count;
+            if (potential > 0 && dentroComercial && (minPct === null || pct < minPct)) {
+                minPct = pct;
                 minSlot = slot;
+                minCount = count;
+                minPotential = potential;
             }
         }
 
         return {
             bounds,
             slots,
-            hasExpediente: min !== null,
-            min: min === null ? 0 : min,
+            hasExpediente: minPct !== null,
+            minPct: minPct === null ? 1 : minPct,
+            minPctLabel: Math.round((minPct === null ? 1 : minPct) * 100),
+            minCount,
+            minPotential,
             minSlot,
             minTime: formatMinutesToTimeEscala(minSlot * SLOT_MINUTES)
         };
@@ -810,11 +821,15 @@
             return 'total-fora';
         }
 
-        if (item.count <= 1) {
+        // Cor pela % (quem esta / quem foi escalado naquela hora), nao pelo
+        // numero cru: <50% critico, 50-70% atencao, >=70% ok.
+        const pct = item.pct != null ? item.pct : (item.potential ? item.count / item.potential : 0);
+
+        if (pct < 0.5) {
             return 'total-critico';
         }
 
-        if (item.count === 2) {
+        if (pct < 0.7) {
             return 'total-atencao';
         }
 
@@ -924,11 +939,12 @@
             return 'vazio';
         }
 
-        if (coverage.min <= 1) {
+        // Mesma regra do dia: cor pela % de menor cobertura no horario comercial.
+        if (coverage.minPct < 0.5) {
             return 'critico';
         }
 
-        if (coverage.min === 2) {
+        if (coverage.minPct < 0.7) {
             return 'atencao';
         }
 
@@ -1119,18 +1135,23 @@
             nivel = 'is-neutro';
             icon = 'fa-circle-info';
             texto = 'Sem expediente neste dia';
-        } else if (coverage.min <= 1) {
-            nivel = 'is-critico';
-            icon = 'fa-triangle-exclamation';
-            texto = `No talo: ${coverage.min} às ${coverage.minTime}`;
-        } else if (coverage.min === 2) {
-            nivel = 'is-atencao';
-            icon = 'fa-circle-exclamation';
-            texto = `Cobertura mínima ${coverage.min} às ${coverage.minTime}`;
         } else {
-            nivel = 'is-ok';
-            icon = 'fa-circle-check';
-            texto = `Cobertura mínima ${coverage.min}`;
+            const pct = coverage.minPctLabel;
+            const detalhe = `${coverage.minCount} de ${coverage.minPotential} (${pct}%) às ${coverage.minTime}`;
+
+            if (coverage.minPct < 0.5) {
+                nivel = 'is-critico';
+                icon = 'fa-triangle-exclamation';
+                texto = `Menor cobertura: ${detalhe}`;
+            } else if (coverage.minPct < 0.7) {
+                nivel = 'is-atencao';
+                icon = 'fa-circle-exclamation';
+                texto = `Menor cobertura: ${detalhe}`;
+            } else {
+                nivel = 'is-ok';
+                icon = 'fa-circle-check';
+                texto = `Cobertura tranquila (mín ${pct}%)`;
+            }
         }
 
         statusEl.className = `escala-daybar-status ${nivel}`;
