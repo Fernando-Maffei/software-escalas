@@ -1169,7 +1169,9 @@
         let lunch = '';
 
         if (lunchStart !== null && lunchEnd !== null && lunchEnd > lunchStart) {
-            lunch = `<div class="escala-lunch" style="left:${pct(lunchStart)}%;width:${pct(lunchEnd) - pct(lunchStart)}%" title="Almoco ${formatTimeInputEscala(record.almocoInicio)}–${formatTimeInputEscala(record.almocoFim)}"></div>`;
+            lunch = `<div class="escala-lunch" data-colaborador-id="${record.colaboradorId}" style="left:${pct(lunchStart)}%;width:${pct(lunchEnd) - pct(lunchStart)}%" title="Arraste para ajustar o almoco">
+                <span class="escala-lunch-time">${formatTimeInputEscala(record.almocoInicio)}–${formatTimeInputEscala(record.almocoFim)}</span>
+            </div>`;
         }
 
         return `<div class="escala-overlay">
@@ -1178,6 +1180,108 @@
             </div>
             ${lunch}
         </div>`;
+    }
+
+    // Arrasto fluido do almoco: o bloco hachurado vira um controle deslizante
+    // (estilo barra de volume). Segue o ponteiro suavemente e mostra o horario
+    // ao vivo; ao soltar, arredonda para o passo (15 min) e salva. Substitui o
+    // antigo arrasto HTML5 celula-a-celula (que era "chunky").
+    function bindFluidLunchDragEscala(row, record, bounds) {
+        const lunch = row.querySelector('.escala-lunch');
+
+        if (!lunch) {
+            return;
+        }
+
+        const spanStart = bounds.startSlot * SLOT_MINUTES;
+        const spanEnd = (bounds.startSlot + bounds.columnCount) * SLOT_MINUTES;
+        const span = Math.max(1, spanEnd - spanStart);
+        const pct = (minutes) => ((minutes - spanStart) / span) * 100;
+
+        const workStart = getTimeMinutesEscala(record.horaInicio);
+        const workEnd = getTimeMinutesEscala(record.horaFim);
+        const lunchStart0 = getTimeMinutesEscala(record.almocoInicio);
+        const lunchEnd0 = getTimeMinutesEscala(record.almocoFim);
+
+        if (workStart === null || workEnd === null || lunchStart0 === null || lunchEnd0 === null) {
+            return;
+        }
+
+        const dur = lunchEnd0 - lunchStart0;
+        const minStart = workStart;
+        const maxStart = workEnd - dur;
+
+        // Sem espaco para deslizar (almoco ocupa a jornada toda): nao arrasta.
+        if (maxStart <= minStart) {
+            lunch.style.cursor = 'default';
+            return;
+        }
+
+        const label = lunch.querySelector('.escala-lunch-time');
+        const setTime = (startMin) => {
+            lunch.style.left = pct(startMin) + '%';
+            if (label) {
+                label.textContent = `${formatMinutesToTimeEscala(startMin)}–${formatMinutesToTimeEscala(startMin + dur)}`;
+            }
+        };
+
+        lunch.addEventListener('pointerdown', (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+
+            const overlayWidth = lunch.parentElement.getBoundingClientRect().width;
+            const minutesPerPx = span / Math.max(1, overlayWidth);
+            const startX = event.clientX;
+            let currentStart = lunchStart0;
+
+            row.classList.add('is-dragging-lunch');
+            lunch.classList.add('is-dragging');
+
+            try {
+                lunch.setPointerCapture(event.pointerId);
+            } catch (error) {
+                // setPointerCapture pode falhar em navegadores antigos; o drag
+                // segue mesmo assim pelos listeners abaixo.
+            }
+
+            const onMove = (moveEvent) => {
+                const deltaMinutes = (moveEvent.clientX - startX) * minutesPerPx;
+                currentStart = Math.min(maxStart, Math.max(minStart, lunchStart0 + deltaMinutes));
+                setTime(currentStart); // segue livre e suave enquanto arrasta
+            };
+
+            const onUp = async () => {
+                lunch.removeEventListener('pointermove', onMove);
+                lunch.removeEventListener('pointerup', onUp);
+                lunch.removeEventListener('pointercancel', onUp);
+                lunch.classList.remove('is-dragging');
+                row.classList.remove('is-dragging-lunch');
+
+                try {
+                    lunch.releasePointerCapture(event.pointerId);
+                } catch (error) {
+                    // ignora: a captura ja pode ter sido liberada.
+                }
+
+                // Arredonda ao passo so ao soltar (durante o arrasto e livre).
+                let snapped = Math.round(currentStart / ESCALA_EDITOR_PASSO_MINUTOS) * ESCALA_EDITOR_PASSO_MINUTOS;
+                snapped = Math.min(maxStart, Math.max(minStart, snapped));
+                setTime(snapped);
+
+                try {
+                    await salvarAjusteDiretoAlmocoEscala(Number(record.colaboradorId), snapped, snapped + dur);
+                } catch (error) {
+                    if (typeof mostrarToast === 'function') {
+                        mostrarToast(`Erro ao ajustar almoco: ${error.message}`, 'error');
+                    }
+                    renderScaleRowsEscala(getCurrentScaleState());
+                }
+            };
+
+            lunch.addEventListener('pointermove', onMove);
+            lunch.addEventListener('pointerup', onUp);
+            lunch.addEventListener('pointercancel', onUp);
+        });
     }
 
     function renderScaleRowsEscala(state) {
@@ -1248,7 +1352,7 @@
             });
 
             body.appendChild(row);
-            bindLunchCellDragEscala(row, record);
+            bindFluidLunchDragEscala(row, record, bounds);
         });
 
         renderTotalRowEscala(items);

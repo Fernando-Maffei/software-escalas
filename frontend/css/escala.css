@@ -3869,6 +3869,50 @@
     background: repeating-linear-gradient(45deg, var(--escala-status-almoco, #fbbf24) 0, var(--escala-status-almoco, #fbbf24) 5px, #c77f0a 5px, #c77f0a 10px);
     border: 1px solid rgba(0, 0, 0, 0.14);
     z-index: 2;
+    /* O overlay e pointer-events:none; aqui reabilitamos SO no bloco de almoco
+       para ele virar um controle deslizante (o resto do overlay segue clicavel
+       atraves, para o clique no nome/edicao continuar funcionando). */
+    pointer-events: auto;
+    cursor: grab;
+    touch-action: none;
+    transition: filter 0.12s ease, box-shadow 0.12s ease;
+}
+
+.escala-page .escala-lunch:hover {
+    filter: brightness(1.06);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+}
+
+.escala-page .escala-lunch.is-dragging {
+    cursor: grabbing;
+    filter: brightness(1.1);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+}
+
+/* Rotulo do horario do almoco: tooltip acima do bloco, aparece no hover/arrasto. */
+.escala-page .escala-lunch .escala-lunch-time {
+    position: absolute;
+    bottom: calc(100% + 5px);
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 2px 7px;
+    border-radius: 6px;
+    background: var(--surface-raised, #1e293b);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    white-space: nowrap;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.1s ease;
+    z-index: 5;
+}
+
+.escala-page .escala-lunch:hover .escala-lunch-time,
+.escala-page .escala-lunch.is-dragging .escala-lunch-time {
+    opacity: 1;
 }
 
 .escala-page .escala-band {
