@@ -2084,16 +2084,26 @@
    de botoes, faixa de legenda e faixa de filtros. Foi condensado em duas
    faixas (titulo+acoes / filtros), com a legenda sob demanda, para sobrar
    altura para os colaboradores. */
+/* Zera o padding-top do container SO na Escala: assim o painel sticky gruda no
+   topo REAL (y:0), em vez de abaixo dos 32px de padding do #appContent. Eram
+   esses 32px que abriam a fresta onde a primeira linha aparecia no topo ao
+   rolar ("Deborah no topo"). Mesmo padrao ja usado no colaboradores. O respiro
+   do topo passa a vir do padding-top do proprio painel (abaixo). */
+#appContent:has(.escala-page) {
+    padding-top: 0;
+}
+
 .escala-page .escala-sticky-panel {
     position: sticky;
     top: 0;
     z-index: 70;
-    margin: -8px 0 12px;
+    margin: 0 0 12px;
     /* Reserva a direita a coluna ocupada pela alca de abrir/fechar o editor
        (.editor-toggle, ~44px na barra recolhida). Sem isso o botao "Novo
        lancamento", que fica no fim da faixa, divide a mesma coluna que a
-       alca e os dois colidem dependendo do tamanho da janela e da rolagem. */
-    padding: 8px 52px 10px 0;
+       alca e os dois colidem dependendo do tamanho da janela e da rolagem.
+       O padding-top (24px) e o respiro do topo, que antes vinha do #appContent. */
+    padding: 24px 52px 10px 0;
     background: var(--bg-soft);
     border-bottom: 1px solid rgba(148, 163, 184, 0.14);
     box-shadow: 0 16px 24px -24px rgba(12, 20, 32, 0.45);
