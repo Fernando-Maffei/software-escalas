@@ -754,6 +754,11 @@
     function computeCoverageEscala(items = []) {
         const list = Array.isArray(items) ? items : [];
         const bounds = getScaleHourBoundsEscala(list);
+        // O alerta "No talo" (o vale da cobertura) so considera o horario
+        // comercial (08:00-18:00). Antes das 8 e depois das 18 e plantao —
+        // normal ter pouca gente —, entao essas faixas nao contam como gargalo.
+        const COMERCIAL_INICIO_MIN = 8 * 60;
+        const COMERCIAL_FIM_MIN = 18 * 60;
         const slots = [];
         let min = null;
         let minSlot = bounds.startSlot;
@@ -781,7 +786,10 @@
 
             slots.push({ slot, count, potential });
 
-            if (potential > 0 && (min === null || count < min)) {
+            const slotMinuto = slot * SLOT_MINUTES;
+            const dentroComercial = slotMinuto >= COMERCIAL_INICIO_MIN && slotMinuto < COMERCIAL_FIM_MIN;
+
+            if (potential > 0 && dentroComercial && (min === null || count < min)) {
                 min = count;
                 minSlot = slot;
             }
