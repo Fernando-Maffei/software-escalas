@@ -3866,7 +3866,10 @@
     top: 7px;
     bottom: 7px;
     border-radius: 7px;
-    background: repeating-linear-gradient(45deg, var(--escala-status-almoco, #fbbf24) 0, var(--escala-status-almoco, #fbbf24) 5px, #c77f0a 5px, #c77f0a 10px);
+    /* Cor unica solida (do token de almoco): antes era hachurado com um laranja
+       fixo (#c77f0a) que sobrava mesmo trocando a cor do token. Agora respeita
+       100% a cor definida. */
+    background: var(--escala-status-almoco, #fbbf24);
     border: 1px solid rgba(0, 0, 0, 0.14);
     z-index: 2;
     /* O overlay e pointer-events:none; aqui reabilitamos SO no bloco de almoco
