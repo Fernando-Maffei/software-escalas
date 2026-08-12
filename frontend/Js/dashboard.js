@@ -237,6 +237,22 @@ function colaboradorDisponivelAgora(colaborador, minutosAtuais, dataISO, jornada
     return tipo !== 'ferias' && tipo !== 'folga' && tipo !== 'ausencia';
 }
 
+// Restringe uma lista de colaboradores aos setores de "Meus setores" (a
+// preferencia por usuario, servida por meus-setores.js). Lista vazia de
+// preferencia = ver todos (sem filtro).
+function filtrarColaboradoresPorSetorDashboard(lista) {
+    const base = Array.isArray(lista) ? lista : [];
+    const meusSetores = typeof window.getMeusSetores === 'function' ? window.getMeusSetores() : [];
+
+    if (!meusSetores.length) {
+        return base;
+    }
+
+    const permitidos = new Set(meusSetores.map(String));
+
+    return base.filter((colaborador) => permitidos.has(String(getDashboardSetorId(colaborador) ?? '')));
+}
+
 function calcularMetricas(agora, dataHoje, jornadaSemanalIndex, colaboradoresBase = window.colaboradores || []) {
     const colaboradores = Array.isArray(colaboradoresBase) ? colaboradoresBase : [];
     const minutosAtuais = (agora.getHours() * 60) + agora.getMinutes();
@@ -288,7 +304,8 @@ function calcularMetricas(agora, dataHoje, jornadaSemanalIndex, colaboradoresBas
 }
 
 function calcularMetricasPorSetor(agora, dataHoje, jornadaSemanalIndex) {
-    const colaboradores = Array.isArray(window.colaboradores) ? window.colaboradores : [];
+    // Respeita "Meus setores": so agrupa os setores que o gestor escolheu ver.
+    const colaboradores = filtrarColaboradoresPorSetorDashboard(window.colaboradores);
     const setoresById = new Map(
         (Array.isArray(window.setores) ? window.setores : [])
             .map((setor) => [String(setor.id ?? setor.Id ?? ''), setor])
@@ -393,9 +410,9 @@ function gerarSetoresDashboard(gruposSetor = []) {
     `;
 }
 
-function gerarAlertas(metricas, dataHoje, jornadaSemanalIndex) {
+function gerarAlertas(metricas, dataHoje, jornadaSemanalIndex, colaboradoresBase = window.colaboradores || []) {
     const alertas = [];
-    const colaboradores = window.colaboradores || [];
+    const colaboradores = Array.isArray(colaboradoresBase) ? colaboradoresBase : [];
     const ausenciasHoje = obterAusenciasNaData(dataHoje);
 
     const semJornadaNemPadrao = colaboradores.filter((colaborador) => {
@@ -539,9 +556,9 @@ function gerarGraficoAusencias() {
     `;
 }
 
-function gerarGraficoOcupacao(dataHoje, jornadaSemanalIndex) {
+function gerarGraficoOcupacao(dataHoje, jornadaSemanalIndex, colaboradoresBase = window.colaboradores || []) {
     const ocupacao = [];
-    const colaboradores = window.colaboradores || [];
+    const colaboradores = Array.isArray(colaboradoresBase) ? colaboradoresBase : [];
     const horariosAtivos = colaboradores
         .map((colaborador) => getColaboradorScheduleForDate(colaborador, dataHoje, jornadaSemanalIndex))
         .filter(Boolean);
@@ -710,9 +727,12 @@ async function renderDashboardInternal() {
     ]);
 
     const jornadaSemanalIndex = buildJornadaSemanalIndex(jornadaSemanalResponse?.items || []);
-    const metricas = calcularMetricas(hoje, dataHoje, jornadaSemanalIndex);
+    // "Meus setores": os cards, alertas e o grafico de ocupacao passam a
+    // refletir so os colaboradores dos setores escolhidos pelo gestor.
+    const colaboradoresEscopo = filtrarColaboradoresPorSetorDashboard(window.colaboradores);
+    const metricas = calcularMetricas(hoje, dataHoje, jornadaSemanalIndex, colaboradoresEscopo);
     const metricasPorSetor = calcularMetricasPorSetor(hoje, dataHoje, jornadaSemanalIndex);
-    const alertas = gerarAlertas(metricas, dataHoje, jornadaSemanalIndex);
+    const alertas = gerarAlertas(metricas, dataHoje, jornadaSemanalIndex, colaboradoresEscopo);
     const proximosEventos = await buscarProximosEventos();
 
     appContent.innerHTML = `
@@ -770,7 +790,7 @@ async function renderDashboardInternal() {
             <div class="chart-card">
                 <h4><i class="fas fa-clock"></i> Cobertura por hora</h4>
                 <div id="chartOcupacao" style="height: 200px;">
-                    ${gerarGraficoOcupacao(dataHoje, jornadaSemanalIndex)}
+                    ${gerarGraficoOcupacao(dataHoje, jornadaSemanalIndex, colaboradoresEscopo)}
                 </div>
             </div>
         </div>
