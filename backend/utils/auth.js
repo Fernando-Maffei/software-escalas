@@ -52,6 +52,46 @@ function generateRandomPassword() {
     return crypto.randomBytes(9).toString('base64url');
 }
 
+// Normaliza a lista de setores visiveis para um array de ids em texto (sem
+// duplicatas, sem vazios, com teto de tamanho). Usado tanto ao ler do banco
+// quanto ao gravar, para os dois lados falarem o mesmo formato. Lista vazia
+// significa "ver todos" (sem filtro).
+function normalizeSetoresVisiveis(value) {
+    let bruto = value;
+
+    if (typeof bruto === 'string') {
+        try {
+            bruto = JSON.parse(bruto);
+        } catch (error) {
+            return [];
+        }
+    }
+
+    if (!Array.isArray(bruto)) {
+        return [];
+    }
+
+    const vistos = new Set();
+
+    for (const item of bruto) {
+        if (item === null || item === undefined || typeof item === 'object') {
+            continue;
+        }
+
+        const id = String(item).trim();
+
+        if (id) {
+            vistos.add(id);
+        }
+
+        if (vistos.size >= 100) {
+            break;
+        }
+    }
+
+    return Array.from(vistos);
+}
+
 function mapUserRow(row) {
     if (!row) {
         return null;
@@ -65,6 +105,7 @@ function mapUserRow(row) {
         deveTrocarSenha: Boolean(row.DeveTrocarSenha),
         ativo: Boolean(row.Ativo),
         isAdmin: Boolean(row.IsAdmin),
+        setoresVisiveis: normalizeSetoresVisiveis(row.SetoresVisiveisJson),
         criadoEm: row.CreatedAt || null,
         ultimoLoginAt: row.UltimoLoginAt || null
     };
@@ -177,6 +218,21 @@ async function touchLastLogin(pool, userId) {
     await pool.request()
         .input('id', sql.Int, userId)
         .query('UPDATE Usuarios SET UltimoLoginAt = GETDATE() WHERE Id = @id');
+}
+
+// Salva a preferencia "Meus setores" da conta. Lista vazia grava NULL (=ver
+// todos), evitando distinguir "[]" de "sem preferencia". Retorna a lista
+// normalizada que ficou gravada.
+async function updateUserSetoresVisiveis(pool, userId, setores) {
+    const normalizados = normalizeSetoresVisiveis(setores);
+    const json = normalizados.length ? JSON.stringify(normalizados) : null;
+
+    await pool.request()
+        .input('id', sql.Int, userId)
+        .input('json', sql.NVarChar(sql.MAX), json)
+        .query('UPDATE Usuarios SET SetoresVisiveisJson = @json WHERE Id = @id');
+
+    return normalizados;
 }
 
 // Exclusao definitiva. Diferente de desativar (Ativo = 0), apaga a linha. Nao
@@ -356,5 +412,6 @@ module.exports = {
     touchLastLogin,
     updateUserFlags,
     updateUserPassword,
+    updateUserSetoresVisiveis,
     verifyPassword
 };

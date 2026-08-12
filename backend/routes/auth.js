@@ -15,6 +15,7 @@ const {
     setSessionCookie,
     touchLastLogin,
     updateUserPassword,
+    updateUserSetoresVisiveis,
     verifyPassword
 } = require('../utils/auth');
 
@@ -38,7 +39,8 @@ function toPublicUser(user) {
         id: user.id,
         username: user.username,
         deveTrocarSenha: user.deveTrocarSenha,
-        isAdmin: Boolean(user.isAdmin)
+        isAdmin: Boolean(user.isAdmin),
+        setoresVisiveis: Array.isArray(user.setoresVisiveis) ? user.setoresVisiveis : []
     };
 }
 
@@ -122,6 +124,21 @@ router.post('/trocar-senha', requireAuth, async (req, res, next) => {
 // sensiveis (ex.: excluir um colaborador) sem alterar o contrato dessas rotas:
 // o front chama isto ANTES de agir e so prossegue se der 200. Usa o mesmo
 // limitador de forca bruta do login, com chave propria.
+// Salva a preferencia "Meus setores" do PROPRIO usuario logado (nao e area
+// administrativa: cada um ajusta a propria visao). Corpo: { setores: [ids] }.
+// Lista vazia = ver todos (sem filtro). Retorna a lista ja normalizada.
+router.put('/me/setores', requireAuth, async (req, res, next) => {
+    try {
+        const setores = Array.isArray(req.body?.setores) ? req.body.setores : [];
+        const pool = await conectar();
+        const setoresVisiveis = await updateUserSetoresVisiveis(pool, req.user.id, setores);
+
+        res.json({ success: true, setoresVisiveis });
+    } catch (error) {
+        next(error);
+    }
+});
+
 router.post('/verify-password', requireAuth, async (req, res, next) => {
     try {
         const password = String(req.body?.password || '');
