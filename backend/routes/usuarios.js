@@ -5,6 +5,7 @@ const { AppError } = require('../utils/errors');
 const {
     countOtherActiveAdmins,
     createUser,
+    deleteUser,
     findUserById,
     findUserByUsername,
     generateRandomPassword,
@@ -160,6 +161,48 @@ router.put('/:id', async (req, res, next) => {
             message: 'Usuario atualizado com sucesso.',
             usuario: toPublicUser(atualizado),
             senhaTemporaria
+        });
+    } catch (error) {
+        next(error);
+    }
+});
+
+router.delete('/:id', async (req, res, next) => {
+    try {
+        const userId = Number(req.params.id);
+
+        if (!Number.isInteger(userId) || userId <= 0) {
+            throw new AppError(400, 'Identificador de usuario invalido.');
+        }
+
+        const pool = await conectar();
+        const alvo = await findUserById(pool, userId);
+
+        if (!alvo) {
+            throw new AppError(404, 'Usuario nao encontrado.');
+        }
+
+        // Nao apagar a propria conta: quem esta logado seguiria com sessao
+        // valida apontando para um usuario inexistente.
+        if (alvo.id === req.user.id) {
+            throw new AppError(400, 'Voce nao pode excluir a propria conta.');
+        }
+
+        // Mesma protecao do desativar: nunca deixar o sistema sem administrador.
+        if (alvo.isAdmin) {
+            const outrosAdmins = await countOtherActiveAdmins(pool, alvo.id);
+
+            if (outrosAdmins === 0) {
+                throw new AppError(400, 'Este e o unico administrador ativo. Promova outro usuario antes de excluir.');
+            }
+        }
+
+        await deleteUser(pool, alvo.id);
+        revokeUserSessions(alvo.id); // encerra qualquer sessao aberta da conta apagada
+
+        res.json({
+            success: true,
+            message: `Usuario "${alvo.username}" excluido definitivamente.`
         });
     } catch (error) {
         next(error);

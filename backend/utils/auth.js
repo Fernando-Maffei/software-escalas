@@ -179,6 +179,16 @@ async function touchLastLogin(pool, userId) {
         .query('UPDATE Usuarios SET UltimoLoginAt = GETDATE() WHERE Id = @id');
 }
 
+// Exclusao definitiva. Diferente de desativar (Ativo = 0), apaga a linha. Nao
+// ha tabela que referencie Usuarios (a escala e por colaborador, nao por
+// conta), entao a remocao nao deixa orfaos. As protecoes (nao apagar a si
+// mesmo, nao apagar o ultimo admin) ficam na rota, junto das demais regras.
+async function deleteUser(pool, userId) {
+    await pool.request()
+        .input('id', sql.Int, userId)
+        .query('DELETE FROM Usuarios WHERE Id = @id');
+}
+
 async function ensureDefaultAdmin(pool) {
     const total = await countUsers(pool);
 
@@ -329,6 +339,7 @@ module.exports = {
     createSession,
     createUser,
     clearSessionCookie,
+    deleteUser,
     destroySession,
     ensureDefaultAdmin,
     findUserById,
