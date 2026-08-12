@@ -2280,14 +2280,45 @@
         }
     }
 
+    // Aplica "Meus setores" a lista do checklist, mas SEMPRE mantem quem ja
+    // esta selecionado (mesmo de outro setor). Sem isso, abrir um plantao com
+    // equipe de outro setor e salvar dropava esses membros — o salvar so le os
+    // checkboxes visiveis e marcados. Preferencia vazia = todos.
+    function filtrarChecklistPorMeusSetoresPlantao(lista, selecionados = []) {
+        const base = Array.isArray(lista) ? lista : [];
+        const meusSetores = typeof window.getMeusSetores === 'function' ? window.getMeusSetores() : [];
+
+        if (!meusSetores.length) {
+            return base;
+        }
+
+        const permitidos = new Set(meusSetores.map(String));
+        const jaSelecionados = new Set((selecionados || []).map(Number));
+
+        return base.filter((colaborador) => {
+            const setorId = String(colaborador.SetorId ?? colaborador.setorId ?? colaborador.setor_id ?? '');
+            return permitidos.has(setorId) || jaSelecionados.has(Number(colaborador.Id));
+        });
+    }
+
     function renderChecklistColaboradoresAvancado(selecionados = [], disponibilidade = []) {
-        const listaColaboradores = Array.isArray(window.colaboradores) ? window.colaboradores : [];
+        const todosColaboradores = Array.isArray(window.colaboradores) ? window.colaboradores : [];
+        const listaColaboradores = filtrarChecklistPorMeusSetoresPlantao(todosColaboradores, selecionados);
+
+        if (todosColaboradores.length === 0) {
+            return `
+                <div class="empty-msg">
+                    <i class="fas fa-users"></i>
+                    <p>Nenhum colaborador cadastrado</p>
+                </div>
+            `;
+        }
 
         if (listaColaboradores.length === 0) {
             return `
                 <div class="empty-msg">
                     <i class="fas fa-users"></i>
-                    <p>Nenhum colaborador cadastrado</p>
+                    <p>Nenhum colaborador nos setores que voce escolheu ver (Meus setores).</p>
                 </div>
             `;
         }
