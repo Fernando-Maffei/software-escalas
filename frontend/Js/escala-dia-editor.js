@@ -862,6 +862,48 @@
         return 'total-ok';
     }
 
+    // Limita a altura do .escala-scroll ao que sobra na janela para que o grid
+    // role verticalmente DENTRO dele (e nao no <main>). E o que permite o
+    // cabecalho de horas grudar no topo (position:sticky) ao rolar a lista.
+    function ajustarAlturaScrollEscala() {
+        const scrollEl = document.querySelector('.escala-page .escala-scroll');
+
+        if (!scrollEl) {
+            return;
+        }
+
+        // Com o grid rolando aqui dentro, o <main> nao rola e o topo do scroller
+        // (logo abaixo do painel fixo) fica estavel para essa medida.
+        const topo = scrollEl.getBoundingClientRect().top;
+        const folgaInferior = 18;
+        const altura = window.innerHeight - topo - folgaInferior;
+        scrollEl.style.setProperty('--escala-scroll-max', `${Math.max(260, Math.round(altura))}px`);
+    }
+
+    // O topo do scroller muda com a altura do painel fixo (que cresce/encolhe
+    // conforme a faixa de acoes quebra de linha ou as abas de setor aparecem) e
+    // com o tamanho da janela. Reobserva o painel a cada render e escuta resize.
+    function bindScrollHeightAutoEscala() {
+        ajustarAlturaScrollEscala();
+
+        const panel = document.querySelector('.escala-page .escala-sticky-panel');
+
+        if (panel && window.ResizeObserver && window.__escalaPanelObservado !== panel) {
+            if (window.__escalaPanelResizeObserver) {
+                window.__escalaPanelResizeObserver.disconnect();
+            }
+            const observer = new ResizeObserver(() => window.requestAnimationFrame(ajustarAlturaScrollEscala));
+            observer.observe(panel);
+            window.__escalaPanelResizeObserver = observer;
+            window.__escalaPanelObservado = panel;
+        }
+
+        if (!window.__escalaScrollResizeBound) {
+            window.__escalaScrollResizeBound = true;
+            window.addEventListener('resize', () => window.requestAnimationFrame(ajustarAlturaScrollEscala));
+        }
+    }
+
     function renderTotalRowEscala(items) {
         const body = document.getElementById('timelineBody');
 
@@ -2326,6 +2368,7 @@
         ensureScaleSidebarToggleEscala();
         bindScaleOutsideSelectionEscala();
         atualizarAcoesCabecalhoEscala();
+        bindScrollHeightAutoEscala();
 
         document.getElementById('btnDiaAnteriorEscala')?.addEventListener('click', async () => {
             const nextDate = shiftIsoDateEscala(obterDataSelecionadaEscala(), -1);

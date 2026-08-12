@@ -2527,7 +2527,15 @@
 
 .escala-page .escala-scroll {
     overflow-x: auto;
-    padding: 14px;
+    overflow-y: auto;
+    /* O grid rola nos DOIS eixos aqui dentro, com altura limitada ao viewport
+       (a medida vem do Js: ajustarAlturaScrollEscala grava --escala-scroll-max).
+       Isso e o que faz o cabecalho de horas (.timeline-header) conseguir grudar
+       no topo com position:sticky: um container com overflow-x:auto sempre vira
+       tambem um contexto de rolagem VERTICAL, entao o sticky do header so
+       funciona se a rolagem vertical do grid acontecer aqui, e nao no <main>. */
+    max-height: var(--escala-scroll-max, none);
+    padding: 0 14px 14px;
 }
 
 .escala-page .escala-scroll::-webkit-scrollbar {
@@ -2568,10 +2576,14 @@
 }
 
 .escala-page .timeline-header {
+    position: sticky;
+    top: 0;
+    z-index: 6;
     margin-bottom: 14px;
     border-radius: 14px;
     overflow: hidden;
-    background: rgba(12, 20, 32, 0.72);
+    /* Opaco (sem alfa): quando pinado no topo, as linhas rolam por baixo dele. */
+    background: rgb(12, 20, 32);
     border: 1px solid rgba(148, 163, 184, 0.18);
 }
 
