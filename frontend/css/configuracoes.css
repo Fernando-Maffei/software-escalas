@@ -915,6 +915,27 @@ input:checked + .slider:before {
 }
 
 /* ================= CONFIGURACOES > USUARIOS ================= */
+/* Faixa do topo: texto explicativo a esquerda e o botao "Minha senha" (troca
+   da senha do proprio admin) a direita; quebra em telas estreitas. */
+.usuarios-topo {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.usuarios-topo .config-descricao {
+  flex: 1 1 320px;
+  margin: 0;
+}
+
+.usuarios-minha-senha {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
 /* Formulario de novo usuario. Antes era uma unica linha flex com campos +
    checkbox + botao disputando a largura: os campos encolhiam ate ~165px e o
    botao "Criar usuario" chegava a cobrir o campo de senha em telas medias.

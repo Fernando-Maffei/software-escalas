@@ -129,6 +129,14 @@
                 : `<button type="button" class="btn-secondary btn-usuario-acao" data-acao="reativar" data-id="${usuario.id}" data-nome="${esc(usuario.username)}">
                         <i class="fas fa-user-check"></i> Reativar
                    </button>`);
+
+            // Excluir e diferente de desativar: apaga a conta de vez. Fica por
+            // ultimo e com estilo de perigo para nao ser confundido com o resto.
+            acoes.push(`
+                <button type="button" class="btn-secondary btn-usuario-acao btn-usuario-danger" data-acao="excluir" data-id="${usuario.id}" data-nome="${esc(usuario.username)}">
+                    <i class="fas fa-trash-alt"></i> Excluir
+                </button>
+            `);
         }
 
         return `
@@ -177,7 +185,8 @@
         const confirmacoes = {
             desativar: `Desativar o usuario "${nome}"? Ele perde o acesso imediatamente.`,
             'remover-admin': `Remover os poderes de administrador de "${nome}"?`,
-            resetar: `Gerar uma nova senha para "${nome}"? A senha atual deixa de valer na hora — numa conta de visualizacao, toda a equipe precisara da senha nova.`
+            resetar: `Gerar uma nova senha para "${nome}"? A senha atual deixa de valer na hora — numa conta de visualizacao, toda a equipe precisara da senha nova.`,
+            excluir: `Excluir DEFINITIVAMENTE o usuario "${nome}"? Esta acao nao pode ser desfeita — diferente de desativar, a conta e apagada de vez.`
         };
 
         if (confirmacoes[acao] && !window.confirm(confirmacoes[acao])) {
@@ -192,12 +201,17 @@
             resetar: { resetarSenha: true }
         };
 
-        try {
-            const response = await fetch(`${USUARIOS_URL}/${id}`, {
+        // Excluir usa DELETE (sem corpo); as demais acoes sao PUT de flags.
+        const requestInit = acao === 'excluir'
+            ? { method: 'DELETE' }
+            : {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payloads[acao])
-            });
+            };
+
+        try {
+            const response = await fetch(`${USUARIOS_URL}/${id}`, requestInit);
             const data = await response.json().catch(() => ({}));
 
             if (!response.ok) {
@@ -276,13 +290,18 @@
         }
 
         container.innerHTML = `
-            <p class="config-descricao">
-                Contas de <strong>administrador</strong> sao pessoais e fazem lancamentos:
-                a senha definida aqui e temporaria e o dono troca no primeiro acesso.
-                A conta de <strong>visualizacao</strong> e compartilhada pela equipe e so
-                enxerga o calendario — a senha vale como definida e quem a usa nao pode
-                altera-la.
-            </p>
+            <div class="usuarios-topo">
+                <p class="config-descricao">
+                    Contas de <strong>administrador</strong> sao pessoais e fazem lancamentos:
+                    a senha definida aqui e temporaria e o dono troca no primeiro acesso.
+                    A conta de <strong>visualizacao</strong> e compartilhada pela equipe e so
+                    enxerga o calendario — a senha vale como definida e quem a usa nao pode
+                    altera-la.
+                </p>
+                <button type="button" id="btnMinhaSenha" class="btn-secondary usuarios-minha-senha">
+                    <i class="fas fa-key"></i> Minha senha
+                </button>
+            </div>
 
             <div id="usuariosSenhaTemporaria" class="hidden"></div>
 
@@ -312,6 +331,14 @@
 
         container.querySelector('#novoUsuarioBtn').addEventListener('click', () => {
             criarUsuario(container, usuarioAtual);
+        });
+
+        // "Minha senha" reaproveita o modal de troca de senha que antes era
+        // aberto pelo botao da sidebar (auth.js expoe window.abrirModalTrocarSenha).
+        container.querySelector('#btnMinhaSenha')?.addEventListener('click', () => {
+            if (typeof window.abrirModalTrocarSenha === 'function') {
+                window.abrirModalTrocarSenha();
+            }
         });
 
         carregarLista(container, usuarioAtual);
