@@ -130,6 +130,12 @@
     function getScaleSectorSelectionEscala() {
         if (!(window.__escalaSectorSelection instanceof Set)) {
             window.__escalaSectorSelection = new Set();
+
+            // Semente com a preferencia "Meus setores" da conta: ao abrir a
+            // escala, ela ja vem filtrada pelos setores que o gestor escolheu.
+            if (typeof window.getMeusSetores === 'function') {
+                window.getMeusSetores().forEach((id) => window.__escalaSectorSelection.add(String(id)));
+            }
         }
         return window.__escalaSectorSelection;
     }
@@ -223,7 +229,15 @@
 
         container.querySelectorAll('[data-escala-setor]').forEach((button) => {
             button.addEventListener('click', () => {
-                toggleScaleSectorEscala(button.getAttribute('data-escala-setor'));
+                const selecaoAtual = toggleScaleSectorEscala(button.getAttribute('data-escala-setor'));
+
+                // As abas da escala sao o editor de "Meus setores": o que o
+                // gestor liga/desliga aqui vira a preferencia salva da conta e
+                // passa a valer tambem no Dashboard e no Plantao.
+                if (typeof window.salvarMeusSetores === 'function') {
+                    window.salvarMeusSetores([...selecaoAtual]);
+                }
+
                 renderScaleSectorTabsEscala(getCurrentScaleState().items || []);
                 renderScaleRowsEscala(getCurrentScaleState());
             });
