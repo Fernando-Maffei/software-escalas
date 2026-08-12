@@ -313,12 +313,6 @@ const CONFIGURACOES_SECOES = [
         description: 'Preferencias gerais'
     },
     {
-        id: 'usuarios',
-        label: 'Usuarios',
-        icon: 'users-cog',
-        description: 'Contas e acessos'
-    },
-    {
         id: 'banco',
         label: 'Conexao banco',
         icon: 'database',
@@ -904,6 +898,9 @@ function carregarPagina(pagina) {
             break;
         case "configuracoes":
             renderConfiguracoes();
+            break;
+        case "usuarios":
+            renderUsuarios();
             break;
         case "relatorios":
             renderRelatorios();
@@ -2434,6 +2431,36 @@ function abrirSeletorMes() {
     });
 }
 
+// Tela de Usuarios (antes era uma aba dentro de Configuracoes; virou item
+// proprio no menu, admin-only). O conteudo em si e montado por
+// inicializarUsuariosTela() em configuracoes-usuarios.js, que popula o
+// #usuariosCardConteudo. A visibilidade e navegacao ja sao filtradas por
+// permissoes.js (o item some e a rota cai no calendario para nao-admin).
+function renderUsuarios() {
+    if (!appContent) {
+        return;
+    }
+
+    appContent.innerHTML = `
+        <div class="page-header">
+            <h1><i class="fas fa-users-cog"></i> Usuários</h1>
+            <p>Contas e acessos ao sistema</p>
+        </div>
+
+        <div class="configuracoes-grid">
+            <div class="config-card config-card-wide" data-config-section="usuarios">
+                <div class="config-card-body" id="usuariosCardConteudo">
+                    <p class="config-descricao">Carregando usuarios...</p>
+                </div>
+            </div>
+        </div>
+    `;
+
+    if (typeof window.inicializarUsuariosTela === 'function') {
+        window.inicializarUsuariosTela();
+    }
+}
+
 function renderConfiguracoes() {
     // Verifica o tema atual salvo
     const temaAtual = localStorage.getItem('tema') || 'light';
@@ -2930,17 +2957,6 @@ function renderConfiguracoes() {
                 </div>
             </div>
 
-            <div class="config-card config-card-wide" data-config-section="usuarios">
-                <div class="config-card-header">
-                    <i class="fas fa-users-cog"></i>
-                    <h2>Usuarios do Sistema</h2>
-                </div>
-
-                <div class="config-card-body" id="usuariosCardConteudo">
-                    <p class="config-descricao">Carregando usuarios...</p>
-                </div>
-            </div>
-
             <div class="config-card config-card-tools" data-config-section="ferramentas">
                 <div class="config-card-header">
                     <i class="fas fa-tools"></i>
@@ -3001,10 +3017,6 @@ function renderConfiguracoes() {
 
     if (typeof window.inicializarBackupSistemaTela === 'function') {
         window.inicializarBackupSistemaTela();
-    }
-
-    if (typeof window.inicializarUsuariosTela === 'function') {
-        window.inicializarUsuariosTela();
     }
 
     inicializarDiagnosticoRede();
@@ -4252,7 +4264,7 @@ function getPaginaFromURL() {
     const hash = window.location.hash.substring(1); // Remove o #
     
     // Se não tiver hash ou for inválido, retorna dashboard
-    const paginasValidas = ['dashboard', 'calendario', 'colaboradores', 'escala', 'lancamentoPlantao', 'relatorios', 'configuracoes'];
+    const paginasValidas = ['dashboard', 'calendario', 'colaboradores', 'escala', 'lancamentoPlantao', 'relatorios', 'configuracoes', 'usuarios'];
     
     if (hash && paginasValidas.includes(hash)) {
         return hash;

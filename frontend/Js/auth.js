@@ -420,6 +420,10 @@
         }
     }
 
+    // Exposto para a tela de Usuarios: o "Alterar senha" saiu da sidebar e
+    // virou um botao "Minha senha" dentro dessa tela, que reaproveita este modal.
+    window.abrirModalTrocarSenha = openTrocarSenhaModal;
+
     if (abrirTrocarSenhaBtn) {
         abrirTrocarSenhaBtn.addEventListener('click', openTrocarSenhaModal);
     }

@@ -61,17 +61,6 @@
         }
     }
 
-    function removerSecaoUsuarios() {
-        document.querySelector('[data-config-tab="usuarios"]')?.remove();
-        document.querySelector('[data-config-section="usuarios"]')?.remove();
-
-        // Se a secao removida era a que estava aberta, volta para a inicial.
-        if (localStorage.getItem('configuracoesSecaoAtual') === 'usuarios'
-            && typeof window.ativarSecaoConfiguracoes === 'function') {
-            window.ativarSecaoConfiguracoes('personalizacao');
-        }
-    }
-
     function mostrarSenhaTemporaria(container, username, senha, isAdmin) {
         const aviso = container.querySelector('#usuariosSenhaTemporaria');
 
@@ -280,7 +269,9 @@
         const usuarioAtual = await buscarUsuarioAtual();
 
         if (!usuarioAtual || !usuarioAtual.isAdmin) {
-            removerSecaoUsuarios();
+            // A tela e admin-only e o permissoes.js ja redireciona o usuario
+            // comum; esta e so uma rede de seguranca visual.
+            container.innerHTML = '<p class="config-descricao">Apenas administradores podem gerenciar usuarios.</p>';
             return;
         }
 

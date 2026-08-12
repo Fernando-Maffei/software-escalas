@@ -25,20 +25,14 @@
     function aplicarPermissoesSidebar() {
         const admin = usuarioEhAdmin();
 
+        // Inclui o item "Usuarios" (data-page="usuarios"): como nao esta em
+        // PAGINAS_USUARIO_COMUM, ja fica oculto para o usuario comum aqui. A
+        // troca de senha pessoal saiu da sidebar e virou o botao "Minha senha"
+        // dentro dessa tela (so admin a alcanca).
         document.querySelectorAll('.sidebar-btn[data-page]').forEach((btn) => {
             const permitido = admin || PAGINAS_USUARIO_COMUM.includes(btn.dataset.page);
             btn.classList.toggle('sidebar-btn-oculto', !permitido);
         });
-
-        // "Alterar senha" e caso a parte: a conta de visualizacao e
-        // compartilhada pela equipe, entao trocar a senha trancaria todo
-        // mundo. Quem altera essa senha e o administrador, pela tela de
-        // Usuarios (o back-end tambem recusa: auth.js, POST /trocar-senha).
-        const trocarSenhaBtn = document.getElementById('abrirTrocarSenhaBtn');
-
-        if (trocarSenhaBtn) {
-            trocarSenhaBtn.classList.toggle('sidebar-btn-oculto', !admin);
-        }
     }
 
     // Envolve carregarPagina para que qualquer caminho de navegacao — clique
