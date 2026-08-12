@@ -1085,6 +1085,67 @@ input:checked + .slider:before {
   border-color: rgba(220, 38, 38, 0.35);
 }
 
+/* Chips de "setores permitidos" (teto de acesso por conta). Ocupam a linha
+   inteira abaixo das acoes; nenhum marcado = sem restricao (ve todos). */
+.usuario-setores {
+  flex: 1 1 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--border);
+}
+
+.usuario-setores-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-light);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.usuario-setores-chips {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.usuario-setor-chip {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 5px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-light);
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.usuario-setor-chip:hover {
+  border-color: var(--primary);
+}
+
+.usuario-setor-chip.is-active {
+  background: var(--primary-soft);
+  border-color: var(--primary);
+  color: var(--primary-dark);
+}
+
+.usuario-setores-hint {
+  font-size: 11px;
+  color: var(--text-lighter);
+  margin-left: auto;
+}
+
+.usuario-setores-hint.is-restrito {
+  color: var(--primary-dark);
+  font-weight: 600;
+}
+
 .usuarios-senha-box {
   border: 1px solid rgba(245, 158, 11, 0.5);
   background: rgba(245, 158, 11, 0.1);

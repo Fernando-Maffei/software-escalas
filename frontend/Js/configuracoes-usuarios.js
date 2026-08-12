@@ -5,6 +5,10 @@
 (function () {
     const USUARIOS_URL = '/api/usuarios';
     const ME_URL = '/api/auth/me';
+    const SETORES_URL = '/api/setores';
+
+    // Setores disponiveis para atribuir como "permitidos" a cada conta.
+    let setoresDisponiveis = [];
 
     function esc(value) {
         return String(value ?? '')
@@ -147,6 +151,38 @@
                     <small class="usuario-ultimo-login">Ultimo acesso: ${esc(formatarDataHora(usuario.ultimoLoginAt))}</small>
                 </div>
                 <div class="usuario-acoes">${acoes.join('')}</div>
+                ${renderSetoresPermitidos(usuario)}
+            </div>
+        `;
+    }
+
+    // Linha de chips para atribuir os setores que a conta PODE ver (teto de
+    // acesso). Nenhum ligado = sem restricao (ve todos). Vale para qualquer
+    // perfil, inclusive admin (a decisao foi: todos seguem a propria permissao).
+    function renderSetoresPermitidos(usuario) {
+        if (!setoresDisponiveis.length) {
+            return '';
+        }
+
+        const permitidos = new Set((usuario.setoresPermitidos || []).map(String));
+        const semRestricao = permitidos.size === 0;
+
+        const chips = setoresDisponiveis.map((setor) => {
+            const id = String(setor.id ?? setor.Id ?? '');
+            const nome = setor.nome ?? setor.Nome ?? id;
+            const ativo = permitidos.has(id);
+            return `
+                <button type="button" class="usuario-setor-chip ${ativo ? 'is-active' : ''}" data-setor-id="${esc(id)}" data-user-id="${usuario.id}" aria-pressed="${ativo ? 'true' : 'false'}">
+                    ${esc(nome)}
+                </button>
+            `;
+        }).join('');
+
+        return `
+            <div class="usuario-setores" data-user-id="${usuario.id}">
+                <span class="usuario-setores-label"><i class="fas fa-shield-halved"></i> Setores permitidos</span>
+                <div class="usuario-setores-chips">${chips}</div>
+                <span class="usuario-setores-hint ${semRestricao ? '' : 'is-restrito'}">${semRestricao ? 'Todos (sem restricao)' : 'So os marcados'}</span>
             </div>
         `;
     }
@@ -176,8 +212,56 @@
                     executarAcao(container, usuarioAtual, botao.dataset.acao, Number(botao.dataset.id), botao.dataset.nome);
                 });
             });
+
+            lista.querySelectorAll('.usuario-setor-chip').forEach((chip) => {
+                chip.addEventListener('click', () => {
+                    chip.classList.toggle('is-active');
+                    salvarSetoresPermitidos(lista, Number(chip.dataset.userId));
+                });
+            });
         } catch (error) {
             lista.innerHTML = '<p class="config-descricao">Falha de comunicacao ao carregar os usuarios.</p>';
+        }
+    }
+
+    // Le os chips ativos da conta e persiste o teto de acesso. Nenhum ativo =
+    // lista vazia = sem restricao (ve todos). Atualiza a dica localmente sem
+    // recarregar a lista inteira (nao perde o lugar do admin).
+    async function salvarSetoresPermitidos(lista, userId) {
+        const bloco = lista.querySelector(`.usuario-setores[data-user-id="${userId}"]`);
+
+        if (!bloco) {
+            return;
+        }
+
+        const setores = Array.from(bloco.querySelectorAll('.usuario-setor-chip.is-active'))
+            .map((chip) => chip.dataset.setorId);
+
+        const dica = bloco.querySelector('.usuario-setores-hint');
+
+        if (dica) {
+            const semRestricao = setores.length === 0;
+            dica.textContent = semRestricao ? 'Todos (sem restricao)' : 'So os marcados';
+            dica.classList.toggle('is-restrito', !semRestricao);
+        }
+
+        bloco.querySelectorAll('.usuario-setor-chip').forEach((chip) => {
+            chip.setAttribute('aria-pressed', chip.classList.contains('is-active') ? 'true' : 'false');
+        });
+
+        try {
+            const response = await fetch(`${USUARIOS_URL}/${userId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ setoresPermitidos: setores })
+            });
+
+            if (!response.ok) {
+                const data = await response.json().catch(() => ({}));
+                toast(data.error || 'Nao foi possivel salvar os setores permitidos.', 'error');
+            }
+        } catch (error) {
+            toast('Falha de comunicacao ao salvar os setores permitidos.', 'error');
         }
     }
 
@@ -287,6 +371,17 @@
             // comum; esta e so uma rede de seguranca visual.
             container.innerHTML = '<p class="config-descricao">Apenas administradores podem gerenciar usuarios.</p>';
             return;
+        }
+
+        // Carrega os setores para os chips de "setores permitidos". Falha aqui
+        // nao impede gerir contas — so esconde os chips.
+        try {
+            const setoresResp = await fetch(SETORES_URL);
+            const setoresData = await setoresResp.json().catch(() => []);
+            const bruto = Array.isArray(setoresData) ? setoresData : (setoresData.setores || setoresData.data || []);
+            setoresDisponiveis = bruto.filter((setor) => (setor.id ?? setor.Id) != null);
+        } catch (error) {
+            setoresDisponiveis = [];
         }
 
         container.innerHTML = `

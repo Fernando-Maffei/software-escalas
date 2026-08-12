@@ -106,6 +106,7 @@ function mapUserRow(row) {
         ativo: Boolean(row.Ativo),
         isAdmin: Boolean(row.IsAdmin),
         setoresVisiveis: normalizeSetoresVisiveis(row.SetoresVisiveisJson),
+        setoresPermitidos: normalizeSetoresVisiveis(row.SetoresPermitidosJson),
         criadoEm: row.CreatedAt || null,
         ultimoLoginAt: row.UltimoLoginAt || null
     };
@@ -153,7 +154,7 @@ async function createUser(pool, { username, password, deveTrocarSenha = false, i
 
 async function listUsers(pool) {
     const result = await pool.request().query(`
-        SELECT Id, Username, DeveTrocarSenha, Ativo, IsAdmin, CreatedAt, UltimoLoginAt
+        SELECT Id, Username, DeveTrocarSenha, Ativo, IsAdmin, SetoresPermitidosJson, CreatedAt, UltimoLoginAt
         FROM Usuarios
         ORDER BY Username
     `);
@@ -231,6 +232,20 @@ async function updateUserSetoresVisiveis(pool, userId, setores) {
         .input('id', sql.Int, userId)
         .input('json', sql.NVarChar(sql.MAX), json)
         .query('UPDATE Usuarios SET SetoresVisiveisJson = @json WHERE Id = @id');
+
+    return normalizados;
+}
+
+// Salva os setores PERMITIDOS da conta (teto imposto, definido por admin).
+// Lista vazia grava NULL (= sem restricao, ve todos). Retorna a lista gravada.
+async function updateUserSetoresPermitidos(pool, userId, setores) {
+    const normalizados = normalizeSetoresVisiveis(setores);
+    const json = normalizados.length ? JSON.stringify(normalizados) : null;
+
+    await pool.request()
+        .input('id', sql.Int, userId)
+        .input('json', sql.NVarChar(sql.MAX), json)
+        .query('UPDATE Usuarios SET SetoresPermitidosJson = @json WHERE Id = @id');
 
     return normalizados;
 }
@@ -412,6 +427,7 @@ module.exports = {
     touchLastLogin,
     updateUserFlags,
     updateUserPassword,
+    updateUserSetoresPermitidos,
     updateUserSetoresVisiveis,
     verifyPassword
 };

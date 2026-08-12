@@ -40,7 +40,8 @@ function toPublicUser(user) {
         username: user.username,
         deveTrocarSenha: user.deveTrocarSenha,
         isAdmin: Boolean(user.isAdmin),
-        setoresVisiveis: Array.isArray(user.setoresVisiveis) ? user.setoresVisiveis : []
+        setoresVisiveis: Array.isArray(user.setoresVisiveis) ? user.setoresVisiveis : [],
+        setoresPermitidos: Array.isArray(user.setoresPermitidos) ? user.setoresPermitidos : []
     };
 }
 

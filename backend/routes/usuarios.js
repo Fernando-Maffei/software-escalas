@@ -15,7 +15,8 @@ const {
     requireAdmin,
     revokeUserSessions,
     updateUserFlags,
-    updateUserPassword
+    updateUserPassword,
+    updateUserSetoresPermitidos
 } = require('../utils/auth');
 
 const router = express.Router();
@@ -31,6 +32,7 @@ function toPublicUser(user) {
         ativo: user.ativo,
         isAdmin: user.isAdmin,
         deveTrocarSenha: user.deveTrocarSenha,
+        setoresPermitidos: Array.isArray(user.setoresPermitidos) ? user.setoresPermitidos : [],
         criadoEm: user.criadoEm,
         ultimoLoginAt: user.ultimoLoginAt
     };
@@ -133,6 +135,14 @@ router.put('/:id', async (req, res, next) => {
         }
 
         await updateUserFlags(pool, alvo.id, flags);
+
+        // Setores permitidos (teto de acesso imposto). So aplica quando o campo
+        // vem no corpo, para nao zerar a permissao numa atualizacao de flags.
+        // Nao derruba a sessao: a imposicao no backend le o teto fresco do banco
+        // a cada request, entao a mudanca ja vale no proximo carregamento.
+        if (Array.isArray(req.body?.setoresPermitidos)) {
+            await updateUserSetoresPermitidos(pool, alvo.id, req.body.setoresPermitidos);
+        }
 
         let senhaTemporaria = null;
 
