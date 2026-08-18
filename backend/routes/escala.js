@@ -4,6 +4,7 @@ const { sql, conectar } = require('../db');
 const { withTransaction } = require('../utils/transactions');
 const { AppError } = require('../utils/errors');
 const { getSchemaInfo } = require('../utils/schema');
+const { getSetoresPermitidosRequest, idsPermitidosNumericos } = require('../utils/acesso-setores');
 const {
     applyLunchPeriod,
     ensureEscalaDiaForPeriod,
@@ -92,12 +93,31 @@ router.get('/dia/:dataISO', async (req, res) => {
         setorId
     }));
 
+    // Controle de acesso por setor: a conta so recebe os itens dos setores que
+    // tem permissao (a escala tem fonte propria, entao filtrar colaboradores
+    // nao basta). Vazio = sem restricao.
+    const itemsVisiveis = await filtrarItensPorSetoresPermitidos(pool, req, items);
+
     res.json({
         dataISO,
         setorId,
-        items
+        items: itemsVisiveis
     });
 });
+
+// Mantem so os itens de escala cujos setores a conta pode ver. Item sem setor
+// (setorId nulo) fica de fora quando ha restricao.
+async function filtrarItensPorSetoresPermitidos(pool, req, items) {
+    const permitidos = await getSetoresPermitidosRequest(pool, req);
+
+    if (!permitidos.length) {
+        return items;
+    }
+
+    const ids = new Set(idsPermitidosNumericos(permitidos));
+
+    return (items || []).filter((item) => ids.has(Number(item.setorId)));
+}
 
 router.get('/relatorio', async (req, res) => {
     const pool = await conectar();

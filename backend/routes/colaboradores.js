@@ -3,6 +3,7 @@ const router = express.Router();
 
 const { sql, conectar } = require('../db');
 const { AppError } = require('../utils/errors');
+const { getSetoresPermitidosRequest, idsPermitidosNumericos } = require('../utils/acesso-setores');
 const { syncColaboradorDefaultsToEscalaDia } = require('../utils/escala');
 const {
     listJornadaSemanal,
@@ -118,6 +119,27 @@ router.get('/', async (req, res) => {
         clauses.push('c.SetorId = @setorId');
     }
 
+    // Controle de acesso por setor: a conta so ve colaboradores dos setores que
+    // tem permissao. Como as telas (Escala, Dashboard, Plantao) derivam desta
+    // lista, filtrar aqui ja as limita. Vazio = sem restricao (ve todos).
+    if (hasSetorSupport(schema)) {
+        const permitidos = await getSetoresPermitidosRequest(pool, req);
+
+        if (permitidos.length) {
+            const ids = idsPermitidosNumericos(permitidos);
+
+            if (ids.length) {
+                const params = ids.map((id, index) => {
+                    request.input(`perm${index}`, sql.Int, id);
+                    return `@perm${index}`;
+                });
+                clauses.push(`c.SetorId IN (${params.join(', ')})`);
+            } else {
+                clauses.push('1 = 0'); // permitidos invalidos: nao vaza ninguem
+            }
+        }
+    }
+
     const query = buildColaboradorSelectQuery(schema, {
         whereClause: clauses.length > 0 ? `WHERE ${clauses.join(' AND ')}` : ''
     });
@@ -140,6 +162,20 @@ router.get('/:id', async (req, res) => {
 
     if (!colaborador) {
         throw new AppError(404, 'Colaborador nao encontrado.');
+    }
+
+    // Controle de acesso por setor: nao revela colaborador de setor sem
+    // permissao (404, para nao confirmar sequer a existencia).
+    if (hasSetorSupport(schema)) {
+        const permitidos = await getSetoresPermitidosRequest(pool, req);
+
+        if (permitidos.length) {
+            const ids = idsPermitidosNumericos(permitidos);
+
+            if (!ids.includes(Number(colaborador.SetorId))) {
+                throw new AppError(404, 'Colaborador nao encontrado.');
+            }
+        }
     }
 
     res.json(colaborador);
