@@ -133,7 +133,11 @@
 
             // Semente com a preferencia "Meus setores" da conta: ao abrir a
             // escala, ela ja vem filtrada pelos setores que o gestor escolheu.
-            if (typeof window.getMeusSetores === 'function') {
+            // So para contas SEM teto de setor — quem tem restricao ve apenas o
+            // permitido (imposto no backend) e nao usa o filtro self-service.
+            const restrito = typeof window.temRestricaoDeSetor === 'function' && window.temRestricaoDeSetor();
+
+            if (!restrito && typeof window.getMeusSetores === 'function') {
                 window.getMeusSetores().forEach((id) => window.__escalaSectorSelection.add(String(id)));
             }
         }
@@ -200,6 +204,18 @@
         if (!container) {
             return;
         }
+
+        // Conta com teto de setor (definido na config de Usuarios): o que ela ve
+        // ja e so o permitido (imposto no backend). Nao faz sentido oferecer
+        // abas de setor aqui — some com elas e nao aplica filtro extra.
+        if (typeof window.temRestricaoDeSetor === 'function' && window.temRestricaoDeSetor()) {
+            getScaleSectorSelectionEscala().clear();
+            container.innerHTML = '';
+            container.style.display = 'none';
+            return;
+        }
+
+        container.style.display = '';
 
         const filters = buildScaleSectorFiltersEscala(items);
         const selecao = getScaleSectorSelectionEscala();

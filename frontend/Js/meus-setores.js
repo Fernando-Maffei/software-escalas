@@ -94,7 +94,23 @@
         return atual;
     }
 
+    // Setores PERMITIDOS (teto imposto, definido pelo admin na tela de
+    // Usuarios). Diferente de "Meus setores": este e o limite de acesso, nao
+    // uma escolha do usuario. Vazio = sem restricao (ve todos).
+    function getSetoresPermitidos() {
+        const doUsuario = root.__usuarioAtual && root.__usuarioAtual.setoresPermitidos;
+        return normalizar(doUsuario);
+    }
+
+    // Conta tem teto de setor definido? Se sim, as telas nao oferecem escolha
+    // de setor — o que ela ve ja e so o permitido.
+    function temRestricaoDeSetor() {
+        return getSetoresPermitidos().length > 0;
+    }
+
     root.getMeusSetores = getMeusSetores;
     root.setMeusSetoresLocal = setMeusSetoresLocal;
     root.salvarMeusSetores = salvarMeusSetores;
+    root.getSetoresPermitidos = getSetoresPermitidos;
+    root.temRestricaoDeSetor = temRestricaoDeSetor;
 }(window));
