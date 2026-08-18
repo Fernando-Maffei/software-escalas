@@ -1,8 +1,10 @@
 const crypto = require('crypto');
+const fs = require('fs');
 
 const { sql } = require('../db');
 const { AppError } = require('./errors');
 const { normalizeOptionalText } = require('./validation');
+const { ensureDataDirectory, resolveDataPath } = require('./app-paths');
 
 const SCRYPT_KEYLEN = 64;
 const SESSION_COOKIE_NAME = 'escalas_sid';
@@ -10,6 +12,41 @@ const SESSION_TTL_MS = 12 * 60 * 60 * 1000;
 const MIN_PASSWORD_LENGTH = 8;
 
 const sessions = new Map();
+
+// As sessoes vivem em memoria, mas sao espelhadas em disco (na pasta de dados,
+// que e um volume persistente) para sobreviverem a reinicios do processo —
+// rebuild da imagem ou reload do `node --watch` em dev. Sem isso, cada reinicio
+// deslogava todo mundo. Guarda o mesmo que createSession; a validade e a de
+// quando foi salva (o TTL desliza so em memoria).
+const SESSIONS_FILE = resolveDataPath('sessions.json');
+
+function carregarSessoesDoDisco() {
+    try {
+        const entradas = JSON.parse(fs.readFileSync(SESSIONS_FILE, 'utf8'));
+        const agora = Date.now();
+
+        if (Array.isArray(entradas)) {
+            entradas.forEach(([token, sessao]) => {
+                if (token && sessao && Number(sessao.expiresAt) > agora) {
+                    sessions.set(token, sessao);
+                }
+            });
+        }
+    } catch (error) {
+        // Arquivo ausente/ilegivel: comeca sem sessoes (todos logam de novo).
+    }
+}
+
+function salvarSessoesNoDisco() {
+    try {
+        ensureDataDirectory();
+        fs.writeFileSync(SESSIONS_FILE, JSON.stringify([...sessions.entries()]));
+    } catch (error) {
+        // Falha ao persistir nao pode derrubar o login; segue so em memoria.
+    }
+}
+
+carregarSessoesDoDisco();
 
 function hashPassword(password) {
     const salt = crypto.randomBytes(16).toString('hex');
@@ -293,6 +330,7 @@ function createSession(user) {
         expiresAt: Date.now() + SESSION_TTL_MS
     });
 
+    salvarSessoesNoDisco();
     return token;
 }
 
@@ -308,6 +346,10 @@ function revokeUserSessions(userId) {
             revoked += 1;
         }
     });
+
+    if (revoked > 0) {
+        salvarSessoesNoDisco();
+    }
 
     return revoked;
 }
@@ -335,6 +377,7 @@ function getSession(token) {
 function destroySession(token) {
     if (token) {
         sessions.delete(token);
+        salvarSessoesNoDisco();
     }
 }
 
