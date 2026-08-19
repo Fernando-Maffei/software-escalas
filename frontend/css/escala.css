@@ -3441,6 +3441,46 @@
     border-color: var(--border);
 }
 
+/* ===========================
+   COLUNA DE NOMES CONGELADA — FUNDO OPACO
+   A coluna de colaboradores fica sticky (left:0) enquanto a grade de
+   horarios rola por baixo dela ao arrastar a barra horizontal. Os fundos
+   que ela herdava eram TRANSLUCIDOS — no escuro a regra .timeline-row > div
+   (0,2,1) vencia a .timeline-name (0,2,0) e deixava a coluna em
+   rgba(15,23,42,.48) (so 48% opaca); no claro ela ficava em ~96/97%. Com
+   qualquer transparencia, as barras coloridas das celulas que passam por
+   tras "vazam" atraves da coluna e a escala parece bugada ao rolar.
+   Aqui forcamos fundo 100% opaco na coluna congelada (cabecalho + linhas,
+   incluindo hover e selecionada) nos dois temas, com especificidade acima
+   das regras herdadas. O restante da grade continua com o efeito de vidro. */
+.escala-page .timeline-header .timeline-name-header,
+.escala-page .timeline-row .timeline-name {
+    background: #141b2e;
+}
+
+.escala-page .timeline-row .timeline-name:hover {
+    background: #2b3c60;
+}
+
+.escala-page .timeline-row.is-selected .timeline-name,
+.escala-page .timeline-row.is-selected .timeline-name:hover {
+    background: #243350;
+}
+
+:root:not([data-theme="dark"]) .escala-page .timeline-header .timeline-name-header,
+:root:not([data-theme="dark"]) .escala-page .timeline-row .timeline-name {
+    background: #ffffff;
+}
+
+:root:not([data-theme="dark"]) .escala-page .timeline-row .timeline-name:hover {
+    background: #f3f5ff;
+}
+
+:root:not([data-theme="dark"]) .escala-page .timeline-row.is-selected .timeline-name,
+:root:not([data-theme="dark"]) .escala-page .timeline-row.is-selected .timeline-name:hover {
+    background: #e9edff;
+}
+
 
 /* ===========================
    ESCALA - RESPONSIVIDADE DA TIMELINE
