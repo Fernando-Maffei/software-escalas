@@ -2535,7 +2535,12 @@
        tambem um contexto de rolagem VERTICAL, entao o sticky do header so
        funciona se a rolagem vertical do grid acontecer aqui, e nao no <main>. */
     max-height: var(--escala-scroll-max, none);
-    padding: 0 14px 14px;
+    /* padding-left = 0 de proposito: com overflow-x:auto, qualquer padding a
+       ESQUERDA vira uma faixa onde as barras rolam por baixo (o overflow recorta
+       na borda do padding, mas a coluna de nomes so fixa em left:0 = borda do
+       CONTENT, depois do padding). Isso abria uma fresta a esquerda dos nomes.
+       O respiro a esquerda ja vem do espaco entre a sidebar e o card. */
+    padding: 0 14px 14px 0;
 }
 
 .escala-page .escala-scroll::-webkit-scrollbar {
@@ -2663,7 +2668,42 @@
     transition: background-color 0.18s ease, box-shadow 0.18s ease, color 0.18s ease;
     position: sticky;
     left: 0;
+    /* Acima do .escala-overlay (z-index:3), senao as barras rolam POR CIMA da
+       coluna de nomes fixa ao arrastar a timeline para a direita. */
+    z-index: 5;
+}
+
+/* Fundo OPACO na coluna fixa de nomes. Sem isto, o bg translucido herdado de
+   ".timeline-row > div" (rgba .48) deixa as barras vazarem por baixo do nome
+   ao rolar. O seletor filho-direto com a classe vence ".timeline-row > div"
+   em especificidade (3 classes > 2 classes + 1 elemento). */
+.escala-page .timeline-row > .timeline-name {
+    background: rgb(12, 20, 32);
+}
+
+/* ---- Congelar a coluna TOTAL junto com a de nomes ----
+   Pina a TOTAL em left = largura da coluna de nomes (a MESMA variavel da grade,
+   entao acompanha os breakpoints e encosta exatamente na borda dos nomes).
+   z-index 4 = abaixo do nome (5, para o nome cobrir no canto) e acima das barras
+   (overlay z3), para o "8h" ficar sempre visivel e OPACO ao rolar. Fundo opaco
+   por tema (escuro aqui; claro no bloco :root:not([data-theme="dark"]) abaixo). */
+.escala-page .timeline-row > .timeline-cell.total-cell {
+    position: sticky;
+    left: var(--esc-col-nome, 240px);
+    z-index: 4;
+    background: rgb(12, 20, 32);
+}
+
+.escala-page .timeline-header .total-header {
+    position: sticky;
+    left: var(--esc-col-nome, 240px);
     z-index: 3;
+    background: rgb(17, 27, 42);
+}
+
+:root:not([data-theme="dark"]) .escala-page .timeline-row > .timeline-cell.total-cell,
+:root:not([data-theme="dark"]) .escala-page .timeline-header .total-header {
+    background: #ffffff;
 }
 
 .escala-page .timeline-row:not(.total-row):not(.mensagem-row) .timeline-name {
@@ -3428,6 +3468,16 @@
 
 :root:not([data-theme="dark"]) .escala-page .timeline-name {
     color: var(--text);
+}
+
+/* Coluna fixa de nomes: OPACA no tema claro tambem. As regras acima a deixam
+   translucida (rgba .96/.97) e, ao rolar a timeline, as barras vazam por baixo
+   do nome. Este seletor (filho-direto) vence as regras translucidas em
+   especificidade; cobre repouso e hover. O escuro ja e opaco via
+   ".timeline-row > .timeline-name" (rgb navy). */
+:root:not([data-theme="dark"]) .escala-page .timeline-row > .timeline-name,
+:root:not([data-theme="dark"]) .escala-page .timeline-row > .timeline-name:hover {
+    background: #ffffff;
 }
 
 :root:not([data-theme="dark"]) .escala-page .timeline-cell.fora-expediente::before {
