@@ -3,7 +3,7 @@
     max-width: 1200px;
     width: 95%;
     background: var(--card);
-    border-radius: 24px;
+    border-radius: var(--radius-lg);
     overflow: hidden;
     box-shadow: var(--shadow-xl);
     border: 1px solid var(--border);
@@ -13,7 +13,7 @@
 }
 
 #modalLancamento .modal-header {
-    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+    background: var(--accent);
     padding: 12px 20px;
 }
 
@@ -40,7 +40,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: all 0.2s ease;
+    transition: var(--transition);
 }
 
 #modalLancamento .modal-close:hover {
@@ -111,7 +111,7 @@
     font-weight: 600;
     font-size: 13px;
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition: var(--transition);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -177,7 +177,7 @@
     border: 1px solid var(--border);
     border-radius: 12px;
     padding: 16px;
-    transition: all 0.2s ease;
+    transition: var(--transition);
     position: relative;
     width: 100%;
     box-sizing: border-box;
@@ -194,7 +194,7 @@
 }
 
 #modalLancamento .lancamento-card.feriado {
-    border-left: 4px solid #e0973a;
+    border-left: 4px solid var(--warning);
 }
 
 #modalLancamento .lancamento-header {
@@ -315,7 +315,7 @@
     background: var(--card-dark);
     color: var(--text-light);
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition: var(--transition);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -423,13 +423,23 @@
     border: 2px solid var(--border);
     background: var(--card);
     color: var(--text);
-    transition: all 0.2s ease;
+    transition: var(--transition);
 }
 
 #modalLancamento .form-control:focus {
     border-color: var(--primary);
     outline: none;
-    box-shadow: 0 0 0 3px var(--primary-soft);
+    box-shadow: 0 0 0 4px var(--primary-soft);
+}
+
+/* Foco por teclado visivel nas abas, botoes e no fechar (a11y). */
+#modalLancamento .tab-btn:focus-visible,
+#modalLancamento .btn-icon-sm:focus-visible,
+#modalLancamento .btn-primary.full-width:focus-visible,
+#modalLancamento .btn-secondary.full-width:focus-visible,
+#modalLancamento .modal-close:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 4px var(--primary-soft);
 }
 
 #modalLancamento .conditional-fields {
@@ -454,10 +464,10 @@
 }
 
 #modalLancamento .btn-primary.full-width {
-    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
-    color: white;
+    background: var(--accent);
+    color: var(--accent-contrast);
     border: none;
-    border-radius: 8px;
+    border-radius: var(--radius-sm);
     padding: 10px;
     font-weight: 600;
     font-size: 14px;
@@ -466,12 +476,13 @@
     justify-content: center;
     gap: 6px;
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition: var(--transition);
 }
 
 #modalLancamento .btn-primary.full-width:hover {
+    background: var(--accent-hover);
     transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(29, 99, 237, 0.3);
+    box-shadow: var(--shadow-primary);
 }
 
 #modalLancamento .btn-secondary.full-width {
@@ -487,7 +498,7 @@
     justify-content: center;
     gap: 6px;
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition: var(--transition);
 }
 
 #modalLancamento .btn-secondary.full-width:hover {
@@ -495,36 +506,33 @@
     color: var(--primary);
 }
 
-/* ================= CORES DOS BADGES ================= */
+/* ================= CORES DOS BADGES =================
+   Semantica via tokens: fundo *-soft + texto/borda forte. Os tokens ja
+   trocam sozinhos no tema escuro, entao nao ha override manual abaixo. */
 #modalLancamento .lancamento-badge.folga {
-    color: #059669;
-    border-color: #d1fae5;
-    background: #f0fdf4;
+    color: var(--success);
+    border-color: var(--success);
+    background: var(--success-soft);
 }
 
 #modalLancamento .lancamento-badge.ausencia {
-    color: #dc2626;
-    border-color: #fee2e2;
-    background: #fef2f2;
+    color: var(--danger);
+    border-color: var(--danger);
+    background: var(--danger-soft);
 }
 
 #modalLancamento .lancamento-badge.ferias {
-    color: #1d63ed;
-    border-color: #dceaff;
-    background: #eff6ff;
+    color: var(--accent);
+    border-color: var(--accent);
+    background: var(--accent-soft);
 }
 
 #modalLancamento .lancamento-badge.feriado,
-#modalLancamento .lancamento-badge.municipal {
-    color: #b45309;
-    border-color: #fcd34d;
-    background: #fffbeb;
-}
-
+#modalLancamento .lancamento-badge.municipal,
 #modalLancamento .lancamento-badge.estadual {
-    color: var(--accent-hover);
-    border-color: #bcd7ff;
-    background: #f5f3ff;
+    color: var(--warning);
+    border-color: var(--warning);
+    background: var(--warning-soft);
 }
 
 /* ================= TEMA ESCURO ================= */
@@ -544,23 +552,7 @@
     background: var(--card);
 }
 
-[data-theme="dark"] #modalLancamento .lancamento-badge.folga {
-    background: #064e3b;
-    color: #d1fae5;
-    border-color: #10b981;
-}
-
-[data-theme="dark"] #modalLancamento .lancamento-badge.ausencia {
-    background: #7f1d1d;
-    color: #fee2e2;
-    border-color: #ef4444;
-}
-
-[data-theme="dark"] #modalLancamento .lancamento-badge.ferias {
-    background: #123a7a;
-    color: #dceaff;
-    border-color: #3f74be;
-}
+/* Badges usam tokens semanticos: nao precisam de override no tema escuro. */
 
 /* ================= RESPONSIVIDADE ================= */
 @media (max-width: 968px) {
@@ -582,38 +574,36 @@
 
 /* Cards de feriado da API */
 #modalLancamento .lancamento-card.feriado-api {
-    border-left: 4px solid #1d63ed;
-    background: linear-gradient(to right, var(--card), #f0f9ff);
+    border-left: 4px solid var(--accent);
 }
 
 /* Cards de feriado manual */
 #modalLancamento .lancamento-card.feriado-manual {
-    border-left: 4px solid #e0973a;
-    background: linear-gradient(to right, var(--card), #fffbeb);
+    border-left: 4px solid var(--warning);
 }
 
 /* Badge para feriados federais */
 #modalLancamento .lancamento-badge.federal {
-    color: #1d63ed;
-    border-color: #bcd7ff;
-    background: #eff6ff;
+    color: var(--accent);
+    border-color: var(--accent);
+    background: var(--accent-soft);
 }
 
 /* Badge para feriados municipais/estaduais */
 #modalLancamento .lancamento-badge.municipal,
 #modalLancamento .lancamento-badge.estadual {
-    color: #b45309;
-    border-color: #fed7aa;
-    background: #fffbeb;
+    color: var(--warning);
+    border-color: var(--warning);
+    background: var(--warning-soft);
 }
 
 /* Ícone de cadeado para feriados oficiais */
 #modalLancamento .info-horario.locked {
-    background: #e2e8f0;
-    color: #64748b;
-    font-size: 11px;
+    background: var(--neutral-fill);
+    color: var(--text-muted);
+    font-size: var(--text-xs);
     padding: 4px 10px;
-    border-radius: 16px;
+    border-radius: var(--radius-pill);
     display: inline-flex;
     align-items: center;
     gap: 4px;
@@ -621,7 +611,7 @@
 
 #modalLancamento .info-horario.locked i {
     font-size: 10px;
-    color: #3a4a5f;
+    color: var(--text-muted);
 }
 
 /* Separador visual na lista */
@@ -641,33 +631,11 @@
 }
 
 /* Estilo para quando não há feriados */
-#modalLancamento .empty-state.feriados {
-    background: linear-gradient(135deg, var(--card-dark), var(--card));
-}
-
 #modalLancamento .empty-state.feriados i {
-    color: #e0973a;
+    color: var(--warning);
 }
 
-/* Tema escuro para feriados */
-[data-theme="dark"] #modalLancamento .lancamento-card.feriado-api {
-    background: linear-gradient(to right, var(--card), #123a7a20);
-}
-
-[data-theme="dark"] #modalLancamento .lancamento-card.feriado-manual {
-    background: linear-gradient(to right, var(--card), #92400e20);
-}
-
-[data-theme="dark"] #modalLancamento .lancamento-badge.federal {
-    background: #123a7a;
-    color: #bcd7ff;
-    border-color: #1d63ed;
-}
-
-[data-theme="dark"] #modalLancamento .info-horario.locked {
-    background: #263243;
-    color: #94a3b8;
-}
+/* Feriados usam tokens: cards chapados e badges semanticos, sem override escuro. */
 /* ================= MODAL DE DETALHES DA HORA ================= */
 .detalhes-hora-modal .modal-content {
     max-width: 450px;
@@ -744,7 +712,7 @@
     max-width: 400px;
     width: 90%;
     background: var(--card);
-    border-radius: 24px;
+    border-radius: var(--radius-lg);
     overflow: hidden;
     box-shadow: var(--shadow-xl);
     border: 1px solid var(--border);
@@ -752,7 +720,7 @@
 }
 
 #modalConfirmacao .modal-header {
-    background: linear-gradient(135deg, var(--danger) 0%, #dc2626 100%);
+    background: var(--danger);
     padding: 16px 20px;
     display: flex;
     justify-content: space-between;
@@ -785,7 +753,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: all 0.2s ease;
+    transition: var(--transition);
 }
 
 #modalConfirmacao .modal-close:hover {
@@ -886,15 +854,15 @@
 }
 
 #modalConfirmacao .btn-danger {
-    background: linear-gradient(135deg, var(--danger) 0%, #dc2626 100%);
+    background: var(--danger);
     color: white;
     border: none;
-    border-radius: 12px;
+    border-radius: var(--radius-md);
     padding: 10px 24px;
     font-weight: 600;
     font-size: 14px;
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition: var(--transition);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -905,7 +873,7 @@
 
 #modalConfirmacao .btn-danger:hover {
     transform: translateY(-2px);
-    box-shadow: 0 8px 20px rgba(239, 68, 68, 0.4);
+    box-shadow: var(--shadow-danger);
 }
 
 #modalConfirmacao .btn-secondary {
@@ -917,7 +885,7 @@
     font-weight: 600;
     font-size: 14px;
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition: var(--transition);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -957,14 +925,14 @@
     max-width: 400px;
     width: 90%;
     background: var(--card);
-    border-radius: 24px;
+    border-radius: var(--radius-lg);
     overflow: hidden;
     box-shadow: var(--shadow-xl);
     border: 1px solid var(--border);
 }
 
 #modalExcluirColaborador .modal-header {
-    background: linear-gradient(135deg, var(--danger) 0%, #dc2626 100%);
+    background: var(--danger);
     padding: 16px 20px;
     display: flex;
     justify-content: space-between;
@@ -1085,9 +1053,9 @@
 }
 
 .banco-horas-movimento.credito {
-    border-left: 4px solid #10b981;
+    border-left: 4px solid var(--success);
 }
 
 .banco-horas-movimento.debito {
-    border-left: 4px solid #ef4444;
+    border-left: 4px solid var(--danger);
 }
