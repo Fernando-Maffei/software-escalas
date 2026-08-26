@@ -2586,7 +2586,13 @@
     z-index: 6;
     margin-bottom: 14px;
     border-radius: 14px;
-    overflow: hidden;
+    /* overflow VISIBLE de proposito: com overflow:hidden aqui, as celulas sticky
+       do cabecalho (Colaborador e Total) grudavam neste header — que rola junto
+       com as horas — em vez de gruarem no scroller, entao os rotulos "mexiam" ao
+       rolar. Sem o overflow, o sticky delas passa a referenciar a .escala-scroll,
+       igual as colunas das linhas de dados. O arredondamento e recolocado nas
+       celulas das pontas (canto esquerdo na coluna de nomes). */
+    overflow: visible;
     /* Opaco (sem alfa): quando pinado no topo, as linhas rolam por baixo dele. */
     background: rgb(12, 20, 32);
     border: 1px solid rgba(148, 163, 184, 0.18);
@@ -2619,6 +2625,10 @@
     position: sticky;
     left: 0;
     z-index: 4;
+    /* Repoe o arredondamento do canto esquerdo do cabecalho (o header perdeu o
+       overflow:hidden que fazia esse corte). */
+    border-top-left-radius: 14px;
+    border-bottom-left-radius: 14px;
     background: rgb(17, 27, 42);
 }
 
@@ -2677,7 +2687,7 @@
    ".timeline-row > div" (rgba .48) deixa as barras vazarem por baixo do nome
    ao rolar. O seletor filho-direto com a classe vence ".timeline-row > div"
    em especificidade (3 classes > 2 classes + 1 elemento). */
-.escala-page .timeline-row > .timeline-name {
+.escala-page .timeline-row:not(.total-row) > .timeline-name {
     background: rgb(12, 20, 32);
 }
 
@@ -2705,6 +2715,10 @@
 :root:not([data-theme="dark"]) .escala-page .timeline-header .total-header {
     background: #ffffff;
 }
+
+/* Obs.: o nome da linha de total (TRABALHANDO) fica de fora do fundo opaco da
+   coluna fixa (via :not(.total-row) nas regras acima e no bloco light), porque
+   ele tem fundo azul proprio; senao o texto branco sumia sobre branco. */
 
 .escala-page .timeline-row:not(.total-row):not(.mensagem-row) .timeline-name {
     display: grid;
@@ -3475,8 +3489,8 @@
    do nome. Este seletor (filho-direto) vence as regras translucidas em
    especificidade; cobre repouso e hover. O escuro ja e opaco via
    ".timeline-row > .timeline-name" (rgb navy). */
-:root:not([data-theme="dark"]) .escala-page .timeline-row > .timeline-name,
-:root:not([data-theme="dark"]) .escala-page .timeline-row > .timeline-name:hover {
+:root:not([data-theme="dark"]) .escala-page .timeline-row:not(.total-row) > .timeline-name,
+:root:not([data-theme="dark"]) .escala-page .timeline-row:not(.total-row) > .timeline-name:hover {
     background: #ffffff;
 }
 
@@ -3491,8 +3505,19 @@
     box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.65);
 }
 
-:root:not([data-theme="dark"]) .escala-page .timeline-row.total-row > div {
+:root:not([data-theme="dark"]) .escala-page .timeline-row.total-row > div:not(.total-nome) {
     background: rgba(248, 250, 252, 0.98);
+}
+
+/* A coluna fixa do nome (TRABALHANDO) fica FORA da regra acima: senao ela
+   recebia o fundo branco translucido, o texto branco sumia sobre branco (so
+   aparecia no hover) e as barras vazavam por baixo ao rolar. Fundo azul opaco
+   (sem alfa) do accent, cobrindo repouso e hover, para o rotulo aparecer e as
+   barras nao atravessarem a coluna fixa. */
+:root:not([data-theme="dark"]) .escala-page .timeline-row.total-row > .total-nome,
+:root:not([data-theme="dark"]) .escala-page .timeline-row.total-row > .total-nome:hover {
+    background: var(--accent);
+    color: #ffffff;
 }
 
 :root:not([data-theme="dark"]) .escala-page .timeline-row.total-row .total-cell:first-of-type {

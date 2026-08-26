@@ -110,6 +110,7 @@ router.put('/:id', async (req, res, next) => {
         const querRemoverAdmin = req.body?.isAdmin === false;
         const querPromoverAdmin = req.body?.isAdmin === true;
         const querResetarSenha = req.body?.resetarSenha === true;
+        const querDefinirSenha = typeof req.body?.novaSenha === 'string' && req.body.novaSenha.length > 0;
         const isSelf = alvo.id === req.user.id;
 
         if (isSelf && (querDesativar || querRemoverAdmin)) {
@@ -146,7 +147,16 @@ router.put('/:id', async (req, res, next) => {
 
         let senhaTemporaria = null;
 
-        if (querResetarSenha) {
+        if (querDefinirSenha) {
+            // Senha definida explicitamente pelo administrador (diferente do
+            // reset, que gera uma aleatoria). Vale como esta e nao exige troca
+            // no primeiro acesso — quem definiu ja escolheu a senha final.
+            const novaSenha = normalizePassword(req.body.novaSenha, 'Nova senha');
+
+            await updateUserPassword(pool, alvo.id, novaSenha, {
+                deveTrocarSenha: false
+            });
+        } else if (querResetarSenha) {
             // Le o papel depois de updateUserFlags: se a mesma requisicao
             // promoveu ou rebaixou o usuario, quem vale e o papel novo.
             const alvoAtualizado = await findUserById(pool, alvo.id);
@@ -160,7 +170,7 @@ router.put('/:id', async (req, res, next) => {
         }
 
         // Mudancas restritivas valem imediatamente, nao so no proximo login.
-        if (querDesativar || querRemoverAdmin || querResetarSenha) {
+        if (querDesativar || querRemoverAdmin || querResetarSenha || querDefinirSenha) {
             await revokeUserSessions(pool, alvo.id);
         }
 

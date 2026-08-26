@@ -99,6 +99,81 @@
         });
     }
 
+    // Form inline para o administrador digitar uma senha especifica (diferente
+    // do "Resetar", que gera uma aleatoria). Reaproveita a area de aviso do topo.
+    function mostrarFormDefinirSenha(container, usuarioAtual, id, nome) {
+        const aviso = container.querySelector('#usuariosSenhaTemporaria');
+
+        if (!aviso) {
+            return;
+        }
+
+        aviso.innerHTML = `
+            <div class="usuarios-senha-box">
+                <div class="usuarios-definir-form">
+                    <label class="usuarios-campo">
+                        <span>Nova senha para ${esc(nome)}</span>
+                        <input type="password" id="definirSenhaInput" class="form-control" placeholder="minimo 8 caracteres" autocomplete="new-password">
+                    </label>
+                    <div class="usuarios-definir-acoes">
+                        <button type="button" class="btn-primary" data-salvar-senha>
+                            <i class="fas fa-check"></i> Salvar senha
+                        </button>
+                        <button type="button" class="btn-secondary" data-cancelar-senha>Cancelar</button>
+                    </div>
+                </div>
+            </div>
+        `;
+        aviso.classList.remove('hidden');
+
+        const input = aviso.querySelector('#definirSenhaInput');
+        input.focus();
+
+        const fechar = () => {
+            aviso.innerHTML = '';
+            aviso.classList.add('hidden');
+        };
+
+        const salvar = async () => {
+            const nova = input.value;
+
+            if (nova.length < 8) {
+                toast('A senha deve ter pelo menos 8 caracteres.', 'error');
+                input.focus();
+                return;
+            }
+
+            try {
+                const response = await fetch(`${USUARIOS_URL}/${id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ novaSenha: nova })
+                });
+                const data = await response.json().catch(() => ({}));
+
+                if (!response.ok) {
+                    toast(data.error || 'Nao foi possivel definir a senha.', 'error');
+                    return;
+                }
+
+                fechar();
+                toast(data.message || 'Senha definida com sucesso.');
+                carregarLista(container, usuarioAtual);
+            } catch (error) {
+                toast('Falha de comunicacao ao definir a senha.', 'error');
+            }
+        };
+
+        aviso.querySelector('[data-cancelar-senha]').addEventListener('click', fechar);
+        aviso.querySelector('[data-salvar-senha]').addEventListener('click', salvar);
+        input.addEventListener('keydown', (evento) => {
+            if (evento.key === 'Enter') {
+                evento.preventDefault();
+                salvar();
+            }
+        });
+    }
+
     function renderLinhaUsuario(usuario, usuarioAtual) {
         const isSelf = Number(usuario.id) === Number(usuarioAtual.id);
         const badges = [
@@ -110,6 +185,12 @@
         ].filter(Boolean).join('');
 
         const acoes = [];
+
+        acoes.push(`
+            <button type="button" class="btn-secondary btn-usuario-acao" data-acao="definir-senha" data-id="${usuario.id}" data-nome="${esc(usuario.username)}">
+                <i class="fas fa-pen"></i> Definir senha
+            </button>
+        `);
 
         acoes.push(`
             <button type="button" class="btn-secondary btn-usuario-acao" data-acao="resetar" data-id="${usuario.id}" data-nome="${esc(usuario.username)}">
@@ -266,6 +347,12 @@
     }
 
     async function executarAcao(container, usuarioAtual, acao, id, nome) {
+        // Definir senha nao e um PUT imediato: abre o campo para o admin digitar.
+        if (acao === 'definir-senha') {
+            mostrarFormDefinirSenha(container, usuarioAtual, id, nome);
+            return;
+        }
+
         const confirmacoes = {
             desativar: `Desativar o usuario "${nome}"? Ele perde o acesso imediatamente.`,
             'remover-admin': `Remover os poderes de administrador de "${nome}"?`,

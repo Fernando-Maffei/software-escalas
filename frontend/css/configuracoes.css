@@ -1171,6 +1171,24 @@ input:checked + .slider:before {
   display: none;
 }
 
+.usuarios-definir-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+}
+
+.usuarios-definir-form .usuarios-campo {
+  flex: 1 1 220px;
+  min-width: 0;
+}
+
+.usuarios-definir-acoes {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 [data-theme="dark"] .badge-ativo {
   color: #4ade80;
 }
