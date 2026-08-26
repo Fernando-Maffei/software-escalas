@@ -14,6 +14,7 @@ const { requireAuth, purgeExpiredSessions } = require('./utils/auth');
 const { checkAccess } = require('./utils/permissoes');
 const { ensureApplicationSchema } = require('./utils/database-schema');
 const { isDatabaseConfigured } = require('./utils/database-config');
+const { isSchemaReady, setSchemaReady } = require('./utils/app-state');
 
 const authRoutes = require('./routes/auth');
 const colaboradoresRoutes = require('./routes/colaboradores');
@@ -298,6 +299,38 @@ app.get('/api/health', async (req, res, next) => {
     }
 });
 
+// Portao de prontidao do schema: enquanto o banco nao estiver pronto (falha de
+// conexao ou schema desatualizado no boot), responde 503 com uma mensagem
+// acionavel em vez de deixar cada rota estourar um erro cru de SQL como
+// "Invalid object name 'Sessoes'". Fica ANTES de /api/auth para que o proprio
+// login receba a mensagem clara. Libera /api/health, /api/setup/status e o
+// fluxo de configuracao inicial (bootstrap), senao uma instalacao nova — ou um
+// banco quebrado — ficaria sem saida.
+app.use('/api', (req, res, next) => {
+    if (isSchemaReady()) {
+        next();
+        return;
+    }
+
+    const requestPath = req.path.replace(/\/+$/, '') || '/';
+
+    if (req.method === 'GET' && (requestPath === '/health' || requestPath === '/setup/status')) {
+        next();
+        return;
+    }
+
+    if (isBootstrapConfigRequest(req)) {
+        next();
+        return;
+    }
+
+    next(new AppError(
+        503,
+        'Sistema em manutencao: o banco de dados nao esta pronto (indisponivel ou schema desatualizado). '
+        + 'Um administrador precisa reiniciar/atualizar o servidor. No Docker: docker compose up -d --build.'
+    ));
+});
+
 app.use('/api/auth', authRoutes);
 
 // Estado do setup, publico de proposito: o front-end precisa saber, antes
@@ -470,31 +503,61 @@ function start(options = {}) {
         console.log('- GET  /api/jornada-semanal');
         console.log('- GET  /api/configuracao-banco');
 
-        try {
-            const pool = await conectar();
-            console.log('Banco de dados conectado com sucesso.');
-            await ensureApplicationSchema(pool);
-            startSessionCleanup();
-            const scheduler = initializeAutoBackupScheduler();
+        let pool;
 
-            if (scheduler.scheduled) {
-                console.log(`Backup automatico agendado a cada ${scheduler.intervalMinutes} minuto(s).`);
-            } else {
-                console.log('Backup automatico periodico desativado.');
-            }
+        try {
+            pool = await conectar();
+            console.log('Banco de dados conectado com sucesso.');
         } catch (error) {
-            console.error('Servidor iniciado, mas nao foi possivel conectar ao banco na inicializacao.');
-            console.error(error.message);
-        } finally {
-            if (!readySettled) {
-                readySettled = true;
-                resolveReady({
-                    host: controller.host,
-                    port: controller.port,
-                    url: controller.url,
-                    urls
-                });
+            setSchemaReady(false);
+            console.error('========================================================');
+            console.error('[boot] FALHA: nao foi possivel conectar ao banco na inicializacao.');
+            console.error(`[boot] ${error.message}`);
+            console.error('[boot] O servidor esta no ar, mas as rotas de dados responderao 503');
+            console.error('[boot] ate o banco voltar. Verifique a conexao e reinicie.');
+            console.error('========================================================');
+        }
+
+        if (pool) {
+            try {
+                await ensureApplicationSchema(pool);
+                setSchemaReady(true);
+                startSessionCleanup();
+                const scheduler = initializeAutoBackupScheduler();
+
+                if (scheduler.scheduled) {
+                    console.log(`Backup automatico agendado a cada ${scheduler.intervalMinutes} minuto(s).`);
+                } else {
+                    console.log('Backup automatico periodico desativado.');
+                }
+            } catch (error) {
+                setSchemaReady(false);
+                // Nao engolir em silencio: sem isto o servidor subia "ok" e o
+                // login quebrava com um erro cru de SQL. Caso classico no Docker:
+                // uma migration nova em ./database nao entra na imagem (so
+                // ./frontend e ./backend sao espelhados), entao ensureApplication
+                // Schema falha ao ler/aplicar o arquivo ausente.
+                console.error('========================================================');
+                console.error('[boot] FALHA ao verificar/criar o schema do banco.');
+                console.error(`[boot] ${error.message}`);
+                if (error.details && error.details.missingTables) {
+                    console.error(`[boot] Tabelas ausentes: ${error.details.missingTables.join(', ')}`);
+                }
+                console.error('[boot] O servidor esta no ar, mas as rotas de dados (inclusive login)');
+                console.error('[boot] responderao 503 ate isto ser resolvido.');
+                console.error('[boot] No Docker, reconstrua a imagem: docker compose up -d --build');
+                console.error('========================================================');
             }
+        }
+
+        if (!readySettled) {
+            readySettled = true;
+            resolveReady({
+                host: controller.host,
+                port: controller.port,
+                url: controller.url,
+                urls
+            });
         }
     });
 

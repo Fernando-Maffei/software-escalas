@@ -23,6 +23,7 @@ const {
 } = require('../utils/database-config');
 const { ensureApplicationSchema, applyExampleSeed, REQUIRED_TABLES } = require('../utils/database-schema');
 const { clearSchemaCache } = require('../utils/schema');
+const { setSchemaReady } = require('../utils/app-state');
 
 const router = express.Router();
 
@@ -77,7 +78,12 @@ router.post('/salvar', async (req, res, next) => {
             const pool = await conectar();
             schema = await ensureApplicationSchema(pool);
             adminBootstrap = schema.bootstrappedAdmin;
+            // Schema aplicado com sucesso aqui: libera o portao de prontidao sem
+            // exigir reinicio do servidor (importante no fluxo de instalacao
+            // nova, em que o boot ainda nao tinha banco para verificar).
+            setSchemaReady(true);
         } catch (schemaError) {
+            setSchemaReady(false);
             schemaWarning = `Conexao salva, mas a verificacao das tabelas falhou: ${schemaError.message || schemaError}`;
         }
 
@@ -110,6 +116,7 @@ router.post('/verificar-tabelas', async (req, res, next) => {
 
         const pool = await conectar();
         const result = await ensureApplicationSchema(pool);
+        setSchemaReady(true);
 
         res.json({
             success: true,
@@ -236,6 +243,7 @@ router.post('/backup/restaurar', async (req, res, next) => {
         const pool = await conectar();
 
         await ensureApplicationSchema(pool);
+        setSchemaReady(true);
 
         // Rede de seguranca: antes de sobrescrever tudo, tenta salvar um backup
         // do estado ATUAL. Se a restauracao trouxer dados errados, o usuario
