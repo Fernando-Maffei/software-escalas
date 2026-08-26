@@ -69,7 +69,7 @@ router.post('/login', async (req, res, next) => {
         // Login valido zera o historico de falhas desta chave.
         loginRateLimiter.reset(rateKey);
 
-        const token = createSession(user);
+        const token = await createSession(pool, user);
         setSessionCookie(res, token);
         await touchLastLogin(pool, user.id);
 
@@ -79,11 +79,16 @@ router.post('/login', async (req, res, next) => {
     }
 });
 
-router.post('/logout', (req, res) => {
-    const token = getSessionTokenFromRequest(req);
-    destroySession(token);
-    clearSessionCookie(res);
-    res.json({ success: true });
+router.post('/logout', async (req, res, next) => {
+    try {
+        const token = getSessionTokenFromRequest(req);
+        const pool = await conectar();
+        await destroySession(pool, token);
+        clearSessionCookie(res);
+        res.json({ success: true });
+    } catch (error) {
+        next(error);
+    }
 });
 
 router.get('/me', requireAuth, async (req, res, next) => {

@@ -161,7 +161,7 @@ router.put('/:id', async (req, res, next) => {
 
         // Mudancas restritivas valem imediatamente, nao so no proximo login.
         if (querDesativar || querRemoverAdmin || querResetarSenha) {
-            revokeUserSessions(alvo.id);
+            await revokeUserSessions(pool, alvo.id);
         }
 
         const atualizado = await findUserById(pool, alvo.id);
@@ -207,8 +207,9 @@ router.delete('/:id', async (req, res, next) => {
             }
         }
 
+        // deleteUser apaga a linha em Usuarios; a FK ON DELETE CASCADE da tabela
+        // Sessoes remove junto qualquer sessao aberta da conta, sem passo extra.
         await deleteUser(pool, alvo.id);
-        revokeUserSessions(alvo.id); // encerra qualquer sessao aberta da conta apagada
 
         res.json({
             success: true,

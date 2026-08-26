@@ -10,7 +10,7 @@ const {
     initializeAutoBackupScheduler
 } = require('./utils/backup-scheduler');
 const { AppError } = require('./utils/errors');
-const { requireAuth } = require('./utils/auth');
+const { requireAuth, purgeExpiredSessions } = require('./utils/auth');
 const { checkAccess } = require('./utils/permissoes');
 const { ensureApplicationSchema } = require('./utils/database-schema');
 const { isDatabaseConfigured } = require('./utils/database-config');
@@ -36,6 +36,39 @@ const app = express();
 const frontendPath = path.join(__dirname, '..', 'frontend');
 
 let activeController = null;
+let sessionCleanupTimer = null;
+
+const SESSION_CLEANUP_INTERVAL_MS = 60 * 60 * 1000;
+
+function clearSessionCleanup() {
+    if (sessionCleanupTimer) {
+        clearInterval(sessionCleanupTimer);
+        sessionCleanupTimer = null;
+    }
+}
+
+// Varre sessoes expiradas: uma vez agora e a cada hora. As linhas vencidas ja
+// nao autenticam (getSession filtra por ExpiresAt); isto so impede a tabela de
+// crescer sem limite. Falha na limpeza nunca derruba o servidor.
+function startSessionCleanup() {
+    clearSessionCleanup();
+
+    const varrer = async () => {
+        try {
+            const pool = await conectar();
+            await purgeExpiredSessions(pool);
+        } catch (error) {
+            console.error('Falha ao limpar sessoes expiradas:', error.message);
+        }
+    };
+
+    varrer();
+    sessionCleanupTimer = setInterval(varrer, SESSION_CLEANUP_INTERVAL_MS);
+
+    if (typeof sessionCleanupTimer.unref === 'function') {
+        sessionCleanupTimer.unref();
+    }
+}
 
 function normalizeCorsOrigin(value) {
     const raw = String(value || '').trim();
@@ -441,6 +474,7 @@ function start(options = {}) {
             const pool = await conectar();
             console.log('Banco de dados conectado com sucesso.');
             await ensureApplicationSchema(pool);
+            startSessionCleanup();
             const scheduler = initializeAutoBackupScheduler();
 
             if (scheduler.scheduled) {
@@ -499,6 +533,7 @@ function start(options = {}) {
 
         isShuttingDown = true;
         clearAutoBackupScheduler();
+        clearSessionCleanup();
         console.log(`${reason} recebido. Encerrando servidor...`);
 
         controller.shutdownPromise = new Promise((resolve, reject) => {
