@@ -122,6 +122,11 @@
 
 .escala-page {
     --escala-nome-largura: 260px;
+    /* Largura da coluna de nomes na grade fixa (a que o layout usa de verdade,
+       via --esc-col-nome). 200px em vez dos 240px de fallback: os nomes sao
+       curtos e sobrava muito espaco em branco. Sticky do total e overlay das
+       barras usam a MESMA variavel, entao continuam alinhados. */
+    --esc-col-nome: 200px;
     /* Largura MINIMA de cada coluna de meia-hora. Antes as colunas eram
        apenas 1fr, entao encolhiam para caber e a grade "bugava" espremida.
        Com um minimo, quando nao couberem elas param de encolher e a barra de
@@ -2697,7 +2702,12 @@
    z-index 4 = abaixo do nome (5, para o nome cobrir no canto) e acima das barras
    (overlay z3), para o "8h" ficar sempre visivel e OPACO ao rolar. Fundo opaco
    por tema (escuro aqui; claro no bloco :root:not([data-theme="dark"]) abaixo). */
-.escala-page .timeline-row > .timeline-cell.total-cell {
+/* So a coluna de TOTAL (badge "8h" das linhas normais e a celula de total da
+   linha TRABALHANDO) congela. As celulas de cobertura da total-row tambem tem
+   a classe .total-cell, mas NAO podem ser sticky — senao, ao rolar para a
+   direita, todas grudam em left:nome e empilham umas sobre as outras (o
+   "grafico bugado"). Por isso o :not(.cov-col). */
+.escala-page .timeline-row > .timeline-cell.total-cell:not(.cov-col) {
     position: sticky;
     left: var(--esc-col-nome, 240px);
     z-index: 4;
@@ -2711,7 +2721,7 @@
     background: rgb(17, 27, 42);
 }
 
-:root:not([data-theme="dark"]) .escala-page .timeline-row > .timeline-cell.total-cell,
+:root:not([data-theme="dark"]) .escala-page .timeline-row > .timeline-cell.total-cell:not(.cov-col),
 :root:not([data-theme="dark"]) .escala-page .timeline-header .total-header {
     background: #ffffff;
 }
@@ -3246,7 +3256,7 @@
 
 @media (max-width: 1500px) {
     .escala-page {
-        --esc-col-nome: 210px;
+        --esc-col-nome: 190px;
         --esc-col-total: 70px;
         --esc-col-hora: 36px;
     }

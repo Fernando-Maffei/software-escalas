@@ -103,7 +103,7 @@
   --sidebar-item-size: 64px;
   --sidebar-icon-size: 32px;
   --sidebar-radius: 18px;
-  --sidebar-transition: 0.26s ease;
+  --sidebar-transition: 0.2s cubic-bezier(0.22, 1, 0.36, 1);
 
   /* ===== APELIDOS DE COMPATIBILIDADE (nomes antigos -> novos) ===== */
   --bg:            var(--surface-sunken);

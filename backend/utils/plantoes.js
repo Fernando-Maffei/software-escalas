@@ -21,10 +21,19 @@ function normalizeColaboradores(values) {
     return normalizeNumericArray(values, 'Colaborador');
 }
 
-const PLANTAO_TIPOS = ['sabado'];
+const PLANTAO_TIPOS = ['sabado', 'domingo', 'feriado'];
 
-function resolvePlantaoTypeByDate(dataISO) {
+// Tipo do plantao a partir da data. Feriado tem PRIORIDADE (mesmo caindo no fim
+// de semana): quando `feriados` (Set de datas ISO) contem a data, o tipo e
+// 'feriado'. Sem o Set (chamadas que so validam fim de semana), sabado/domingo
+// ainda resolvem; um feriado em dia util so e aceito quando o Set e passado.
+function resolvePlantaoTypeByDate(dataISO, feriados = null) {
     const normalized = normalizeIsoDate(dataISO, 'Data do plantao');
+
+    if (feriados && typeof feriados.has === 'function' && feriados.has(normalized)) {
+        return 'feriado';
+    }
+
     const [year, month, day] = normalized.split('-').map(Number);
     const weekday = new Date(Date.UTC(year, month - 1, day, 12, 0, 0)).getUTCDay();
 
@@ -32,13 +41,17 @@ function resolvePlantaoTypeByDate(dataISO) {
         return 'sabado';
     }
 
-    throw new AppError(400, 'Plantao deve ser lancado somente para sabado.');
+    if (weekday === 0) {
+        return 'domingo';
+    }
+
+    throw new AppError(400, 'Plantao deve ser lancado somente para sabado, domingo ou feriado.');
 }
 
-function normalizePlantaoType(value, dataISO = null) {
+function normalizePlantaoType(value, dataISO = null, feriados = null) {
     if (value === undefined || value === null || String(value).trim() === '') {
         if (dataISO) {
-            return resolvePlantaoTypeByDate(dataISO);
+            return resolvePlantaoTypeByDate(dataISO, feriados);
         }
 
         throw new AppError(400, 'Tipo de plantao e obrigatorio.');
@@ -47,7 +60,7 @@ function normalizePlantaoType(value, dataISO = null) {
     const normalized = normalizeEnum(value, 'Tipo de plantao', PLANTAO_TIPOS);
 
     if (dataISO) {
-        const expected = resolvePlantaoTypeByDate(dataISO);
+        const expected = resolvePlantaoTypeByDate(dataISO, feriados);
 
         if (normalized !== expected) {
             throw new AppError(400, `A data informada corresponde a ${expected}, nao a ${normalized}.`);
@@ -67,7 +80,7 @@ function resolveLegacyPlantaoType(row, dataISO) {
             .normalize('NFD')
             .replace(/[\u0300-\u036f]/g, '');
 
-        if (normalized === 'sabado' || normalized === 'domingo') {
+        if (normalized === 'sabado' || normalized === 'domingo' || normalized === 'feriado') {
             return normalized;
         }
     }

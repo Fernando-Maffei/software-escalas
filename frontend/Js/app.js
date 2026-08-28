@@ -905,6 +905,14 @@ function carregarPagina(pagina) {
         case "relatorios":
             renderRelatorios();
             break;
+        case "bancoHoras":
+            if (typeof window.renderBancoHoras === 'function') {
+                window.renderBancoHoras();
+            } else {
+                console.error('renderBancoHoras nao carregado');
+                renderDashboard();
+            }
+            break;
         default:
             console.log("Página não encontrada:", pagina);
             renderDashboard(); // Fallback para dashboard
@@ -970,9 +978,14 @@ function renderColaboradores() {
     appContent.innerHTML = `
         <div class="page-header colaboradores-page-header">
             <h1>Colaboradores</h1>
-            <button id="btnNovoColaborador" class="btn-primary">
-                <i class="fas fa-plus"></i> Novo Colaborador
-            </button>
+            <div class="colaboradores-header-actions">
+                <button id="btnColaboradoresDesligados" class="btn-secondary" type="button">
+                    <i class="fas fa-user-slash"></i> Desligados
+                </button>
+                <button id="btnNovoColaborador" class="btn-primary">
+                    <i class="fas fa-plus"></i> Novo Colaborador
+                </button>
+            </div>
         </div>
 
         <div class="colaboradores-layout">
@@ -1012,6 +1025,14 @@ function renderColaboradores() {
     document.getElementById('btnNovoColaborador').addEventListener('click', function() {
         abrirEditorColaborador(null);
     });
+
+    // Evento do botão "Desligados" (soft delete / retencao / limpeza)
+    const btnDesligados = document.getElementById('btnColaboradoresDesligados');
+    if (btnDesligados && typeof window.abrirDesligadosColaboradores === 'function') {
+        btnDesligados.addEventListener('click', function() {
+            window.abrirDesligadosColaboradores();
+        });
+    }
     
     // Evento de busca
     document.getElementById('searchColaborador').addEventListener('input', function(e) {
@@ -4264,7 +4285,7 @@ function getPaginaFromURL() {
     const hash = window.location.hash.substring(1); // Remove o #
     
     // Se não tiver hash ou for inválido, retorna dashboard
-    const paginasValidas = ['dashboard', 'calendario', 'colaboradores', 'escala', 'lancamentoPlantao', 'relatorios', 'configuracoes', 'usuarios'];
+    const paginasValidas = ['dashboard', 'calendario', 'colaboradores', 'escala', 'lancamentoPlantao', 'bancoHoras', 'relatorios', 'configuracoes', 'usuarios'];
     
     if (hash && paginasValidas.includes(hash)) {
         return hash;

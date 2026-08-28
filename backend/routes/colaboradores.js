@@ -10,12 +10,14 @@ const {
     normalizeJornadaSemanalPayload,
     replaceColaboradorJornadaSemanal
 } = require('../utils/jornada-semanal');
-const { getBancoHorasCapabilities, getSchemaInfo, hasTable } = require('../utils/schema');
+const { getBancoHorasCapabilities, getSchemaInfo, hasColumn, hasTable } = require('../utils/schema');
 const { ensureSetorExists, normalizeNullableSetorId } = require('../utils/setores');
 const { withTransaction } = require('../utils/transactions');
 const {
     ensurePositiveInt,
+    extractDateString,
     extractTimeString,
+    normalizeIsoDate,
     normalizeNullableTime,
     normalizeOptionalText,
     toSqlTime,
@@ -138,6 +140,16 @@ router.get('/', async (req, res) => {
                 clauses.push('1 = 0'); // permitidos invalidos: nao vaza ninguem
             }
         }
+    }
+
+    // Soft delete: por padrao esconde colaboradores desligados (Ativo = 0). As
+    // telas ativas (Escala, Calendario, Plantao, Dashboard) derivam desta lista,
+    // entao o desligado some delas de uma vez. `?incluirInativos=1` traz todos
+    // (usado pela tela de limpeza/gestao).
+    const incluirInativos = String(req.query.incluirInativos || '') === '1';
+
+    if (!incluirInativos && hasColumn(schema, 'Colaboradores', 'Ativo')) {
+        clauses.push('c.Ativo = 1');
     }
 
     const query = buildColaboradorSelectQuery(schema, {
@@ -387,6 +399,65 @@ router.put('/:id', async (req, res) => {
     });
 });
 
+// Desliga o colaborador (soft delete): esconde das telas ativas, mas mantem o
+// historico no banco. DataDesligamento e a referencia para a limpeza posterior.
+router.put('/:id/desligar', async (req, res) => {
+    const id = ensurePositiveInt(req.params.id, 'Colaborador');
+    const pool = await conectar();
+    const schema = await getSchemaInfo(pool);
+
+    if (!hasColumn(schema, 'Colaboradores', 'Ativo') || !hasColumn(schema, 'Colaboradores', 'DataDesligamento')) {
+        throw new AppError(400, 'Atualize o banco: faltam as colunas de desligamento.');
+    }
+
+    const colaborador = await findColaboradorById(pool, id);
+
+    if (!colaborador) {
+        throw new AppError(404, 'Colaborador nao encontrado.');
+    }
+
+    const dataDesligamento = req.body?.dataDesligamento
+        ? normalizeIsoDate(req.body.dataDesligamento, 'Data de desligamento')
+        : extractDateString(new Date());
+
+    await pool.request()
+        .input('id', sql.Int, id)
+        .input('data', sql.Date, dataDesligamento)
+        .query('UPDATE Colaboradores SET Ativo = 0, DataDesligamento = @data WHERE Id = @id');
+
+    res.json({
+        success: true,
+        message: 'Colaborador desligado. O historico foi preservado.',
+        data: { id, ativo: false, dataDesligamento }
+    });
+});
+
+// Reativa um colaborador desligado (desfaz o desligamento).
+router.put('/:id/reativar', async (req, res) => {
+    const id = ensurePositiveInt(req.params.id, 'Colaborador');
+    const pool = await conectar();
+    const schema = await getSchemaInfo(pool);
+
+    if (!hasColumn(schema, 'Colaboradores', 'Ativo')) {
+        throw new AppError(400, 'Atualize o banco: falta a coluna Ativo.');
+    }
+
+    const colaborador = await findColaboradorById(pool, id);
+
+    if (!colaborador) {
+        throw new AppError(404, 'Colaborador nao encontrado.');
+    }
+
+    await pool.request()
+        .input('id', sql.Int, id)
+        .query('UPDATE Colaboradores SET Ativo = 1, DataDesligamento = NULL WHERE Id = @id');
+
+    res.json({ success: true, message: 'Colaborador reativado.', data: { id, ativo: true } });
+});
+
+// Exclusao DEFINITIVA (limpeza). So permitida para quem ja esta desligado E cuja
+// data de desligamento ja passou (fim do periodo de retencao). Agora sim cascata
+// completa, inclusive Ausencias e banco de horas semanal.
 router.delete('/:id', async (req, res) => {
     const id = ensurePositiveInt(req.params.id, 'Colaborador');
     const pool = await conectar();
@@ -397,12 +468,19 @@ router.delete('/:id', async (req, res) => {
         throw new AppError(404, 'Colaborador nao encontrado.');
     }
 
-    const checkAusencias = await pool.request()
-        .input('colaboradorId', sql.Int, id)
-        .query('SELECT COUNT(*) AS total FROM Ausencias WHERE ColaboradorId = @colaboradorId');
+    if (hasColumn(schema, 'Colaboradores', 'Ativo')) {
+        const ativo = colaborador.Ativo === true || colaborador.Ativo === 1;
 
-    if (checkAusencias.recordset[0].total > 0) {
-        throw new AppError(400, 'Nao e possivel excluir: colaborador possui lancamentos vinculados.');
+        if (ativo) {
+            throw new AppError(400, 'Desligue o colaborador antes de excluir definitivamente.');
+        }
+
+        const dataDesligamento = extractDateString(colaborador.DataDesligamento);
+        const hojeISO = extractDateString(new Date());
+
+        if (!dataDesligamento || dataDesligamento > hojeISO) {
+            throw new AppError(400, 'A exclusao definitiva so e permitida apos a data de desligamento (periodo de retencao ainda vigente).');
+        }
     }
 
     const plantoes = await pool.request()
@@ -460,12 +538,24 @@ router.delete('/:id', async (req, res) => {
             .query('DELETE FROM AlmocosPersonalizados WHERE ColaboradorId = @colaboradorId');
     }
 
+    if (hasTable(schema, 'BancoHorasSemanal')) {
+        await pool.request()
+            .input('colaboradorId', sql.Int, id)
+            .query('DELETE FROM BancoHorasSemanal WHERE ColaboradorId = @colaboradorId');
+    }
+
+    // Na limpeza pos-retencao, as ausencias tambem sao removidas (o historico
+    // ja passou do periodo de guarda). Antes, elas BLOQUEAVAM a exclusao.
+    await pool.request()
+        .input('colaboradorId', sql.Int, id)
+        .query('DELETE FROM Ausencias WHERE ColaboradorId = @colaboradorId');
+
     await pool.request()
         .input('id', sql.Int, id)
         .query('DELETE FROM Colaboradores WHERE Id = @id');
 
     res.json({
-        message: 'Colaborador excluido com sucesso!',
+        message: 'Colaborador e historico excluidos definitivamente.',
         success: true
     });
 });

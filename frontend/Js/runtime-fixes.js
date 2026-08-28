@@ -2157,8 +2157,10 @@
 
     function renderCardBancoHoras(colaborador) {
         const resumo = getBancoHorasResumoByColaborador(colaborador.Id);
-        const saldoClasse = resumo?.saldoMinutos < 0 ? 'negativo' : 'positivo';
-        const saldoTexto = resumo ? resumo.saldoFormatado : '+00h 00m';
+        // Saldo atual vem da grade semanal (mesmo numero da tela Banco de Horas).
+        const saldoSemanal = (window.bancoHorasSaldoSemanal || {})[Number(colaborador.Id)] || null;
+        const saldoClasse = (saldoSemanal ? saldoSemanal.minutos : 0) < 0 ? 'negativo' : 'positivo';
+        const saldoTexto = saldoSemanal ? saldoSemanal.formatado : '0:00';
         const creditosTexto = resumo ? resumo.creditosMesFormatado : '00h 00m';
         const debitosTexto = resumo ? resumo.debitosMesFormatado : '00h 00m';
 
@@ -2436,10 +2438,11 @@
                 <div class="editor-form-grid">
                     <div class="editor-form-group">
                         <label><i class="fas fa-calendar-week"></i> Tipo do plantao</label>
-                        <select id="plantaoTipoPlantao" class="form-control">
-                            <option value="sabado" selected>Sabado</option>
-                        </select>
-                        <small class="helper-text">Plantao extra permitido apenas aos sabados.</small>
+                        <div class="plantao-tipo-display plantao-tipo--${state.tipoPlantao || 'sabado'}">
+                            <i class="fas fa-circle"></i>
+                            ${escapeHtml(rotuloTipoPlantao(state.tipoPlantao, construirMapaFeriadosPlantao().get(state.dataISO)))}
+                        </div>
+                        <small class="helper-text">Detectado pela data. Plantao permitido em sabado, domingo e feriado.</small>
                     </div>
                     <div class="editor-form-group">
                         <label><i class="fas fa-clock"></i> Horario do plantao</label>
@@ -2537,6 +2540,20 @@
 
             window.bancoHorasResumo = items;
             window.bancoHorasStatus = status;
+
+            // Saldo "atual" do cadastro = ultimo lancamento da grade semanal
+            // (BancoHorasSemanal), para bater com a tela de Banco de Horas.
+            try {
+                const saldosPayload = await window.API.getBancoHorasSaldosSemanais();
+                const mapa = {};
+                (saldosPayload?.saldos || []).forEach((saldo) => {
+                    mapa[Number(saldo.colaboradorId)] = saldo;
+                });
+                window.bancoHorasSaldoSemanal = mapa;
+            } catch (error) {
+                window.bancoHorasSaldoSemanal = window.bancoHorasSaldoSemanal || {};
+            }
+
             return { items, status };
         });
     };
@@ -2996,7 +3013,6 @@
                     <small class="helper-text">Esses horarios definem a base padrao da escala para esse colaborador.</small>
                 </div>
 
-                ${typeof buildBancoHorasEditorMarkup === 'function' ? buildBancoHorasEditorMarkup(colaborador) : ''}
                 ${buildJornadaSemanalEditorMarkup(buildJornadaSemanalDefaultRows(), { showSuggestion: false })}
 
                 <div class="editor-actions">
@@ -3010,9 +3026,10 @@
 
                 ${colaborador ? `
                     <div class="editor-footer">
-                        <button onclick="excluirColaborador(${colaborador.Id})" class="btn-danger" style="width: 100%;">
-                            <i class="fas fa-trash"></i> Excluir Colaborador
+                        <button onclick="abrirDesligarColaborador(${colaborador.Id}, '${escapeHtml(String(colaborador.Nome || '')).replace(/'/g, "\\'")}')" class="btn-danger" style="width: 100%;">
+                            <i class="fas fa-user-slash"></i> Desligar colaborador
                         </button>
+                        <small class="helper-text">O historico e preservado. A exclusao definitiva so acontece depois, na tela de desligados.</small>
                     </div>
                 ` : ''}
             </div>
@@ -3039,9 +3056,6 @@
         const trabalhoFim = document.getElementById('editorTrabFim')?.value || null;
         const almocoInicio = document.getElementById('editorAlmInicio')?.value || null;
         const almocoFim = document.getElementById('editorAlmFim')?.value || null;
-        const bancoHorasSaldoOriginal = (document.getElementById('editorBancoHorasSaldoOriginal')?.value || '').trim() || '+00:00';
-        const bancoHorasHabilitado = document.querySelector('.banco-horas-editor-shell')?.dataset?.enabled !== 'false';
-        let bancoHorasSaldo = bancoHorasSaldoOriginal;
 
         if (!nome) {
             mostrarToast('Nome e obrigatorio!', 'error');
@@ -3051,15 +3065,6 @@
         if (!setorId) {
             mostrarToast('Selecione um setor para o colaborador.', 'warning');
             return;
-        }
-
-        if (bancoHorasHabilitado) {
-            try {
-                bancoHorasSaldo = obterSaldoBancoHorasEditorValue();
-            } catch (error) {
-                mostrarToast(error.message || 'Revise o saldo do banco de horas.', 'error');
-                return;
-            }
         }
 
         try {
@@ -3106,20 +3111,6 @@
                 throw new Error(data?.error || data?.message || 'Erro ao salvar');
             }
 
-            const colaboradorId = Number(data?.data?.Id || data?.Id || id);
-
-            if (
-                bancoHorasHabilitado
-                && bancoHorasSaldo !== bancoHorasSaldoOriginal
-                && Number.isFinite(colaboradorId)
-                && colaboradorId > 0
-                && window.API?.atualizarBancoHorasSaldo
-            ) {
-                await window.API.atualizarBancoHorasSaldo(colaboradorId, {
-                    saldo: bancoHorasSaldo
-                });
-            }
-
             await Promise.allSettled([
                 typeof carregarSetores === 'function' ? carregarSetores() : Promise.resolve([]),
                 carregarColaboradores(),
@@ -3143,6 +3134,182 @@
             mostrarToast(error.message || 'Erro ao salvar colaborador', 'error');
         }
     };
+
+    function fecharModalColab() {
+        const existente = document.getElementById('modalColabGeral');
+        if (existente) {
+            existente.remove();
+        }
+    }
+
+    // Modal de desligamento: pede a data e desliga (soft delete). Nao apaga nada.
+    window.abrirDesligarColaborador = function abrirDesligarColaborador(id, nome) {
+        fecharModalColab();
+        const hojeISO = obterDataISO(new Date());
+        const overlay = document.createElement('div');
+        overlay.id = 'modalColabGeral';
+        overlay.className = 'bh-modal-overlay';
+        overlay.innerHTML = `
+            <div class="bh-modal" style="max-width: 460px;">
+                <div class="bh-modal-header">
+                    <h3><i class="fas fa-user-slash"></i> Desligar ${escapeHtml(nome || 'colaborador')}</h3>
+                    <button type="button" class="bh-modal-fechar" aria-label="Fechar"><i class="fas fa-times"></i></button>
+                </div>
+                <div class="bh-modal-body">
+                    <p class="bh-modal-info">O colaborador some das escalas, calendario e plantao, mas o <strong>historico continua no banco</strong>. A exclusao definitiva so acontece depois, na tela de desligados.</p>
+                    <div class="editor-form-group">
+                        <label><i class="fas fa-calendar-day"></i> Data de desligamento</label>
+                        <input type="date" id="inputDataDesligamento" class="form-control" value="${hojeISO}">
+                    </div>
+                </div>
+                <div class="bh-modal-footer">
+                    <button type="button" class="btn-secondary bh-modal-cancelar">Cancelar</button>
+                    <button type="button" class="btn-danger" id="btnConfirmarDesligamento"><i class="fas fa-user-slash"></i> Desligar</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+        overlay.querySelector('.bh-modal-fechar').addEventListener('click', fecharModalColab);
+        overlay.querySelector('.bh-modal-cancelar').addEventListener('click', fecharModalColab);
+        overlay.addEventListener('click', (evento) => {
+            if (evento.target === overlay) {
+                fecharModalColab();
+            }
+        });
+        overlay.querySelector('#btnConfirmarDesligamento').addEventListener('click', async () => {
+            const dataDesligamento = document.getElementById('inputDataDesligamento')?.value || hojeISO;
+            try {
+                await window.API.desligarColaborador(id, { dataDesligamento });
+                fecharModalColab();
+                if (typeof fecharColaboradorEditor === 'function') {
+                    fecharColaboradorEditor();
+                }
+                mostrarToast('Colaborador desligado. Historico preservado.', 'success');
+                await Promise.allSettled([
+                    typeof carregarColaboradores === 'function' ? carregarColaboradores() : Promise.resolve([]),
+                    typeof carregarBancoHorasResumo === 'function' ? carregarBancoHorasResumo() : Promise.resolve(null)
+                ]);
+                if (typeof renderListaColaboradores === 'function') {
+                    renderListaColaboradores();
+                }
+            } catch (error) {
+                mostrarToast(error.message || 'Nao foi possivel desligar.', 'error');
+            }
+        });
+    };
+
+    // Tela de desligados: lista quem esta desligado, permite reativar e (so
+    // depois da data de desligamento) excluir definitivamente.
+    window.abrirDesligadosColaboradores = async function abrirDesligadosColaboradores() {
+        fecharModalColab();
+        const overlay = document.createElement('div');
+        overlay.id = 'modalColabGeral';
+        overlay.className = 'bh-modal-overlay';
+        overlay.innerHTML = `
+            <div class="bh-modal">
+                <div class="bh-modal-header">
+                    <h3><i class="fas fa-user-slash"></i> Colaboradores desligados</h3>
+                    <button type="button" class="bh-modal-fechar" aria-label="Fechar"><i class="fas fa-times"></i></button>
+                </div>
+                <div class="bh-modal-body" id="desligadosBody">
+                    <div class="bh-loading"><i class="fas fa-spinner fa-spin"></i> Carregando...</div>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+        overlay.querySelector('.bh-modal-fechar').addEventListener('click', fecharModalColab);
+        overlay.addEventListener('click', (evento) => {
+            if (evento.target === overlay) {
+                fecharModalColab();
+            }
+        });
+        await renderDesligadosLista();
+    };
+
+    async function renderDesligadosLista() {
+        const alvo = document.getElementById('desligadosBody');
+        if (!alvo) {
+            return;
+        }
+        try {
+            const todos = await window.API.getColaboradores({ incluirInativos: 1 });
+            const hojeISO = obterDataISO(new Date());
+            const desligados = (Array.isArray(todos) ? todos : []).filter((c) => c.Ativo === false || c.Ativo === 0);
+
+            if (desligados.length === 0) {
+                alvo.innerHTML = '<div class="bh-vazio">Nenhum colaborador desligado.</div>';
+                return;
+            }
+
+            const linhas = desligados.map((c) => {
+                const dataISO = obterDataISO(c.DataDesligamento);
+                const apto = dataISO && dataISO <= hojeISO;
+                return `
+                    <tr>
+                        <td>${escapeHtml(c.Nome || 'Sem nome')}</td>
+                        <td>${dataISO ? escapeHtml(formatarDataPlantaoCard(dataISO)) : '--'}</td>
+                        <td>${apto ? '<span class="desligado-apto">Apto a limpeza</span>' : '<span class="desligado-retencao">Em retencao</span>'}</td>
+                        <td class="desligado-acoes">
+                            <button type="button" class="btn-secondary" data-reativar="${c.Id}"><i class="fas fa-rotate-left"></i> Reativar</button>
+                            <button type="button" class="btn-danger" data-excluir="${c.Id}" data-nome="${escapeHtml(c.Nome || '')}" ${apto ? '' : 'disabled'} title="${apto ? 'Excluir definitivamente' : 'So apos a data de desligamento'}"><i class="fas fa-trash"></i></button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+
+            alvo.innerHTML = `
+                <p class="bh-modal-info">Desligados mantem o historico ate a data de desligamento. Depois dela ficam <strong>aptos a limpeza</strong> (exclusao definitiva).</p>
+                <div class="banco-horas-tabela-wrap">
+                    <table class="banco-horas-tabela bh-tabela-verificar">
+                        <thead><tr><th>Colaborador</th><th>Desligamento</th><th>Status</th><th></th></tr></thead>
+                        <tbody>${linhas}</tbody>
+                    </table>
+                </div>
+            `;
+
+            alvo.querySelectorAll('[data-reativar]').forEach((btn) => {
+                btn.addEventListener('click', async () => {
+                    try {
+                        await window.API.reativarColaborador(Number(btn.dataset.reativar));
+                        mostrarToast('Colaborador reativado.', 'success');
+                        if (typeof carregarColaboradores === 'function') {
+                            await carregarColaboradores();
+                        }
+                        if (typeof renderListaColaboradores === 'function') {
+                            renderListaColaboradores();
+                        }
+                        await renderDesligadosLista();
+                    } catch (error) {
+                        mostrarToast(error.message || 'Falha ao reativar.', 'error');
+                    }
+                });
+            });
+
+            alvo.querySelectorAll('[data-excluir]').forEach((btn) => {
+                btn.addEventListener('click', async () => {
+                    const nome = btn.dataset.nome || 'este colaborador';
+                    if (!window.confirm(`Excluir DEFINITIVAMENTE ${nome} e todo o historico? Esta acao nao pode ser desfeita.`)) {
+                        return;
+                    }
+                    try {
+                        await window.API.excluirColaborador(Number(btn.dataset.excluir));
+                        mostrarToast('Colaborador excluido definitivamente.', 'success');
+                        if (typeof carregarColaboradores === 'function') {
+                            await carregarColaboradores();
+                        }
+                        if (typeof renderListaColaboradores === 'function') {
+                            renderListaColaboradores();
+                        }
+                        await renderDesligadosLista();
+                    } catch (error) {
+                        mostrarToast(error.message || 'Falha ao excluir.', 'error');
+                    }
+                });
+            });
+        } catch (error) {
+            alvo.innerHTML = `<div class="bh-erro">${escapeHtml(error.message || 'Falha ao carregar desligados.')}</div>`;
+        }
+    }
 
     window.renderColaboradoresPlantao = renderColaboradoresPlantao = function renderColaboradoresPlantaoAvancado(colaboradoresIds) {
         if (!colaboradoresIds || colaboradoresIds.length === 0) {
@@ -3225,20 +3392,83 @@
         definirAncoraSabadoPlantao(obterDataISO(data));
     }
 
+    // Feriados cadastrados (locais) + nacionais (API), como Map ISO -> nome.
+    function construirMapaFeriadosPlantao() {
+        const mapa = new Map();
+        const add = (dataRaw, nome) => {
+            const iso = obterDataISO(dataRaw);
+            if (iso) {
+                mapa.set(iso, nome || 'Feriado');
+            }
+        };
+        (Array.isArray(window.feriadosLocais) ? window.feriadosLocais : [])
+            .forEach((item) => add(item.Data || item.data, item.Nome || item.nome));
+        (Array.isArray(window.feriadosAPI) ? window.feriadosAPI : [])
+            .forEach((item) => add(item.date, item.name));
+        return mapa;
+    }
+
+    // Tipo do plantao pela data (feriado tem prioridade sobre o dia da semana).
+    // Retorna 'feriado' | 'sabado' | 'domingo' | null (dia comum).
+    function resolverTipoPlantaoFront(dataISO, feriadosMap) {
+        const iso = obterDataISO(dataISO);
+        if (!iso) {
+            return null;
+        }
+        const mapa = feriadosMap || construirMapaFeriadosPlantao();
+        if (mapa.has(iso)) {
+            return 'feriado';
+        }
+        const weekday = criarDataLocalPlantao(iso).getDay();
+        if (weekday === 6) {
+            return 'sabado';
+        }
+        if (weekday === 0) {
+            return 'domingo';
+        }
+        return null;
+    }
+
+    function ehDataPlantaoValida(dataISO) {
+        return resolverTipoPlantaoFront(dataISO) !== null;
+    }
+
+    function rotuloTipoPlantao(tipo, feriadoNome) {
+        if (tipo === 'feriado') {
+            return feriadoNome || 'Feriado';
+        }
+        if (tipo === 'domingo') {
+            return 'Domingo';
+        }
+        return 'Sabado';
+    }
+
+    // Regua de datas lancaveis: sabados, domingos e feriados dentro da janela,
+    // em ordem cronologica. Antes era so sabado (passos de 7 dias).
+    const PLANTAO_DIAS_ANTES = 14;
+    const PLANTAO_DIAS_DEPOIS = 56;
+
     function construirSabadosVisiveisPlantao() {
         const hojeISO = obterDataISO(new Date());
         const dataAncora = criarDataLocalPlantao(obterAncoraSabadoPlantao());
         const dataFoco = obterDataISO(window.__plantaoDataFocoISO || '');
-        const sabados = [];
+        const feriadosMap = construirMapaFeriadosPlantao();
+        const datas = [];
 
-        for (let deslocamento = PLANTAO_SABADOS_ANTERIORES * -1; deslocamento <= PLANTAO_SABADOS_POSTERIORES; deslocamento += 1) {
+        for (let off = PLANTAO_DIAS_ANTES * -1; off <= PLANTAO_DIAS_DEPOIS; off += 1) {
             const data = new Date(dataAncora);
-            data.setDate(data.getDate() + (deslocamento * 7));
-
+            data.setDate(data.getDate() + off);
             const dataISO = obterDataISO(data);
+            const tipo = resolverTipoPlantaoFront(dataISO, feriadosMap);
+
+            if (!tipo) {
+                continue;
+            }
+
+            const feriadoNome = tipo === 'feriado' ? feriadosMap.get(dataISO) : null;
             const plantao = (window.plantoesLancados || []).find((item) => item.dataISO === dataISO) || null;
 
-            sabados.push({
+            datas.push({
                 dataISO,
                 formatada: formatarDataPlantaoCard(dataISO),
                 dia: String(data.getDate()).padStart(2, '0'),
@@ -3249,21 +3479,23 @@
                 isPast: dataISO < hojeISO,
                 isToday: dataISO === hojeISO,
                 isActive: dataFoco === dataISO,
-                tipoLabel: 'Sabado'
+                tipo,
+                tipoLabel: rotuloTipoPlantao(tipo, feriadoNome),
+                feriadoNome
             });
         }
 
-        return sabados;
+        return datas;
     }
 
     function renderSabadosPlantaoHistorico(items) {
         return items.map((sabado) => `
             <button
                 type="button"
-                class="sabado-card ${sabado.temPlantao ? 'lancado' : ''} ${sabado.isPast ? 'passado' : ''} ${sabado.isToday ? 'hoje' : ''} ${sabado.isActive ? 'is-active' : ''}"
+                class="sabado-card sabado-card--${sabado.tipo || 'sabado'} ${sabado.temPlantao ? 'lancado' : ''} ${sabado.isPast ? 'passado' : ''} ${sabado.isToday ? 'hoje' : ''} ${sabado.isActive ? 'is-active' : ''}"
                 data-plantao-sabado="${sabado.dataISO}"
                 onclick="abrirPlantaoPorData('${sabado.dataISO}')"
-                title="${escapeHtml(sabado.formatada)}${sabado.temPlantao ? ' - Plantao ja lancado' : ''}"
+                title="${escapeHtml(sabado.formatada)}${sabado.feriadoNome ? ' - ' + escapeHtml(sabado.feriadoNome) : ''}${sabado.temPlantao ? ' - Plantao ja lancado' : ''}"
             >
                 <div class="sabado-card-badges">
                     ${sabado.temPlantao ? '<span class="badge-plantao">Lancado</span>' : ''}
@@ -3329,7 +3561,7 @@
             }
 
             const ordenados = [...window.plantoesLancados]
-                .filter((plantao) => plantao.tipoPlantao === 'sabado' || isPlantaoSabadoEscala(plantao.dataISO))
+                .filter((plantao) => ehDataPlantaoValida(plantao.dataISO) || ['sabado', 'domingo', 'feriado'].includes(plantao.tipoPlantao))
                 .sort((a, b) => new Date(b.dataISO) - new Date(a.dataISO));
 
             if (ordenados.length === 0) {
@@ -3368,6 +3600,35 @@
         atualizarResumoPlantaoNaTela();
     };
 
+    // Garante os feriados NACIONAIS (BrasilAPI) dos anos da janela em
+    // window.feriadosAPI. carregarFeriadosAPI substitui a lista a cada chamada,
+    // entao aqui juntamos os anos manualmente (dedup por data).
+    async function garantirFeriadosApiPlantao(anos) {
+        const porData = new Map(
+            (Array.isArray(window.feriadosAPI) ? window.feriadosAPI : [])
+                .filter((item) => item && item.date)
+                .map((item) => [item.date, item])
+        );
+
+        for (const ano of anos) {
+            try {
+                const resposta = await fetch(`https://brasilapi.com.br/api/feriados/v1/${ano}`);
+                if (resposta.ok) {
+                    const lista = await resposta.json();
+                    (Array.isArray(lista) ? lista : []).forEach((item) => {
+                        if (item && item.date) {
+                            porData.set(item.date, item);
+                        }
+                    });
+                }
+            } catch (error) {
+                // Sem rede/API fora do ar: segue com os feriados locais/ja carregados.
+            }
+        }
+
+        window.feriadosAPI = [...porData.values()];
+    }
+
     window.renderLancamentoPlantao = renderLancamentoPlantao = async function renderLancamentoPlantaoAtualizado() {
         const appContent = document.getElementById('appContent');
 
@@ -3375,14 +3636,22 @@
             return;
         }
 
+        const anoInicio = new Date().getFullYear();
+        const anoFim = criarDataLocalPlantao(
+            obterDataISO(new Date(Date.now() + PLANTAO_DIAS_DEPOIS * 86400000))
+        ).getFullYear();
+        const anosJanela = anoFim > anoInicio ? [anoInicio, anoFim] : [anoInicio];
+
         await Promise.allSettled([
             typeof carregarColaboradores === 'function' ? carregarColaboradores() : Promise.resolve([]),
             typeof carregarAusencias === 'function' ? carregarAusencias() : Promise.resolve([]),
             typeof carregarPlantoes === 'function' ? carregarPlantoes() : Promise.resolve([]),
-            typeof carregarBancoHorasResumo === 'function' ? carregarBancoHorasResumo() : Promise.resolve(null)
+            typeof carregarBancoHorasResumo === 'function' ? carregarBancoHorasResumo() : Promise.resolve(null),
+            typeof carregarFeriadosLocais === 'function' ? carregarFeriadosLocais() : Promise.resolve([]),
+            garantirFeriadosApiPlantao(anosJanela)
         ]);
 
-        window.plantoesLancados = (window.plantoesLancados || []).filter((plantao) => isPlantaoSabadoEscala(plantao.dataISO));
+        window.plantoesLancados = (window.plantoesLancados || []).filter((plantao) => ehDataPlantaoValida(plantao.dataISO) || ['sabado', 'domingo', 'feriado'].includes(plantao.tipoPlantao));
 
         const dataFoco = obterDataISO(window.__plantaoDataFocoISO || getPlantaoEditorState()?.dataISO || '');
         definirAncoraSabadoPlantao(dataFoco || obterAncoraSabadoPlantao());
@@ -3394,8 +3663,8 @@
         appContent.innerHTML = `
             <div class="page-header">
                 <div>
-                    <h1><i class="fas fa-calendar-plus"></i> Plantoes de sabado</h1>
-                    <p>Consulte os plantões de sabado, abra um registro existente para editar e mantenha o mesmo lancamento atualizado.</p>
+                    <h1><i class="fas fa-calendar-plus"></i> Plantoes</h1>
+                    <p>Lance plantoes de sabado, domingo e feriado. Clique numa data para abrir ou editar o registro.</p>
                 </div>
             </div>
 
@@ -3403,8 +3672,8 @@
                 <div class="sabados-container">
                     <div class="sabados-header">
                         <div>
-                            <h3><i class="fas fa-calendar-day"></i> Sabados disponiveis</h3>
-                            <p class="sabados-subtitle">Janela atual: ${escapeHtml(primeiraData)} ate ${escapeHtml(ultimaData)}</p>
+                            <h3><i class="fas fa-calendar-day"></i> Datas disponiveis</h3>
+                            <p class="sabados-subtitle">Sabados, domingos e feriados &middot; ${escapeHtml(primeiraData)} ate ${escapeHtml(ultimaData)}</p>
                         </div>
                         <div class="sabados-nav">
                             <button type="button" class="btn-secondary" id="plantaoAnteriorBtn">
@@ -3518,9 +3787,9 @@
 
         const existente = (window.plantoesLancados || []).find((item) => item.dataISO === dataISO);
 
-        if (!isPlantaoSabadoEscala(dataISO)) {
+        if (!ehDataPlantaoValida(dataISO)) {
             if (typeof mostrarToast === 'function') {
-                mostrarToast('Plantao agora e lancado somente aos sabados.', 'warning');
+                mostrarToast('Plantao so pode ser lancado em sabado, domingo ou feriado.', 'warning');
             }
             return;
         }
@@ -3528,7 +3797,7 @@
         const state = setPlantaoEditorState({
             dataISO,
             dataFormatada,
-            tipoPlantao: 'sabado',
+            tipoPlantao: resolverTipoPlantaoFront(dataISO) || 'sabado',
             horaInicio: existente?.horaInicio ? formatarHoraInput(existente.horaInicio) : '',
             horaFim: existente?.horaFim ? formatarHoraInput(existente.horaFim) : '',
             observacao: existente?.observacao || '',
@@ -3565,7 +3834,7 @@
     };
 
     window.salvarPlantao = salvarPlantao = async function salvarPlantaoAvancado(dataISO) {
-        const tipoPlantao = 'sabado';
+        const tipoPlantao = resolverTipoPlantaoFront(dataISO) || 'sabado';
         const horaInicio = document.getElementById('plantaoHoraInicio')?.value;
         const horaFim = document.getElementById('plantaoHoraFim')?.value;
         const observacao = document.getElementById('plantaoObservacao')?.value || '';
@@ -3587,8 +3856,8 @@
             return;
         }
 
-        if (!isPlantaoSabadoEscala(dataISO)) {
-            mostrarToast('Plantao agora e lancado somente aos sabados.', 'warning');
+        if (!ehDataPlantaoValida(dataISO)) {
+            mostrarToast('Plantao so pode ser lancado em sabado, domingo ou feriado.', 'warning');
             return;
         }
 
@@ -4016,7 +4285,7 @@
                 duracaoFormatada: item.duracaoFormatada || null
             }))
             .filter((plantao) => {
-                if (plantao.tipoPlantao !== 'sabado' && !isPlantaoSabadoEscala(plantao.dataISO)) {
+                if (!['sabado', 'domingo', 'feriado'].includes(plantao.tipoPlantao) && !ehDataPlantaoValida(plantao.dataISO)) {
                     return false;
                 }
 

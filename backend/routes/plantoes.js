@@ -9,7 +9,7 @@ const {
     describePlantaoMovement,
     minutesToDurationLabel
 } = require('../utils/bancoHoras');
-const { getBancoHorasCapabilities, getSchemaInfo, hasTable } = require('../utils/schema');
+const { getBancoHorasCapabilities, getSchemaInfo, hasColumn, hasTable } = require('../utils/schema');
 const {
     deleteEscalaDiaByOrigin,
     restoreEscalaDefaultsForPeriod,
@@ -75,6 +75,22 @@ async function findPlantaoByDate(poolOrTx, dataISO, schema) {
     return result.recordset[0] || null;
 }
 
+// Datas de feriado (ISO) cadastradas, como Set — para o tipo do plantao poder
+// ser 'feriado' (inclusive em dia util). A tabela Feriados e obrigatoria.
+async function loadFeriadosSet(poolOrTx) {
+    const result = await poolOrTx.request().query('SELECT Data FROM Feriados');
+    const set = new Set();
+
+    for (const row of result.recordset) {
+        const iso = extractDateString(row.Data);
+        if (iso) {
+            set.add(iso);
+        }
+    }
+
+    return set;
+}
+
 async function ensureColaboradoresExist(poolOrTx, colaboradoresIds) {
     for (const colaboradorId of colaboradoresIds) {
         const result = await poolOrTx.request()
@@ -87,7 +103,7 @@ async function ensureColaboradoresExist(poolOrTx, colaboradoresIds) {
     }
 }
 
-function buildPlantaoPayload(body, fallback = {}) {
+function buildPlantaoPayload(body, fallback = {}, feriados = null) {
     const dataISO = body.dataISO !== undefined
         ? normalizeIsoDate(body.dataISO, 'Data do plantao')
         : normalizeIsoDate(
@@ -121,8 +137,8 @@ function buildPlantaoPayload(body, fallback = {}) {
         : normalizeOptionalText(fallback.observacao || fallback.Observacao, 'Observacao', { maxLength: 500 });
 
     const tipoPlantao = body.tipoPlantao !== undefined
-        ? normalizePlantaoType(body.tipoPlantao, dataISO)
-        : normalizePlantaoType(fallback.tipo_plantao || fallback.TipoPlantao || fallback.tipoPlantao, dataISO);
+        ? normalizePlantaoType(body.tipoPlantao, dataISO, feriados)
+        : normalizePlantaoType(fallback.tipo_plantao || fallback.TipoPlantao || fallback.tipoPlantao, dataISO, feriados);
 
     return {
         dataISO,
@@ -156,7 +172,9 @@ function buildDisponibilidadeSelect(schema) {
 }
 
 async function listDisponibilidade(poolOrTx, schema, plantao) {
-    const colaboradoresResult = await poolOrTx.request().query('SELECT * FROM Colaboradores ORDER BY Nome');
+    // Colaborador desligado (Ativo = 0) nao aparece como disponivel para plantao.
+    const filtroAtivo = hasColumn(schema, 'Colaboradores', 'Ativo') ? 'WHERE Ativo = 1' : '';
+    const colaboradoresResult = await poolOrTx.request().query(`SELECT * FROM Colaboradores ${filtroAtivo} ORDER BY Nome`);
     const ausenciasResult = await poolOrTx.request()
         .input('dataPlantao', sql.Date, plantao.dataISO)
         .query(`
@@ -306,7 +324,7 @@ router.get('/', async (req, res) => {
         }
 
         return serialized;
-    }).filter((plantao) => plantao.tipoPlantao === 'sabado');
+    }).filter((plantao) => ['sabado', 'domingo', 'feriado'].includes(plantao.tipoPlantao));
 
     res.json(records);
 });
@@ -320,7 +338,7 @@ router.get('/disponibilidade/:dataISO', async (req, res) => {
     const pool = await conectar();
     const schema = await getSchemaInfo(pool);
     const dataISO = normalizeIsoDate(req.params.dataISO, 'Data do plantao');
-    resolvePlantaoTypeByDate(dataISO);
+    resolvePlantaoTypeByDate(dataISO, await loadFeriadosSet(pool));
     const horaInicio = req.query.horaInicio ? normalizeNullableTime(req.query.horaInicio, 'Hora inicial do plantao') : null;
     const horaFim = req.query.horaFim ? normalizeNullableTime(req.query.horaFim, 'Hora final do plantao') : null;
 
@@ -346,7 +364,7 @@ router.get('/:dataISO', async (req, res) => {
     const pool = await conectar();
     const schema = await getSchemaInfo(pool);
     const dataISO = normalizeIsoDate(req.params.dataISO, 'Data do plantao');
-    resolvePlantaoTypeByDate(dataISO);
+    resolvePlantaoTypeByDate(dataISO, await loadFeriadosSet(pool));
     const plantao = await findPlantaoByDate(pool, dataISO, schema);
 
     if (!plantao) {
@@ -366,7 +384,8 @@ router.get('/:dataISO', async (req, res) => {
 router.post('/', async (req, res) => {
     const pool = await conectar();
     const schema = await getSchemaInfo(pool);
-    const payload = buildPlantaoPayload(req.body);
+    const feriados = await loadFeriadosSet(pool);
+    const payload = buildPlantaoPayload(req.body, {}, feriados);
 
     if (payload.colaboradores.length === 0) {
         throw new AppError(400, 'Selecione pelo menos um colaborador para o plantao.');

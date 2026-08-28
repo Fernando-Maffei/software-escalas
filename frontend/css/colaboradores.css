@@ -1,4 +1,17 @@
 /* ================= TELA DE COLABORADORES ================= */
+.colaboradores-header-actions {
+    display: flex;
+    gap: var(--space-2, 8px);
+    align-items: center;
+}
+
+/* Tela de desligados (soft delete) */
+.desligado-apto { color: var(--danger); font-weight: 600; }
+.desligado-retencao { color: var(--text-light); }
+.desligado-acoes { display: flex; gap: 6px; justify-content: flex-end; }
+.desligado-acoes .btn-secondary,
+.desligado-acoes .btn-danger { padding: 6px 10px; font-size: 13px; }
+
 .colaboradores-layout {
     display: flex;
     gap: 20px;

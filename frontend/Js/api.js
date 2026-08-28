@@ -181,6 +181,8 @@ const API = {
     }),
     getJornadaSemanal: (params = {}) => API.get('/jornada-semanal', params),
     excluirColaborador: (id) => API.delete(`/colaboradores/${id}`),
+    desligarColaborador: (id, data) => API.put(`/colaboradores/${id}/desligar`, data),
+    reativarColaborador: (id) => API.put(`/colaboradores/${id}/reativar`, {}),
     // Confirma a senha do usuario logado antes de uma acao sensivel (ex.:
     // excluir colaborador). Lanca erro com .status 403 se a senha estiver errada.
     verificarSenha: (password) => API.post('/auth/verify-password', { password }),
@@ -214,6 +216,15 @@ const API = {
     getBancoHorasExtrato: (colaboradorId, params = {}) => API.get(`/banco-horas/colaborador/${colaboradorId}`, params),
     atualizarBancoHorasSaldo: (colaboradorId, data) => API.put(`/banco-horas/colaborador/${colaboradorId}/saldo`, data),
     recalcularBancoHoras: () => API.post('/banco-horas/recalcular', {}),
+
+    getBancoHorasSemanal: (params = {}) => API.get('/banco-horas-semanal', params),
+    salvarBancoHorasSemanalCelula: (data) => API.put('/banco-horas-semanal/celula', data),
+    salvarBancoHorasSemanalNota: (data) => API.put('/banco-horas-semanal/nota', data),
+    verificarBancoHorasSemanal: (params = {}) => API.get('/banco-horas-semanal/verificar', params),
+    getBancoHorasSaldosSemanais: (params = {}) => API.get('/banco-horas-semanal/saldos', params),
+    gerarBancoHorasSemana: (data) => API.post('/banco-horas-semanal/gerar-semana', data),
+    confirmarBancoHorasSemana: (data) => API.put('/banco-horas-semanal/confirmar-semana', data),
+    excluirBancoHorasSemana: (semana) => API.delete(`/banco-horas-semanal/semana/${semana}`),
 
     getConfiguracaoBanco: () => API.get('/configuracao-banco'),
     salvarConfiguracaoBanco: (data) => API.post('/configuracao-banco/salvar', data),

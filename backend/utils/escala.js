@@ -515,7 +515,9 @@ async function listEscalaDiaRows(poolOrTx, startISO, endISO, options = {}) {
     const request = poolOrTx.request()
         .input('dataInicio', sql.Date, normalizeIsoDate(startISO, 'Data inicial'))
         .input('dataFim', sql.Date, normalizeIsoDate(endISO, 'Data final'));
-    const clauses = ['e.data BETWEEN @dataInicio AND @dataFim'];
+    // Colaborador desligado (Ativo = 0) some da escala e do relatorio, mesmo com
+    // linhas historicas em escala_dia (o historico segue no banco ate a limpeza).
+    const clauses = ['e.data BETWEEN @dataInicio AND @dataFim', 'c.Ativo = 1'];
 
     if (colaboradorId) {
         request.input('colaboradorId', sql.Int, ensurePositiveInt(colaboradorId, 'Colaborador'));

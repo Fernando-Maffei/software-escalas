@@ -13,6 +13,8 @@ const REQUIRED_TABLES = Object.freeze([
     'Feriados',
     'plantoes',
     'BancoHorasMovimentos',
+    'BancoHorasSemanal',
+    'BancoHorasSemanalNota',
     'escala_dia',
     'AlmocosPersonalizados',
     'Usuarios',
@@ -29,7 +31,9 @@ const SCHEMA_SCRIPT_PATHS = Object.freeze([
     path.join(__dirname, '..', '..', 'database', 'migrations', '2026-07-09-usuarios-admin.sql'),
     path.join(__dirname, '..', '..', 'database', 'migrations', '2026-08-11-usuarios-setores-visiveis.sql'),
     path.join(__dirname, '..', '..', 'database', 'migrations', '2026-08-12-usuarios-setores-permitidos.sql'),
-    path.join(__dirname, '..', '..', 'database', 'migrations', '2026-08-26-sessoes.sql')
+    path.join(__dirname, '..', '..', 'database', 'migrations', '2026-08-26-sessoes.sql'),
+    path.join(__dirname, '..', '..', 'database', 'migrations', '2026-08-27-banco-horas-semanal.sql'),
+    path.join(__dirname, '..', '..', 'database', 'migrations', '2026-08-28-colaborador-desligamento.sql')
 ]);
 
 const EXAMPLE_SEED_SCRIPT_PATH = path.join(__dirname, '..', '..', 'database', 'seeds', 'dados-exemplo.sql');
