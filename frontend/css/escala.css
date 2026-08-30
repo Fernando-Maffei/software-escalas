@@ -2966,7 +2966,11 @@
    22:00): a coluna fica estreita demais para "07:30". O rotulo da meia hora
    sai — o tique da grade continua marcando a posicao — e o da hora cheia
    ganha respiro reduzindo o padding lateral. */
-.escala-page[data-horas-densas="1"] .timeline-header .hora-header {
+/* :not(.total-header) em todas as regras densas: o cabecalho da coluna Total
+   tambem carrega a classe .hora-header, mas e uma coluna CONGELADA
+   (position: sticky). Sem a exclusao, o position:relative logo abaixo
+   derrubava esse sticky e o rotulo "Total" saia do lugar ao rolar. */
+.escala-page[data-horas-densas="1"] .timeline-header .hora-header:not(.total-header) {
     padding: 0 2px;
     font-size: 11px;
     letter-spacing: -0.02em;
@@ -2980,20 +2984,23 @@
     font-size: 0;
 }
 
-/* Rotulo completo x curto. No dia normal mostra "07:00"; no dia longo, em que
-   a coluna tem ~28px, mostra so "07" — o texto inteiro vazaria por cima da
-   coluna vizinha. Como a meia hora esta oculta, nao ha ambiguidade: todo
-   rotulo visivel e uma hora cheia. */
-.escala-page .hora-rotulo-curto {
-    display: none;
+/* Horario COMPLETO mesmo no dia longo.
+   A coluna sozinha tem ~28px e "07:00" precisa de ~42px, mas o rotulo da meia
+   hora ao lado esta oculto: cada hora dispoe, na pratica, de duas colunas
+   (~56px). Centrando o rotulo na divisa da hora e deixando-o transbordar para
+   esse vazio, o texto inteiro cabe com folga — sem precisar encolher a coluna
+   de nomes nem a barra lateral.
+   position:absolute tira o texto do fluxo, entao ele nao empurra a grade. */
+.escala-page[data-horas-densas="1"] .timeline-header .hora-header:not(.total-header) {
+    position: relative;
+    overflow: visible;
 }
 
-.escala-page[data-horas-densas="1"] .hora-rotulo-completo {
-    display: none;
-}
-
-.escala-page[data-horas-densas="1"] .hora-header:not(.hora-header-half) .hora-rotulo-curto {
-    display: inline;
+.escala-page[data-horas-densas="1"] .timeline-header .hora-header:not(.hora-header-half) .hora-rotulo {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    white-space: nowrap;
 }
 
 /* --- Zebra e hover na area de horas ----------------------------------------
