@@ -1471,7 +1471,12 @@
                 ${Array.from({ length: bounds.columnCount }, (_, index) => {
                     const slot = bounds.startSlot + index;
                     const cellState = getCellStateEscala(record, slot);
-                    return `<div class="timeline-cell ${cellState.className}" data-slot="${slot}" data-colaborador-id="${record.colaboradorId}"></div>`;
+                    // Marca o inicio de cada hora cheia (slots sao de 30 min), mesma
+                    // regra do cabecalho. O CSS usa isso para desenhar a linha da
+                    // grade mais forte na hora e mais fraca na meia hora — sem essa
+                    // hierarquia as 23 colunas viram um paredao de linhas iguais.
+                    const isHourMark = slot % 2 === 0;
+                    return `<div class="timeline-cell ${cellState.className}${isHourMark ? ' slot-hora-cheia' : ''}" data-slot="${slot}" data-colaborador-id="${record.colaboradorId}"></div>`;
                 }).join('')}
                 ${buildRowOverlayEscala(record, bounds)}
             `;

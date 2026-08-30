@@ -130,9 +130,14 @@
    colunas. Sticky da coluna de nomes e overlay das barras leem as MESMAS
    variaveis, por isso continuam alinhados em qualquer largura. */
 .escala-page {
-    --esc-col-nome: 200px;   /* coluna do colaborador (congelada) */
+    --esc-col-nome: 220px;   /* coluna do colaborador (congelada) */
     --esc-col-total: 80px;   /* coluna do badge de total (congelada) */
     --esc-col-hora: 42px;    /* cada faixa de 30 min */
+
+    /* Cores das linhas da grade de horas (tema escuro; o claro sobrescreve
+       mais abaixo). A da hora cheia e nitida, a da meia hora quase some. */
+    --esc-grid-hora: rgba(148, 163, 184, 0.22);
+    --esc-grid-meia: rgba(148, 163, 184, 0.07);
 
     --escala-linha-padding: 16px;
     --escala-linha-gap: 8px;
@@ -2686,9 +2691,12 @@
 
 .escala-page .timeline-name {
     min-width: 0;
-    padding: 0 14px;
+    /* Padding e gap enxutos: nesta coluna o espaco util e disputado entre
+       avatar, nome e botao de editar — cada 2px economizado aqui vira nome
+       legivel em vez de reticencias. */
+    padding: 0 10px;
     align-items: center;
-    gap: 10px;
+    gap: 8px;
     font-weight: 800;
     color: #f8fafc;
     background: rgba(12, 20, 32, 0.96);
@@ -2870,6 +2878,35 @@
 
 .escala-page .timeline-cell:hover {
     background: rgba(12, 20, 32, 0.48);
+}
+
+/* --- Hierarquia da grade de horas ------------------------------------------
+   Antes toda coluna de 30 min tinha a MESMA linha divisoria: 23 tracos iguais,
+   sem nenhuma pista de onde comeca cada hora — dificil bater o olho e achar
+   "meio-dia". Agora a linha da hora cheia e nitida e a da meia hora e quase
+   invisivel, criando um ritmo visual de leitura (padrao de Gantt/calendario).
+
+   A linha e desenhada com border-LEFT (nao right) porque a divisa da hora fica
+   no INICIO da celula de slot par; com border-right sobrariam duas linhas
+   coladas na mesma divisa. */
+.escala-page .timeline-cell[data-slot] {
+    border-right: none;
+    border-left: 1px solid var(--esc-grid-meia);
+}
+
+.escala-page .timeline-cell[data-slot].slot-hora-cheia {
+    border-left-color: var(--esc-grid-hora);
+}
+
+/* O cabecalho segue exatamente a mesma regra, senao o tique da hora no topo
+   nao cai em cima da linha da grade das linhas de baixo. */
+.escala-page .timeline-header .hora-header {
+    border-right: none;
+    border-left: 1px solid var(--esc-grid-meia);
+}
+
+.escala-page .timeline-header .hora-header:not(.hora-header-half) {
+    border-left-color: var(--esc-grid-hora);
 }
 
 .escala-page .timeline-row.is-selected:hover > div,
@@ -3270,7 +3307,10 @@
 
 @media (max-width: 1500px) {
     .escala-page {
-        --esc-col-nome: 190px;
+        /* 215px (era 190): com 190 sobravam so 87px para o texto e quase todo
+           nome completo virava reticencias; 215 da ~112px, o suficiente para
+           "nome + sobrenome" tipico sem cortar. */
+        --esc-col-nome: 215px;
         --esc-col-total: 70px;
         --esc-col-hora: 36px;
     }
@@ -3339,6 +3379,13 @@
         --esc-col-nome: 158px;
         --esc-col-total: 64px;
         --esc-col-hora: 30px;
+    }
+
+    /* Numa coluna de 30px o rotulo "07:30" nao cabe e vira poluicao; some com o
+       texto e deixa so o tique da grade marcando a meia hora. As horas cheias
+       continuam rotuladas. */
+    .escala-page .timeline-header .hora-header-half {
+        font-size: 0;
     }
 
     .escala-page .timeline-name {
@@ -3488,6 +3535,13 @@
     background: rgba(255, 255, 255, 0.96);
     border-right-color: rgba(226, 232, 240, 0.95);
     border-bottom-color: rgba(226, 232, 240, 0.92);
+}
+
+/* Grade de horas no tema claro: mesma hierarquia (hora nitida / meia hora
+   discreta), com o cinza da paleta clara em vez do slate translucido. */
+:root:not([data-theme="dark"]) .escala-page {
+    --esc-grid-hora: rgba(148, 163, 184, 0.45);
+    --esc-grid-meia: rgba(148, 163, 184, 0.14);
 }
 
 :root:not([data-theme="dark"]) .escala-page .timeline-row:hover > div,
