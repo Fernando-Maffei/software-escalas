@@ -136,14 +136,27 @@
     --esc-col-total: 80px;   /* coluna do badge de total (congelada) */
     --esc-col-hora: 42px;    /* cada faixa de 30 min */
 
-    /* Largura minima da grade inteira: abaixo disso as colunas ficariam
-       espremidas, entao entra o scroll horizontal. Acima disso as horas
-       esticam para ocupar a tela (util quando a barra lateral e recolhida).
-       Cabecalho, linhas e o container usam esta MESMA conta. */
+    /* Piso de legibilidade da coluna de hora. So abaixo DELE a tela passa a
+       rolar na horizontal; entre o piso e a largura ideal, as colunas
+       encolhem para caber. E o que faz um dia longo (plantonista ate 22:00,
+       31 colunas) caber num notebook em vez de exigir rolagem. */
+    --esc-col-hora-piso: 24px;
+
+    /* Largura que cada hora teria se a grade coubesse exatamente na tela.
+       O 100% resolve contra a largura do proprio grid, entao acompanha a
+       area disponivel (inclusive quando a barra lateral e recolhida). */
+    --esc-col-hora-fit: calc(
+        (100% - var(--esc-col-nome) - var(--esc-col-total))
+        / var(--escala-hour-columns, 12)
+    );
+
+    /* Largura minima da grade inteira, calculada sobre o PISO: e o ponto em
+       que a rolagem horizontal finalmente entra. Cabecalho, linhas e
+       container usam esta mesma conta para nunca divergirem. */
     --esc-grade-largura-min: calc(
         var(--esc-col-nome)
         + var(--esc-col-total)
-        + var(--escala-hour-columns, 12) * var(--esc-col-hora)
+        + var(--escala-hour-columns, 12) * var(--esc-col-hora-piso)
     );
 
     /* Cores das linhas da grade de horas (tema escuro; o claro sobrescreve
@@ -2604,10 +2617,25 @@
 .escala-page .timeline-header,
 .escala-page .timeline-row {
     display: grid;
+    /* Largura da coluna de hora, em uma linha:
+         max(piso, min(ideal, cabe-na-tela))
+       - sobra espaco  -> vale a ideal e o 1fr ainda reparte o excedente
+       - falta espaco  -> vale "cabe-na-tela": as colunas encolhem em vez de
+                          empurrar a grade para fora e exigir rolagem
+       - falta muito   -> trava no piso e ai sim entra o scroll horizontal */
     grid-template-columns:
         var(--esc-col-nome)
         var(--esc-col-total)
-        repeat(var(--escala-hour-columns, 12), minmax(var(--esc-col-hora), 1fr));
+        repeat(
+            var(--escala-hour-columns, 12),
+            minmax(
+                max(
+                    var(--esc-col-hora-piso),
+                    min(var(--esc-col-hora), var(--esc-col-hora-fit))
+                ),
+                1fr
+            )
+        );
     /* width:100% + min-width calculada (NAO max-content).
        Com max-content o navegador dimensiona cada faixa pelo proprio conteudo:
        o cabecalho, que tem os rotulos "08:00", ficava mais largo que as linhas
@@ -2932,6 +2960,40 @@
 
 .escala-page .timeline-header .hora-header:not(.hora-header-half) {
     border-left-color: var(--esc-grid-hora);
+}
+
+/* Dia longo (marcado pelo JS quando passa de 26 colunas, ex.: plantonista ate
+   22:00): a coluna fica estreita demais para "07:30". O rotulo da meia hora
+   sai — o tique da grade continua marcando a posicao — e o da hora cheia
+   ganha respiro reduzindo o padding lateral. */
+.escala-page[data-horas-densas="1"] .timeline-header .hora-header {
+    padding: 0 2px;
+    font-size: 11px;
+    letter-spacing: -0.02em;
+}
+
+/* Depois da regra acima de proposito: a celula de meia hora tem as DUAS
+   classes (.hora-header e .hora-header-half), entao as duas regras tem a
+   mesma especificidade e vence a ultima. Invertida, o font-size:11px
+   reacendia o rotulo que esta regra quer apagar. */
+.escala-page[data-horas-densas="1"] .timeline-header .hora-header-half {
+    font-size: 0;
+}
+
+/* Rotulo completo x curto. No dia normal mostra "07:00"; no dia longo, em que
+   a coluna tem ~28px, mostra so "07" — o texto inteiro vazaria por cima da
+   coluna vizinha. Como a meia hora esta oculta, nao ha ambiguidade: todo
+   rotulo visivel e uma hora cheia. */
+.escala-page .hora-rotulo-curto {
+    display: none;
+}
+
+.escala-page[data-horas-densas="1"] .hora-rotulo-completo {
+    display: none;
+}
+
+.escala-page[data-horas-densas="1"] .hora-header:not(.hora-header-half) .hora-rotulo-curto {
+    display: inline;
 }
 
 /* --- Zebra e hover na area de horas ----------------------------------------

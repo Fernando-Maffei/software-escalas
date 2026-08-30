@@ -67,6 +67,11 @@
 
         if (escalaPage) {
             escalaPage.style.setProperty('--escala-hour-columns', String(bounds.columnCount));
+            // Dia longo (ex.: plantonista ate 22:00) gera muitas colunas e cada
+            // uma fica estreita demais para o rotulo "07:30". O CSS usa esta
+            // marca para enxugar o cabecalho nesses dias, em vez de deixar o
+            // texto vazar ou obrigar a rolagem horizontal.
+            escalaPage.dataset.horasDensas = bounds.columnCount > 26 ? '1' : '0';
         }
 
         return bounds;
@@ -799,7 +804,16 @@
             + Array.from({ length: bounds.columnCount }, (_, index) => {
                 const slot = bounds.startSlot + index;
                 const isHourMark = slot % 2 === 0;
-                return `<div class="hora-header${isHourMark ? '' : ' hora-header-half'}">${formatMinutesToTimeEscala(slot * SLOT_MINUTES)}</div>`;
+                const label = formatMinutesToTimeEscala(slot * SLOT_MINUTES);
+                // Duas versoes do rotulo: a completa ("07:00") e a curta
+                // ("07"), para o dia longo em que a coluna nao comporta o
+                // texto inteiro. Quem escolhe e o CSS, pelo data-horas-densas
+                // — assim o limiar fica definido num lugar so e nao e preciso
+                // re-renderizar o cabecalho ao redimensionar a janela.
+                return `<div class="hora-header${isHourMark ? '' : ' hora-header-half'}">`
+                    + `<span class="hora-rotulo-completo">${label}</span>`
+                    + `<span class="hora-rotulo-curto">${label.slice(0, 2)}</span>`
+                    + '</div>';
             }).join('');
     }
 
