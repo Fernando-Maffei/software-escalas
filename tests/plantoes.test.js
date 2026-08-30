@@ -44,22 +44,38 @@ module.exports = [
         }
     },
     {
-        name: 'resolvePlantaoTypeByDate accepts only saturday',
+        // Domingo passou a valer como plantao (cobre a folga do plantonista),
+        // ao lado de sabado e feriado. Dia util comum continua recusado.
+        name: 'resolvePlantaoTypeByDate accepts saturday, sunday and holiday',
         run() {
             assert.equal(resolvePlantaoTypeByDate('2026-04-25'), 'sabado');
+            assert.equal(resolvePlantaoTypeByDate('2026-04-26'), 'domingo');
             assert.throws(
-                () => resolvePlantaoTypeByDate('2026-04-26'),
-                /somente para sabado/i
+                () => resolvePlantaoTypeByDate('2026-04-27'),
+                /somente para sabado, domingo ou feriado/i
             );
+        }
+    },
+    {
+        // Um feriado em dia util so resolve quando o Set de feriados e passado;
+        // sem ele, a mesma data cai na recusa de dia util.
+        name: 'resolvePlantaoTypeByDate marks a weekday as holiday only with the holiday set',
+        run() {
+            const feriados = new Set(['2026-04-27']);
+
+            assert.equal(resolvePlantaoTypeByDate('2026-04-27', feriados), 'feriado');
+            assert.throws(() => resolvePlantaoTypeByDate('2026-04-27'), /somente para sabado/i);
         }
     },
     {
         name: 'normalizePlantaoType validates explicit type against weekend date',
         run() {
             assert.equal(normalizePlantaoType('sabado', '2026-04-25'), 'sabado');
+            assert.equal(normalizePlantaoType('domingo', '2026-04-26'), 'domingo');
+            // Tipo declarado que nao bate com o dia da data e recusado.
             assert.throws(
                 () => normalizePlantaoType('domingo', '2026-04-25'),
-                /Tipo de plantao/i
+                /corresponde a sabado, nao a domingo/i
             );
         }
     },
