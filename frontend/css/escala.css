@@ -42,9 +42,13 @@
     overflow-x: auto;
 }
 
+/* A GRADE (grid-template-columns) NAO e definida aqui.
+   Fonte unica: ".escala-page .timeline-header, .escala-page .timeline-row"
+   (secao "GRADE DA TIMELINE" mais abaixo). Antes este seletor declarava
+   "260px + horas 1fr" e brigava com aquela regra: larguras diferentes por
+   linha e a coluna de Total (que o JS renderiza) nem existia aqui. */
 .timeline-header {
     display: grid;
-    grid-template-columns: 260px repeat(var(--escala-hour-columns, 12), minmax(var(--escala-hora-largura-min, 44px), 1fr));
     background: var(--card-dark);
     border-radius: var(--radius-lg);
     margin-bottom: 16px;
@@ -120,25 +124,24 @@
     height: 24px;
 }
 
+/* Medidas da timeline — PONTO UNICO DE AJUSTE.
+   Estas tres variaveis controlam a grade inteira (ver "GRADE DA TIMELINE").
+   Os breakpoints la embaixo so as redefinem; nenhum outro lugar declara
+   colunas. Sticky da coluna de nomes e overlay das barras leem as MESMAS
+   variaveis, por isso continuam alinhados em qualquer largura. */
 .escala-page {
-    --escala-nome-largura: 260px;
-    /* Largura da coluna de nomes na grade fixa (a que o layout usa de verdade,
-       via --esc-col-nome). 200px em vez dos 240px de fallback: os nomes sao
-       curtos e sobrava muito espaco em branco. Sticky do total e overlay das
-       barras usam a MESMA variavel, entao continuam alinhados. */
-    --esc-col-nome: 200px;
-    /* Largura MINIMA de cada coluna de meia-hora. Antes as colunas eram
-       apenas 1fr, entao encolhiam para caber e a grade "bugava" espremida.
-       Com um minimo, quando nao couberem elas param de encolher e a barra de
-       rolagem horizontal do .timeline-container passa a funcionar. */
-    --escala-hora-largura-min: 44px;
+    --esc-col-nome: 200px;   /* coluna do colaborador (congelada) */
+    --esc-col-total: 80px;   /* coluna do badge de total (congelada) */
+    --esc-col-hora: 42px;    /* cada faixa de 30 min */
+
     --escala-linha-padding: 16px;
     --escala-linha-gap: 8px;
 }
 
+/* Idem: a grade vem da fonte unica em "GRADE DA TIMELINE". Aqui ficam so
+   aparencia e espacamento da linha. */
 .timeline-row {
     display: grid;
-    grid-template-columns: var(--escala-nome-largura) repeat(var(--escala-hour-columns, 12), minmax(var(--escala-hora-largura-min, 44px), 1fr));
     border-radius: var(--radius-lg);
     overflow: hidden;
     margin-bottom: var(--escala-linha-gap);
@@ -1106,10 +1109,9 @@
         grid-template-columns: 1fr;
     }
     
-    .timeline-header,
-    .timeline-row {
-        grid-template-columns: 200px repeat(var(--escala-hour-columns, 12), minmax(var(--escala-hora-largura-min, 44px), 1fr));
-    }
+    /* (Grade removida: este breakpoint esquecia a coluna de Total, jogando as
+       horas uma coluna para tras. As larguras responsivas agora saem das
+       variaveis --esc-col-* nos breakpoints de .escala-page.) */
 }
 
 @media (max-width: 768px) {
@@ -1629,15 +1631,9 @@
     background: var(--primary-soft);
 }
 
-.timeline-header {
-    display: grid;
-    grid-template-columns: 260px 80px repeat(var(--escala-hour-columns, 12), minmax(var(--escala-hora-largura-min, 44px), 1fr)); /* Coluna extra de 80px para o total */
-}
-
-.timeline-row {
-    display: grid;
-    grid-template-columns: 260px 80px repeat(var(--escala-hour-columns, 12), minmax(var(--escala-hora-largura-min, 44px), 1fr));
-}
+/* (Grade removida: era mais uma copia divergente — 260px de nome contra os
+   200px da fonte unica — que desalinhava cabecalho e linhas. Ver
+   "GRADE DA TIMELINE".) */
 
 /* Estilo para o cabeçalho do total */
 .total-header {
@@ -2570,19 +2566,28 @@
     width: 100%;
 }
 
+/* ================= GRADE DA TIMELINE (FONTE UNICA) =================
+   Esta e a UNICA regra que define as colunas da timeline. Cabecalho, linhas
+   de colaborador, linha de total e linha de mensagem passam todos por aqui,
+   entao resolvem exatamente as mesmas larguras — que e o que garante o
+   alinhamento vertical perfeito entre eles.
+
+   Colunas em px fixo (nao minmax/1fr) de proposito: com 1fr cada linha
+   distribui a sobra conforme o proprio conteudo e as colunas "dancam" entre
+   as linhas. Fixo + width:max-content = grade estavel e scroll horizontal
+   previsivel em .escala-scroll (padrao de Gantt/timeline).
+
+   Para ajustar larguras, mexa SOMENTE nas variaveis (aqui e nos breakpoints
+   de .escala-page). Nunca redeclare grid-template-columns em outro seletor. */
 .escala-page .timeline-header,
 .escala-page .timeline-row {
     display: grid;
-    /* Colunas em px fixo (nao minmax/1fr): cada linha (cabecalho, dados, total)
-       precisa resolver exatamente a mesma largura por coluna, senao desalinham
-       entre si quando o grid depende do conteudo para se dimensionar.
-       Os valores vem de variaveis para que os breakpoints (mais abaixo) e a
-       densidade compacta consigam ajusta-los num lugar so. */
     grid-template-columns:
-        var(--esc-col-nome, 240px)
-        var(--esc-col-total, 80px)
-        repeat(var(--escala-hour-columns, 12), var(--esc-col-hora, 42px));
+        var(--esc-col-nome)
+        var(--esc-col-total)
+        repeat(var(--escala-hour-columns, 12), var(--esc-col-hora));
     width: max-content;
+    min-width: 100%;
 }
 
 .escala-page .timeline-header {
@@ -2600,7 +2605,16 @@
     overflow: visible;
     /* Opaco (sem alfa): quando pinado no topo, as linhas rolam por baixo dele. */
     background: rgb(12, 20, 32);
-    border: 1px solid rgba(148, 163, 184, 0.18);
+    /* Contorno com OUTLINE, nao border: border entra no box do grid e empurrava
+       as colunas do cabecalho 1px para a direita em relacao as linhas (que nao
+       tem borda), deixando os rotulos de hora fora de prumo com as celulas.
+       outline desenha por fora, sem ocupar espaco — cabecalho e linhas passam
+       a comecar exatamente na mesma coordenada. */
+    outline: 1px solid rgba(148, 163, 184, 0.18);
+    outline-offset: -1px;
+    /* Zera a borda herdada da regra base .timeline-header: e ela que empurrava
+       as colunas 1px (o outline acima faz o mesmo papel visual sem deslocar). */
+    border: 0;
 }
 
 .escala-page .timeline-header div {
@@ -3615,15 +3629,21 @@
   border-radius: 16px;
 }
 
+/* Sem min-width fixo: a grade tem width:max-content e ja define a largura
+   real (colunas fixas). Um piso de 1120px so criava faixa vazia a direita
+   quando a escala era estreita — e brigava com o scroll de .escala-scroll. */
 .timeline-container {
-  min-width: 1120px;
-  width: 100%;
+  width: max-content;
+  min-width: 100%;
 }
 
+/* Grade removida daqui de proposito. Esta regra vinha DEPOIS da fonte unica
+   no arquivo e, com a mesma especificidade, vencia a cascata: fixava 12
+   colunas de hora (o JS gera 23+) e usava minmax(...,1fr), que fazia cada
+   linha resolver larguras proprias — a origem dos vaos irregulares e do
+   desalinhamento entre cabecalho e linhas. */
 .timeline-header,
 .timeline-row {
-  display: grid;
-  grid-template-columns: 220px 80px repeat(12, minmax(64px, 1fr));
   align-items: stretch;
 }
 
@@ -3715,13 +3735,10 @@
     display: none;
   }
 
+  /* Largura da grade agora vem das variaveis (ver breakpoints de
+     .escala-page), entao nao se redeclara grid-template-columns aqui. */
   .timeline-container {
-    min-width: 980px;
-  }
-
-  .timeline-header,
-  .timeline-row {
-    grid-template-columns: 180px 70px repeat(12, minmax(58px, 1fr));
+    min-width: 0;
   }
 }
 
