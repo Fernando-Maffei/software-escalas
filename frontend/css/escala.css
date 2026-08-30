@@ -130,7 +130,9 @@
    colunas. Sticky da coluna de nomes e overlay das barras leem as MESMAS
    variaveis, por isso continuam alinhados em qualquer largura. */
 .escala-page {
-    --esc-col-nome: 220px;   /* coluna do colaborador (congelada) */
+    /* 230px: acima de 1500px a fonte do nome e maior, e com 220 um nome como
+       "Diego Nascimento" ficava 1px curto e caia em reticencias. */
+    --esc-col-nome: 230px;   /* coluna do colaborador (congelada) */
     --esc-col-total: 80px;   /* coluna do badge de total (congelada) */
     --esc-col-hora: 42px;    /* cada faixa de 30 min */
 
@@ -138,6 +140,11 @@
        mais abaixo). A da hora cheia e nitida, a da meia hora quase some. */
     --esc-grid-hora: rgba(148, 163, 184, 0.22);
     --esc-grid-meia: rgba(148, 163, 184, 0.07);
+
+    /* Faixa zebrada e realce de hover na area de horas. Ambos bem sutis: a
+       leitura tem de ganhar apoio sem competir com as barras de jornada. */
+    --esc-zebra: rgba(148, 163, 184, 0.05);
+    --esc-row-hover: rgba(96, 165, 250, 0.14);
 
     --escala-linha-padding: 16px;
     --escala-linha-gap: 8px;
@@ -2909,6 +2916,27 @@
     border-left-color: var(--esc-grid-hora);
 }
 
+/* --- Zebra e hover na area de horas ----------------------------------------
+   Numa timeline de 23 colunas o olho perde a linha da pessoa no meio do
+   caminho. A faixa zebrada da um trilho de leitura e o hover confirma qual
+   linha esta sendo lida (antes o hover existia mas pintava o MESMO fundo,
+   ou seja, nao fazia nada).
+
+   Aplicado so nas celulas de hora ([data-slot]): as colunas de nome e total
+   sao "congeladas" (sticky) e precisam de fundo opaco proprio, senao o
+   conteudo que passa por baixo ao rolar apareceria atraves delas.
+
+   Linha de total e de mensagem ficam de fora: nao sao dados de pessoa. */
+.escala-page .timeline-row:not(.total-row):not(.mensagem-row):nth-child(even) > .timeline-cell[data-slot] {
+    background: var(--esc-zebra);
+}
+
+/* Depois da zebra de proposito: mesma especificidade, entao o hover vence e
+   pinta a linha inteira mesmo quando ela e uma faixa zebrada. */
+.escala-page .timeline-row:not(.total-row):not(.mensagem-row):hover > .timeline-cell[data-slot] {
+    background: var(--esc-row-hover);
+}
+
 .escala-page .timeline-row.is-selected:hover > div,
 .escala-page .timeline-row.is-selected .timeline-name:hover,
 .escala-page .timeline-row.is-selected .timeline-cell:hover {
@@ -3542,6 +3570,10 @@
 :root:not([data-theme="dark"]) .escala-page {
     --esc-grid-hora: rgba(148, 163, 184, 0.45);
     --esc-grid-meia: rgba(148, 163, 184, 0.14);
+    /* No fundo branco a faixa precisa de um cinza levemente mais presente que
+       no tema escuro para nao sumir. */
+    --esc-zebra: rgba(148, 163, 184, 0.10);
+    --esc-row-hover: rgba(37, 99, 235, 0.11);
 }
 
 :root:not([data-theme="dark"]) .escala-page .timeline-row:hover > div,
