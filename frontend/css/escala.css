@@ -136,6 +136,16 @@
     --esc-col-total: 80px;   /* coluna do badge de total (congelada) */
     --esc-col-hora: 42px;    /* cada faixa de 30 min */
 
+    /* Largura minima da grade inteira: abaixo disso as colunas ficariam
+       espremidas, entao entra o scroll horizontal. Acima disso as horas
+       esticam para ocupar a tela (util quando a barra lateral e recolhida).
+       Cabecalho, linhas e o container usam esta MESMA conta. */
+    --esc-grade-largura-min: calc(
+        var(--esc-col-nome)
+        + var(--esc-col-total)
+        + var(--escala-hour-columns, 12) * var(--esc-col-hora)
+    );
+
     /* Cores das linhas da grade de horas (tema escuro; o claro sobrescreve
        mais abaixo). A da hora cheia e nitida, a da meia hora quase some. */
     --esc-grid-hora: rgba(148, 163, 184, 0.22);
@@ -2597,9 +2607,17 @@
     grid-template-columns:
         var(--esc-col-nome)
         var(--esc-col-total)
-        repeat(var(--escala-hour-columns, 12), var(--esc-col-hora));
-    width: max-content;
-    min-width: 100%;
+        repeat(var(--escala-hour-columns, 12), minmax(var(--esc-col-hora), 1fr));
+    /* width:100% + min-width calculada (NAO max-content).
+       Com max-content o navegador dimensiona cada faixa pelo proprio conteudo:
+       o cabecalho, que tem os rotulos "08:00", ficava mais largo que as linhas
+       de dados, que sao celulas vazias — exatamente o desalinhamento que esta
+       tela tinha. Com uma largura explicita, cabecalho e linhas resolvem o
+       mesmo valor sempre:
+         - sobra espaco  -> os 100% valem e o 1fr reparte a sobra entre as horas
+         - falta espaco  -> a min-width vale e o scroll horizontal entra */
+    width: 100%;
+    min-width: var(--esc-grade-largura-min);
 }
 
 .escala-page .timeline-header {
@@ -3715,12 +3733,12 @@
   border-radius: 16px;
 }
 
-/* Sem min-width fixo: a grade tem width:max-content e ja define a largura
-   real (colunas fixas). Um piso de 1120px so criava faixa vazia a direita
-   quando a escala era estreita — e brigava com o scroll de .escala-scroll. */
+/* Mesma conta da grade: ocupa a largura disponivel e so passa a rolar quando
+   nao cabe. O antigo piso fixo de 1120px criava faixa vazia a direita nas
+   escalas estreitas e brigava com o scroll de .escala-scroll. */
 .timeline-container {
-  width: max-content;
-  min-width: 100%;
+  width: 100%;
+  min-width: var(--esc-grade-largura-min);
 }
 
 /* Grade removida daqui de proposito. Esta regra vinha DEPOIS da fonte unica
@@ -4034,10 +4052,14 @@
     position: absolute;
     top: 0;
     bottom: 0;
-    /* Comeca em nome+total e cobre a area de horas usando as MESMAS variaveis
-       da grade -> alinha exatamente com as colunas em qualquer largura. */
+    /* Comeca depois de nome+total e vai ate o fim da linha. Usa right:0 em vez
+       de largura calculada: as colunas de hora podem ESTICAR para ocupar a
+       sobra da tela (minmax(...,1fr) na grade), entao uma largura fixa
+       (colunas x 42px) descolaria as barras da grade sempre que houvesse
+       espaco sobrando. Com right:0 o overlay acompanha a area real de horas,
+       e as barras — posicionadas em % — seguem junto em qualquer largura. */
     left: calc(var(--esc-col-nome, 240px) + var(--esc-col-total, 80px));
-    width: calc(var(--escala-hour-columns, 12) * var(--esc-col-hora, 42px));
+    right: 0;
     pointer-events: none;
     z-index: 3;
 }
