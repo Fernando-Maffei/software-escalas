@@ -1,8 +1,9 @@
 # Central de Escalas
 
-![Versão](https://img.shields.io/badge/versão-1.6.1-6366f1)
+![Versão](https://img.shields.io/badge/versão-1.6.3-6366f1)
 ![Node](https://img.shields.io/badge/Node-20%2B-3c873a)
 ![Licença](https://img.shields.io/badge/licença-proprietária-lightgrey)
+[![CI](https://github.com/Fernando-Maffei/software-escalas/actions/workflows/ci.yml/badge.svg)](https://github.com/Fernando-Maffei/software-escalas/actions/workflows/ci.yml)
 
 Sistema web para gestão de escalas de trabalho, colaboradores, ausências e plantões.
 Uma máquina roda o servidor; qualquer dispositivo da rede acessa pelo navegador, sem instalar nada.
@@ -27,7 +28,7 @@ Uma máquina roda o servidor; qualquer dispositivo da rede acessa pelo navegador
 - Lançamento de ausências, férias e folgas
 - Calendário mensal com feriados e eventos
 - Escala diária com timeline visual e resumo por horário
-- Plantões de sábado
+- Plantões de sábado, domingo e feriado
 - Relatórios e exportação de dados (PDF)
 - Autenticação com perfis de usuário e controle de acesso
 - Backup automático (inclusive antes de restaurações)
@@ -43,6 +44,31 @@ Uma máquina roda o servidor; qualquer dispositivo da rede acessa pelo navegador
 | Banco de dados | SQL Server |
 
 ## Início rápido (desenvolvimento)
+
+### Com Docker (recomendado)
+
+Sobe o servidor **e** o banco juntos, sem instalar Node nem SQL Server na máquina:
+
+```bash
+cp .env.docker.example .env
+```
+```bash
+docker compose up -d --build
+```
+
+Acesse `http://localhost:4450`. O banco `SoftwareEscalas`, as tabelas e o
+administrador são criados automaticamente na primeira subida — se `ADMIN_PASSWORD`
+ficar vazio, a senha aparece uma única vez em `docker compose logs app`. Os dados
+ficam em volumes e sobrevivem a reinícios; com `restart: always` os containers
+voltam sozinhos quando a máquina liga.
+
+```bash
+docker compose down
+```
+
+### Sem Docker
+
+Requer Node 20+ e um SQL Server acessível:
 
 ```bash
 npm install
@@ -62,6 +88,8 @@ npm run smoke    # checagem rápida de sintaxe de todos os módulos
 ## Implantação
 
 O modelo recomendado é **um servidor central na rede**; o time acessa pelo navegador.
+A forma mais simples de manter esse servidor no ar é o Docker: `restart: always`
+faz app e banco subirem sozinhos quando a máquina liga, sem ninguém precisar logar.
 
 - **Montar o servidor** (serviço do Windows, firewall, IP fixo):
   [`docs/SERVIDOR-COMO-INSTALAR.md`](docs/SERVIDOR-COMO-INSTALAR.md)
@@ -112,7 +140,7 @@ são afetadas pela atualização.
 
 ## Versionamento
 
-Versão atual: **1.6.1**. O histórico completo fica em [`CHANGELOG.md`](CHANGELOG.md).
+Versão atual: **1.6.3**. O histórico completo fica em [`CHANGELOG.md`](CHANGELOG.md).
 Segue [SemVer](https://semver.org/lang/pt-BR/): correção (`1.0.1`), funcionalidade
 (`1.1.0`), mudança que quebra fluxo (`2.0.0`).
 

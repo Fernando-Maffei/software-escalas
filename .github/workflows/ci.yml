@@ -1,0 +1,40 @@
+# Integracao continua: roda a suite de testes e a checagem de sintaxe a cada
+# push e pull request. O objetivo e simples — nada entra na main sem os testes
+# passando, sem depender de alguem lembrar de rodar na mao.
+#
+# Nao precisa de banco: a suite cobre as regras puras (escala, banco de horas,
+# plantoes, permissoes, validacao, backup, rate limit) sem tocar no SQL Server.
+
+name: CI
+
+on:
+  push:
+    branches: [main, refatoracao-visual]
+  pull_request:
+    branches: [main, refatoracao-visual]
+
+jobs:
+  testes:
+    name: Testes e sintaxe
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Baixar o codigo
+        uses: actions/checkout@v4
+
+      - name: Preparar Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      # npm ci (e nao npm install): instala exatamente o que esta no
+      # package-lock.json, entao o CI testa as mesmas versoes do desenvolvimento.
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Checagem de sintaxe (smoke)
+        run: npm run smoke
+
+      - name: Suite de testes
+        run: npm test
