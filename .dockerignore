@@ -25,3 +25,7 @@ tests
 docs
 *.md
 *.log
+
+# Demo estatica (nao faz parte da imagem do servidor)
+demo
+vercel.json
