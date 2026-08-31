@@ -32,10 +32,22 @@ fix(visual): corrige formulario de novo usuario em Configuracoes
 
 ## Rodando o projeto
 
+Com Docker (sobe o app e o banco juntos):
+
+```bash
+docker compose up -d --build
+```
+
+Sem Docker (requer Node 20+ e um SQL Server acessivel):
+
 ```bash
 npm install
 npm start        # sobe em http://localhost:4450
 ```
+
+Ao mexer no backend com o Docker rodando, reconstrua a imagem
+(`docker compose up -d --build`): o override local de desenvolvimento espelha
+apenas o `frontend/`.
 
 ## Testes
 
@@ -44,7 +56,9 @@ npm test         # suite de testes
 npm run smoke    # checagem rapida de sintaxe de todos os modulos
 ```
 
-Rode ambos antes de abrir um Pull Request.
+Rode ambos antes de abrir um Pull Request. Os dois tambem rodam
+automaticamente no GitHub Actions a cada push e PR (ver
+`.github/workflows/ci.yml`), entao um PR com teste quebrado aparece marcado.
 
 ## Estilo de codigo
 
