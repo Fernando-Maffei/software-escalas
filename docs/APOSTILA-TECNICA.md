@@ -167,7 +167,7 @@ App de escalas/
 ├── tests/                      ← testes de lógica (Node puro)
 │
 ├── Dockerfile, docker-compose.yml   ← execução em contêiner
-├── iniciar-servidor.bat, *.vbs      ← atalhos de execução no Windows
+├── docker/init-db.sh                ← cria o banco na primeira subida
 ├── package.json                     ← dependências e scripts (npm)
 └── *.md                             ← README, CHANGELOG, planos, relatórios
 ```
@@ -541,7 +541,7 @@ Pré-requisitos: **Node.js** (LTS) e **SQL Server** (Express serve) instalados; 
    ```
    O servidor sobe na porta **4450**, cria as tabelas automaticamente (migrations) e o admin inicial. Abra <http://localhost:4450>.
 
-   No Windows, há atalhos: `iniciar-servidor.bat` (com terminal) e `iniciar-sem-terminal.vbs` (sem janela).
+   Com Docker, `docker compose up -d --build` sobe o app e o banco juntos.
 
 ### Scripts do `npm`
 

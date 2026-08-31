@@ -96,9 +96,8 @@ faz app e banco subirem sozinhos quando a máquina liga, sem ninguém precisar l
 - **Acessar e instalar o app** (para o time, Chrome/Edge):
   [`docs/README-TIME.md`](docs/README-TIME.md)
 
-Para uso local rápido em uma máquina Windows, também existem os atalhos
-`iniciar-servidor.bat` (com janela) e `iniciar-sem-terminal.vbs` (oculto);
-`parar-servidor.bat` encerra o servidor.
+Para parar o servidor, use `docker compose down` (ou pare o serviço, se
+configurado sem Docker).
 
 ## Login e primeiro acesso
 
@@ -130,10 +129,12 @@ sistema impede desativar ou rebaixar a própria conta e o último administrador 
 
 ## Atualização
 
-1. Pare o servidor (`parar-servidor.bat` ou pelo serviço, se configurado)
-2. Atualize os arquivos do projeto (`git pull`)
-3. Rode `npm install` caso as dependências tenham mudado
-4. Suba o servidor novamente
+1. Atualize os arquivos do projeto (`git pull`)
+2. Suba novamente:
+   - **Com Docker:** `docker compose up -d --build` (o `--build` é o que leva
+     as mudanças de backend para dentro da imagem)
+   - **Sem Docker:** pare o servidor, rode `npm install` caso as dependências
+     tenham mudado e inicie de novo com `npm start`
 
 As configurações de banco e backup ficam em `backend/config/`, fora do código, e não
 são afetadas pela atualização.
