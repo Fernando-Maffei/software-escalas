@@ -39,8 +39,103 @@ const frontendPath = path.join(__dirname, '..', 'frontend');
 
 let activeController = null;
 let sessionCleanupTimer = null;
+let bootstrapRetryTimer = null;
 
 const SESSION_CLEANUP_INTERVAL_MS = 60 * 60 * 1000;
+
+// Retentativa do bootstrap do banco (conectar + garantir schema).
+// Sem isto, um unico tropeco na inicializacao deixava o sistema em modo
+// manutencao (503) ATE alguem reiniciar na mao. O caso comum e o reinicio da
+// maquina: com "restart: always" o app sobe junto com o SQL Server, que leva
+// ~1 minuto para aceitar conexoes — o app perdia a corrida, desistia e o
+// restart automatico virava um sistema no ar porem inutilizavel.
+const BOOTSTRAP_RETRY_INICIAL_MS = 5 * 1000;
+const BOOTSTRAP_RETRY_MAX_MS = 60 * 1000;
+
+function clearBootstrapRetry() {
+    if (bootstrapRetryTimer) {
+        clearTimeout(bootstrapRetryTimer);
+        bootstrapRetryTimer = null;
+    }
+}
+
+// Conecta ao banco e garante o schema. Em caso de falha, reagenda a si mesma
+// com espera crescente (5s -> 60s) ate conseguir, em vez de desistir na
+// primeira tentativa. Enquanto nao conclui, schemaReady segue false e as rotas
+// de dados respondem 503 — a diferenca e que agora o sistema se recupera
+// sozinho assim que o banco fica de pe.
+//
+// Nunca lanca: e chamada sem await pelo timer, e uma excecao aqui viraria
+// unhandled rejection e derrubaria o processo.
+async function bootstrapDatabaseWithRetry(esperaMs = BOOTSTRAP_RETRY_INICIAL_MS) {
+    clearBootstrapRetry();
+
+    const reagendar = (proximaEspera) => {
+        // Nao insiste depois de um pedido de encerramento: o processo esta
+        // saindo e um timer pendente atrasaria o shutdown.
+        if (!activeController || activeController.encerrando) {
+            return;
+        }
+
+        const espera = Math.min(proximaEspera, BOOTSTRAP_RETRY_MAX_MS);
+        console.error(`[boot] Nova tentativa em ${Math.round(espera / 1000)}s...`);
+        bootstrapRetryTimer = setTimeout(() => {
+            bootstrapDatabaseWithRetry(Math.min(espera * 2, BOOTSTRAP_RETRY_MAX_MS));
+        }, espera);
+
+        if (typeof bootstrapRetryTimer.unref === 'function') {
+            bootstrapRetryTimer.unref();
+        }
+    };
+
+    let pool;
+
+    try {
+        pool = await conectar();
+        console.log('Banco de dados conectado com sucesso.');
+    } catch (error) {
+        setSchemaReady(false);
+        console.error('========================================================');
+        console.error('[boot] FALHA: nao foi possivel conectar ao banco na inicializacao.');
+        console.error(`[boot] ${error.message}`);
+        console.error('[boot] O servidor esta no ar; as rotas de dados respondem 503');
+        console.error('[boot] enquanto isso. Isto se resolve sozinho quando o banco subir.');
+        console.error('========================================================');
+        reagendar(esperaMs);
+        return;
+    }
+
+    try {
+        await ensureApplicationSchema(pool);
+        setSchemaReady(true);
+        startSessionCleanup();
+        const scheduler = initializeAutoBackupScheduler();
+
+        if (scheduler.scheduled) {
+            console.log(`Backup automatico agendado a cada ${scheduler.intervalMinutes} minuto(s).`);
+        } else {
+            console.log('Backup automatico periodico desativado.');
+        }
+    } catch (error) {
+        setSchemaReady(false);
+        // Nao engolir em silencio: sem isto o servidor subia "ok" e o login
+        // quebrava com um erro cru de SQL. Caso classico no Docker: uma
+        // migration nova em ./database nao entra na imagem, entao
+        // ensureApplicationSchema falha ao aplicar o arquivo ausente.
+        console.error('========================================================');
+        console.error('[boot] FALHA ao verificar/criar o schema do banco.');
+        console.error(`[boot] ${error.message}`);
+        if (error.details && error.details.missingTables) {
+            console.error(`[boot] Tabelas ausentes: ${error.details.missingTables.join(', ')}`);
+        }
+        console.error('[boot] O servidor esta no ar, mas as rotas de dados (inclusive login)');
+        console.error('[boot] responderao 503 ate isto ser resolvido.');
+        console.error('[boot] Se for migration faltando na imagem, reconstrua:');
+        console.error('[boot]   docker compose up -d --build');
+        console.error('========================================================');
+        reagendar(esperaMs);
+    }
+}
 
 function clearSessionCleanup() {
     if (sessionCleanupTimer) {
@@ -468,6 +563,9 @@ function start(options = {}) {
         requestedPort: runtimeOptions.port,
         ready: null,
         shutdownPromise: null,
+        // Lido pela retentativa do bootstrap para parar de reagendar quando o
+        // servidor comeca a encerrar.
+        encerrando: false,
         get port() {
             return getControllerPort(controller);
         },
@@ -505,52 +603,7 @@ function start(options = {}) {
         console.log('- GET  /api/jornada-semanal');
         console.log('- GET  /api/configuracao-banco');
 
-        let pool;
-
-        try {
-            pool = await conectar();
-            console.log('Banco de dados conectado com sucesso.');
-        } catch (error) {
-            setSchemaReady(false);
-            console.error('========================================================');
-            console.error('[boot] FALHA: nao foi possivel conectar ao banco na inicializacao.');
-            console.error(`[boot] ${error.message}`);
-            console.error('[boot] O servidor esta no ar, mas as rotas de dados responderao 503');
-            console.error('[boot] ate o banco voltar. Verifique a conexao e reinicie.');
-            console.error('========================================================');
-        }
-
-        if (pool) {
-            try {
-                await ensureApplicationSchema(pool);
-                setSchemaReady(true);
-                startSessionCleanup();
-                const scheduler = initializeAutoBackupScheduler();
-
-                if (scheduler.scheduled) {
-                    console.log(`Backup automatico agendado a cada ${scheduler.intervalMinutes} minuto(s).`);
-                } else {
-                    console.log('Backup automatico periodico desativado.');
-                }
-            } catch (error) {
-                setSchemaReady(false);
-                // Nao engolir em silencio: sem isto o servidor subia "ok" e o
-                // login quebrava com um erro cru de SQL. Caso classico no Docker:
-                // uma migration nova em ./database nao entra na imagem (so
-                // ./frontend e ./backend sao espelhados), entao ensureApplication
-                // Schema falha ao ler/aplicar o arquivo ausente.
-                console.error('========================================================');
-                console.error('[boot] FALHA ao verificar/criar o schema do banco.');
-                console.error(`[boot] ${error.message}`);
-                if (error.details && error.details.missingTables) {
-                    console.error(`[boot] Tabelas ausentes: ${error.details.missingTables.join(', ')}`);
-                }
-                console.error('[boot] O servidor esta no ar, mas as rotas de dados (inclusive login)');
-                console.error('[boot] responderao 503 ate isto ser resolvido.');
-                console.error('[boot] No Docker, reconstrua a imagem: docker compose up -d --build');
-                console.error('========================================================');
-            }
-        }
+        await bootstrapDatabaseWithRetry();
 
         if (!readySettled) {
             readySettled = true;
@@ -597,6 +650,10 @@ function start(options = {}) {
         }
 
         isShuttingDown = true;
+        // Sinaliza para a retentativa do bootstrap parar de reagendar; sem
+        // isto um retry pendente poderia reabrir a conexao durante o encerramento.
+        controller.encerrando = true;
+        clearBootstrapRetry();
         clearAutoBackupScheduler();
         clearSessionCleanup();
         console.log(`${reason} recebido. Encerrando servidor...`);
