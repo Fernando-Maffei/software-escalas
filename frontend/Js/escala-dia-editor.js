@@ -225,14 +225,23 @@
         const filters = buildScaleSectorFiltersEscala(items);
         const selecao = getScaleSectorSelectionEscala();
 
-        // Limpa da selecao setores que sumiram (evita filtro "fantasma" que
-        // esconderia todo mundo).
-        const idsValidos = new Set(filters.filter((item) => item.id !== 'all').map((item) => String(item.id)));
-        [...selecao].forEach((id) => {
-            if (!idsValidos.has(id)) {
-                selecao.delete(id);
-            }
-        });
+        // A selecao de setor NAO e mais podada aqui.
+        //
+        // Antes, todo setor ausente do dia atual saia da selecao. Isso fazia o
+        // filtro sumir sozinho ao navegar: com "N1" ativo, bastava passar por
+        // um dia sem ninguem do N1 para o filtro ser descartado em silencio e
+        // nao voltar ao retornar para o dia anterior.
+        //
+        // O medo original — filtro "fantasma" escondendo todo mundo — e
+        // tratado onde de fato importa: quando o filtro zera as linhas, a
+        // timeline mostra um estado vazio dizendo que o filtro esta ativo, com
+        // um botao para limpa-lo (ver renderScaleRowsEscala).
+        //
+        // As abas saem de window.setores (todos os cadastrados), nao dos itens
+        // do dia, entao um setor selecionado continua visivel para ser
+        // desmarcado mesmo sem ninguem escalado nele hoje. Um setor EXCLUIDO do
+        // sistema perderia a aba, mas ai o estado vazio com "Limpar filtro"
+        // resolve — nao ha como ficar preso.
 
         container.innerHTML = filters.map((setor) => {
             const ehTodos = setor.id === 'all';
@@ -984,6 +993,81 @@
         body.appendChild(row);
     }
 
+    // Rotulo "08:00 as 17:00" para leitores de tela: a barra na timeline
+    // comunica o turno visualmente, mas nada disso chega a quem usa leitor —
+    // o texto vai no aria-label da linha.
+    function buildTimeRangeLabelEscala(record) {
+        const inicio = formatTimeInputEscala(record?.horaInicio);
+        const fim = formatTimeInputEscala(record?.horaFim);
+
+        if (!inicio || !fim) {
+            return '';
+        }
+
+        return `Das ${inicio} as ${fim}`;
+    }
+
+    // Componente unico para as tres mensagens de tela cheia da timeline:
+    // vazio, carregando e erro. Antes so existia o markup do vazio, escrito
+    // inline — carregar e falhar nao mostravam nada, e a tela ficava com os
+    // dados do dia anterior (ver renderScaleLoadingEscala/ErrorEscala abaixo).
+    function renderScaleMessageEscala({ label, icon, title, description, variante = '', acaoHtml = '' }) {
+        const body = document.getElementById('timelineBody');
+
+        if (!body) {
+            return;
+        }
+
+        const bounds = getScaleHourBoundsEscala();
+
+        body.innerHTML = `
+            <div class="timeline-row mensagem-row${variante ? ` ${variante}` : ''}">
+                <div class="timeline-name mensagem-nome">
+                    <i class="fas ${icon}"></i>
+                    <span>${escapeHtmlEscala(label)}</span>
+                </div>
+                <div class="timeline-cell mensagem-cell" style="grid-column: span ${bounds.columnCount + 1};">
+                    <div class="mensagem-conteudo">
+                        <i class="fas ${icon}"></i>
+                        <h3>${escapeHtmlEscala(title)}</h3>
+                        <p>${escapeHtmlEscala(description)}</p>
+                        ${acaoHtml}
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    // Enquanto a requisicao do dia esta em voo. Sem isto, trocar de data dava
+    // a impressao de que nada aconteceu — a tela seguia mostrando o dia
+    // anterior ate a resposta chegar.
+    function renderScaleLoadingEscala(dataISO) {
+        renderScaleMessageEscala({
+            label: getDayLabelEscala(dataISO).toUpperCase(),
+            icon: 'fa-circle-notch fa-spin',
+            title: 'Carregando escala...',
+            description: `Buscando os registros de ${formatDatePtBrEscala(dataISO)}.`,
+            variante: 'mensagem-row--carregando'
+        });
+    }
+
+    // Falha de rede/servidor. Mostra o motivo e um botao de repetir, em vez de
+    // deixar a tela com dados velhos e nenhum aviso.
+    function renderScaleErrorEscala(dataISO, error) {
+        renderScaleMessageEscala({
+            label: 'ERRO',
+            icon: 'fa-triangle-exclamation',
+            title: 'Nao foi possivel carregar a escala',
+            description: error?.message || 'Verifique sua conexao e tente novamente.',
+            variante: 'mensagem-row--erro',
+            acaoHtml: `
+                <button type="button" class="btn-repetir-escala" data-repetir-escala="${escapeHtmlEscala(dataISO)}">
+                    <i class="fas fa-rotate-right"></i> Tentar novamente
+                </button>
+            `
+        });
+    }
+
     function renderScaleEmptyMessageEscala(dataISO) {
         const body = document.getElementById('timelineBody');
         const weekday = getIsoDayOfWeekEscala(dataISO);
@@ -1009,22 +1093,8 @@
             label = 'SABADO';
         }
 
-        const bounds = getScaleHourBoundsEscala();
-        body.innerHTML = `
-            <div class="timeline-row mensagem-row">
-                <div class="timeline-name mensagem-nome">
-                    <i class="fas ${icon}"></i>
-                    <span>${label}</span>
-                </div>
-                <div class="timeline-cell mensagem-cell" style="grid-column: span ${bounds.columnCount + 1};">
-                    <div class="mensagem-conteudo">
-                        <i class="fas ${icon}"></i>
-                        <h3>${escapeHtmlEscala(title)}</h3>
-                        <p>${escapeHtmlEscala(description)}</p>
-                    </div>
-                </div>
-            </div>
-        `;
+        // Passou a reusar o componente comum de mensagem (vazio/carregando/erro).
+        renderScaleMessageEscala({ label, icon, title, description });
     }
 
     // ===== Previa da semana (faixa dos 7 dias) =====
@@ -1448,6 +1518,31 @@
         body.innerHTML = '';
 
         if (items.length === 0) {
+            // Distingue "ninguem escalado neste dia" de "o filtro de setor
+            // escondeu todo mundo". Sem essa diferenca o usuario via "nenhum
+            // registro" num dia cheio e concluia que a escala tinha sumido.
+            const totalSemFiltro = (state.items || []).length;
+            const filtroAtivo = getScaleSectorSelectionEscala().size > 0;
+
+            if (totalSemFiltro > 0 && filtroAtivo) {
+                renderScaleMessageEscala({
+                    label: 'FILTRADO',
+                    icon: 'fa-filter',
+                    title: 'Nenhum colaborador no setor filtrado',
+                    description: `Ha ${totalSemFiltro} colaborador(es) escalado(s) neste dia, mas nenhum nos setores selecionados.`,
+                    variante: 'mensagem-row--filtrado',
+                    acaoHtml: `
+                        <button type="button" class="btn-repetir-escala" data-limpar-setor-escala="1">
+                            <i class="fas fa-filter-circle-xmark"></i> Limpar filtro de setor
+                        </button>
+                    `
+                });
+                renderDayContextEscala(state);
+                refreshWeekStripLiveEscala();
+                atualizarBotaoRestaurarAlmocosEscala();
+                return;
+            }
+
             renderScaleEmptyMessageEscala(state.dataISO);
             renderDayContextEscala(state);
             refreshWeekStripLiveEscala();
@@ -1465,7 +1560,10 @@
             row.className = `timeline-row${type === 'plantao' ? ' plantao-row' : ''}${isSelected ? ' is-selected' : ''}`;
 
             row.innerHTML = `
-                <div class="timeline-name" data-colaborador-id="${record.colaboradorId}" title="Editar escala de ${escapeHtmlEscala(record.colaboradorNome || 'colaborador')}">
+                <div class="timeline-name" data-colaborador-id="${record.colaboradorId}"
+                     role="button" tabindex="0"
+                     aria-label="Editar escala de ${escapeHtmlEscala(record.colaboradorNome || 'colaborador')}${record.setorNome ? `, setor ${escapeHtmlEscala(record.setorNome)}` : ''}. ${escapeHtmlEscala(buildTimeRangeLabelEscala(record) || 'sem horario definido')}"
+                     title="Editar escala de ${escapeHtmlEscala(record.colaboradorNome || 'colaborador')}">
                     <span class="timeline-name-main">
                         <strong class="timeline-name-text">${escapeHtmlEscala(record.colaboradorNome || 'Sem nome')}</strong>
                         <span class="timeline-name-meta">
@@ -1474,7 +1572,7 @@
                             ${type !== 'normal' && type !== 'plantao' ? `<small class="escala-dia-tipo">${escapeHtmlEscala(typeLabel)}</small>` : ''}
                         </span>
                     </span>
-                    <span class="timeline-name-action" aria-label="Editar escala">
+                    <span class="timeline-name-action" aria-hidden="true">
                         <i class="fas fa-pen edit-indicator"></i>
                     </span>
                 </div>
@@ -1494,9 +1592,24 @@
                 ${buildRowOverlayEscala(record, bounds)}
             `;
 
-            row.querySelector('.timeline-name')?.addEventListener('click', (event) => {
+            const nomeEl = row.querySelector('.timeline-name');
+
+            nomeEl?.addEventListener('click', (event) => {
                 event.preventDefault();
                 event.stopPropagation();
+                abrirEditorNaEscala(record.colaboradorId);
+            });
+
+            // A celula do nome e um div com role="button": ao contrario de um
+            // <button> de verdade, ela nao aciona sozinha por teclado. Sem
+            // isto, quem navega por Tab consegue focar a linha mas nunca abrir
+            // o editor — a tela ficava inteiramente dependente do mouse.
+            nomeEl?.addEventListener('keydown', (event) => {
+                if (event.key !== 'Enter' && event.key !== ' ' && event.key !== 'Spacebar') {
+                    return;
+                }
+
+                event.preventDefault();
                 abrirEditorNaEscala(record.colaboradorId);
             });
 
@@ -1928,13 +2041,15 @@
 
     }
 
+    // Sequencia da requisicao do dia. Cada carregamento recebe um numero e so
+    // o mais recente pode pintar a tela: clicar rapido em "proximo dia" dispara
+    // varias buscas, e sem isto a que voltasse por ultimo venceria — mesmo
+    // sendo de um dia que o usuario ja abandonou (race condition classica).
+    let escalaLoadSeq = 0;
+
     async function carregarEscalaDiaEscala(dataISO) {
         const normalized = toISODateEscala(dataISO) || toISODateEscala(new Date());
-        const payload = await window.API.getEscalaDia(normalized);
-        const state = setCurrentScaleState({
-            dataISO: normalized,
-            items: Array.isArray(payload?.items) ? payload.items : []
-        });
+        const meuLoad = ++escalaLoadSeq;
 
         window.dataEscalaSelecionada = normalized;
         const selector = document.getElementById('seletorDataEscala');
@@ -1942,7 +2057,40 @@
             selector.value = normalized;
         }
 
+        // Cabecalho e faixa da semana ja refletem a data pedida; so a area de
+        // linhas espera os dados.
         renderScaleHeaderEscala();
+        renderScaleLoadingEscala(normalized);
+
+        let payload;
+
+        try {
+            payload = await window.API.getEscalaDia(normalized);
+        } catch (error) {
+            if (meuLoad !== escalaLoadSeq) {
+                return null;
+            }
+
+            // Sem isto a tela ficava com os dados do dia anterior e nenhum
+            // aviso, dando a impressao de que a data nao tinha registros.
+            renderScaleErrorEscala(normalized, error);
+
+            if (typeof mostrarToast === 'function') {
+                mostrarToast(error?.message || 'Falha ao carregar a escala do dia.', 'error');
+            }
+
+            return null;
+        }
+
+        if (meuLoad !== escalaLoadSeq) {
+            return null;
+        }
+
+        const state = setCurrentScaleState({
+            dataISO: normalized,
+            items: Array.isArray(payload?.items) ? payload.items : []
+        });
+
         renderScaleSectorTabsEscala(state.items || []);
         renderScaleRowsEscala(state);
         renderWeekStripEscala(normalized);
@@ -2430,6 +2578,25 @@
 
         document.getElementById('seletorDataEscala')?.addEventListener('change', async (event) => {
             await carregarEscalaSelecionadaEscala(event.target.value);
+        });
+
+        // "Tentar novamente" do estado de erro. Delegado no body da timeline
+        // porque o botao e recriado a cada render.
+        document.getElementById('timelineBody')?.addEventListener('click', (event) => {
+            const repetir = event.target.closest('[data-repetir-escala]');
+
+            if (repetir) {
+                carregarEscalaSelecionadaEscala(repetir.dataset.repetirEscala);
+                return;
+            }
+
+            // Saida do estado "filtro escondeu todo mundo".
+            if (event.target.closest('[data-limpar-setor-escala]')) {
+                getScaleSectorSelectionEscala().clear();
+                const state = getCurrentScaleState();
+                renderScaleSectorTabsEscala(state.items || []);
+                renderScaleRowsEscala(state);
+            }
         });
 
         document.getElementById('btnNovoLancamentoEscala')?.addEventListener('click', abrirLancamentoPessoalEscala);

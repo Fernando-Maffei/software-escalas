@@ -4226,3 +4226,64 @@
 .escala-page .escala-band-ferias { background: var(--escala-status-ferias, #3f74be); }
 .escala-page .escala-band-ausencia { background: var(--escala-status-ausencia, #ef4444); }
 .escala-page .escala-band-folga { background: var(--escala-status-folga, #94a3b8); color: #1e293b; }
+
+/* ===== Estados da timeline: carregando e erro =====================
+   O estado "vazio" ja existia; carregando e erro nao — trocar de dia com a
+   rede lenta parecia travamento, e uma falha deixava a tela com os dados do
+   dia anterior, sem nenhum aviso. Os tres agora compartilham o mesmo
+   componente (renderScaleMessageEscala), variando so por modificador. */
+.escala-page .mensagem-row--carregando .mensagem-conteudo h3,
+.escala-page .mensagem-row--carregando .mensagem-conteudo p {
+    opacity: 0.75;
+}
+
+.escala-page .mensagem-row--erro .mensagem-conteudo > i,
+.escala-page .mensagem-row--erro .mensagem-nome i {
+    color: var(--danger, #ef4444);
+}
+
+.escala-page .mensagem-row--erro .mensagem-nome {
+    color: var(--danger, #ef4444);
+}
+
+/* Botao de repetir: acao de recuperacao do estado de erro. */
+.escala-page .btn-repetir-escala {
+    margin-top: 14px;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 18px;
+    border-radius: var(--radius-full, 999px);
+    border: 1px solid var(--primary, #2563eb);
+    background: var(--primary, #2563eb);
+    color: #fff;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: filter 0.18s ease, transform 0.18s ease;
+}
+
+.escala-page .btn-repetir-escala:hover {
+    filter: brightness(1.08);
+}
+
+.escala-page .btn-repetir-escala:active {
+    transform: translateY(1px);
+}
+
+/* Foco visivel: o botao e alcancavel por teclado e precisa se anunciar. */
+.escala-page .btn-repetir-escala:focus-visible {
+    outline: 3px solid var(--primary, #2563eb);
+    outline-offset: 2px;
+}
+
+/* Foco de teclado na linha do colaborador.
+   A celula do nome virou role="button" + tabindex=0; sem um anel de foco
+   visivel, quem navega por Tab nao enxerga onde esta. z-index acima da
+   coluna congelada para o anel nao ficar por baixo das celulas vizinhas. */
+.escala-page .timeline-name:focus-visible {
+    outline: 3px solid var(--primary, #2563eb);
+    outline-offset: -3px;
+    position: relative;
+    z-index: 7;
+}
