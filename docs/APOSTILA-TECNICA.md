@@ -460,7 +460,7 @@ Todo acesso à API passa por aqui. Isso concentra num só lugar coisas como URL 
 | `permissoes.js` | Aplica no front-end o que o perfil pode ver/fazer (esconde botões que o usuário comum não usa). |
 | `runtime-fixes.js` (~4.556 linhas) | Apesar do nome, contém **funcionalidades de verdade** (cerca de dois terços do arquivo), além de ajustes. Historicamente cresceu como um "extra" ao `app.js`. |
 
-> **Nota de manutenção:** `app.js` e `runtime-fixes.js` são os dois arquivos gigantes do front-end e concentram a maior parte da complexidade. Um trabalho contínuo do projeto (ver `RELATORIO-REVISAO.md`) é ir extraindo pedaços deles para módulos menores e nomeados — foi assim que nasceram `configuracoes-backup.js`, `pdf-utils.js`, `escala-dia-editor.js`, etc.
+> **Nota de manutenção:** `app.js` e `runtime-fixes.js` são os dois arquivos gigantes do front-end e concentram a maior parte da complexidade. Um trabalho contínuo do projeto é ir extraindo pedaços deles para módulos menores e nomeados — foi assim que nasceram `configuracoes-backup.js`, `pdf-utils.js`, `escala-dia-editor.js`, etc.
 
 #### PWA
 

@@ -1,0 +1,36 @@
+#!/bin/sh
+# Impede push direto na main.
+#
+# Por que existe: as regras de protecao do GitHub nao valem em repositorio
+# privado no plano gratuito, entao nada no servidor barra um push direto.
+# Este hook faz esse papel do lado de ca — que, num projeto de uma pessoa so,
+# cobre o caso real: o engano proprio.
+#
+# Instalacao (uma vez por clone):
+#   git config core.hooksPath .githooks
+#
+# Emergencia, quando for MESMO necessario subir direto:
+#   git push --no-verify
+
+BRANCH_PROTEGIDA="main"
+
+while read -r _local_ref _local_sha remote_ref _remote_sha; do
+    case "$remote_ref" in
+        "refs/heads/$BRANCH_PROTEGIDA")
+            echo ""
+            echo "  Push direto na '$BRANCH_PROTEGIDA' bloqueado."
+            echo ""
+            echo "  O fluxo do projeto e por Pull Request:"
+            echo ""
+            echo "    git switch -c fix/nome-do-ajuste"
+            echo "    git push -u origin HEAD"
+            echo ""
+            echo "  Depois abra o PR pelo link que o proprio git imprime."
+            echo "  Em emergencia: git push --no-verify"
+            echo ""
+            exit 1
+            ;;
+    esac
+done
+
+exit 0
