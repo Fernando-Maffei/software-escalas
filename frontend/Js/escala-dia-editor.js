@@ -61,6 +61,67 @@
         };
     }
 
+    // Largura da coluna de nomes medida pelo CONTEUDO REAL do dia.
+    //
+    // Antes era um valor fixo, calibrado no maior nome que existia na epoca.
+    // Com nomes curtos ("Ivan", "Jean", "Mike") sobravam ~58px por linha sem
+    // uso — espaco que faz falta justamente quando a barra lateral e o painel
+    // de ajustes estao abertos e as horas ficam espremidas.
+    //
+    // A largura continua sendo UM valor unico para todas as linhas (e o que
+    // mantem cabecalho e linhas alinhados); o que muda e como esse valor e
+    // escolhido. Limites evitam os dois extremos: estreita demais para ler e
+    // larga a ponto de roubar a area de horas.
+    const NOME_LARGURA_MIN = 132;
+    const NOME_LARGURA_MAX = 230;
+    let medidorNomeCanvas = null;
+
+    function medirTextoNomeEscala(texto, fonte) {
+        if (!medidorNomeCanvas) {
+            medidorNomeCanvas = document.createElement('canvas');
+        }
+
+        const ctx = medidorNomeCanvas.getContext('2d');
+        ctx.font = fonte;
+        return ctx.measureText(texto || '').width;
+    }
+
+    function ajustarLarguraColunaNomeEscala(items = []) {
+        const escalaPage = document.querySelector('.escala-page');
+        const amostra = document.querySelector('.timeline-name-text');
+
+        if (!escalaPage || !amostra) {
+            return;
+        }
+
+        const estilo = window.getComputedStyle(amostra);
+        const fonte = `${estilo.fontWeight} ${estilo.fontSize} ${estilo.fontFamily}`;
+        let maior = 0;
+
+        (items || []).forEach((item) => {
+            maior = Math.max(maior, medirTextoNomeEscala(item?.colaboradorNome || '', fonte));
+        });
+
+        // Espaco fixo da celula que nao e o nome: avatar, botao de editar,
+        // os dois gaps e o padding lateral. Lido do CSS para nao duplicar
+        // numeros que podem mudar por breakpoint.
+        const gridCols = window.getComputedStyle(amostra.closest('.timeline-name')).gridTemplateColumns.split(' ');
+        const avatar = parseFloat(gridCols[0]) || 30;
+        const acao = parseFloat(gridCols[2]) || 30;
+        const nomeEl = amostra.closest('.timeline-name');
+        const estiloNome = window.getComputedStyle(nomeEl);
+        const cromo = avatar + acao
+            + (parseFloat(estiloNome.columnGap) || 8) * 2
+            + (parseFloat(estiloNome.paddingLeft) || 10)
+            + (parseFloat(estiloNome.paddingRight) || 10);
+
+        // +2px de folga para o arredondamento nao cortar a ultima letra.
+        const alvo = Math.ceil(maior + 2 + cromo);
+        const largura = Math.min(NOME_LARGURA_MAX, Math.max(NOME_LARGURA_MIN, alvo));
+
+        escalaPage.style.setProperty('--esc-col-nome', `${largura}px`);
+    }
+
     function applyScaleHourBoundsCssEscala(items = getCurrentScaleState().items || []) {
         const escalaPage = document.querySelector('.escala-page');
         const bounds = getScaleHourBoundsEscala(items);
@@ -1616,6 +1677,10 @@
             body.appendChild(row);
             bindFluidLunchDragEscala(row, record, bounds);
         });
+
+        // Depois das linhas existirem no DOM: a medicao usa a fonte real ja
+        // aplicada, entao precisa de pelo menos uma celula de nome renderizada.
+        ajustarLarguraColunaNomeEscala(items);
 
         renderTotalRowEscala(items);
         renderDayContextEscala(state);

@@ -2980,7 +2980,11 @@
    classes (.hora-header e .hora-header-half), entao as duas regras tem a
    mesma especificidade e vence a ultima. Invertida, o font-size:11px
    reacendia o rotulo que esta regra quer apagar. */
-.escala-page[data-horas-densas="1"] .timeline-header .hora-header-half {
+/* O :not(.total-header) aqui NAO e decorativo: sem ele esta regra fica com
+   especificidade menor que a de padding/font-size logo acima (que ganhou o
+   :not ao proteger a coluna Total), e o font-size:11px de la reacendia o
+   rotulo da meia hora que esta regra existe para apagar. */
+.escala-page[data-horas-densas="1"] .timeline-header .hora-header-half:not(.total-header) {
     font-size: 0;
 }
 
