@@ -2972,7 +2972,11 @@
    derrubava esse sticky e o rotulo "Total" saia do lugar ao rolar. */
 .escala-page[data-horas-densas="1"] .timeline-header .hora-header:not(.total-header) {
     padding: 0 2px;
-    font-size: 11px;
+    /* Definida em Js/escala-dia-editor.js (ajustarFonteHorasEscala) a partir
+       da largura real da coluna: abrir a barra lateral e o painel de ajustes
+       juntos aperta a grade, e a fonte encolhe junto em vez de deixar os
+       rotulos se encostarem. O 11px e o fallback do dia folgado. */
+    font-size: var(--esc-hora-fonte, 11px);
     letter-spacing: -0.02em;
 }
 
@@ -2980,12 +2984,31 @@
    classes (.hora-header e .hora-header-half), entao as duas regras tem a
    mesma especificidade e vence a ultima. Invertida, o font-size:11px
    reacendia o rotulo que esta regra quer apagar. */
-/* O :not(.total-header) aqui NAO e decorativo: sem ele esta regra fica com
+/* Meia hora no dia longo: em vez de sumir, mostra so os minutos ("30").
+   "07:30" pede ~42px e a coluna tem ~28px (24px no piso), entao o texto
+   inteiro se encavalaria no vizinho; "30" ocupa ~20px e cabe nos dois casos.
+   Fica menor e mais claro que a hora cheia, para a leitura continuar sendo
+   guiada pelas horas.
+
+   O :not(.total-header) aqui NAO e decorativo: sem ele estas regras ficam com
    especificidade menor que a de padding/font-size logo acima (que ganhou o
-   :not ao proteger a coluna Total), e o font-size:11px de la reacendia o
-   rotulo da meia hora que esta regra existe para apagar. */
-.escala-page[data-horas-densas="1"] .timeline-header .hora-header-half:not(.total-header) {
-    font-size: 0;
+   :not ao proteger a coluna Total) e seriam sobrescritas por ela. */
+.escala-page[data-horas-densas="1"] .timeline-header .hora-header-half:not(.total-header) .hora-rotulo {
+    display: none;
+}
+
+.escala-page[data-horas-densas="1"] .timeline-header .hora-header-half:not(.total-header) .hora-rotulo-min {
+    display: inline;
+    /* Um degrau abaixo da hora cheia: os minutos sao referencia secundaria,
+       a leitura deve ser guiada pelas horas. */
+    font-size: calc(var(--esc-hora-fonte, 11px) - 1px);
+    font-weight: 600;
+    opacity: 0.55;
+}
+
+/* No dia normal a coluna comporta "07:30" inteiro, entao a versao curta some. */
+.escala-page .hora-rotulo-min {
+    display: none;
 }
 
 /* Horario COMPLETO mesmo no dia longo.
@@ -4290,4 +4313,12 @@
     outline-offset: -3px;
     position: relative;
     z-index: 7;
+}
+
+/* Linha TRABALHANDO: o rotulo ocupa nome + total.
+   A coluna de Total nao tem valor nesta linha (o total por pessoa nao se
+   aplica a uma contagem por faixa de horario) e ficava um retangulo vazio
+   colado no rotulo. Com o span de 2 a emenda some e o texto respira. */
+.escala-page .timeline-row.total-row .total-nome--full {
+    grid-column: 1 / span 2;
 }

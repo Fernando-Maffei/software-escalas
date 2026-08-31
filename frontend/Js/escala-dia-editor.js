@@ -122,6 +122,49 @@
         escalaPage.style.setProperty('--esc-col-nome', `${largura}px`);
     }
 
+    // Fonte dos rotulos de hora conforme o espaco REAL de cada coluna.
+    //
+    // A largura da coluna nao depende so da tela: abrir a barra lateral e o
+    // painel de ajustes ao mesmo tempo pode espremer a grade ate o piso de
+    // 24px, onde os rotulos passam a quase se encostar. Em vez de deixar o
+    // texto colidir (ou sumir), a fonte encolhe junto.
+    //
+    // Faixas em degraus, nao formula continua: evita o texto "respirando" a
+    // cada pixel de redimensionamento.
+    function ajustarFonteHorasEscala() {
+        const escalaPage = document.querySelector('.escala-page');
+        const celula = document.querySelector('.timeline-cell[data-slot]');
+
+        if (!escalaPage || !celula) {
+            return;
+        }
+
+        const largura = celula.getBoundingClientRect().width;
+        let fonte = 11;
+
+        if (largura < 30) {
+            fonte = 9;
+        } else if (largura < 36) {
+            fonte = 10;
+        }
+
+        escalaPage.style.setProperty('--esc-hora-fonte', `${fonte}px`);
+    }
+
+    // Reage a mudancas de largura da area da timeline — abrir/fechar a barra
+    // lateral ou o painel de ajustes muda o espaco sem trocar de dia, entao
+    // nao passaria por um novo render.
+    function observarLarguraTimelineEscala() {
+        const alvo = document.querySelector('.escala-scroll');
+
+        if (!alvo || alvo.dataset.observandoLargura === 'true' || typeof ResizeObserver !== 'function') {
+            return;
+        }
+
+        alvo.dataset.observandoLargura = 'true';
+        new ResizeObserver(() => ajustarFonteHorasEscala()).observe(alvo);
+    }
+
     function applyScaleHourBoundsCssEscala(items = getCurrentScaleState().items || []) {
         const escalaPage = document.querySelector('.escala-page');
         const bounds = getScaleHourBoundsEscala(items);
@@ -880,8 +923,13 @@
                 // transbordar para a coluna da meia hora ao lado (que fica sem
                 // rotulo nesses dias). E o que permite manter "07:00" inteiro
                 // mesmo com a coluna em ~28px.
+                // Meia hora tem duas versoes do rotulo: a completa ("07:30") e
+                // a curta ("30"). No dia longo a coluna fica com ~28px e
+                // "07:30" (42px) nao cabe, mas "30" (20px) cabe — e ate no
+                // piso de 24px. Quem escolhe e o CSS, pelo data-horas-densas.
                 return `<div class="hora-header${isHourMark ? '' : ' hora-header-half'}">`
                     + `<span class="hora-rotulo">${label}</span>`
+                    + (isHourMark ? '' : '<span class="hora-rotulo-min">30</span>')
                     + '</div>';
             }).join('');
     }
@@ -1029,11 +1077,15 @@
         const row = document.createElement('div');
         row.className = 'timeline-row total-row';
         row.innerHTML = `
-            <div class="timeline-name total-nome">
+            <!-- Ocupa nome + total numa celula so: a coluna de Total nao tem
+                 valor nesta linha (o total por pessoa nao se aplica a uma
+                 contagem por faixa de horario), entao ficava um retangulo
+                 vazio ao lado do rotulo. Fundidas, o rotulo respira e a
+                 emenda some. -->
+            <div class="timeline-name total-nome total-nome--full">
                 <i class="fas fa-users"></i>
                 <span><strong>TRABALHANDO</strong></span>
             </div>
-            <div class="timeline-cell total-cell"></div>
             ${coverage.slots.map((item) => {
                 const nivel = getCoverageLevelEscala(item);
                 const isVale = coverage.hasExpediente && item.slot === coverage.minSlot && item.potential > 0;
@@ -1681,6 +1733,10 @@
         // Depois das linhas existirem no DOM: a medicao usa a fonte real ja
         // aplicada, entao precisa de pelo menos uma celula de nome renderizada.
         ajustarLarguraColunaNomeEscala(items);
+        // A largura da coluna de nomes acabou de mudar, entao a das horas
+        // tambem: recalcula a fonte dos rotulos com o espaco ja definitivo.
+        ajustarFonteHorasEscala();
+        observarLarguraTimelineEscala();
 
         renderTotalRowEscala(items);
         renderDayContextEscala(state);
