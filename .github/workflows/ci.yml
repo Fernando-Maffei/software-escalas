@@ -9,9 +9,9 @@ name: CI
 
 on:
   push:
-    branches: [main, refatoracao-visual]
+    branches: [main]
   pull_request:
-    branches: [main, refatoracao-visual]
+    branches: [main]
 
 jobs:
   testes:
