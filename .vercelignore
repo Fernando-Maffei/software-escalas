@@ -1,0 +1,28 @@
+# O que NAO vai para o deploy da demonstracao.
+#
+# Sem isto, o deploy serve a raiz do repositorio como arquivos estaticos e
+# qualquer um poderia baixar o codigo do servidor pela URL publica
+# (ex.: /backend/server.js) — o repositorio e privado, mas o site nao.
+# So o necessario para a demo roda: demo/ e frontend/.
+
+backend
+database
+docker
+tests
+docs
+.github
+.githooks
+node_modules
+
+Dockerfile
+docker-compose.yml
+docker-compose.override.yml
+package.json
+package-lock.json
+
+*.md
+.env
+.env.*
+.editorconfig
+.gitattributes
+.dockerignore
