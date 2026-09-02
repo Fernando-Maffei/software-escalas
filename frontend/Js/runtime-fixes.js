@@ -3705,6 +3705,61 @@
         selecionarAbaPlantao(getPlantaoAbaAtiva());
     }
 
+    function ativarFiltrosPlantao() {
+        const seletorMes = document.getElementById('plantaoFiltroMes');
+        const campoBusca = document.getElementById('plantaoFiltroBusca');
+        const botaoLimpar = document.getElementById('plantaoFiltroLimpar');
+
+        seletorMes?.addEventListener('change', (event) => {
+            window.__plantaoFiltroMes = event.target.value;
+            atualizarResumoPlantaoNaTela();
+        });
+
+        // Debounce curto: sem ele, cada tecla refaz a lista inteira.
+        let buscaTimer = null;
+
+        campoBusca?.addEventListener('input', (event) => {
+            const valor = event.target.value;
+
+            if (buscaTimer) {
+                clearTimeout(buscaTimer);
+            }
+
+            buscaTimer = setTimeout(() => {
+                window.__plantaoFiltroBusca = valor;
+                atualizarResumoPlantaoNaTela();
+            }, 200);
+        });
+
+        botaoLimpar?.addEventListener('click', () => {
+            window.__plantaoFiltroMes = obterDataISO(new Date()).slice(0, 7);
+            window.__plantaoFiltroBusca = '';
+
+            if (campoBusca) {
+                campoBusca.value = '';
+            }
+
+            atualizarResumoPlantaoNaTela();
+        });
+
+        atualizarResumoFiltroPlantao();
+    }
+
+    function atualizarResumoFiltroPlantao() {
+        const resumo = document.getElementById('plantaoFiltroResumo');
+
+        if (!resumo) {
+            return;
+        }
+
+        const total = listarPlantoesLancadosOrdenados();
+        const visiveis = filtrarPlantoesLancados(total);
+
+        resumo.textContent = visiveis.length === total.length
+            ? `${total.length} ${total.length === 1 ? 'registro' : 'registros'}`
+            : `${visiveis.length} de ${total.length} registros`;
+    }
+
     function contarPlantoesLancados() {
         return (window.plantoesLancados || [])
             .filter((plantao) => ehDataPlantaoValida(plantao.dataISO) || ['sabado', 'domingo', 'feriado'].includes(plantao.tipoPlantao))
@@ -3765,29 +3820,152 @@
 
         container.innerHTML = renderPlantoesLancados();
         atualizarContagemAbaPlantao();
+        atualizarResumoFiltroPlantao();
+
+        // As opcoes mudam quando um registro e criado ou apagado (um mes pode
+        // entrar ou sair da lista). Redesenhar o <select> nao atrapalha o
+        // usuario: o foco durante a digitacao esta no campo de busca.
+        const seletorMes = document.getElementById('plantaoFiltroMes');
+
+        if (seletorMes) {
+            seletorMes.innerHTML = renderOpcoesMesPlantao();
+        }
     }
 
+    // ---- Filtros da lista de lancados -----------------------------------
+    // O estado mora fora do DOM porque salvar e excluir refazem a pagina
+    // inteira; guardado so no <select>, o filtro se perdia a cada acao.
+    function getFiltroMesPlantao() {
+        if (typeof window.__plantaoFiltroMes !== 'string') {
+            // Padrao pedido: abre no mes corrente.
+            window.__plantaoFiltroMes = obterDataISO(new Date()).slice(0, 7);
+        }
+
+        return window.__plantaoFiltroMes;
+    }
+
+    function getFiltroBuscaPlantao() {
+        return typeof window.__plantaoFiltroBusca === 'string' ? window.__plantaoFiltroBusca : '';
+    }
+
+    function listarPlantoesLancadosOrdenados() {
+        return [...(window.plantoesLancados || [])]
+            .filter((plantao) => ehDataPlantaoValida(plantao.dataISO) || ['sabado', 'domingo', 'feriado'].includes(plantao.tipoPlantao))
+            .sort((a, b) => new Date(b.dataISO) - new Date(a.dataISO));
+    }
+
+    function nomesColaboradoresPlantao(ids) {
+        return (ids || [])
+            .map((id) => (window.colaboradores || []).find((item) => Number(item.Id) === Number(id))?.Nome || '')
+            .join(' ');
+    }
+
+    function filtrarPlantoesLancados(lista) {
+        const mes = getFiltroMesPlantao();
+        const busca = getFiltroBuscaPlantao().trim().toLowerCase();
+
+        return lista.filter((plantao) => {
+            if (mes !== 'todos' && String(plantao.dataISO).slice(0, 7) !== mes) {
+                return false;
+            }
+
+            if (!busca) {
+                return true;
+            }
+
+            const alvo = [
+                formatarDataPtBr(plantao.dataISO),
+                plantao.tipoPlantao || 'sabado',
+                plantao.observacao || '',
+                nomesColaboradoresPlantao(plantao.colaboradores)
+            ].join(' ').toLowerCase();
+
+            return alvo.includes(busca);
+        });
+    }
+
+    function rotuloMesPlantao(chave) {
+        const [ano, mes] = String(chave).split('-').map(Number);
+        return `${PLANTAO_MESES_NOMES[mes - 1] || ''} de ${ano}`;
+    }
+
+    // So os meses que tem registro entram na lista — mais o mes corrente,
+    // que precisa existir como opcao mesmo vazio por ser o padrao da tela.
+    function renderOpcoesMesPlantao() {
+        const todos = listarPlantoesLancadosOrdenados();
+        const selecionado = getFiltroMesPlantao();
+        const porMes = new Map();
+
+        todos.forEach((plantao) => {
+            const chave = String(plantao.dataISO).slice(0, 7);
+            porMes.set(chave, (porMes.get(chave) || 0) + 1);
+        });
+
+        const mesAtual = obterDataISO(new Date()).slice(0, 7);
+
+        if (!porMes.has(mesAtual)) {
+            porMes.set(mesAtual, 0);
+        }
+
+        const opcoes = [...porMes.keys()]
+            .sort()
+            .reverse()
+            .map((chave) => `
+                <option value="${chave}" ${chave === selecionado ? 'selected' : ''}>
+                    ${escapeHtml(rotuloMesPlantao(chave))} (${porMes.get(chave)})
+                </option>
+            `);
+
+        return `
+            <option value="todos" ${selecionado === 'todos' ? 'selected' : ''}>Todos os meses (${todos.length})</option>
+            ${opcoes.join('')}
+        `;
+    }
+
+    // Escape do estado vazio: sem isso, abrir num mes ainda sem lancamento
+    // parece que os registros sumiram.
+    window.plantaoVerTodosOsMeses = function plantaoVerTodosOsMeses() {
+        window.__plantaoFiltroMes = 'todos';
+        window.__plantaoFiltroBusca = '';
+
+        const campoBusca = document.getElementById('plantaoFiltroBusca');
+
+        if (campoBusca) {
+            campoBusca.value = '';
+        }
+
+        atualizarResumoPlantaoNaTela();
+    };
+
     window.renderPlantoesLancados = renderPlantoesLancados = function renderPlantoesLancadosAvancado() {
-            const vazio = (texto) => `
+            const vazio = (texto, comAtalho) => `
                 <div class="empty-msg">
                     <i class="fas fa-calendar-plus"></i>
                     <p>${texto}</p>
+                    ${comAtalho ? '<button type="button" class="btn-secondary" onclick="plantaoVerTodosOsMeses()"><i class="fas fa-list"></i> Ver todos os meses</button>' : ''}
                 </div>
             `;
 
-            if (!window.plantoesLancados || window.plantoesLancados.length === 0) {
-                return vazio('Nenhum plantao lancado ainda. Use a aba Lancar para registrar o primeiro.');
-            }
-
-            const ordenados = [...window.plantoesLancados]
-                .filter((plantao) => ehDataPlantaoValida(plantao.dataISO) || ['sabado', 'domingo', 'feriado'].includes(plantao.tipoPlantao))
-                .sort((a, b) => new Date(b.dataISO) - new Date(a.dataISO));
+            const ordenados = listarPlantoesLancadosOrdenados();
 
             if (ordenados.length === 0) {
-                return vazio('Nenhum plantao lancado ainda. Use a aba Lancar para registrar o primeiro.');
+                return vazio('Nenhum plantao lancado ainda. Use a aba Lancar para registrar o primeiro.', false);
             }
 
-            return ordenados.map((plantao) => `
+            const visiveis = filtrarPlantoesLancados(ordenados);
+
+            if (visiveis.length === 0) {
+                const mes = getFiltroMesPlantao();
+                const busca = getFiltroBuscaPlantao().trim();
+
+                if (busca) {
+                    return vazio(`Nenhum plantao encontrado para "${escapeHtml(busca)}".`, true);
+                }
+
+                return vazio(`Nenhum plantao lancado em ${escapeHtml(rotuloMesPlantao(mes))}.`, true);
+            }
+
+            return visiveis.map((plantao) => `
                 <div class="plantao-card plantao-card--${plantao.tipoPlantao || 'sabado'}">
                     <div class="plantao-header">
                         <div>
@@ -3960,9 +4138,30 @@
                     <div class="plantoes-lancados-header">
                         <div>
                             <h3><i class="fas fa-list"></i> Plantoes lancados</h3>
-                            <p class="sabados-subtitle">Todos os registros ja salvos, do mais recente para o mais antigo. Editar abre a data na aba Lancar.</p>
+                            <p class="sabados-subtitle">Do mais recente para o mais antigo. Editar abre a data na aba Lancar.</p>
                         </div>
                     </div>
+
+                    <!-- Fica FORA de #listaPlantoesLancados de proposito: so a
+                         lista e redesenhada a cada tecla, entao o campo de
+                         busca nao perde o foco nem o cursor enquanto digita. -->
+                    <div class="plantao-filtros">
+                        <div class="plantao-filtro-campo">
+                            <label for="plantaoFiltroMes"><i class="fas fa-calendar-alt"></i> Mes</label>
+                            <select id="plantaoFiltroMes" class="form-control">
+                                ${renderOpcoesMesPlantao()}
+                            </select>
+                        </div>
+                        <div class="plantao-filtro-campo plantao-filtro-campo--busca">
+                            <label for="plantaoFiltroBusca"><i class="fas fa-search"></i> Buscar</label>
+                            <input type="search" id="plantaoFiltroBusca" class="form-control" placeholder="Colaborador, tipo ou observacao" value="${escapeHtml(getFiltroBuscaPlantao())}">
+                        </div>
+                        <button type="button" class="btn-secondary" id="plantaoFiltroLimpar" title="Voltar ao mes atual, sem busca">
+                            <i class="fas fa-rotate-left"></i> Limpar
+                        </button>
+                        <p class="plantao-filtro-resumo" id="plantaoFiltroResumo"></p>
+                    </div>
+
                     <div id="listaPlantoesLancados" class="plantoes-grid">
                         ${renderPlantoesLancados()}
                     </div>
@@ -3971,6 +4170,7 @@
         `;
 
         ativarAbasPlantao();
+        ativarFiltrosPlantao();
 
         // Navegar e so mudar a janela de datas: nao fecha o painel aberto,
         // nao refaz a pagina e nao vai na rede.
