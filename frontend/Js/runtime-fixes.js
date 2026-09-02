@@ -3643,6 +3643,102 @@
         return construirSabadosVisiveisPlantao().some((item) => item.dataISO === dataISO);
     }
 
+    // ---- Feriados nacionais ainda nao cadastrados -------------------------
+    // A tela trata como feriado o que vem da BrasilAPI (window.feriadosAPI),
+    // mas o backend so aceita o que esta na tabela Feriados. Um feriado
+    // nacional nao cadastrado aparecia lancavel na regua e o servidor recusava
+    // na hora de salvar, com "Plantao deve ser lancado somente para sabado,
+    // domingo ou feriado" — sem dizer que o problema era o cadastro faltando.
+    function feriadosNacionaisPendentesPlantao() {
+        const cadastrados = new Set(
+            (Array.isArray(window.feriadosLocais) ? window.feriadosLocais : [])
+                .map((item) => obterDataISO(item.Data || item.data))
+                .filter(Boolean)
+        );
+
+        const naJanela = new Set(construirSabadosVisiveisPlantao().map((item) => item.dataISO));
+
+        return (Array.isArray(window.feriadosAPI) ? window.feriadosAPI : [])
+            .map((item) => ({ dataISO: obterDataISO(item.date), nome: item.name || 'Feriado' }))
+            .filter((item) => item.dataISO && naJanela.has(item.dataISO) && !cadastrados.has(item.dataISO))
+            .sort((a, b) => a.dataISO.localeCompare(b.dataISO));
+    }
+
+    window.cadastrarFeriadosNacionaisPlantao = async function cadastrarFeriadosNacionaisPlantao() {
+        const pendentes = feriadosNacionaisPendentesPlantao();
+
+        if (pendentes.length === 0) {
+            return;
+        }
+
+        const botao = document.getElementById('plantaoCadastrarFeriadosBtn');
+
+        if (botao) {
+            botao.disabled = true;
+            botao.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Cadastrando...';
+        }
+
+        let cadastrados = 0;
+        const falhas = [];
+
+        for (const feriado of pendentes) {
+            try {
+                await window.API.salvarFeriado({
+                    nome: feriado.nome,
+                    data: feriado.dataISO,
+                    tipo: 'Nacional'
+                });
+                cadastrados += 1;
+            } catch (error) {
+                falhas.push(feriado.nome + ': ' + error.message);
+            }
+        }
+
+        if (typeof carregarFeriadosLocais === 'function') {
+            await carregarFeriadosLocais();
+        }
+
+        if (typeof mostrarToast === 'function') {
+            if (cadastrados > 0) {
+                mostrarToast(cadastrados + ' feriado(s) cadastrado(s). Ja da para lancar plantao neles.', 'success');
+            }
+
+            if (falhas.length > 0) {
+                mostrarToast('Nao foi possivel cadastrar: ' + falhas.join(' | '), 'error');
+            }
+        }
+
+        if (typeof renderLancamentoPlantao === 'function') {
+            await renderLancamentoPlantao();
+        }
+    };
+
+    function renderAvisoFeriadosPlantao() {
+        const pendentes = feriadosNacionaisPendentesPlantao();
+
+        if (pendentes.length === 0) {
+            return '';
+        }
+
+        const nomes = pendentes
+            .slice(0, 3)
+            .map((item) => escapeHtml(item.nome) + ' (' + escapeHtml(formatarDataPlantaoCard(item.dataISO)) + ')')
+            .join(', ');
+
+        return [
+            '<div class="plantao-aviso-feriados">',
+            '<i class="fas fa-triangle-exclamation"></i>',
+            '<div>',
+            '<strong>' + pendentes.length + ' feriado(s) nacional(is) desta janela nao estao cadastrados.</strong>',
+            '<p>' + nomes + (pendentes.length > 3 ? ' e outros' : '') + '. Sem o cadastro, o servidor recusa o lancamento nessas datas.</p>',
+            '</div>',
+            '<button type="button" class="btn-secondary" id="plantaoCadastrarFeriadosBtn" onclick="cadastrarFeriadosNacionaisPlantao()">',
+            '<i class="fas fa-calendar-check"></i> Cadastrar',
+            '</button>',
+            '</div>'
+        ].join('');
+    }
+
     // ---- Abas da tela (Lancar | Lancados) --------------------------------
     // Os dois paineis ficam no DOM o tempo todo (o inativo apenas oculto),
     // como nas abas de Relatorios: assim os handlers existentes seguem
@@ -4085,6 +4181,7 @@
             </div>
 
             <div class="plantao-painel" data-plantao-painel="lancar" id="painelPlantaoLancar" role="tabpanel">
+            ${renderAvisoFeriadosPlantao()}
             <div class="plantao-layout">
                 <div class="sabados-container">
                     <div class="sabados-header">

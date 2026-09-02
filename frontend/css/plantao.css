@@ -110,6 +110,62 @@
 }
 
 /* ===========================
+   AVISO DE FERIADOS NAO CADASTRADOS
+   A regua oferece feriados nacionais vindos da BrasilAPI, mas quem decide
+   se a data vale e a tabela Feriados do banco. Quando os dois discordam, o
+   lancamento so falhava no salvar — o aviso antecipa isso e resolve.
+=========================== */
+.plantao-aviso-feriados {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    margin-bottom: var(--space-4);
+    padding: var(--space-3) var(--space-4);
+    background: var(--warning-soft);
+    border: 1px solid var(--warning);
+    border-radius: var(--radius-md);
+    color: var(--warning-text);
+}
+
+.plantao-aviso-feriados > i {
+    flex-shrink: 0;
+    font-size: var(--text-lg);
+    color: var(--warning);
+}
+
+.plantao-aviso-feriados > div {
+    flex: 1;
+    min-width: 0;
+}
+
+.plantao-aviso-feriados strong {
+    display: block;
+    font-size: var(--text-sm);
+    font-weight: var(--weight-semibold);
+}
+
+.plantao-aviso-feriados p {
+    margin: 2px 0 0;
+    font-size: var(--text-xs);
+    opacity: 0.9;
+}
+
+.plantao-aviso-feriados .btn-secondary {
+    flex-shrink: 0;
+}
+
+@media (max-width: 768px) {
+    .plantao-aviso-feriados {
+        flex-wrap: wrap;
+    }
+
+    .plantao-aviso-feriados .btn-secondary {
+        flex: 1 1 100%;
+        justify-content: center;
+    }
+}
+
+/* ===========================
    LAYOUT
    Grid (e nao flex) para a regua nunca ser espremida pelo painel: a
    coluna do painel tem largura fixa e a da regua fica com o resto.
