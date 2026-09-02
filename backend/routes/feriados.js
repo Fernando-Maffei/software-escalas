@@ -3,6 +3,7 @@ const router = express.Router();
 
 const { sql, conectar } = require('../db');
 const { AppError } = require('../utils/errors');
+const { normalizarTipoFeriado } = require('../utils/dias');
 const {
     ensurePositiveInt,
     extractDateString,
@@ -30,7 +31,9 @@ function buildFeriadoPayload(body, fallback = {}) {
     return {
         nome,
         data,
-        tipo: tipo || 'municipal'
+        // Vocabulario fechado: nacional | estadual | municipal. Valor
+        // desconhecido cai em 'municipal', o mesmo default da coluna.
+        tipo: normalizarTipoFeriado(tipo)
     };
 }
 
@@ -119,12 +122,16 @@ router.post('/', async (req, res) => {
     const pool = await conectar();
     const payload = buildFeriadoPayload(req.body);
 
+    // Um feriado municipal pode cair no mesmo dia de um nacional, entao o que
+    // caracteriza duplicata e a data MAIS a abrangencia. Antes, bastava a data:
+    // um municipal ja cadastrado impedia o importador de gravar o nacional.
     const checkResult = await pool.request()
         .input('data', sql.Date, payload.data)
-        .query('SELECT Id FROM Feriados WHERE Data = @data');
+        .input('tipo', sql.NVarChar(50), payload.tipo)
+        .query('SELECT Id FROM Feriados WHERE Data = @data AND Tipo = @tipo');
 
     if (checkResult.recordset.length > 0) {
-        throw new AppError(400, 'Já existe um feriado cadastrado nesta data.');
+        throw new AppError(400, `Ja existe um feriado ${payload.tipo} cadastrado nesta data.`);
     }
 
     const result = await pool.request()
@@ -157,11 +164,12 @@ router.put('/:id', async (req, res) => {
 
     const dataCheck = await pool.request()
         .input('data', sql.Date, payload.data)
+        .input('tipo', sql.NVarChar(50), payload.tipo)
         .input('id', sql.Int, id)
-        .query('SELECT Id FROM Feriados WHERE Data = @data AND Id != @id');
+        .query('SELECT Id FROM Feriados WHERE Data = @data AND Tipo = @tipo AND Id != @id');
 
     if (dataCheck.recordset.length > 0) {
-        throw new AppError(400, 'Já existe outro feriado nesta data.');
+        throw new AppError(400, `Ja existe outro feriado ${payload.tipo} nesta data.`);
     }
 
     const result = await pool.request()

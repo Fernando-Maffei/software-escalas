@@ -1,6 +1,7 @@
 const { sql } = require('../db');
 const { AppError } = require('./errors');
 const { listJornadaSemanal } = require('./jornada-semanal');
+const { classificarDia, criarIndiceFeriados } = require('./dias');
 const { serializePlantaoRecord } = require('./plantoes');
 const { getBancoHorasCapabilities, hasTable } = require('./schema');
 const {
@@ -682,6 +683,18 @@ async function applyAutomaticEscalaRecord(poolOrTx, existingMap, incomingRecord,
     };
 }
 
+// Feriados do periodo, como indice para o classificador. A tabela Feriados e a
+// unica autoridade: nacional, estadual e municipal valem igual, e a coluna Tipo
+// serve para identificar a origem, nao para mudar a regra.
+async function carregarFeriadosDoPeriodo(poolOrTx, startISO, endISO) {
+    const result = await poolOrTx.request()
+        .input('inicio', sql.Date, normalizeIsoDate(startISO, 'Data inicial'))
+        .input('fim', sql.Date, normalizeIsoDate(endISO, 'Data final'))
+        .query('SELECT Nome, Data, Tipo FROM Feriados WHERE Data BETWEEN @inicio AND @fim');
+
+    return criarIndiceFeriados(result.recordset);
+}
+
 async function ensureEscalaBaseForPeriod(poolOrTx, schema, startISO, endISO, options = {}) {
     ensureEscalaDiaTable(schema);
 
@@ -694,6 +707,7 @@ async function ensureEscalaBaseForPeriod(poolOrTx, schema, startISO, endISO, opt
     });
     const jornadaSemanalIndex = buildJornadaSemanalIndex(jornadaSemanalRows);
     const hasJornadaSemanalSupport = hasTable(schema, 'ColaboradorJornadaSemanal');
+    const feriados = await carregarFeriadosDoPeriodo(poolOrTx, startISO, endISO);
     const existingRows = await listEscalaDiaRows(poolOrTx, startISO, endISO, { colaboradorId });
     const existingMap = new Map(existingRows.map((row) => [buildEscalaKey(row.colaboradorId, row.dataISO), row]));
     const counters = {
@@ -705,6 +719,7 @@ async function ensureEscalaBaseForPeriod(poolOrTx, schema, startISO, endISO, opt
 
     for (const dataISO of iterateIsoDates(startISO, endISO)) {
         const weekday = getDayOfWeek(dataISO);
+        const dia = classificarDia(dataISO, feriados);
 
         for (const colaborador of colaboradores) {
             const key = buildEscalaKey(colaborador.Id, dataISO);
@@ -737,6 +752,22 @@ async function ensureEscalaBaseForPeriod(poolOrTx, schema, startISO, endISO, opt
                         tipo: 'normal'
                     });
                 }
+            }
+
+            // Em feriado ninguem trabalha por padrao — quem trabalha e quem tem
+            // lancamento explicito (plantao), que entra por syncPlantaoToEscalaDia
+            // com origem propria. Ate aqui o feriado era um dia util qualquer: a
+            // escala do dia 07/09/2026 marcava 20 pessoas em jornada normal
+            // enquanto so duas tinham plantao lancado.
+            //
+            // Sabado e domingo NAO mudam: continuam regidos pela jornada semanal
+            // do colaborador e pela opcao includeSaturday, como sempre foram.
+            //
+            // Quando defaultRecord fica nulo, o bloco abaixo apaga a linha
+            // automatica que porventura exista — e canDeleteAutomaticEscalaRecord
+            // preserva ajuste manual, plantao e ausencia.
+            if (dia.ehFeriado) {
+                defaultRecord = null;
             }
 
             if (!defaultRecord) {

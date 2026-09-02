@@ -1,5 +1,6 @@
 const { AppError } = require('./errors');
 const { extractDateString, extractTimeString, normalizeIsoDate, normalizeTime } = require('./validation');
+const { criarIndiceFeriados } = require('./dias');
 
 function padNumber(value) {
     return String(value).padStart(2, '0');
@@ -60,9 +61,17 @@ function calculateDailyWorkMinutes(colaborador) {
     return total;
 }
 
-function enumerateBusinessDates(startISO, endISO) {
+// Dias uteis de um periodo: sem fim de semana e, quando o indice de feriados e
+// informado, sem feriado. E o que conta o debito de uma ausencia — sem isso,
+// ferias que cobrem um feriado debitavam um dia que ninguem trabalharia.
+//
+// O parametro e opcional de proposito: chamadas que nao tem como carregar os
+// feriados (utilitario puro, sem banco) seguem com o comportamento de antes,
+// em vez de silenciosamente errar para o outro lado.
+function enumerateBusinessDates(startISO, endISO, feriados = null) {
     const startDate = new Date(`${normalizeIsoDate(startISO)}T00:00:00`);
     const endDate = new Date(`${normalizeIsoDate(endISO)}T00:00:00`);
+    const indiceFeriados = feriados instanceof Map ? feriados : criarIndiceFeriados(feriados);
     const dates = [];
 
     for (const current = new Date(startDate); current <= endDate; current.setDate(current.getDate() + 1)) {
@@ -77,6 +86,10 @@ function enumerateBusinessDates(startISO, endISO) {
             padNumber(current.getMonth() + 1),
             padNumber(current.getDate())
         ].join('-');
+
+        if (indiceFeriados.has(dateISO)) {
+            continue;
+        }
 
         dates.push(dateISO);
     }
@@ -149,7 +162,8 @@ function calculateAusenciaDebitMinutes(ausencia, colaborador, options = {}) {
     const dailyMinutes = calculateDailyWorkMinutes(colaborador);
     const dates = filterDatesUpToReference(enumerateBusinessDates(
         extractDateString(ausencia.dataInicio || ausencia.DataInicio),
-        extractDateString(ausencia.dataFim || ausencia.DataFim)
+        extractDateString(ausencia.dataFim || ausencia.DataFim),
+        options.feriados || null
     ), referenceDateISO);
 
     return dailyMinutes * dates.length;
