@@ -753,14 +753,12 @@
         return Array.isArray(day?.rows) && day.rows.length > 0;
     }
 
-    function shouldIncludeSundayInMonthlyExport(snapshot) {
-        const groups = Array.isArray(snapshot?.setorGroups) && snapshot.setorGroups.length > 0
-            ? snapshot.setorGroups
-            : [{ calendarWeeks: Array.isArray(snapshot?.calendarWeeks) ? snapshot.calendarWeeks : [] }];
-
-        return groups.some((group) => (
-            (Array.isArray(group.calendarWeeks) ? group.calendarWeeks : []).some((week) => hasEscalaExportRows(week?.[6]))
-        ));
+    // O quadro mostra SEMPRE os sete dias. Antes o domingo so entrava se
+    // alguem tivesse escala nele, e um setor que nao trabalha no fim de semana
+    // recebia uma folha de seis colunas, terminando no sabado — o leitor nao
+    // conseguia distinguir "domingo vazio" de "domingo fora do relatorio".
+    function shouldIncludeSundayInMonthlyExport() {
+        return true;
     }
 
     function getEscalaExportWeekSlots(week, includeSunday) {
@@ -790,16 +788,13 @@
         return '';
     }
 
+    // Quantas linhas cabem no dia mais cheio de uma folha com N linhas de
+    // semana. Menos semanas na folha = mais altura para cada dia. Os valores
+    // sao calibrados por medicao: renderizando a folha e verificando quando
+    // .escala-sheet-day (que tem overflow: hidden) comeca a cortar conteudo.
     function getMonthlyEscalaOnePageMaxRows(weekCount) {
-        if (weekCount >= 6) {
-            return 9;
-        }
-
-        if (weekCount >= 5) {
-            return 14;
-        }
-
-        return 18;
+        const CAPACIDADE_POR_SEMANAS = { 1: 70, 2: 38, 3: 25, 4: 18, 5: 14, 6: 13 };
+        return CAPACIDADE_POR_SEMANAS[Math.min(6, Math.max(1, Number(weekCount) || 1))];
     }
 
     function shouldShowEscalaSheetLunchColumn(day, weekDayIndex) {
@@ -966,6 +961,86 @@
         };
     }
 
+    function dividirSemanasEmBlocos(weeks, quantidadeDePaginas) {
+        const porPagina = Math.ceil(weeks.length / quantidadeDePaginas);
+        const blocos = [];
+
+        for (let inicio = 0; inicio < weeks.length; inicio += porPagina) {
+            blocos.push(weeks.slice(inicio, inicio + porPagina));
+        }
+
+        return blocos;
+    }
+
+    // Retorna a primeira divisao (1 folha, depois 2, depois 3...) em que todo
+    // bloco cabe na altura da pagina, ou null se nem uma semana isolada couber.
+    // Importante caber: .escala-export-month-page tem altura fixa e
+    // overflow: hidden, entao o que passa nao "vaza" — some do PDF.
+    function escolherBlocosDeSemanasPlantao(weeks, includeSunday) {
+        for (let paginas = 1; paginas <= weeks.length; paginas += 1) {
+            const blocos = dividirSemanasEmBlocos(weeks, paginas);
+            const cabe = blocos.every((bloco) => (
+                getEscalaExportEntryMaxRows(bloco, includeSunday) <= getMonthlyEscalaOnePageMaxRows(bloco.length)
+            ));
+
+            if (cabe) {
+                return blocos;
+            }
+        }
+
+        return null;
+    }
+
+    // Sobra vertical de uma folha ja renderizada: distancia entre a base da
+    // celula de dia mais baixa e o fim da area util da pagina. Negativo = o
+    // conteudo passou do fim e sera CORTADO (a pagina tem overflow: hidden).
+    function medirSobraDaFolhaEscala(pagina) {
+        const celulas = [...pagina.querySelectorAll('.escala-sheet-day:not(.is-placeholder)')];
+
+        if (celulas.length === 0) {
+            return 0;
+        }
+
+        const retangulo = pagina.getBoundingClientRect();
+        const recuoInferior = parseFloat(getComputedStyle(pagina).paddingBottom) || 0;
+        const limite = retangulo.bottom - recuoInferior;
+        const maisBaixa = Math.max(...celulas.map((celula) => celula.getBoundingClientRect().bottom));
+
+        return limite - maisBaixa;
+    }
+
+    // As faixas fixas de densidade (>= 9 linhas vira densa, >= 13 vira
+    // ultra-densa) erravam por uma linha em varios pontos: com 12 pessoas num
+    // mes de 5 semanas, ou 8 num de 6, a folha estourava e o PDF saia com
+    // linhas faltando, sem nenhum aviso. Em vez de calibrar faixa por faixa —
+    // que muda com o tamanho dos nomes e com a coluna de almoco — a folha ja
+    // montada e medida aqui e vai ficando mais compacta ate caber.
+    window.ajustarDensidadeFolhasEscala = function ajustarDensidadeFolhasEscala(container) {
+        const NIVEIS = ['', 'is-dense', 'is-ultra-dense'];
+        const folhas = [...(container?.querySelectorAll('.escala-export-month-page') || [])];
+        let folhasEstouradas = 0;
+
+        folhas.forEach((folha) => {
+            const nivelAtual = NIVEIS.findIndex((nivel) => nivel && folha.classList.contains(nivel));
+            let indice = nivelAtual === -1 ? 0 : nivelAtual;
+
+            while (medirSobraDaFolhaEscala(folha) < 0 && indice < NIVEIS.length - 1) {
+                NIVEIS.filter(Boolean).forEach((nivel) => folha.classList.remove(nivel));
+                indice += 1;
+
+                if (NIVEIS[indice]) {
+                    folha.classList.add(NIVEIS[indice]);
+                }
+            }
+
+            if (medirSobraDaFolhaEscala(folha) < 0) {
+                folhasEstouradas += 1;
+            }
+        });
+
+        return { folhas: folhas.length, folhasEstouradas };
+    };
+
     function buildMonthlyEscalaExportPageEntries(snapshot) {
         const compactWeekMaxRows = 12;
         const maxRowsPerWeekDay = 22;
@@ -994,6 +1069,39 @@
                 }];
             }
 
+            // Nao cabendo tudo em uma folha, procura o MENOR numero de folhas em
+            // que todas as semanas cabem, dividindo o mes em blocos iguais.
+            // Antes o codigo pulava direto para "uma semana por pagina", e so
+            // emparelhava duas se ambas tivessem <= 12 linhas — o que nunca
+            // acontece justamente nos meses cheios. Dai um setor de 15 pessoas
+            // sair em 5 folhas, e um mes de 6 semanas sair em 3 mesmo com 11.
+            // Menos semanas por folha = mais altura para cada dia, entao a
+            // divisao ganha capacidade sem precisar encolher a fonte.
+            const blocosPorPagina = escolherBlocosDeSemanasPlantao(weeks, includeSunday);
+
+            if (blocosPorPagina) {
+                return blocosPorPagina.map((bloco, indice) => {
+                    const inicio = blocosPorPagina
+                        .slice(0, indice)
+                        .reduce((total, anterior) => total + anterior.length, 0);
+                    const fim = inicio + bloco.length - 1;
+
+                    return {
+                        sector,
+                        weeks: bloco,
+                        kind: bloco.length > 1 ? 'weeks' : 'week',
+                        weekIndex: inicio,
+                        endWeekIndex: fim,
+                        includeSunday,
+                        label: bloco.length > 1
+                            ? `Semanas ${inicio + 1}-${fim + 1}`
+                            : `Semana ${inicio + 1}`
+                    };
+                });
+            }
+
+            // Nenhuma divisao resolve: ha um dia com mais linhas do que cabe
+            // numa folha inteira. Ai sim a semana e fatiada em partes.
             const entries = [];
             let weekIndex = 0;
 
@@ -1808,6 +1916,18 @@
                 width: isMonthlyExport ? 1700 : 1480
             });
             await window.aguardarLayoutRelatorioPdf();
+
+            // Com a folha ja montada e medida, e o unico momento em que da para
+            // saber se o conteudo realmente coube na altura da pagina.
+            if (isMonthlyExport && typeof window.ajustarDensidadeFolhasEscala === 'function') {
+                const ajuste = window.ajustarDensidadeFolhasEscala(container);
+
+                if (ajuste.folhasEstouradas > 0) {
+                    console.warn('[relatorio-escala] ' + ajuste.folhasEstouradas + ' de ' + ajuste.folhas + ' folha(s) nao couberam nem na densidade maxima; o PDF pode sair com linhas cortadas.');
+                }
+
+                await window.aguardarLayoutRelatorioPdf();
+            }
 
             const canvas = await window.renderizarPaginaPdfEmCanvas(container, {
                 minWidth: isMonthlyExport ? 1700 : 1800,
