@@ -976,8 +976,15 @@
     // bloco cabe na altura da pagina, ou null se nem uma semana isolada couber.
     // Importante caber: .escala-export-month-page tem altura fixa e
     // overflow: hidden, entao o que passa nao "vaza" — some do PDF.
+    // Um mes inteiro numa folha so cabe espremendo tudo na menor fonte (8px).
+    // Com no maximo tres semanas por folha o mes normal sai em duas, e sobra
+    // altura para a folha subir de fonte no ajuste que roda depois.
+    const MAX_SEMANAS_POR_FOLHA = 3;
+
     function escolherBlocosDeSemanasPlantao(weeks, includeSunday) {
-        for (let paginas = 1; paginas <= weeks.length; paginas += 1) {
+        const minimoDePaginas = Math.max(1, Math.ceil(weeks.length / MAX_SEMANAS_POR_FOLHA));
+
+        for (let paginas = minimoDePaginas; paginas <= weeks.length; paginas += 1) {
             const blocos = dividirSemanasEmBlocos(weeks, paginas);
             const cabe = blocos.every((bloco) => (
                 getEscalaExportEntryMaxRows(bloco, includeSunday) <= getMonthlyEscalaOnePageMaxRows(bloco.length)
@@ -1016,29 +1023,44 @@
     // que muda com o tamanho dos nomes e com a coluna de almoco — a folha ja
     // montada e medida aqui e vai ficando mais compacta ate caber.
     window.ajustarDensidadeFolhasEscala = function ajustarDensidadeFolhasEscala(container) {
+        // Da fonte maior para a menor: 11px, 9.5px, 8px.
         const NIVEIS = ['', 'is-dense', 'is-ultra-dense'];
         const folhas = [...(container?.querySelectorAll('.escala-export-month-page') || [])];
         let folhasEstouradas = 0;
 
-        folhas.forEach((folha) => {
-            const nivelAtual = NIVEIS.findIndex((nivel) => nivel && folha.classList.contains(nivel));
-            let indice = nivelAtual === -1 ? 0 : nivelAtual;
+        const aplicar = (folha, nivel) => {
+            NIVEIS.filter(Boolean).forEach((classe) => folha.classList.remove(classe));
 
-            while (medirSobraDaFolhaEscala(folha) < 0 && indice < NIVEIS.length - 1) {
-                NIVEIS.filter(Boolean).forEach((nivel) => folha.classList.remove(nivel));
-                indice += 1;
-
-                if (NIVEIS[indice]) {
-                    folha.classList.add(NIVEIS[indice]);
-                }
+            if (nivel) {
+                folha.classList.add(nivel);
             }
+        };
 
-            if (medirSobraDaFolhaEscala(folha) < 0) {
+        // Testa da MAIOR fonte para a menor e fica na primeira que couber.
+        // Antes so encolhia a partir da classe que o gerador tinha escolhido
+        // por faixa de linhas — uma folha com espaco de sobra continuava na
+        // fonte miuda, sem motivo nenhum.
+        const nivelNecessario = folhas.map((folha) => {
+            const indice = NIVEIS.findIndex((nivel) => {
+                aplicar(folha, nivel);
+                return medirSobraDaFolhaEscala(folha) >= 0;
+            });
+
+            if (indice === -1) {
                 folhasEstouradas += 1;
+                return NIVEIS.length - 1;
             }
+
+            return indice;
         });
 
-        return { folhas: folhas.length, folhasEstouradas };
+        // Uma unica densidade para o relatorio inteiro: folhas com tamanhos de
+        // letra diferentes, no mesmo documento impresso, parecem defeito. Vale
+        // a menor fonte exigida por alguma folha.
+        const nivelComum = NIVEIS[Math.max(0, ...nivelNecessario)];
+        folhas.forEach((folha) => aplicar(folha, nivelComum));
+
+        return { folhas: folhas.length, folhasEstouradas, densidade: nivelComum || 'normal' };
     };
 
     function buildMonthlyEscalaExportPageEntries(snapshot) {
@@ -1056,18 +1078,9 @@
             const weeks = Array.isArray(sector.calendarWeeks) && sector.calendarWeeks.length > 0
                 ? sector.calendarWeeks
                 : [Array(7).fill(null)];
-            const monthMaxRows = getEscalaExportEntryMaxRows(weeks, includeSunday);
-            const onePageMaxRows = getMonthlyEscalaOnePageMaxRows(weeks.length);
-
-            if (monthMaxRows <= onePageMaxRows) {
-                return [{
-                    sector,
-                    weeks,
-                    kind: 'month',
-                    includeSunday,
-                    label: 'Mes completo'
-                }];
-            }
+            // O atalho que jogava o mes todo numa folha saiu: ele passava por
+            // cima do teto de semanas por folha e era justamente o que deixava
+            // o quadro miudo demais para ler.
 
             // Nao cabendo tudo em uma folha, procura o MENOR numero de folhas em
             // que todas as semanas cabem, dividindo o mes em blocos iguais.
@@ -1093,9 +1106,11 @@
                         weekIndex: inicio,
                         endWeekIndex: fim,
                         includeSunday,
-                        label: bloco.length > 1
-                            ? `Semanas ${inicio + 1}-${fim + 1}`
-                            : `Semana ${inicio + 1}`
+                        label: bloco.length === weeks.length
+                            ? 'Mes completo'
+                            : (bloco.length > 1
+                                ? `Semanas ${inicio + 1}-${fim + 1}`
+                                : `Semana ${inicio + 1}`)
                     };
                 });
             }
