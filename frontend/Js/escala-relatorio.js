@@ -580,6 +580,7 @@
             merged.set(key, {
                 dataISO,
                 nome: item.Nome || item.nome || 'Feriado',
+                tipo: item.Tipo || item.tipo || 'municipal',
                 origem: 'local'
             });
         });
@@ -740,9 +741,13 @@
             }
 
             const nome = String(item?.nome || item?.Nome || 'Feriado').trim() || 'Feriado';
+            // A abrangencia vem da tabela (Tipo). Feriado que so a BrasilAPI
+            // conhece e nacional por definicao.
+            const tipoBruto = String(item?.tipo || item?.Tipo || (item?.origem === 'nacional' ? 'nacional' : '')).trim().toLowerCase();
+            const tipo = ['nacional', 'estadual', 'municipal'].includes(tipoBruto) ? tipoBruto : 'municipal';
 
             if (!map.has(dataISO)) {
-                map.set(dataISO, nome);
+                map.set(dataISO, { nome, tipo });
             }
         });
 
@@ -823,18 +828,28 @@
             return '<article class="escala-sheet-day is-placeholder" aria-hidden="true"></article>';
         }
 
-        const holidayLabel = options.holidayMap?.get(day.dataISO);
+        const feriado = options.holidayMap?.get(day.dataISO) || null;
         const weekDayIndex = Number(options.weekDayIndex) || 0;
         const includeLunch = shouldShowEscalaSheetLunchColumn(day, weekDayIndex);
         const columnCount = includeLunch ? 3 : 2;
         const rows = Array.isArray(day.rows) ? day.rows : [];
         const hasRows = day.hasScale && rows.length > 0;
-        const emptyLabel = holidayLabel ? 'FERIADO' : 'Sem escala';
-        const titleAttribute = holidayLabel ? ` title="${escapeHtmlEscala(holidayLabel)}"` : '';
+        const emptyLabel = feriado ? 'Feriado, ninguem escalado' : 'Sem escala';
+        const titleAttribute = feriado ? ` title="${escapeHtmlEscala(feriado.nome)}"` : '';
+
+        // O nome do feriado so existia num atributo title — invisivel no PDF,
+        // que e onde o relatorio e lido. E a marcacao so aparecia quando o dia
+        // estava vazio: feriado COM plantao lancado nao se distinguia de um dia
+        // util qualquer. Agora a faixa aparece nos dois casos, com a
+        // abrangencia, e quem trabalha continua listado logo abaixo.
+        const faixaFeriado = feriado
+            ? `<div class="escala-sheet-day-feriado"><span>${escapeHtmlEscala(feriado.tipo)}</span>${escapeHtmlEscala(feriado.nome)}</div>`
+            : '';
 
         return `
-            <article class="escala-sheet-day${hasRows ? '' : ' is-empty'}${holidayLabel ? ' is-holiday' : ''}">
+            <article class="escala-sheet-day${hasRows ? '' : ' is-empty'}${feriado ? ' is-holiday' : ''}">
                 <div class="escala-sheet-day-date"${titleAttribute}>${escapeHtmlEscala(day.dateLabel || '--')}</div>
+                ${faixaFeriado}
                 <table class="escala-sheet-table">
                     <colgroup>
                         ${includeLunch
@@ -1481,9 +1496,47 @@
                     }
                     .escala-sheet-day.is-holiday .escala-sheet-empty {
                         color: #000000 !important;
-                        font-size: 16px !important;
+                        font-size: 13px !important;
                         font-style: normal;
                         letter-spacing: 0;
+                    }
+                    /* Faixa de feriado: ambar, para nao competir com o azul da
+                       escala e ainda assim saltar numa folha impressa. */
+                    .escala-sheet-day-feriado {
+                        display: flex;
+                        align-items: center;
+                        gap: 4px;
+                        padding: 2px 4px;
+                        background: #fde68a;
+                        border-bottom: 1px solid #b45309;
+                        color: #78350f;
+                        font-size: 9px;
+                        font-weight: 700;
+                        line-height: 1.15;
+                        overflow: hidden;
+                        white-space: nowrap;
+                        text-overflow: ellipsis;
+                    }
+                    .escala-sheet-day-feriado span {
+                        flex-shrink: 0;
+                        padding: 0 3px;
+                        background: #b45309;
+                        color: #ffffff;
+                        border-radius: 2px;
+                        font-size: 7px;
+                        text-transform: uppercase;
+                        letter-spacing: .04em;
+                    }
+                    .escala-export-month-page.is-dense .escala-sheet-day-feriado {
+                        font-size: 8px;
+                        padding: 1px 3px;
+                    }
+                    .escala-export-month-page.is-ultra-dense .escala-sheet-day-feriado {
+                        font-size: 7px;
+                        padding: 1px 3px;
+                    }
+                    .escala-export-month-page.is-ultra-dense .escala-sheet-day-feriado span {
+                        font-size: 6px;
                     }
                     .escala-export-month-page.is-dense .escala-sheet-title {
                         font-size: 36px;

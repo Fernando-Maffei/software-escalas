@@ -2621,7 +2621,9 @@
         }
 
         const tipo = state.tipoPlantao || 'sabado';
-        const rotuloTipo = rotuloTipoPlantao(tipo, construirMapaFeriadosPlantao().get(state.dataISO));
+        const feriadosMapEditor = construirMapaFeriadosPlantao();
+        const feriadoDoDia = feriadosMapEditor.get(state.dataISO) || null;
+        const rotuloTipo = rotuloTipoPlantao(tipo, feriadoDoDia ? feriadoDoDia.nome : null);
         const jaLancado = (window.plantoesLancados || []).some((item) => item.dataISO === state.dataISO);
 
         editorPanel.style.display = 'block';
@@ -2636,6 +2638,7 @@
                 <span class="plantao-tipo-chip plantao-tipo--${tipo}">
                     <i class="fas fa-circle"></i> ${escapeHtml(rotuloTipo)}
                 </span>
+                ${feriadoDoDia ? `<span class="plantao-abrangencia-chip">${escapeHtml(feriadoDoDia.tipo)}</span>` : ''}
                 <span class="plantao-estado-chip ${jaLancado ? 'is-lancado' : ''}">
                     ${jaLancado ? 'Plantao lancado' : 'Ainda nao lancado'}
                 </span>
@@ -3589,19 +3592,45 @@
     }
 
     // Feriados cadastrados (locais) + nacionais (API), como Map ISO -> nome.
+    // Feriados que VALEM para o lancamento: apenas os cadastrados na tabela.
+    //
+    // Antes esta funcao juntava a tabela com a BrasilAPI, e era dai que vinha a
+    // divergencia: a regua oferecia um feriado nacional que o servidor, que so
+    // conhece a tabela, recusava na hora de salvar. Nacional, estadual e
+    // municipal entram igual — o que decide e estar cadastrado, nao a origem.
+    //
+    // A BrasilAPI continua sendo consultada, mas so para o aviso que sugere
+    // cadastrar o que falta (feriadosNacionaisPendentesPlantao). Sugestao, nao
+    // autoridade.
     function construirMapaFeriadosPlantao() {
         const mapa = new Map();
-        const add = (dataRaw, nome) => {
-            const iso = obterDataISO(dataRaw);
-            if (iso) {
-                mapa.set(iso, nome || 'Feriado');
+
+        (Array.isArray(window.feriadosLocais) ? window.feriadosLocais : []).forEach((item) => {
+            const iso = obterDataISO(item.Data || item.data);
+
+            if (!iso) {
+                return;
             }
-        };
-        (Array.isArray(window.feriadosLocais) ? window.feriadosLocais : [])
-            .forEach((item) => add(item.Data || item.data, item.Nome || item.nome));
-        (Array.isArray(window.feriadosAPI) ? window.feriadosAPI : [])
-            .forEach((item) => add(item.date, item.name));
+
+            const tipo = String(item.Tipo || item.tipo || 'municipal').trim().toLowerCase();
+
+            mapa.set(iso, {
+                nome: item.Nome || item.nome || 'Feriado',
+                tipo: ['nacional', 'estadual', 'municipal'].includes(tipo) ? tipo : 'municipal'
+            });
+        });
+
         return mapa;
+    }
+
+    function nomeFeriadoPlantao(dataISO, feriadosMap) {
+        const feriado = (feriadosMap || construirMapaFeriadosPlantao()).get(obterDataISO(dataISO));
+        return feriado ? feriado.nome : null;
+    }
+
+    function tipoFeriadoPlantao(dataISO, feriadosMap) {
+        const feriado = (feriadosMap || construirMapaFeriadosPlantao()).get(obterDataISO(dataISO));
+        return feriado ? feriado.tipo : null;
     }
 
     // Tipo do plantao pela data (feriado tem prioridade sobre o dia da semana).
@@ -3661,7 +3690,9 @@
                 continue;
             }
 
-            const feriadoNome = tipo === 'feriado' ? feriadosMap.get(dataISO) : null;
+            const feriadoDaData = tipo === 'feriado' ? feriadosMap.get(dataISO) : null;
+            const feriadoNome = feriadoDaData ? feriadoDaData.nome : null;
+            const feriadoTipo = feriadoDaData ? feriadoDaData.tipo : null;
 
             // O dia pode ter varios lancamentos: pegar so o primeiro faria o
             // card mentir sobre horario e tamanho da equipe.
@@ -3686,7 +3717,8 @@
                 isActive: dataFoco === dataISO,
                 tipo,
                 tipoLabel: rotuloTipoPlantao(tipo, feriadoNome),
-                feriadoNome
+                feriadoNome,
+                feriadoTipo
             });
         }
 
@@ -3852,11 +3884,23 @@
                 .filter(Boolean)
         );
 
-        const naJanela = new Set(construirSabadosVisiveisPlantao().map((item) => item.dataISO));
+        // Compara com o INTERVALO da janela, e nao com a lista de datas da
+        // regua: desde que a regua so mostra feriado cadastrado, um feriado
+        // pendente nunca estaria nessa lista — a busca se anularia sozinha.
+        const visiveis = construirSabadosVisiveisPlantao();
+        const inicio = visiveis[0]?.dataISO || '';
+        const fim = visiveis[visiveis.length - 1]?.dataISO || '';
+
+        if (!inicio || !fim) {
+            return [];
+        }
 
         return (Array.isArray(window.feriadosAPI) ? window.feriadosAPI : [])
             .map((item) => ({ dataISO: obterDataISO(item.date), nome: item.name || 'Feriado' }))
-            .filter((item) => item.dataISO && naJanela.has(item.dataISO) && !cadastrados.has(item.dataISO))
+            .filter((item) => item.dataISO
+                && item.dataISO >= inicio
+                && item.dataISO <= fim
+                && !cadastrados.has(item.dataISO))
             .sort((a, b) => a.dataISO.localeCompare(b.dataISO));
     }
 

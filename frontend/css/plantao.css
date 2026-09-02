@@ -567,6 +567,21 @@
 .plantao-tipo--domingo i { color: var(--plantao-domingo); }
 .plantao-tipo--feriado i { color: var(--plantao-feriado); }
 
+/* Abrangencia do feriado: nacional, estadual ou municipal. Ambar, o mesmo tom
+   que o feriado ja usa na regua, para o leitor ligar as duas coisas. */
+.plantao-abrangencia-chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px var(--space-2);
+    border-radius: var(--radius-pill);
+    background: var(--plantao-feriado-fundo);
+    color: var(--plantao-feriado-texto);
+    font-size: 10px;
+    font-weight: var(--weight-semibold);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
 .plantao-estado-chip.is-lancado {
     background: var(--success-soft);
     border-color: transparent;
