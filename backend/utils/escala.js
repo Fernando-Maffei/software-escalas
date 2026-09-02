@@ -1232,7 +1232,11 @@ async function syncPlantaoToEscalaDia(poolOrTx, schema, plantaoRow, colaboradore
 
     const plantao = serializePlantaoRecord(plantaoRow);
 
-    if (plantao.tipoPlantao !== 'sabado') {
+    // Domingo e feriado tambem entram na escala do dia. Enquanto so sabado
+    // sincronizava, um plantao lancado em feriado existia no cadastro de
+    // plantoes mas sumia da tela de Escala do Dia e dos relatorios que leem
+    // escala_dia — sem erro, sem aviso.
+    if (!['sabado', 'domingo', 'feriado'].includes(plantao.tipoPlantao)) {
         return;
     }
 
@@ -1254,13 +1258,16 @@ async function syncPlantaoToEscalaDia(poolOrTx, schema, plantaoRow, colaboradore
             continue;
         }
 
-        const key = buildEscalaKey(colaborador.Id, plantao.dataISO);
-        const existing = existingMap.get(key) || null;
-
-        if (existing && normalizeEscalaTipo(existing.tipo || 'normal') !== 'plantao' && !trimToNull(existing.origemTipo)) {
-            continue;
-        }
-
+        // A guarda que existia aqui pulava qualquer linha ja gravada que nao
+        // fosse de plantao e nao tivesse origem — ou seja, a jornada padrao
+        // gerada automaticamente. Em sabado isso quase nunca aparecia (nao ha
+        // jornada padrao), mas em feriado, que cai em dia util, TODO
+        // colaborador ja tem a linha normal do dia: o plantao era descartado
+        // e o feriado ficava sem lancamento nenhum na escala.
+        //
+        // A protecao que importa ja existe uma camada abaixo: mergeEscalaRecord
+        // devolve null quando a linha tem ajuste_manual, entao edicao feita a
+        // mao continua intocada.
         await applyAutomaticEscalaRecord(
             poolOrTx,
             existingMap,
