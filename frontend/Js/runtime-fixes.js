@@ -2430,20 +2430,31 @@
             return;
         }
 
+        const tipo = state.tipoPlantao || 'sabado';
+        const rotuloTipo = rotuloTipoPlantao(tipo, construirMapaFeriadosPlantao().get(state.dataISO));
+        const jaLancado = (window.plantoesLancados || []).some((item) => item.dataISO === state.dataISO);
+
         editorPanel.style.display = 'block';
-        editorTitle.innerText = `Plantao - ${state.dataFormatada}`;
+        editorTitle.innerText = state.dataFormatada;
+
+        // O tipo e detectado pela data e nao e editavel: como campo de
+        // formulario ele so ocupava espaco. Vira etiqueta no cabecalho.
+        const editorSubtitulo = document.getElementById('plantaoEditorSubtitulo');
+
+        if (editorSubtitulo) {
+            editorSubtitulo.innerHTML = `
+                <span class="plantao-tipo-chip plantao-tipo--${tipo}">
+                    <i class="fas fa-circle"></i> ${escapeHtml(rotuloTipo)}
+                </span>
+                <span class="plantao-estado-chip ${jaLancado ? 'is-lancado' : ''}">
+                    ${jaLancado ? 'Plantao lancado' : 'Ainda nao lancado'}
+                </span>
+            `;
+        }
 
         editorContent.innerHTML = `
             <div class="editor-plantao">
                 <div class="editor-form-grid">
-                    <div class="editor-form-group">
-                        <label><i class="fas fa-calendar-week"></i> Tipo do plantao</label>
-                        <div class="plantao-tipo-display plantao-tipo--${state.tipoPlantao || 'sabado'}">
-                            <i class="fas fa-circle"></i>
-                            ${escapeHtml(rotuloTipoPlantao(state.tipoPlantao, construirMapaFeriadosPlantao().get(state.dataISO)))}
-                        </div>
-                        <small class="helper-text">Detectado pela data. Plantao permitido em sabado, domingo e feriado.</small>
-                    </div>
                     <div class="editor-form-group">
                         <label><i class="fas fa-clock"></i> Horario do plantao</label>
                         <div class="time-inputs plantao-time-inputs">
@@ -2454,16 +2465,11 @@
                         <small class="helper-text">Essas horas viram credito no banco de horas.</small>
                     </div>
                     <div class="editor-form-group">
-                        <label><i class="fas fa-wallet"></i> Resumo</label>
+                        <label><i class="fas fa-wallet"></i> Credito gerado</label>
                         <div class="plantao-bank-preview">
                             <span id="plantaoCreditoPreview">Credito por colaborador: ${state.horaInicio && state.horaFim ? minutosParaTexto((((Number(state.horaFim.slice(0, 2)) * 60) + Number(state.horaFim.slice(3, 5))) - ((Number(state.horaInicio.slice(0, 2)) * 60) + Number(state.horaInicio.slice(3, 5))))) : 'informe o horario'}</span>
                         </div>
                     </div>
-                </div>
-
-                <div class="editor-form-group">
-                    <label><i class="fas fa-align-left"></i> Observacao</label>
-                    <textarea id="plantaoObservacao" class="form-control" rows="3" placeholder="Detalhes opcionais para o plantao">${escapeHtml(state.observacao || '')}</textarea>
                 </div>
 
                 <div class="editor-form-group">
@@ -2473,13 +2479,23 @@
                     </div>
                 </div>
 
+                <div class="editor-form-group">
+                    <label><i class="fas fa-align-left"></i> Observacao</label>
+                    <textarea id="plantaoObservacao" class="form-control" rows="2" placeholder="Detalhes opcionais para o plantao">${escapeHtml(state.observacao || '')}</textarea>
+                </div>
+
                 <div class="editor-actions">
-                    <button onclick="salvarPlantao('${state.dataISO}')" class="btn-primary">
-                        <i class="fas fa-save"></i> Salvar Plantao
+                    <button type="button" onclick="salvarPlantao('${state.dataISO}')" class="btn-primary">
+                        <i class="fas fa-save"></i> ${jaLancado ? 'Salvar alteracoes' : 'Lancar plantao'}
                     </button>
-                    <button onclick="fecharPlantaoEditor()" class="btn-secondary">
+                    <button type="button" onclick="fecharPlantaoEditor()" class="btn-secondary">
                         <i class="fas fa-times"></i> Cancelar
                     </button>
+                    ${jaLancado ? `
+                        <button type="button" onclick="excluirPlantao('${state.dataISO}')" class="btn-danger-ghost" title="Excluir este plantao">
+                            <i class="fas fa-trash"></i> Excluir
+                        </button>
+                    ` : ''}
                 </div>
             </div>
         `;
@@ -3338,6 +3354,7 @@
     const PLANTAO_SABADOS_POSTERIORES = 10;
     const PLANTAO_SABADOS_PASSO = 8;
     const PLANTAO_MESES_LABELS = ['JAN', 'FEV', 'MAR', 'ABR', 'MAI', 'JUN', 'JUL', 'AGO', 'SET', 'OUT', 'NOV', 'DEZ'];
+    const PLANTAO_MESES_NOMES = ['Janeiro', 'Fevereiro', 'Marco', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
 
     function criarDataLocalPlantao(dataISO) {
         const [ano, mes, dia] = String(dataISO || '').split('-').map(Number);
@@ -3451,7 +3468,7 @@
     function construirSabadosVisiveisPlantao() {
         const hojeISO = obterDataISO(new Date());
         const dataAncora = criarDataLocalPlantao(obterAncoraSabadoPlantao());
-        const dataFoco = obterDataISO(window.__plantaoDataFocoISO || '');
+        const dataFoco = obterDataISO(getPlantaoEditorState()?.dataISO || window.__plantaoDataFocoISO || '');
         const feriadosMap = construirMapaFeriadosPlantao();
         const datas = [];
 
@@ -3488,31 +3505,149 @@
         return datas;
     }
 
-    function renderSabadosPlantaoHistorico(items) {
-        return items.map((sabado) => `
+    // A regua vinha como uma fila corrida de 20+ datas, sem dizer onde um mes
+    // acaba e outro comeca. Agrupar por mes da esse ponto de referencia sem
+    // custar altura: o titulo do mes ocupa uma linha fina sobre a grade.
+    function agruparSabadosPorMesPlantao(items) {
+        const grupos = [];
+
+        items.forEach((item) => {
+            const chave = String(item.dataISO).slice(0, 7);
+            const atual = grupos[grupos.length - 1];
+
+            if (atual && atual.chave === chave) {
+                atual.itens.push(item);
+                return;
+            }
+
+            const [ano, mes] = chave.split('-').map(Number);
+
+            grupos.push({
+                chave,
+                rotulo: `${PLANTAO_MESES_NOMES[mes - 1] || ''} de ${ano}`,
+                itens: [item]
+            });
+        });
+
+        return grupos;
+    }
+
+    // Rodape do card. Quando ja existe plantao, mostra horario e tamanho da
+    // equipe — antes era sempre "Clique para editar", que nao informava nada e
+    // obrigava a abrir o painel so para ver o que ja estava lancado.
+    function resumoCardSabadoPlantao(sabado) {
+        if (!sabado.temPlantao) {
+            return 'Clique para lancar';
+        }
+
+        const inicio = formatarHoraInput(sabado.plantao.horaInicio);
+        const fim = formatarHoraInput(sabado.plantao.horaFim);
+        const equipe = (sabado.plantao.colaboradores || []).length;
+        const horario = inicio && fim ? `${inicio}-${fim}` : 'Horario pendente';
+
+        return `${escapeHtml(horario)} &middot; ${equipe} ${equipe === 1 ? 'pessoa' : 'pessoas'}`;
+    }
+
+    function renderCardSabadoPlantao(sabado) {
+        const classes = [
+            'sabado-card',
+            `sabado-card--${sabado.tipo || 'sabado'}`,
+            sabado.temPlantao ? 'lancado' : 'vago',
+            sabado.isPast ? 'passado' : '',
+            sabado.isToday ? 'hoje' : '',
+            sabado.isActive ? 'is-active' : ''
+        ].filter(Boolean).join(' ');
+
+        const titulo = `${sabado.formatada}${sabado.feriadoNome ? ' - ' + sabado.feriadoNome : ''}${sabado.temPlantao ? ' - plantao ja lancado' : ''}`;
+
+        // Sem onclick inline: quem trata o clique e a delegacao no #listaSabados.
+        // Ter os dois fazia o editor abrir duas vezes a cada clique.
+        // Filhos em <span> porque <button> so aceita conteudo de frase — os
+        // <div> de antes eram HTML invalido.
+        return `
             <button
                 type="button"
-                class="sabado-card sabado-card--${sabado.tipo || 'sabado'} ${sabado.temPlantao ? 'lancado' : ''} ${sabado.isPast ? 'passado' : ''} ${sabado.isToday ? 'hoje' : ''} ${sabado.isActive ? 'is-active' : ''}"
+                class="${classes}"
                 data-plantao-sabado="${sabado.dataISO}"
-                onclick="abrirPlantaoPorData('${sabado.dataISO}')"
-                title="${escapeHtml(sabado.formatada)}${sabado.feriadoNome ? ' - ' + escapeHtml(sabado.feriadoNome) : ''}${sabado.temPlantao ? ' - Plantao ja lancado' : ''}"
+                aria-pressed="${sabado.isActive ? 'true' : 'false'}"
+                title="${escapeHtml(titulo)}"
             >
-                <div class="sabado-card-badges">
-                    ${sabado.temPlantao ? '<span class="badge-plantao">Lancado</span>' : ''}
-                    ${sabado.isPast ? '<span class="badge-historico">Historico</span>' : ''}
-                </div>
-                <div class="sabado-dia">${escapeHtml(sabado.dia)}</div>
-                <div class="sabado-mes">${escapeHtml(sabado.mes)}</div>
-                <div class="sabado-ano">${escapeHtml(String(sabado.ano))}</div>
-                <div class="sabado-tipo">${escapeHtml(sabado.tipoLabel || 'Sabado')}</div>
-                <div class="sabado-status">${sabado.temPlantao ? 'Clique para editar' : 'Clique para lancar'}</div>
+                <span class="sabado-card-topo">
+                    <span class="sabado-dia">${escapeHtml(sabado.dia)}</span>
+                    <span class="sabado-quando">
+                        <span class="sabado-mes">${escapeHtml(sabado.mes)}</span>
+                        <span class="sabado-ano">${escapeHtml(String(sabado.ano))}</span>
+                    </span>
+                </span>
+                <span class="sabado-tipo">${escapeHtml(sabado.tipoLabel || 'Sabado')}</span>
+                <span class="sabado-status">${resumoCardSabadoPlantao(sabado)}</span>
+                ${sabado.isToday ? '<span class="sabado-flag sabado-flag--hoje">Hoje</span>' : ''}
+                ${sabado.temPlantao ? '<span class="sabado-flag sabado-flag--lancado"><i class="fas fa-check"></i> Lancado</span>' : ''}
             </button>
+        `;
+    }
+
+    function renderSabadosPlantaoHistorico(items) {
+        if (!items.length) {
+            return '<div class="empty-state">Nenhum sabado, domingo ou feriado nesta janela.</div>';
+        }
+
+        return agruparSabadosPorMesPlantao(items).map((grupo) => `
+            <section class="plantao-mes">
+                <h4 class="plantao-mes-titulo">
+                    <span>${escapeHtml(grupo.rotulo)}</span>
+                    <span class="plantao-mes-contagem">${grupo.itens.filter((item) => item.temPlantao).length}/${grupo.itens.length}</span>
+                </h4>
+                <div class="sabados-grid">
+                    ${grupo.itens.map(renderCardSabadoPlantao).join('')}
+                </div>
+            </section>
         `).join('');
+    }
+
+    function descreverIntervaloPlantao(sabados) {
+        const primeira = sabados[0]?.formatada || '--';
+        const ultima = sabados[sabados.length - 1]?.formatada || '--';
+
+        return `Sabados, domingos e feriados &middot; ${escapeHtml(primeira)} ate ${escapeHtml(ultima)}`;
+    }
+
+    // Redesenha SO a regua, sem tocar no resto da pagina nem na rede. Antes,
+    // cada clique em Anteriores/Proximos refazia a tela inteira e recarregava
+    // colaboradores, ausencias, plantoes, banco de horas e feriados (incluindo
+    // a BrasilAPI): lento, piscando e perdendo a posicao da rolagem.
+    function atualizarGradePlantao() {
+        const grade = document.getElementById('listaSabados');
+
+        if (!grade) {
+            return;
+        }
+
+        const sabados = construirSabadosVisiveisPlantao();
+        grade.innerHTML = renderSabadosPlantaoHistorico(sabados);
+
+        const intervalo = document.getElementById('plantaoIntervaloLabel');
+
+        if (intervalo) {
+            intervalo.innerHTML = descreverIntervaloPlantao(sabados);
+        }
+
+        const btnAtual = document.getElementById('plantaoHojeBtn');
+
+        if (btnAtual) {
+            btnAtual.classList.toggle('is-current', sabados.some((item) => item.isToday));
+        }
+    }
+
+    function sabadoEstaNaJanelaPlantao(dataISO) {
+        return construirSabadosVisiveisPlantao().some((item) => item.dataISO === dataISO);
     }
 
     function atualizarSabadoSelecionadoPlantao(dataISO) {
         document.querySelectorAll('[data-plantao-sabado]').forEach((element) => {
-            element.classList.toggle('is-active', element.getAttribute('data-plantao-sabado') === dataISO);
+            const ativo = element.getAttribute('data-plantao-sabado') === dataISO;
+            element.classList.toggle('is-active', ativo);
+            element.setAttribute('aria-pressed', ativo ? 'true' : 'false');
         });
     }
 
@@ -3653,12 +3788,17 @@
 
         window.plantoesLancados = (window.plantoesLancados || []).filter((plantao) => ehDataPlantaoValida(plantao.dataISO) || ['sabado', 'domingo', 'feriado'].includes(plantao.tipoPlantao));
 
-        const dataFoco = obterDataISO(window.__plantaoDataFocoISO || getPlantaoEditorState()?.dataISO || '');
-        definirAncoraSabadoPlantao(dataFoco || obterAncoraSabadoPlantao());
+        // A ancora da regua so se move por foco EXPLICITO: clique num card,
+        // salvar, excluir, ou abrir pela lista de lancados. Antes, o editor
+        // aberto tambem reancorava — e era exatamente isso que travava os
+        // botoes Anteriores/Proximos: eles moviam a ancora e o render seguinte
+        // a puxava de volta para a data em edicao, deixando a regua parada.
+        const focoExplicito = obterDataISO(window.__plantaoDataFocoISO || '');
+        const dataFoco = focoExplicito || obterDataISO(getPlantaoEditorState()?.dataISO || '');
+
+        definirAncoraSabadoPlantao(focoExplicito || obterAncoraSabadoPlantao());
 
         const sabados = construirSabadosVisiveisPlantao();
-        const primeiraData = sabados[0]?.formatada || '--';
-        const ultimaData = sabados[sabados.length - 1]?.formatada || '--';
 
         appContent.innerHTML = `
             <div class="page-header">
@@ -3671,24 +3811,24 @@
             <div class="plantao-layout">
                 <div class="sabados-container">
                     <div class="sabados-header">
-                        <div>
+                        <div class="sabados-header-texto">
                             <h3><i class="fas fa-calendar-day"></i> Datas disponiveis</h3>
-                            <p class="sabados-subtitle">Sabados, domingos e feriados &middot; ${escapeHtml(primeiraData)} ate ${escapeHtml(ultimaData)}</p>
+                            <p class="sabados-subtitle" id="plantaoIntervaloLabel">${descreverIntervaloPlantao(sabados)}</p>
                         </div>
                         <div class="sabados-nav">
-                            <button type="button" class="btn-secondary" id="plantaoAnteriorBtn">
-                                <i class="fas fa-arrow-left"></i> Anteriores
+                            <button type="button" class="btn-secondary" id="plantaoAnteriorBtn" title="Voltar 8 semanas">
+                                <i class="fas fa-arrow-left"></i> <span>Anteriores</span>
                             </button>
-                            <button type="button" class="btn-secondary" id="plantaoHojeBtn">
-                                <i class="fas fa-bullseye"></i> Atual
+                            <button type="button" class="btn-secondary" id="plantaoHojeBtn" title="Voltar para a semana atual">
+                                <i class="fas fa-bullseye"></i> <span>Atual</span>
                             </button>
-                            <button type="button" class="btn-secondary" id="plantaoProximoBtn">
-                                Proximos <i class="fas fa-arrow-right"></i>
+                            <button type="button" class="btn-secondary" id="plantaoProximoBtn" title="Avancar 8 semanas">
+                                <span>Proximos</span> <i class="fas fa-arrow-right"></i>
                             </button>
                         </div>
                     </div>
 
-                    <div class="sabados-grid" id="listaSabados">
+                    <div class="sabados-regua" id="listaSabados">
                         ${renderSabadosPlantaoHistorico(sabados)}
                     </div>
                 </div>
@@ -3696,15 +3836,18 @@
                 <div id="plantaoEditor" class="editor-sidebar" style="display: none;">
                     <div class="editor-content">
                         <div class="editor-header">
-                            <h3><i class="fas fa-clock"></i> <span id="plantaoDataTitle">Selecione um sabado</span></h3>
-                            <button onclick="fecharPlantaoEditor()" class="btn-close-editor">
+                            <div class="editor-header-texto">
+                                <h3><i class="fas fa-clock"></i> <span id="plantaoDataTitle">Selecione uma data</span></h3>
+                                <p class="editor-header-sub" id="plantaoEditorSubtitulo"></p>
+                            </div>
+                            <button type="button" onclick="fecharPlantaoEditor()" class="btn-close-editor" title="Fechar painel" aria-label="Fechar painel">
                                 <i class="fas fa-times"></i>
                             </button>
                         </div>
                         <div id="plantaoEditorContent" class="editor-form">
                             <div class="editor-empty">
                                 <i class="fas fa-hand-pointer"></i>
-                                <p>Escolha um sabado para abrir o plantao, revisar a equipe e salvar sem duplicar o lancamento.</p>
+                                <p>Escolha uma data na regua ao lado para lancar ou editar o plantao.</p>
                             </div>
                         </div>
                     </div>
@@ -3724,22 +3867,21 @@
             </div>
         `;
 
+        // Navegar e so mudar a janela de datas: nao fecha o painel aberto,
+        // nao refaz a pagina e nao vai na rede.
         document.getElementById('plantaoAnteriorBtn')?.addEventListener('click', () => {
             mudarPaginaSabadosPlantao(PLANTAO_SABADOS_PASSO * -1);
-            window.__plantaoDataFocoISO = null;
-            renderLancamentoPlantao();
+            atualizarGradePlantao();
         });
 
         document.getElementById('plantaoHojeBtn')?.addEventListener('click', () => {
             definirAncoraSabadoPlantao(new Date());
-            window.__plantaoDataFocoISO = null;
-            renderLancamentoPlantao();
+            atualizarGradePlantao();
         });
 
         document.getElementById('plantaoProximoBtn')?.addEventListener('click', () => {
             mudarPaginaSabadosPlantao(PLANTAO_SABADOS_PASSO);
-            window.__plantaoDataFocoISO = null;
-            renderLancamentoPlantao();
+            atualizarGradePlantao();
         });
 
         document.getElementById('listaSabados')?.addEventListener('click', async (event) => {
@@ -3782,7 +3924,15 @@
         }
 
         window.__plantaoDataFocoISO = dataISO;
-        definirAncoraSabadoPlantao(dataISO);
+
+        // Reancorar so quando a data esta FORA da janela visivel (caso de abrir
+        // pela lista de plantoes lancados). Reancorar sempre fazia a regua
+        // inteira saltar embaixo do cursor a cada clique num card.
+        if (!sabadoEstaNaJanelaPlantao(dataISO)) {
+            definirAncoraSabadoPlantao(dataISO);
+            atualizarGradePlantao();
+        }
+
         atualizarSabadoSelecionadoPlantao(dataISO);
 
         const existente = (window.plantoesLancados || []).find((item) => item.dataISO === dataISO);
@@ -3806,6 +3956,13 @@
         });
 
         renderPlantaoEditor(state);
+
+        // Abaixo de 1200px o painel cai para baixo da regua e o clique parecia
+        // "nao fazer nada" — nada mudava na parte visivel da tela.
+        if (window.matchMedia('(max-width: 1200px)').matches) {
+            editorPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+
         await carregarDisponibilidadePlantao(state);
         renderPlantaoEditor(state);
         atualizarSabadoSelecionadoPlantao(dataISO);
@@ -3815,15 +3972,26 @@
         const editorPanel = document.getElementById('plantaoEditor');
         const editorContent = document.getElementById('plantaoEditorContent');
 
+        const editorSubtitulo = document.getElementById('plantaoEditorSubtitulo');
+        const editorTituloAoFechar = document.getElementById('plantaoDataTitle');
+
         window.__plantaoDataFocoISO = null;
         setPlantaoEditorState(null);
         atualizarSabadoSelecionadoPlantao(null);
+
+        if (editorSubtitulo) {
+            editorSubtitulo.innerHTML = '';
+        }
+
+        if (editorTituloAoFechar) {
+            editorTituloAoFechar.innerText = 'Selecione uma data';
+        }
 
         if (editorContent) {
             editorContent.innerHTML = `
                 <div class="editor-empty">
                     <i class="fas fa-hand-pointer"></i>
-                    <p>Escolha um sabado para abrir o plantao, revisar a equipe e salvar sem duplicar o lancamento.</p>
+                    <p>Escolha uma data na regua ao lado para lancar ou editar o plantao.</p>
                 </div>
             `;
         }
