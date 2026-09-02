@@ -31,6 +31,85 @@
 }
 
 /* ===========================
+   ABAS DA TELA (Lancar | Lancados)
+   Mesmo desenho das abas de Relatorios, que por sua vez seguem as abas de
+   setor da Escala do Dia — a navegacao do sistema se le como uma coisa so.
+   (Esta e a terceira copia do padrao; extrair para components.css e a
+   limpeza natural, mas nao cabia nesta mudanca.)
+=========================== */
+.plantao-abas {
+    display: flex;
+    gap: var(--space-2);
+    flex-wrap: wrap;
+    margin-bottom: var(--space-4);
+}
+
+.plantao-aba {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: 9px var(--space-4);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-pill);
+    background: var(--card);
+    color: var(--text-light);
+    font: inherit;
+    font-size: var(--text-sm);
+    font-weight: var(--weight-semibold);
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.plantao-aba:hover {
+    color: var(--text);
+    border-color: var(--border-dark);
+}
+
+.plantao-aba:focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
+}
+
+.plantao-aba.is-ativa {
+    background: var(--primary);
+    border-color: var(--primary);
+    color: var(--accent-contrast);
+    box-shadow: var(--shadow-primary);
+}
+
+.plantao-aba i {
+    font-size: var(--text-sm);
+}
+
+.plantao-aba-contagem {
+    min-width: 20px;
+    padding: 1px 6px;
+    border-radius: var(--radius-pill);
+    background: var(--card-dark);
+    color: var(--text-light);
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+    text-align: center;
+}
+
+/* Na aba ativa o fundo e o acento: o contador precisa de um tom proprio
+   para nao sumir nem brigar com o branco do rotulo. */
+.plantao-aba.is-ativa .plantao-aba-contagem {
+    background: rgba(255, 255, 255, 0.22);
+    color: var(--accent-contrast);
+}
+
+/* Os dois paineis ficam no DOM; so o ativo aparece. Assim os handlers
+   existentes seguem achando seus campos por id. */
+.plantao-painel {
+    display: none;
+}
+
+.plantao-painel.is-ativo {
+    display: block;
+}
+
+/* ===========================
    LAYOUT
    Grid (e nao flex) para a regua nunca ser espremida pelo painel: a
    coluna do painel tem largura fixa e a da regua fica com o resto.
@@ -697,13 +776,29 @@
     gap: var(--space-3);
 }
 
+/* Faixa lateral de tipo, igual a dos cards da regua: sabado, domingo e
+   feriado se distinguem do mesmo jeito nas duas listas da tela. */
 .plantao-card {
+    position: relative;
     padding: var(--space-4);
+    padding-left: calc(var(--space-4) + 3px);
     background: var(--card-dark);
     border: 1px solid var(--border);
     border-radius: var(--radius-md);
+    overflow: hidden;
     transition: var(--transition);
 }
+
+.plantao-card::before {
+    content: "";
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 3px;
+    background: transparent;
+}
+
+.plantao-card--domingo::before { background: var(--plantao-domingo-forte); }
+.plantao-card--feriado::before { background: var(--plantao-feriado); }
 
 .plantao-card:hover {
     border-color: var(--primary);

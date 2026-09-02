@@ -3643,6 +3643,82 @@
         return construirSabadosVisiveisPlantao().some((item) => item.dataISO === dataISO);
     }
 
+    // ---- Abas da tela (Lancar | Lancados) --------------------------------
+    // Os dois paineis ficam no DOM o tempo todo (o inativo apenas oculto),
+    // como nas abas de Relatorios: assim os handlers existentes seguem
+    // achando seus campos por getElementById, sem nenhuma alteracao.
+    const PLANTAO_ABAS_VALIDAS = ['lancar', 'lancados'];
+
+    function getPlantaoAbaAtiva() {
+        return PLANTAO_ABAS_VALIDAS.includes(window.__plantaoAbaAtiva)
+            ? window.__plantaoAbaAtiva
+            : 'lancar';
+    }
+
+    // Guardado fora do DOM porque salvar e excluir refazem a pagina inteira:
+    // sem isso, apagar um registro pela lista jogava o usuario de volta para
+    // a aba Lancar a cada acao.
+    function selecionarAbaPlantao(chave) {
+        const alvo = PLANTAO_ABAS_VALIDAS.includes(chave) ? chave : 'lancar';
+        window.__plantaoAbaAtiva = alvo;
+
+        document.querySelectorAll('[data-plantao-aba]').forEach((aba) => {
+            const ativa = aba.dataset.plantaoAba === alvo;
+            aba.classList.toggle('is-ativa', ativa);
+            aba.setAttribute('aria-selected', ativa ? 'true' : 'false');
+            aba.setAttribute('tabindex', ativa ? '0' : '-1');
+        });
+
+        document.querySelectorAll('[data-plantao-painel]').forEach((painel) => {
+            painel.classList.toggle('is-ativo', painel.dataset.plantaoPainel === alvo);
+        });
+    }
+
+    function ativarAbasPlantao() {
+        const abas = Array.from(document.querySelectorAll('[data-plantao-aba]'));
+
+        if (abas.length === 0) {
+            return;
+        }
+
+        abas.forEach((aba) => {
+            aba.addEventListener('click', () => selecionarAbaPlantao(aba.dataset.plantaoAba));
+        });
+
+        // Setas navegam entre as abas, como manda o padrao de tablist.
+        document.getElementById('plantaoAbas')?.addEventListener('keydown', (event) => {
+            if (event.key !== 'ArrowRight' && event.key !== 'ArrowLeft') {
+                return;
+            }
+
+            const atual = abas.findIndex((aba) => aba.dataset.plantaoAba === getPlantaoAbaAtiva());
+            const passo = event.key === 'ArrowRight' ? 1 : -1;
+            const proxima = abas[(atual + passo + abas.length) % abas.length];
+
+            if (proxima) {
+                event.preventDefault();
+                selecionarAbaPlantao(proxima.dataset.plantaoAba);
+                proxima.focus();
+            }
+        });
+
+        selecionarAbaPlantao(getPlantaoAbaAtiva());
+    }
+
+    function contarPlantoesLancados() {
+        return (window.plantoesLancados || [])
+            .filter((plantao) => ehDataPlantaoValida(plantao.dataISO) || ['sabado', 'domingo', 'feriado'].includes(plantao.tipoPlantao))
+            .length;
+    }
+
+    function atualizarContagemAbaPlantao() {
+        const contador = document.getElementById('plantaoAbaContagem');
+
+        if (contador) {
+            contador.textContent = contarPlantoesLancados();
+        }
+    }
+
     function atualizarSabadoSelecionadoPlantao(dataISO) {
         document.querySelectorAll('[data-plantao-sabado]').forEach((element) => {
             const ativo = element.getAttribute('data-plantao-sabado') === dataISO;
@@ -3688,11 +3764,19 @@
         }
 
         container.innerHTML = renderPlantoesLancados();
+        atualizarContagemAbaPlantao();
     }
 
     window.renderPlantoesLancados = renderPlantoesLancados = function renderPlantoesLancadosAvancado() {
+            const vazio = (texto) => `
+                <div class="empty-msg">
+                    <i class="fas fa-calendar-plus"></i>
+                    <p>${texto}</p>
+                </div>
+            `;
+
             if (!window.plantoesLancados || window.plantoesLancados.length === 0) {
-                return '<div class="empty-state">Nenhum plantao lancado ainda</div>';
+                return vazio('Nenhum plantao lancado ainda. Use a aba Lancar para registrar o primeiro.');
             }
 
             const ordenados = [...window.plantoesLancados]
@@ -3700,11 +3784,11 @@
                 .sort((a, b) => new Date(b.dataISO) - new Date(a.dataISO));
 
             if (ordenados.length === 0) {
-                return '<div class="empty-state">Nenhum plantao de sabado lancado ainda</div>';
+                return vazio('Nenhum plantao lancado ainda. Use a aba Lancar para registrar o primeiro.');
             }
 
             return ordenados.map((plantao) => `
-                <div class="plantao-card">
+                <div class="plantao-card plantao-card--${plantao.tipoPlantao || 'sabado'}">
                     <div class="plantao-header">
                         <div>
                             <div class="plantao-data">${escapeHtml(formatarDataPtBr(plantao.dataISO))}</div>
@@ -3796,6 +3880,10 @@
         const focoExplicito = obterDataISO(window.__plantaoDataFocoISO || '');
         const dataFoco = focoExplicito || obterDataISO(getPlantaoEditorState()?.dataISO || '');
 
+        // Lido ANTES de qualquer coisa: a reabertura do editor no fim desta
+        // funcao chama selecionarAbaPlantao('lancar') e sobrescreveria o valor.
+        const abaEscolhida = getPlantaoAbaAtiva();
+
         definirAncoraSabadoPlantao(focoExplicito || obterAncoraSabadoPlantao());
 
         const sabados = construirSabadosVisiveisPlantao();
@@ -3808,6 +3896,17 @@
                 </div>
             </div>
 
+            <div class="plantao-abas" id="plantaoAbas" role="tablist" aria-label="Secoes de plantao">
+                <button type="button" class="plantao-aba is-ativa" data-plantao-aba="lancar" role="tab" aria-selected="true" aria-controls="painelPlantaoLancar">
+                    <i class="fas fa-calendar-plus"></i> Lancar
+                </button>
+                <button type="button" class="plantao-aba" data-plantao-aba="lancados" role="tab" aria-selected="false" aria-controls="painelPlantaoLancados">
+                    <i class="fas fa-list"></i> Lancados
+                    <span class="plantao-aba-contagem" id="plantaoAbaContagem">${contarPlantoesLancados()}</span>
+                </button>
+            </div>
+
+            <div class="plantao-painel" data-plantao-painel="lancar" id="painelPlantaoLancar" role="tabpanel">
             <div class="plantao-layout">
                 <div class="sabados-container">
                     <div class="sabados-header">
@@ -3854,18 +3953,24 @@
                 </div>
             </div>
 
-            <div class="plantoes-lancados-container">
-                <div class="plantoes-lancados-header">
-                    <div>
-                        <h3><i class="fas fa-list"></i> Plantoes lancados</h3>
-                        <p class="sabados-subtitle">Edite sabados anteriores diretamente por esta lista quando preferir.</p>
+            </div>
+
+            <div class="plantao-painel" data-plantao-painel="lancados" id="painelPlantaoLancados" role="tabpanel">
+                <div class="plantoes-lancados-container">
+                    <div class="plantoes-lancados-header">
+                        <div>
+                            <h3><i class="fas fa-list"></i> Plantoes lancados</h3>
+                            <p class="sabados-subtitle">Todos os registros ja salvos, do mais recente para o mais antigo. Editar abre a data na aba Lancar.</p>
+                        </div>
                     </div>
-                </div>
-                <div id="listaPlantoesLancados" class="plantoes-grid">
-                    ${renderPlantoesLancados()}
+                    <div id="listaPlantoesLancados" class="plantoes-grid">
+                        ${renderPlantoesLancados()}
+                    </div>
                 </div>
             </div>
         `;
+
+        ativarAbasPlantao();
 
         // Navegar e so mudar a janela de datas: nao fecha o painel aberto,
         // nao refaz a pagina e nao vai na rede.
@@ -3897,6 +4002,11 @@
 
         if (dataFoco) {
             await openPlantaoEditorFromGrid(dataFoco);
+
+            // Reabrir o editor faz parte de refazer a tela, nao e o usuario
+            // pedindo para ir a aba Lancar. Sem restaurar aqui, excluir um
+            // registro pela aba Lancados jogava de volta para a outra aba.
+            selecionarAbaPlantao(abaEscolhida);
         } else {
             const editorPanel = document.getElementById('plantaoEditor');
 
@@ -3924,6 +4034,11 @@
         }
 
         window.__plantaoDataFocoISO = dataISO;
+
+        // O editor vive dentro do painel "Lancar". Abrir um registro pela aba
+        // "Lancados" sem trocar de aba deixaria o painel montado porem oculto,
+        // e o clique em Editar nao pareceria fazer nada.
+        selecionarAbaPlantao('lancar');
 
         // Reancorar so quando a data esta FORA da janela visivel (caso de abrir
         // pela lista de plantoes lancados). Reancorar sempre fazia a regua
