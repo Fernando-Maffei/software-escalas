@@ -674,6 +674,143 @@
 }
 
 /* ===========================
+   LANCAMENTOS DO DIA
+   Uma linha por colaborador + horario. O dia pode ter varios turnos, e
+   quem divide o mesmo horario e agrupado so na gravacao.
+=========================== */
+.plantao-novo-lancamento {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+}
+
+.plantao-novo-horario {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+}
+
+.plantao-novo-horario input[type="time"] {
+    flex: 1 1 0;
+    min-width: 0;
+}
+
+.plantao-novo-horario span {
+    flex-shrink: 0;
+    font-size: var(--text-xs);
+    color: var(--text-light);
+}
+
+.plantao-add-btn {
+    flex-shrink: 0;
+    width: 42px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.plantao-lancamentos {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+    max-height: 240px;
+    overflow-y: auto;
+}
+
+.plantao-lancamento {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto auto;
+    align-items: center;
+    gap: var(--space-2);
+    padding: 6px var(--space-2);
+    background: var(--card-dark);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+}
+
+.plantao-lancamento.is-indisponivel {
+    border-style: dashed;
+    border-color: var(--danger);
+}
+
+.plantao-lancamento-hora {
+    font-size: var(--text-xs);
+    font-weight: var(--weight-semibold);
+    color: var(--plantao-sobre-soft);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.plantao-lancamento-nome {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    min-width: 0;
+    font-size: var(--text-xs);
+    color: var(--text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.plantao-lancamento-credito {
+    font-size: 11px;
+    color: var(--text-light);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.plantao-lancamentos-vazio {
+    margin: 0;
+    padding: var(--space-4);
+    text-align: center;
+    font-size: var(--text-xs);
+    color: var(--text-light);
+    background: var(--card-dark);
+    border: 1px dashed var(--border);
+    border-radius: var(--radius-sm);
+}
+
+.plantao-lancamentos-resumo {
+    margin: var(--space-2) 0 0;
+    font-size: 11px;
+    font-weight: var(--weight-semibold);
+    color: var(--plantao-sobre-soft);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+/* Turnos dentro do card da lista de lancados */
+.plantao-turnos {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+}
+
+.plantao-turno {
+    padding: var(--space-2);
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+}
+
+.plantao-turno-hora {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 6px;
+    font-size: var(--text-xs);
+    font-weight: var(--weight-semibold);
+    color: var(--primary);
+    font-variant-numeric: tabular-nums;
+}
+
+/* ===========================
    CHECKLIST DE COLABORADORES
 =========================== */
 .colaboradores-checklist {

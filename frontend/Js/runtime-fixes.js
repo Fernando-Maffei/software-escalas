@@ -2363,6 +2363,196 @@
         `;
     }
 
+    // ---- Lancamentos do dia ----------------------------------------------
+    // Cada linha da tela e UM colaborador com UM horario. Um dia pode ter
+    // varias. Quem compartilha horario e agrupado so na hora de gravar, no
+    // backend — aqui a linha por pessoa e o que deixa montar turnos
+    // diferentes (um das 08h as 13h, outro das 13h as 18h).
+    function lancamentosDoDiaPlantao(dataISO) {
+        const linhas = [];
+
+        (window.plantoesLancados || [])
+            .filter((item) => item.dataISO === dataISO)
+            .forEach((registro) => {
+                const horaInicio = formatarHoraInput(registro.horaInicio) || '';
+                const horaFim = formatarHoraInput(registro.horaFim) || '';
+
+                (registro.colaboradores || []).forEach((colaboradorId) => {
+                    linhas.push({
+                        colaboradorId: Number(colaboradorId),
+                        horaInicio,
+                        horaFim,
+                        observacao: registro.observacao || ''
+                    });
+                });
+            });
+
+        return ordenarLancamentosPlantao(linhas);
+    }
+
+    function ordenarLancamentosPlantao(linhas) {
+        return [...linhas].sort((a, b) => (
+            String(a.horaInicio).localeCompare(String(b.horaInicio))
+            || nomeColaboradorPlantao(a.colaboradorId).localeCompare(nomeColaboradorPlantao(b.colaboradorId))
+        ));
+    }
+
+    function nomeColaboradorPlantao(colaboradorId) {
+        const colaborador = (window.colaboradores || [])
+            .find((item) => Number(item.Id) === Number(colaboradorId));
+
+        return colaborador ? colaborador.Nome : 'Colaborador removido';
+    }
+
+    function minutosDoHorarioPlantao(hora) {
+        const [h, m] = String(hora || '').split(':').map(Number);
+        return Number.isFinite(h) && Number.isFinite(m) ? (h * 60) + m : null;
+    }
+
+    function duracaoLancamentoPlantao(linha) {
+        const inicio = minutosDoHorarioPlantao(linha.horaInicio);
+        const fim = minutosDoHorarioPlantao(linha.horaFim);
+
+        return inicio !== null && fim !== null && fim > inicio ? fim - inicio : null;
+    }
+
+    // Mesma regra do backend: ninguem em dois turnos que se sobrepoem.
+    function conflitoDeLancamentoPlantao(linhas, nova) {
+        const inicioNovo = minutosDoHorarioPlantao(nova.horaInicio);
+        const fimNovo = minutosDoHorarioPlantao(nova.horaFim);
+
+        return linhas.some((linha) => {
+            if (Number(linha.colaboradorId) !== Number(nova.colaboradorId)) {
+                return false;
+            }
+
+            const inicio = minutosDoHorarioPlantao(linha.horaInicio);
+            const fim = minutosDoHorarioPlantao(linha.horaFim);
+
+            return inicio < fimNovo && inicioNovo < fim;
+        });
+    }
+
+    window.adicionarLancamentoPlantao = function adicionarLancamentoPlantao() {
+        const state = getPlantaoEditorState();
+
+        if (!state) {
+            return;
+        }
+
+        const colaboradorId = Number(document.getElementById('plantaoNovoColaborador')?.value || 0);
+        const horaInicio = document.getElementById('plantaoNovoInicio')?.value || '';
+        const horaFim = document.getElementById('plantaoNovoFim')?.value || '';
+
+        if (!colaboradorId) {
+            mostrarToast('Escolha o colaborador.', 'error');
+            return;
+        }
+
+        if (!horaInicio || !horaFim) {
+            mostrarToast('Informe a hora inicial e a final.', 'error');
+            return;
+        }
+
+        if (horaFim <= horaInicio) {
+            mostrarToast('A hora final precisa ser maior que a inicial.', 'error');
+            return;
+        }
+
+        const nova = { colaboradorId, horaInicio, horaFim, observacao: '' };
+
+        if (conflitoDeLancamentoPlantao(state.lancamentos, nova)) {
+            mostrarToast(`${nomeColaboradorPlantao(colaboradorId)} ja tem um lancamento que cruza esse horario.`, 'error');
+            return;
+        }
+
+        state.lancamentos = ordenarLancamentosPlantao([...state.lancamentos, nova]);
+        renderPlantaoEditor(state);
+
+        // Mantem o horario para encadear varios colaboradores no mesmo turno.
+        const campoInicio = document.getElementById('plantaoNovoInicio');
+        const campoFim = document.getElementById('plantaoNovoFim');
+        const campoColaborador = document.getElementById('plantaoNovoColaborador');
+
+        if (campoInicio) { campoInicio.value = horaInicio; }
+        if (campoFim) { campoFim.value = horaFim; }
+        if (campoColaborador) { campoColaborador.focus(); }
+    };
+
+    window.removerLancamentoPlantao = function removerLancamentoPlantao(indice) {
+        const state = getPlantaoEditorState();
+
+        if (!state) {
+            return;
+        }
+
+        state.lancamentos = state.lancamentos.filter((_, posicao) => posicao !== Number(indice));
+        renderPlantaoEditor(state);
+    };
+
+    function renderLancamentosPlantao(state) {
+        if (state.lancamentos.length === 0) {
+            return '<p class="plantao-lancamentos-vazio">Nenhum lancamento ainda. Escolha o colaborador e o horario acima e clique em +.</p>';
+        }
+
+        const indisponiveis = new Set(
+            (state.disponibilidade || [])
+                .filter((item) => item.disponivel === false)
+                .map((item) => Number(item.id))
+        );
+
+        const linhas = state.lancamentos.map((linha, indice) => {
+            const minutos = duracaoLancamentoPlantao(linha);
+            const indisponivel = indisponiveis.has(Number(linha.colaboradorId));
+
+            return [
+                '<li class="plantao-lancamento' + (indisponivel ? ' is-indisponivel' : '') + '">',
+                '<span class="plantao-lancamento-hora">' + escapeHtml(linha.horaInicio) + ' - ' + escapeHtml(linha.horaFim) + '</span>',
+                '<span class="plantao-lancamento-nome">' + escapeHtml(nomeColaboradorPlantao(linha.colaboradorId)),
+                indisponivel ? '<small class="status-indisponivel">Indisponivel</small>' : '',
+                '</span>',
+                '<span class="plantao-lancamento-credito">' + (minutos ? escapeHtml(minutosParaTexto(minutos)) : '--') + '</span>',
+                '<button type="button" class="btn-icon-sm delete" title="Remover" onclick="removerLancamentoPlantao(' + indice + ')">',
+                '<i class="fas fa-times"></i>',
+                '</button>',
+                '</li>'
+            ].join('');
+        }).join('');
+
+        const totalMinutos = state.lancamentos
+            .reduce((soma, linha) => soma + (duracaoLancamentoPlantao(linha) || 0), 0);
+        const pessoas = new Set(state.lancamentos.map((linha) => Number(linha.colaboradorId))).size;
+
+        return [
+            '<ul class="plantao-lancamentos">' + linhas + '</ul>',
+            '<p class="plantao-lancamentos-resumo">',
+            '<i class="fas fa-wallet"></i> ' + state.lancamentos.length + ' lancamento(s), ' + pessoas + ' pessoa(s) \u00b7 ' + escapeHtml(minutosParaTexto(totalMinutos)) + ' de credito no total',
+            '</p>'
+        ].join('');
+    }
+
+    function renderOpcoesColaboradorPlantao(state) {
+        const indisponiveis = new Map(
+            (state.disponibilidade || [])
+                .filter((item) => item.disponivel === false)
+                .map((item) => [Number(item.id), item.motivoLabel || 'Indisponivel'])
+        );
+
+        const lista = filtrarChecklistPorMeusSetoresPlantao(
+            Array.isArray(window.colaboradores) ? window.colaboradores : [],
+            state.lancamentos.map((linha) => linha.colaboradorId)
+        );
+
+        return ['<option value="">Selecione o colaborador</option>'].concat(
+            lista.map((colaborador) => {
+                const motivo = indisponiveis.get(Number(colaborador.Id));
+                const rotulo = escapeHtml(colaborador.Nome) + (motivo ? ' (' + escapeHtml(motivo) + ')' : '');
+
+                return '<option value="' + colaborador.Id + '"' + (motivo ? ' disabled' : '') + '>' + rotulo + '</option>';
+            })
+        ).join('');
+    }
+
     function updatePlantaoSelectionSummary() {
         const contador = document.getElementById('plantaoSelecionadosCount');
         const credito = document.getElementById('plantaoCreditoPreview');
@@ -2452,86 +2642,75 @@
             `;
         }
 
-        editorContent.innerHTML = `
-            <div class="editor-plantao">
-                <div class="editor-form-grid">
-                    <div class="editor-form-group">
-                        <label><i class="fas fa-clock"></i> Horario do plantao</label>
-                        <div class="time-inputs plantao-time-inputs">
-                            <input type="time" id="plantaoHoraInicio" value="${escapeHtml(formatarHoraInput(state.horaInicio))}">
-                            <span>ate</span>
-                            <input type="time" id="plantaoHoraFim" value="${escapeHtml(formatarHoraInput(state.horaFim))}">
-                        </div>
-                        <small class="helper-text">Essas horas viram credito no banco de horas.</small>
-                    </div>
-                    <div class="editor-form-group">
-                        <label><i class="fas fa-wallet"></i> Credito gerado</label>
-                        <div class="plantao-bank-preview">
-                            <span id="plantaoCreditoPreview">Credito por colaborador: ${state.horaInicio && state.horaFim ? minutosParaTexto((((Number(state.horaFim.slice(0, 2)) * 60) + Number(state.horaFim.slice(3, 5))) - ((Number(state.horaInicio.slice(0, 2)) * 60) + Number(state.horaInicio.slice(3, 5))))) : 'informe o horario'}</span>
-                        </div>
-                    </div>
-                </div>
+        editorContent.innerHTML = [
+            '<div class="editor-plantao">',
 
-                <div class="editor-form-group">
-                    <label><i class="fas fa-users"></i> Selecione os colaboradores</label>
-                    <div class="colaboradores-checklist" id="checklistColaboradores">
-                        ${renderChecklistColaboradoresAvancado(state.selecionados, state.disponibilidade)}
-                    </div>
-                </div>
+            // Formulario de adicionar: colaborador + horario + botao "+".
+            '<div class="editor-form-group">',
+            '<label><i class="fas fa-user-plus"></i> Adicionar lancamento</label>',
+            '<div class="plantao-novo-lancamento">',
+            '<select id="plantaoNovoColaborador" class="form-control">' + renderOpcoesColaboradorPlantao(state) + '</select>',
+            '<div class="plantao-novo-horario">',
+            '<input type="time" id="plantaoNovoInicio" class="form-control" value="' + escapeHtml(state.ultimoInicio || '') + '" aria-label="Hora inicial">',
+            '<span>ate</span>',
+            '<input type="time" id="plantaoNovoFim" class="form-control" value="' + escapeHtml(state.ultimoFim || '') + '" aria-label="Hora final">',
+            '<button type="button" class="btn-primary plantao-add-btn" onclick="adicionarLancamentoPlantao()" title="Adicionar ao dia">',
+            '<i class="fas fa-plus"></i>',
+            '</button>',
+            '</div>',
+            '</div>',
+            '<small class="helper-text">Um colaborador por linha. Para um turno com varias pessoas, repita o mesmo horario.</small>',
+            '</div>',
 
-                <div class="editor-form-group">
-                    <label><i class="fas fa-align-left"></i> Observacao</label>
-                    <textarea id="plantaoObservacao" class="form-control" rows="2" placeholder="Detalhes opcionais para o plantao">${escapeHtml(state.observacao || '')}</textarea>
-                </div>
+            '<div class="editor-form-group">',
+            '<label><i class="fas fa-list-check"></i> Lancamentos do dia</label>',
+            renderLancamentosPlantao(state),
+            '</div>',
 
-                <div class="editor-actions">
-                    <button type="button" onclick="salvarPlantao('${state.dataISO}')" class="btn-primary">
-                        <i class="fas fa-save"></i> ${jaLancado ? 'Salvar alteracoes' : 'Lancar plantao'}
-                    </button>
-                    <button type="button" onclick="fecharPlantaoEditor()" class="btn-secondary">
-                        <i class="fas fa-times"></i> Cancelar
-                    </button>
-                    ${jaLancado ? `
-                        <button type="button" onclick="excluirPlantao('${state.dataISO}')" class="btn-danger-ghost" title="Excluir este plantao">
-                            <i class="fas fa-trash"></i> Excluir
-                        </button>
-                    ` : ''}
-                </div>
-            </div>
-        `;
+            '<div class="editor-form-group">',
+            '<label><i class="fas fa-align-left"></i> Observacao</label>',
+            '<textarea id="plantaoObservacao" class="form-control" rows="2" placeholder="Detalhes opcionais para o dia">' + escapeHtml(state.observacao || '') + '</textarea>',
+            '</div>',
 
-        editorContent.querySelectorAll('#checklistColaboradores input[type="checkbox"]').forEach((checkbox) => {
-            checkbox.addEventListener('change', updatePlantaoSelectionSummary);
-        });
+            '<div class="editor-actions">',
+            '<button type="button" onclick="salvarPlantao(\'' + state.dataISO + '\')" class="btn-primary">',
+            '<i class="fas fa-save"></i> ' + (jaLancado ? 'Salvar alteracoes' : 'Salvar dia'),
+            '</button>',
+            '<button type="button" onclick="fecharPlantaoEditor()" class="btn-secondary">',
+            '<i class="fas fa-times"></i> Cancelar',
+            '</button>',
+            jaLancado ? '<button type="button" onclick="excluirPlantao(\'' + state.dataISO + '\')" class="btn-danger-ghost" title="Excluir todos os lancamentos do dia"><i class="fas fa-trash"></i> Excluir dia</button>' : '',
+            '</div>',
+            '</div>'
+        ].join('');
 
-        const horaInicio = document.getElementById('plantaoHoraInicio');
-        const horaFim = document.getElementById('plantaoHoraFim');
+        // O horario digitado sobrevive ao redesenho da lista, para dar para
+        // encadear varios colaboradores no mesmo turno sem redigitar.
+        const novoInicio = document.getElementById('plantaoNovoInicio');
+        const novoFim = document.getElementById('plantaoNovoFim');
 
-        [horaInicio, horaFim].forEach((campo) => {
+        [novoInicio, novoFim].forEach((campo) => {
             campo?.addEventListener('input', () => {
-                updatePlantaoSelectionSummary();
+                const currentState = getPlantaoEditorState();
 
-                if (disponibilidadeTimer) {
-                    clearTimeout(disponibilidadeTimer);
+                if (!currentState) {
+                    return;
                 }
 
-                disponibilidadeTimer = setTimeout(async () => {
-                    const currentState = getPlantaoEditorState();
-
-                    if (!currentState) {
-                        return;
-                    }
-
-                    currentState.horaInicio = horaInicio?.value || null;
-                    currentState.horaFim = horaFim?.value || null;
-                    await carregarDisponibilidadePlantao(currentState);
-                    renderPlantaoEditor(currentState);
-                    updatePlantaoSelectionSummary();
-                }, 250);
+                currentState.ultimoInicio = novoInicio?.value || '';
+                currentState.ultimoFim = novoFim?.value || '';
             });
         });
 
-        updatePlantaoSelectionSummary();
+        // Enter no campo de hora adiciona, como o botao "+".
+        [novoInicio, novoFim, document.getElementById('plantaoNovoColaborador')].forEach((campo) => {
+            campo?.addEventListener('keydown', (event) => {
+                if (event.key === 'Enter') {
+                    event.preventDefault();
+                    window.adicionarLancamentoPlantao();
+                }
+            });
+        });
     }
 
     window.carregarBancoHorasResumo = carregarBancoHorasResumo = function carregarBancoHorasResumoComCache() {
@@ -3483,7 +3662,11 @@
             }
 
             const feriadoNome = tipo === 'feriado' ? feriadosMap.get(dataISO) : null;
-            const plantao = (window.plantoesLancados || []).find((item) => item.dataISO === dataISO) || null;
+
+            // O dia pode ter varios lancamentos: pegar so o primeiro faria o
+            // card mentir sobre horario e tamanho da equipe.
+            const registrosDoDia = (window.plantoesLancados || []).filter((item) => item.dataISO === dataISO);
+            const plantao = registrosDoDia[0] || null;
 
             datas.push({
                 dataISO,
@@ -3492,7 +3675,12 @@
                 mes: formatarMesPlantaoCard(dataISO),
                 ano: data.getFullYear(),
                 plantao,
-                temPlantao: Boolean(plantao),
+                registrosDoDia,
+                totalLancamentos: registrosDoDia.length,
+                totalPessoas: new Set(
+                    registrosDoDia.flatMap((item) => (item.colaboradores || []).map(Number))
+                ).size,
+                temPlantao: registrosDoDia.length > 0,
                 isPast: dataISO < hojeISO,
                 isToday: dataISO === hojeISO,
                 isActive: dataFoco === dataISO,
@@ -3540,12 +3728,20 @@
             return 'Clique para lancar';
         }
 
+        const pessoas = sabado.totalPessoas || 0;
+        const sufixoPessoas = `${pessoas} ${pessoas === 1 ? 'pessoa' : 'pessoas'}`;
+
+        // Mais de um turno: mostrar o horario de um so enganaria, entao o card
+        // diz quantos sao e o painel detalha.
+        if ((sabado.totalLancamentos || 0) > 1) {
+            return `${sabado.totalLancamentos} turnos &middot; ${sufixoPessoas}`;
+        }
+
         const inicio = formatarHoraInput(sabado.plantao.horaInicio);
         const fim = formatarHoraInput(sabado.plantao.horaFim);
-        const equipe = (sabado.plantao.colaboradores || []).length;
         const horario = inicio && fim ? `${inicio}-${fim}` : 'Horario pendente';
 
-        return `${escapeHtml(horario)} &middot; ${equipe} ${equipe === 1 ? 'pessoa' : 'pessoas'}`;
+        return `${escapeHtml(horario)} &middot; ${sufixoPessoas}`;
     }
 
     function renderCardSabadoPlantao(sabado) {
@@ -3944,6 +4140,29 @@
         return typeof window.__plantaoFiltroBusca === 'string' ? window.__plantaoFiltroBusca : '';
     }
 
+    function agruparPlantoesPorDia(registros) {
+        const porDia = new Map();
+
+        registros.forEach((registro) => {
+            const atual = porDia.get(registro.dataISO);
+
+            if (atual) {
+                atual.turnos.push(registro);
+                return;
+            }
+
+            porDia.set(registro.dataISO, { ...registro, turnos: [registro] });
+        });
+
+        return [...porDia.values()].map((dia) => ({
+            ...dia,
+            turnos: [...dia.turnos].sort((a, b) => (
+                String(formatarHoraInput(a.horaInicio) || '').localeCompare(String(formatarHoraInput(b.horaInicio) || ''))
+            )),
+            colaboradores: [...new Set(dia.turnos.flatMap((item) => (item.colaboradores || []).map(Number)))]
+        }));
+    }
+
     function listarPlantoesLancadosOrdenados() {
         return [...(window.plantoesLancados || [])]
             .filter((plantao) => ehDataPlantaoValida(plantao.dataISO) || ['sabado', 'domingo', 'feriado'].includes(plantao.tipoPlantao))
@@ -4042,7 +4261,9 @@
                 </div>
             `;
 
-            const ordenados = listarPlantoesLancadosOrdenados();
+            // Um dia com dois turnos virava dois cards com a mesma data. Agrupa
+            // por data e detalha os turnos dentro do card.
+            const ordenados = agruparPlantoesPorDia(listarPlantoesLancadosOrdenados());
 
             if (ordenados.length === 0) {
                 return vazio('Nenhum plantao lancado ainda. Use a aba Lancar para registrar o primeiro.', false);
@@ -4082,9 +4303,14 @@
                         </div>
                     </div>
                     ${plantao.observacao ? `<p class="plantao-observacao">${escapeHtml(plantao.observacao)}</p>` : ''}
-                    <div class="plantao-colaboradores">
-                        ${renderColaboradoresPlantao(plantao.colaboradores)}
-                    </div>
+                    ${(plantao.turnos || []).length > 1
+                        ? `<div class="plantao-turnos">${plantao.turnos.map((turno) => `
+                            <div class="plantao-turno">
+                                <span class="plantao-turno-hora"><i class="fas fa-clock"></i> ${escapeHtml(formatarHoraInput(turno.horaInicio) || '--:--')} - ${escapeHtml(formatarHoraInput(turno.horaFim) || '--:--')}</span>
+                                <div class="plantao-colaboradores">${renderColaboradoresPlantao(turno.colaboradores)}</div>
+                            </div>
+                        `).join('')}</div>`
+                        : `<div class="plantao-colaboradores">${renderColaboradoresPlantao(plantao.colaboradores)}</div>`}
                 </div>
             `).join('');
         };
@@ -4360,6 +4586,9 @@
             dataISO,
             dataFormatada,
             tipoPlantao: resolverTipoPlantaoFront(dataISO) || 'sabado',
+            lancamentos: lancamentosDoDiaPlantao(dataISO),
+            ultimoInicio: '',
+            ultimoFim: '',
             horaInicio: existente?.horaInicio ? formatarHoraInput(existente.horaInicio) : '',
             horaFim: existente?.horaFim ? formatarHoraInput(existente.horaFim) : '',
             observacao: existente?.observacao || '',
@@ -4414,25 +4643,13 @@
     };
 
     window.salvarPlantao = salvarPlantao = async function salvarPlantaoAvancado(dataISO) {
+        const state = getPlantaoEditorState();
         const tipoPlantao = resolverTipoPlantaoFront(dataISO) || 'sabado';
-        const horaInicio = document.getElementById('plantaoHoraInicio')?.value;
-        const horaFim = document.getElementById('plantaoHoraFim')?.value;
         const observacao = document.getElementById('plantaoObservacao')?.value || '';
-        const selecionados = Array.from(document.querySelectorAll('#checklistColaboradores input:checked'))
-            .map((checkbox) => Number(checkbox.value));
+        const lancamentos = state?.dataISO === dataISO ? (state.lancamentos || []) : [];
 
-        if (!horaInicio || !horaFim) {
-            mostrarToast('Informe a hora inicial e final do plantao.', 'error');
-            return;
-        }
-
-        if (horaFim <= horaInicio) {
-            mostrarToast('A hora final precisa ser maior que a hora inicial.', 'error');
-            return;
-        }
-
-        if (selecionados.length === 0) {
-            mostrarToast('Selecione pelo menos um colaborador disponivel.', 'error');
+        if (lancamentos.length === 0) {
+            mostrarToast('Adicione pelo menos um lancamento antes de salvar o dia.', 'error');
             return;
         }
 
@@ -4443,18 +4660,24 @@
 
         try {
             window.__plantaoDataFocoISO = dataISO;
+
+            // O dia inteiro vai de uma vez: o backend substitui o que existir
+            // naquela data, o que mantem o banco de horas sem credito orfao.
             await window.API.salvarPlantao({
                 dataISO,
                 tipoPlantao,
-                horaInicio,
-                horaFim,
                 observacao,
-                colaboradores: selecionados
+                lancamentos: lancamentos.map((linha) => ({
+                    horaInicio: linha.horaInicio,
+                    horaFim: linha.horaFim,
+                    colaboradores: [Number(linha.colaboradorId)],
+                    observacao
+                }))
             });
 
             await atualizarTudo({ silent: true, source: 'plantao' });
 
-            mostrarToast('Plantao salvo com sucesso!', 'success');
+            mostrarToast(`Dia salvo com ${lancamentos.length} lancamento(s).`, 'success');
         } catch (error) {
             mostrarToast(`Erro ao salvar plantao: ${error.message}`, 'error');
         }
