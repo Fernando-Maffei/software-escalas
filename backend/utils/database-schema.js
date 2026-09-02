@@ -33,7 +33,9 @@ const SCHEMA_SCRIPT_PATHS = Object.freeze([
     path.join(__dirname, '..', '..', 'database', 'migrations', '2026-08-12-usuarios-setores-permitidos.sql'),
     path.join(__dirname, '..', '..', 'database', 'migrations', '2026-08-26-sessoes.sql'),
     path.join(__dirname, '..', '..', 'database', 'migrations', '2026-08-27-banco-horas-semanal.sql'),
-    path.join(__dirname, '..', '..', 'database', 'migrations', '2026-08-28-colaborador-desligamento.sql')
+    path.join(__dirname, '..', '..', 'database', 'migrations', '2026-08-28-colaborador-desligamento.sql'),
+    path.join(__dirname, '..', '..', 'database', 'migrations', '2026-09-02-plantao-tipo-feriado.sql'),
+    path.join(__dirname, '..', '..', 'database', 'migrations', '2026-09-02-feriados-abrangencia.sql')
 ]);
 
 const EXAMPLE_SEED_SCRIPT_PATH = path.join(__dirname, '..', '..', 'database', 'seeds', 'dados-exemplo.sql');

@@ -580,6 +580,7 @@
             merged.set(key, {
                 dataISO,
                 nome: item.Nome || item.nome || 'Feriado',
+                tipo: item.Tipo || item.tipo || 'municipal',
                 origem: 'local'
             });
         });
@@ -740,9 +741,13 @@
             }
 
             const nome = String(item?.nome || item?.Nome || 'Feriado').trim() || 'Feriado';
+            // A abrangencia vem da tabela (Tipo). Feriado que so a BrasilAPI
+            // conhece e nacional por definicao.
+            const tipoBruto = String(item?.tipo || item?.Tipo || (item?.origem === 'nacional' ? 'nacional' : '')).trim().toLowerCase();
+            const tipo = ['nacional', 'estadual', 'municipal'].includes(tipoBruto) ? tipoBruto : 'municipal';
 
             if (!map.has(dataISO)) {
-                map.set(dataISO, nome);
+                map.set(dataISO, { nome, tipo });
             }
         });
 
@@ -753,14 +758,12 @@
         return Array.isArray(day?.rows) && day.rows.length > 0;
     }
 
-    function shouldIncludeSundayInMonthlyExport(snapshot) {
-        const groups = Array.isArray(snapshot?.setorGroups) && snapshot.setorGroups.length > 0
-            ? snapshot.setorGroups
-            : [{ calendarWeeks: Array.isArray(snapshot?.calendarWeeks) ? snapshot.calendarWeeks : [] }];
-
-        return groups.some((group) => (
-            (Array.isArray(group.calendarWeeks) ? group.calendarWeeks : []).some((week) => hasEscalaExportRows(week?.[6]))
-        ));
+    // O quadro mostra SEMPRE os sete dias. Antes o domingo so entrava se
+    // alguem tivesse escala nele, e um setor que nao trabalha no fim de semana
+    // recebia uma folha de seis colunas, terminando no sabado — o leitor nao
+    // conseguia distinguir "domingo vazio" de "domingo fora do relatorio".
+    function shouldIncludeSundayInMonthlyExport() {
+        return true;
     }
 
     function getEscalaExportWeekSlots(week, includeSunday) {
@@ -790,16 +793,13 @@
         return '';
     }
 
+    // Quantas linhas cabem no dia mais cheio de uma folha com N linhas de
+    // semana. Menos semanas na folha = mais altura para cada dia. Os valores
+    // sao calibrados por medicao: renderizando a folha e verificando quando
+    // .escala-sheet-day (que tem overflow: hidden) comeca a cortar conteudo.
     function getMonthlyEscalaOnePageMaxRows(weekCount) {
-        if (weekCount >= 6) {
-            return 9;
-        }
-
-        if (weekCount >= 5) {
-            return 14;
-        }
-
-        return 18;
+        const CAPACIDADE_POR_SEMANAS = { 1: 70, 2: 38, 3: 25, 4: 18, 5: 14, 6: 13 };
+        return CAPACIDADE_POR_SEMANAS[Math.min(6, Math.max(1, Number(weekCount) || 1))];
     }
 
     function shouldShowEscalaSheetLunchColumn(day, weekDayIndex) {
@@ -828,18 +828,28 @@
             return '<article class="escala-sheet-day is-placeholder" aria-hidden="true"></article>';
         }
 
-        const holidayLabel = options.holidayMap?.get(day.dataISO);
+        const feriado = options.holidayMap?.get(day.dataISO) || null;
         const weekDayIndex = Number(options.weekDayIndex) || 0;
         const includeLunch = shouldShowEscalaSheetLunchColumn(day, weekDayIndex);
         const columnCount = includeLunch ? 3 : 2;
         const rows = Array.isArray(day.rows) ? day.rows : [];
         const hasRows = day.hasScale && rows.length > 0;
-        const emptyLabel = holidayLabel ? 'FERIADO' : 'Sem escala';
-        const titleAttribute = holidayLabel ? ` title="${escapeHtmlEscala(holidayLabel)}"` : '';
+        const emptyLabel = feriado ? 'Feriado, ninguem escalado' : 'Sem escala';
+        const titleAttribute = feriado ? ` title="${escapeHtmlEscala(feriado.nome)}"` : '';
+
+        // O nome do feriado so existia num atributo title — invisivel no PDF,
+        // que e onde o relatorio e lido. E a marcacao so aparecia quando o dia
+        // estava vazio: feriado COM plantao lancado nao se distinguia de um dia
+        // util qualquer. Agora a faixa aparece nos dois casos, com a
+        // abrangencia, e quem trabalha continua listado logo abaixo.
+        const faixaFeriado = feriado
+            ? `<div class="escala-sheet-day-feriado"><span>${escapeHtmlEscala(feriado.tipo)}</span>${escapeHtmlEscala(feriado.nome)}</div>`
+            : '';
 
         return `
-            <article class="escala-sheet-day${hasRows ? '' : ' is-empty'}${holidayLabel ? ' is-holiday' : ''}">
+            <article class="escala-sheet-day${hasRows ? '' : ' is-empty'}${feriado ? ' is-holiday' : ''}">
                 <div class="escala-sheet-day-date"${titleAttribute}>${escapeHtmlEscala(day.dateLabel || '--')}</div>
+                ${faixaFeriado}
                 <table class="escala-sheet-table">
                     <colgroup>
                         ${includeLunch
@@ -966,6 +976,108 @@
         };
     }
 
+    function dividirSemanasEmBlocos(weeks, quantidadeDePaginas) {
+        const porPagina = Math.ceil(weeks.length / quantidadeDePaginas);
+        const blocos = [];
+
+        for (let inicio = 0; inicio < weeks.length; inicio += porPagina) {
+            blocos.push(weeks.slice(inicio, inicio + porPagina));
+        }
+
+        return blocos;
+    }
+
+    // Retorna a primeira divisao (1 folha, depois 2, depois 3...) em que todo
+    // bloco cabe na altura da pagina, ou null se nem uma semana isolada couber.
+    // Importante caber: .escala-export-month-page tem altura fixa e
+    // overflow: hidden, entao o que passa nao "vaza" — some do PDF.
+    // Um mes inteiro numa folha so cabe espremendo tudo na menor fonte (8px).
+    // Com no maximo tres semanas por folha o mes normal sai em duas, e sobra
+    // altura para a folha subir de fonte no ajuste que roda depois.
+    const MAX_SEMANAS_POR_FOLHA = 3;
+
+    function escolherBlocosDeSemanasPlantao(weeks, includeSunday) {
+        const minimoDePaginas = Math.max(1, Math.ceil(weeks.length / MAX_SEMANAS_POR_FOLHA));
+
+        for (let paginas = minimoDePaginas; paginas <= weeks.length; paginas += 1) {
+            const blocos = dividirSemanasEmBlocos(weeks, paginas);
+            const cabe = blocos.every((bloco) => (
+                getEscalaExportEntryMaxRows(bloco, includeSunday) <= getMonthlyEscalaOnePageMaxRows(bloco.length)
+            ));
+
+            if (cabe) {
+                return blocos;
+            }
+        }
+
+        return null;
+    }
+
+    // Sobra vertical de uma folha ja renderizada: distancia entre a base da
+    // celula de dia mais baixa e o fim da area util da pagina. Negativo = o
+    // conteudo passou do fim e sera CORTADO (a pagina tem overflow: hidden).
+    function medirSobraDaFolhaEscala(pagina) {
+        const celulas = [...pagina.querySelectorAll('.escala-sheet-day:not(.is-placeholder)')];
+
+        if (celulas.length === 0) {
+            return 0;
+        }
+
+        const retangulo = pagina.getBoundingClientRect();
+        const recuoInferior = parseFloat(getComputedStyle(pagina).paddingBottom) || 0;
+        const limite = retangulo.bottom - recuoInferior;
+        const maisBaixa = Math.max(...celulas.map((celula) => celula.getBoundingClientRect().bottom));
+
+        return limite - maisBaixa;
+    }
+
+    // As faixas fixas de densidade (>= 9 linhas vira densa, >= 13 vira
+    // ultra-densa) erravam por uma linha em varios pontos: com 12 pessoas num
+    // mes de 5 semanas, ou 8 num de 6, a folha estourava e o PDF saia com
+    // linhas faltando, sem nenhum aviso. Em vez de calibrar faixa por faixa —
+    // que muda com o tamanho dos nomes e com a coluna de almoco — a folha ja
+    // montada e medida aqui e vai ficando mais compacta ate caber.
+    window.ajustarDensidadeFolhasEscala = function ajustarDensidadeFolhasEscala(container) {
+        // Da fonte maior para a menor: 11px, 9.5px, 8px.
+        const NIVEIS = ['', 'is-dense', 'is-ultra-dense'];
+        const folhas = [...(container?.querySelectorAll('.escala-export-month-page') || [])];
+        let folhasEstouradas = 0;
+
+        const aplicar = (folha, nivel) => {
+            NIVEIS.filter(Boolean).forEach((classe) => folha.classList.remove(classe));
+
+            if (nivel) {
+                folha.classList.add(nivel);
+            }
+        };
+
+        // Testa da MAIOR fonte para a menor e fica na primeira que couber.
+        // Antes so encolhia a partir da classe que o gerador tinha escolhido
+        // por faixa de linhas — uma folha com espaco de sobra continuava na
+        // fonte miuda, sem motivo nenhum.
+        const nivelNecessario = folhas.map((folha) => {
+            const indice = NIVEIS.findIndex((nivel) => {
+                aplicar(folha, nivel);
+                return medirSobraDaFolhaEscala(folha) >= 0;
+            });
+
+            if (indice === -1) {
+                folhasEstouradas += 1;
+                return NIVEIS.length - 1;
+            }
+
+            return indice;
+        });
+
+        // Uma unica densidade para o relatorio inteiro: folhas com tamanhos de
+        // letra diferentes, no mesmo documento impresso, parecem defeito. Vale
+        // a menor fonte exigida por alguma folha.
+        const nivelComum = NIVEIS[Math.max(0, ...nivelNecessario)];
+        folhas.forEach((folha) => aplicar(folha, nivelComum));
+
+        return { folhas: folhas.length, folhasEstouradas, densidade: nivelComum || 'normal' };
+    };
+
     function buildMonthlyEscalaExportPageEntries(snapshot) {
         const compactWeekMaxRows = 12;
         const maxRowsPerWeekDay = 22;
@@ -981,19 +1093,45 @@
             const weeks = Array.isArray(sector.calendarWeeks) && sector.calendarWeeks.length > 0
                 ? sector.calendarWeeks
                 : [Array(7).fill(null)];
-            const monthMaxRows = getEscalaExportEntryMaxRows(weeks, includeSunday);
-            const onePageMaxRows = getMonthlyEscalaOnePageMaxRows(weeks.length);
+            // O atalho que jogava o mes todo numa folha saiu: ele passava por
+            // cima do teto de semanas por folha e era justamente o que deixava
+            // o quadro miudo demais para ler.
 
-            if (monthMaxRows <= onePageMaxRows) {
-                return [{
-                    sector,
-                    weeks,
-                    kind: 'month',
-                    includeSunday,
-                    label: 'Mes completo'
-                }];
+            // Nao cabendo tudo em uma folha, procura o MENOR numero de folhas em
+            // que todas as semanas cabem, dividindo o mes em blocos iguais.
+            // Antes o codigo pulava direto para "uma semana por pagina", e so
+            // emparelhava duas se ambas tivessem <= 12 linhas — o que nunca
+            // acontece justamente nos meses cheios. Dai um setor de 15 pessoas
+            // sair em 5 folhas, e um mes de 6 semanas sair em 3 mesmo com 11.
+            // Menos semanas por folha = mais altura para cada dia, entao a
+            // divisao ganha capacidade sem precisar encolher a fonte.
+            const blocosPorPagina = escolherBlocosDeSemanasPlantao(weeks, includeSunday);
+
+            if (blocosPorPagina) {
+                return blocosPorPagina.map((bloco, indice) => {
+                    const inicio = blocosPorPagina
+                        .slice(0, indice)
+                        .reduce((total, anterior) => total + anterior.length, 0);
+                    const fim = inicio + bloco.length - 1;
+
+                    return {
+                        sector,
+                        weeks: bloco,
+                        kind: bloco.length > 1 ? 'weeks' : 'week',
+                        weekIndex: inicio,
+                        endWeekIndex: fim,
+                        includeSunday,
+                        label: bloco.length === weeks.length
+                            ? 'Mes completo'
+                            : (bloco.length > 1
+                                ? `Semanas ${inicio + 1}-${fim + 1}`
+                                : `Semana ${inicio + 1}`)
+                    };
+                });
             }
 
+            // Nenhuma divisao resolve: ha um dia com mais linhas do que cabe
+            // numa folha inteira. Ai sim a semana e fatiada em partes.
             const entries = [];
             let weekIndex = 0;
 
@@ -1358,9 +1496,47 @@
                     }
                     .escala-sheet-day.is-holiday .escala-sheet-empty {
                         color: #000000 !important;
-                        font-size: 16px !important;
+                        font-size: 13px !important;
                         font-style: normal;
                         letter-spacing: 0;
+                    }
+                    /* Faixa de feriado: ambar, para nao competir com o azul da
+                       escala e ainda assim saltar numa folha impressa. */
+                    .escala-sheet-day-feriado {
+                        display: flex;
+                        align-items: center;
+                        gap: 4px;
+                        padding: 2px 4px;
+                        background: #fde68a;
+                        border-bottom: 1px solid #b45309;
+                        color: #78350f;
+                        font-size: 9px;
+                        font-weight: 700;
+                        line-height: 1.15;
+                        overflow: hidden;
+                        white-space: nowrap;
+                        text-overflow: ellipsis;
+                    }
+                    .escala-sheet-day-feriado span {
+                        flex-shrink: 0;
+                        padding: 0 3px;
+                        background: #b45309;
+                        color: #ffffff;
+                        border-radius: 2px;
+                        font-size: 7px;
+                        text-transform: uppercase;
+                        letter-spacing: .04em;
+                    }
+                    .escala-export-month-page.is-dense .escala-sheet-day-feriado {
+                        font-size: 8px;
+                        padding: 1px 3px;
+                    }
+                    .escala-export-month-page.is-ultra-dense .escala-sheet-day-feriado {
+                        font-size: 7px;
+                        padding: 1px 3px;
+                    }
+                    .escala-export-month-page.is-ultra-dense .escala-sheet-day-feriado span {
+                        font-size: 6px;
                     }
                     .escala-export-month-page.is-dense .escala-sheet-title {
                         font-size: 36px;
@@ -1808,6 +1984,18 @@
                 width: isMonthlyExport ? 1700 : 1480
             });
             await window.aguardarLayoutRelatorioPdf();
+
+            // Com a folha ja montada e medida, e o unico momento em que da para
+            // saber se o conteudo realmente coube na altura da pagina.
+            if (isMonthlyExport && typeof window.ajustarDensidadeFolhasEscala === 'function') {
+                const ajuste = window.ajustarDensidadeFolhasEscala(container);
+
+                if (ajuste.folhasEstouradas > 0) {
+                    console.warn('[relatorio-escala] ' + ajuste.folhasEstouradas + ' de ' + ajuste.folhas + ' folha(s) nao couberam nem na densidade maxima; o PDF pode sair com linhas cortadas.');
+                }
+
+                await window.aguardarLayoutRelatorioPdf();
+            }
 
             const canvas = await window.renderizarPaginaPdfEmCanvas(container, {
                 minWidth: isMonthlyExport ? 1700 : 1800,

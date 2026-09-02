@@ -10,6 +10,7 @@ const {
     resolveDefaultDescontaBancoHoras
 } = require('../utils/bancoHoras');
 const { getBancoHorasCapabilities, getSchemaInfo, hasTable } = require('../utils/schema');
+const { criarIndiceFeriados } = require('../utils/dias');
 const {
     restoreEscalaDefaultsForPeriod,
     syncAusenciaToEscalaDia
@@ -202,6 +203,24 @@ async function deleteAusenciaMovement(poolOrTx, ausenciaId) {
         `);
 }
 
+// Feriados dentro do periodo da ausencia. A tabela Feriados e a unica
+// autoridade: nacional, estadual e municipal contam igual.
+async function carregarFeriadosDaAusencia(poolOrTx, ausencia) {
+    const inicio = extractDateString(ausencia.dataInicio || ausencia.DataInicio);
+    const fim = extractDateString(ausencia.dataFim || ausencia.DataFim);
+
+    if (!inicio || !fim) {
+        return null;
+    }
+
+    const result = await poolOrTx.request()
+        .input('inicio', sql.Date, inicio)
+        .input('fim', sql.Date, fim)
+        .query('SELECT Nome, Data, Tipo FROM Feriados WHERE Data BETWEEN @inicio AND @fim');
+
+    return criarIndiceFeriados(result.recordset);
+}
+
 async function syncAusenciaMovement(poolOrTx, schema, ausencia, colaborador) {
     const capabilities = getBancoHorasCapabilities(schema);
 
@@ -211,7 +230,11 @@ async function syncAusenciaMovement(poolOrTx, schema, ausencia, colaborador) {
 
     await deleteAusenciaMovement(poolOrTx, ausencia.Id);
 
-    const minutosDebito = calculateAusenciaDebitMinutes(ausencia, colaborador);
+    // Feriado dentro de uma ausencia nao debita: e um dia que ninguem
+    // trabalharia. Sem isso, ferias que cobrem um feriado tiravam do banco de
+    // horas uma jornada que nunca existiu.
+    const feriados = await carregarFeriadosDaAusencia(poolOrTx, ausencia);
+    const minutosDebito = calculateAusenciaDebitMinutes(ausencia, colaborador, { feriados });
 
     if (minutosDebito <= 0) {
         return { synced: false, skippedReason: 'no_debit' };

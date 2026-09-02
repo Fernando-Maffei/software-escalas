@@ -26,6 +26,8 @@ const {
     toSqlTime
 } = require('../utils/validation');
 const {
+    agruparLancamentosPorHorario,
+    buildPlantaoDiaPayload,
     generateUpcomingSaturdays,
     normalizeColaboradores,
     normalizePlantaoType,
@@ -149,6 +151,23 @@ function buildPlantaoPayload(body, fallback = {}, feriados = null) {
         observacao,
         duracaoMinutos
     };
+}
+
+// O dia pode ter MAIS DE UM lancamento (turnos diferentes, com pessoas e
+// horarios diferentes), entao a busca por data devolve lista. findPlantaoByDate
+// continua existindo para os pontos que so precisam saber se o dia tem algo.
+async function findPlantoesByDate(poolOrTx, dataISO, schema) {
+    const result = await poolOrTx.request()
+        .input('data_plantao', sql.Date, dataISO)
+        .query(`
+            SELECT
+                ${buildPlantaoSelect(schema)}
+            FROM plantoes
+            WHERE data_plantao = @data_plantao
+            ORDER BY hora_inicio, id
+        `);
+
+    return result.recordset;
 }
 
 function buildDisponibilidadeSelect(schema) {
@@ -365,83 +384,75 @@ router.get('/:dataISO', async (req, res) => {
     const schema = await getSchemaInfo(pool);
     const dataISO = normalizeIsoDate(req.params.dataISO, 'Data do plantao');
     resolvePlantaoTypeByDate(dataISO, await loadFeriadosSet(pool));
-    const plantao = await findPlantaoByDate(pool, dataISO, schema);
+    const plantoes = await findPlantoesByDate(pool, dataISO, schema);
 
-    if (!plantao) {
+    if (plantoes.length === 0) {
         throw new AppError(404, 'Plantao nao encontrado.');
     }
 
-    const serialized = serializePlantaoRecord(plantao);
+    const lancamentos = plantoes.map((plantao) => {
+        const serialized = serializePlantaoRecord(plantao);
 
-    if (!serialized.duracaoFormatada && serialized.horaInicio && serialized.horaFim) {
-        serialized.duracaoMinutos = calculateIntervalMinutes(serialized.horaInicio, serialized.horaFim);
-        serialized.duracaoFormatada = minutesToDurationLabel(serialized.duracaoMinutos);
-    }
+        if (!serialized.duracaoFormatada && serialized.horaInicio && serialized.horaFim) {
+            serialized.duracaoMinutos = calculateIntervalMinutes(serialized.horaInicio, serialized.horaFim);
+            serialized.duracaoFormatada = minutesToDurationLabel(serialized.duracaoMinutos);
+        }
 
-    res.json(serialized);
+        return serialized;
+    });
+
+    // O corpo continua sendo o primeiro lancamento, para nao quebrar quem ja
+    // consumia esta rota esperando um objeto; a lista completa vem em
+    // "lancamentos".
+    res.json({ ...lancamentos[0], total: lancamentos.length, lancamentos });
 });
 
+// Salva o DIA inteiro: recebe a lista de lancamentos e substitui o que houver
+// naquela data. E o contrato que a tela usa ("adiciona varios e salva o dia"),
+// e tambem o que mantem o banco de horas coerente — apagar e regravar num so
+// lugar evita credito orfao de um turno que deixou de existir.
 router.post('/', async (req, res) => {
     const pool = await conectar();
     const schema = await getSchemaInfo(pool);
     const feriados = await loadFeriadosSet(pool);
-    const payload = buildPlantaoPayload(req.body, {}, feriados);
-
-    if (payload.colaboradores.length === 0) {
-        throw new AppError(400, 'Selecione pelo menos um colaborador para o plantao.');
-    }
+    const payload = buildPlantaoDiaPayload(req.body, feriados);
+    const capabilities = getBancoHorasCapabilities(schema);
 
     const result = await withTransaction(sql, pool, async (tx) => {
-        await ensureColaboradoresExist(tx, payload.colaboradores);
-        await assertColaboradoresDisponiveis(tx, schema, payload);
+        for (const lancamento of payload.lancamentos) {
+            await ensureColaboradoresExist(tx, lancamento.colaboradores);
+            await assertColaboradoresDisponiveis(tx, schema, {
+                dataISO: payload.dataISO,
+                horaInicio: lancamento.horaInicio,
+                horaFim: lancamento.horaFim,
+                colaboradores: lancamento.colaboradores
+            });
+        }
 
-        const existing = await findPlantaoByDate(tx, payload.dataISO, schema);
-        const capabilities = getBancoHorasCapabilities(schema);
-        let saved;
-        let action;
+        const anteriores = await findPlantoesByDate(tx, payload.dataISO, schema);
+        const existia = anteriores.length > 0;
 
-        if (existing) {
-            action = 'updated';
-
-            const setParts = [
-                'colaboradores_ids = @colaboradores_ids',
-                'atualizado_em = GETDATE()'
-            ];
-
-            if (capabilities.hasPlantaoHoraInicio) {
-                setParts.push('hora_inicio = @horaInicio');
+        for (const anterior of anteriores) {
+            if (capabilities.hasMovimentosTable) {
+                await deletePlantaoMovements(tx, anterior.id);
             }
 
-            if (capabilities.hasPlantaoHoraFim) {
-                setParts.push('hora_fim = @horaFim');
+            if (hasTable(schema, 'escala_dia')) {
+                await deleteEscalaDiaByOrigin(tx, 'plantao', anterior.id);
             }
+        }
 
-            if (capabilities.hasPlantaoObservacao) {
-                setParts.push('observacao = @observacao');
-            }
+        await tx.request()
+            .input('data_plantao', sql.Date, payload.dataISO)
+            .query('DELETE FROM plantoes WHERE data_plantao = @data_plantao');
 
-            if (capabilities.hasPlantaoTipo) {
-                setParts.push('tipo_plantao = @tipoPlantao');
-            }
+        const colaboradoresDoBanco = hasTable(schema, 'escala_dia')
+            ? (await tx.request().query('SELECT * FROM Colaboradores')).recordset
+            : [];
 
-            const updateResult = await tx.request()
-                .input('data_plantao', sql.Date, payload.dataISO)
-                .input('colaboradores_ids', sql.NVarChar(sql.MAX), JSON.stringify(payload.colaboradores))
-                .input('tipoPlantao', sql.NVarChar(30), payload.tipoPlantao)
-                .input('horaInicio', sql.Time, toSqlTime(payload.horaInicio, 'Hora inicial do plantao'))
-                .input('horaFim', sql.Time, toSqlTime(payload.horaFim, 'Hora final do plantao'))
-                .input('observacao', sql.NVarChar(500), payload.observacao)
-                .query(`
-                    UPDATE plantoes
-                    SET ${setParts.join(', ')}
-                    OUTPUT INSERTED.*
-                    WHERE data_plantao = @data_plantao
-                `);
+        const salvos = [];
 
-            saved = updateResult.recordset[0];
-        } else {
-            action = 'created';
-
+        for (const lancamento of agruparLancamentosPorHorario(payload.lancamentos)) {
             const fields = ['data_plantao', 'colaboradores_ids'];
             const values = ['@data_plantao', '@colaboradores_ids'];
 
@@ -467,50 +478,48 @@ router.post('/', async (req, res) => {
 
             const insertResult = await tx.request()
                 .input('data_plantao', sql.Date, payload.dataISO)
-                .input('colaboradores_ids', sql.NVarChar(sql.MAX), JSON.stringify(payload.colaboradores))
+                .input('colaboradores_ids', sql.NVarChar(sql.MAX), JSON.stringify(lancamento.colaboradores))
                 .input('tipoPlantao', sql.NVarChar(30), payload.tipoPlantao)
-                .input('horaInicio', sql.Time, toSqlTime(payload.horaInicio, 'Hora inicial do plantao'))
-                .input('horaFim', sql.Time, toSqlTime(payload.horaFim, 'Hora final do plantao'))
-                .input('observacao', sql.NVarChar(500), payload.observacao)
+                .input('horaInicio', sql.Time, toSqlTime(lancamento.horaInicio, 'Hora inicial do plantao'))
+                .input('horaFim', sql.Time, toSqlTime(lancamento.horaFim, 'Hora final do plantao'))
+                .input('observacao', sql.NVarChar(500), lancamento.observacao)
                 .query(`
                     INSERT INTO plantoes (${fields.join(', ')})
                     OUTPUT INSERTED.*
                     VALUES (${values.join(', ')})
                 `);
 
-            saved = insertResult.recordset[0];
-        }
+            const saved = insertResult.recordset[0];
 
-        if (saved.hora_inicio === undefined && capabilities.hasPlantaoHoraInicio) {
-            saved.hora_inicio = toSqlTime(payload.horaInicio, 'Hora inicial do plantao');
-        }
+            if (saved.hora_inicio === undefined && capabilities.hasPlantaoHoraInicio) {
+                saved.hora_inicio = toSqlTime(lancamento.horaInicio, 'Hora inicial do plantao');
+            }
 
-        if (saved.hora_fim === undefined && capabilities.hasPlantaoHoraFim) {
-            saved.hora_fim = toSqlTime(payload.horaFim, 'Hora final do plantao');
-        }
+            if (saved.hora_fim === undefined && capabilities.hasPlantaoHoraFim) {
+                saved.hora_fim = toSqlTime(lancamento.horaFim, 'Hora final do plantao');
+            }
 
-        if (saved.observacao === undefined && capabilities.hasPlantaoObservacao) {
-            saved.observacao = payload.observacao;
-        }
+            if (saved.observacao === undefined && capabilities.hasPlantaoObservacao) {
+                saved.observacao = lancamento.observacao;
+            }
 
-        if (saved.tipo_plantao === undefined && capabilities.hasPlantaoTipo) {
-            saved.tipo_plantao = payload.tipoPlantao;
-        }
+            if (saved.tipo_plantao === undefined && capabilities.hasPlantaoTipo) {
+                saved.tipo_plantao = payload.tipoPlantao;
+            }
 
-        await syncPlantaoMovements(tx, schema, saved);
+            await syncPlantaoMovements(tx, schema, saved);
 
-        if (hasTable(schema, 'escala_dia')) {
-            const colaboradoresResult = await tx.request().query('SELECT * FROM Colaboradores');
-            await syncPlantaoToEscalaDia(tx, schema, saved, colaboradoresResult.recordset);
-        }
+            if (hasTable(schema, 'escala_dia')) {
+                await syncPlantaoToEscalaDia(tx, schema, saved, colaboradoresDoBanco);
+            }
 
-        return {
-            action,
-            plantao: serializePlantaoRecord({
+            salvos.push(serializePlantaoRecord({
                 ...saved,
-                duracaoMinutos: payload.duracaoMinutos
-            })
-        };
+                duracaoMinutos: lancamento.duracaoMinutos
+            }));
+        }
+
+        return { action: existia ? 'updated' : 'created', plantoes: salvos };
     });
 
     res.status(result.action === 'created' ? 201 : 200).json({
@@ -519,28 +528,33 @@ router.post('/', async (req, res) => {
             : 'Plantao atualizado com sucesso!',
         success: true,
         action: result.action,
-        data: result.plantao
+        total: result.plantoes.length,
+        data: result.plantoes.length === 1 ? result.plantoes[0] : result.plantoes,
+        lancamentos: result.plantoes
     });
 });
-
 router.delete('/:dataISO', async (req, res) => {
     const pool = await conectar();
     const schema = await getSchemaInfo(pool);
     const dataISO = normalizeIsoDate(req.params.dataISO, 'Data do plantao');
 
     await withTransaction(sql, pool, async (tx) => {
-        const existing = await findPlantaoByDate(tx, dataISO, schema);
+        // O dia pode ter varios lancamentos: limpar so o primeiro deixaria
+        // credito de banco de horas orfao nos demais.
+        const existentes = await findPlantoesByDate(tx, dataISO, schema);
 
-        if (!existing) {
+        if (existentes.length === 0) {
             throw new AppError(404, 'Plantao nao encontrado.');
         }
 
-        if (getBancoHorasCapabilities(schema).hasMovimentosTable) {
-            await deletePlantaoMovements(tx, existing.id);
-        }
+        for (const existing of existentes) {
+            if (getBancoHorasCapabilities(schema).hasMovimentosTable) {
+                await deletePlantaoMovements(tx, existing.id);
+            }
 
-        if (hasTable(schema, 'escala_dia')) {
-            await deleteEscalaDiaByOrigin(tx, 'plantao', existing.id);
+            if (hasTable(schema, 'escala_dia')) {
+                await deleteEscalaDiaByOrigin(tx, 'plantao', existing.id);
+            }
         }
 
         await tx.request()

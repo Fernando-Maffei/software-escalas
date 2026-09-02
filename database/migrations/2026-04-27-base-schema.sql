@@ -90,15 +90,22 @@ BEGIN
 END;
 GO
 
+-- Unico por (Data, Tipo), nao so por Data: um feriado municipal pode cair no
+-- mesmo dia de um nacional. A migracao 2026-09-02-feriados-abrangencia.sql faz
+-- a troca em bancos existentes; aqui a instalacao nova ja nasce correta.
+--
+-- Como este script roda a cada boot, recriar o indice antigo aqui desfaria a
+-- migracao — ou falharia, em banco que ja tenha as duas abrangencias na mesma
+-- data, derrubando a verificacao de schema inteira.
 IF NOT EXISTS (
     SELECT 1
     FROM sys.indexes
     WHERE object_id = OBJECT_ID('dbo.Feriados')
-      AND name = 'UX_Feriados_Data'
+      AND name IN ('UX_Feriados_Data', 'UX_Feriados_Data_Tipo')
 )
 BEGIN
-    CREATE UNIQUE INDEX UX_Feriados_Data
-        ON dbo.Feriados (Data);
+    CREATE UNIQUE INDEX UX_Feriados_Data_Tipo
+        ON dbo.Feriados (Data, Tipo);
 END;
 GO
 
@@ -349,14 +356,29 @@ BEGIN
 END;
 GO
 
+-- Indice COMUM, nao unico: um dia pode ter mais de um lancamento de plantao
+-- (turnos com horarios e pessoas diferentes). Ate 2026-09 este indice era
+-- UNIQUE, o que impedia isso; a migracao 2026-09-02-plantao-tipo-feriado.sql
+-- troca o indice em bancos ja existentes, e aqui a instalacao nova ja nasce
+-- com o formato certo.
+--
+-- Nao basta corrigir na migracao: este script roda a cada boot, e recriar o
+-- indice UNIQUE aqui falharia em qualquer banco que ja tenha dois turnos no
+-- mesmo dia — derrubando toda a verificacao de schema junto.
 IF NOT EXISTS (
+    SELECT 1
+    FROM sys.indexes
+    WHERE object_id = OBJECT_ID('dbo.plantoes')
+      AND name = 'IX_plantoes_data'
+)
+AND NOT EXISTS (
     SELECT 1
     FROM sys.indexes
     WHERE object_id = OBJECT_ID('dbo.plantoes')
       AND name = 'UX_plantoes_data'
 )
 BEGIN
-    CREATE UNIQUE INDEX UX_plantoes_data
+    CREATE INDEX IX_plantoes_data
         ON dbo.plantoes (data_plantao);
 END;
 GO
