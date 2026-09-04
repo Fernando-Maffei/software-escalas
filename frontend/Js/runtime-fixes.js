@@ -3729,6 +3729,7 @@
     const PLANTAO_SABADOS_POSTERIORES = 10;
     const PLANTAO_SABADOS_PASSO = 8;
     const PLANTAO_MESES_LABELS = ['JAN', 'FEV', 'MAR', 'ABR', 'MAI', 'JUN', 'JUL', 'AGO', 'SET', 'OUT', 'NOV', 'DEZ'];
+    const PLANTAO_MESES_NOMES = ['Janeiro', 'Fevereiro', 'Marco', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
 
     function criarDataLocalPlantao(dataISO) {
         const [ano, mes, dia] = String(dataISO || '').split('-').map(Number);
@@ -3879,8 +3880,54 @@
         return datas;
     }
 
+    // A regua cobre 10 semanas: numa grade corrida, "23" podia ser de setembro
+    // ou de outubro e so dava para saber lendo a etiqueta de mes de cada card.
+    // Agrupado, o mes vira cabecalho e o card so precisa do dia. Os itens ja
+    // chegam em ordem cronologica, entao basta quebrar quando o ano-mes muda.
+    function agruparSabadosPorMesPlantao(items) {
+        const grupos = [];
+
+        items.forEach((item) => {
+            const chave = String(item.dataISO).slice(0, 7);
+            const atual = grupos[grupos.length - 1];
+
+            if (atual && atual.chave === chave) {
+                atual.itens.push(item);
+                return;
+            }
+
+            const [ano, mes] = chave.split('-').map(Number);
+
+            grupos.push({
+                chave,
+                rotulo: `${PLANTAO_MESES_NOMES[mes - 1] || ''} de ${ano}`,
+                itens: [item]
+            });
+        });
+
+        return grupos;
+    }
+
     function renderSabadosPlantaoHistorico(items) {
-        return items.map((sabado) => `
+        if (!items.length) {
+            return '<div class="empty-state">Nenhum sabado, domingo ou feriado nesta janela.</div>';
+        }
+
+        return agruparSabadosPorMesPlantao(items).map((grupo) => `
+            <section class="plantao-mes">
+                <h4 class="plantao-mes-titulo">
+                    <span>${escapeHtml(grupo.rotulo)}</span>
+                    <span class="plantao-mes-contagem">${grupo.itens.filter((item) => item.temPlantao).length}/${grupo.itens.length}</span>
+                </h4>
+                <div class="sabados-grid">
+                    ${grupo.itens.map(renderCardSabadoPlantao).join('')}
+                </div>
+            </section>
+        `).join('');
+    }
+
+    function renderCardSabadoPlantao(sabado) {
+        return `
             <button
                 type="button"
                 class="sabado-card sabado-card--${sabado.tipo || 'sabado'} ${sabado.temPlantao ? 'lancado' : ''} ${sabado.isPast ? 'passado' : ''} ${sabado.isToday ? 'hoje' : ''} ${sabado.isActive ? 'is-active' : ''}"
@@ -3898,7 +3945,7 @@
                 <div class="sabado-tipo">${escapeHtml(sabado.tipoLabel || 'Sabado')}</div>
                 <div class="sabado-status">${sabado.temPlantao ? 'Clique para editar' : 'Clique para lancar'}</div>
             </button>
-        `).join('');
+        `;
     }
 
     function atualizarSabadoSelecionadoPlantao(dataISO) {
@@ -4132,7 +4179,7 @@
                         </div>
                     </div>
 
-                    <div class="sabados-grid" id="listaSabados">
+                    <div class="sabados-regua" id="listaSabados">
                         ${renderSabadosPlantaoHistorico(sabados)}
                     </div>
                 </div>

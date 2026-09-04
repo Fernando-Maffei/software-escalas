@@ -13,6 +13,7 @@ Todas as alteracoes relevantes deste projeto serao documentadas neste arquivo.
 ### Alterado
 - Lancar Plantao: a barra lateral deixou de ser um checklist com um horario unico para todo mundo e virou um montador de turnos — formulario de adicionar/editar no topo, lista dos lancamentos do dia com duracao e etiqueta banco/extra por linha, e um resumo que separa quanto vai para o banco e quanto sai como hora extra. O painel passou de 400px para 460px, ganhou etiquetas de tipo do dia e de status no cabecalho e acompanha a rolagem da regua de datas.
 - Lancar Plantao: a lista "Plantoes lancados" agrupa por dia e mostra cada turno do dia como uma faixa, em vez de um card por registro.
+- Lancar Plantao: a regua de datas passa a ser agrupada por mes, com cabecalho ("Setembro de 2026") e a contagem de lancados sobre o total do mes (3/9). Numa grade corrida de 10 semanas, "23" podia ser de setembro ou de outubro e so dava para saber lendo a etiqueta de cada card.
 
 - Relatorio de Plantoes: coluna "Destino" (banco de horas / hora extra) e o antigo card "Credito total da equipe" virou dois — "Credito em banco de horas" e "Horas extras (fora do banco)" —, porque somar os dois num numero so nao bate com nenhum saldo. Vale tambem para o PDF, que reaproveita a mesma tabela.
 - Extrato do Banco de Horas: secao "Horas extras de plantao" com os plantoes do colaborador lancados como extra (data, horario e total), marcada como paga em folha e fora do saldo. Sem ela, um plantao de hora extra nao aparecia em lugar nenhum do extrato e parecia perdido.
