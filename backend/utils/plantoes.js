@@ -6,8 +6,11 @@ const {
     extractTimeString,
     normalizeEnum,
     normalizeIsoDate,
-    normalizeNumericArray
+    normalizeNullableTime,
+    normalizeNumericArray,
+    normalizeOptionalText
 } = require('./validation');
+const { calculateIntervalMinutes } = require('./bancoHoras');
 
 function formatDateToISO(date) {
     return normalizeIsoDate(extractDateString(date), 'Data');
@@ -22,6 +25,31 @@ function normalizeColaboradores(values) {
 }
 
 const PLANTAO_TIPOS = ['sabado', 'domingo', 'feriado'];
+
+// Destino das horas do lancamento. 'banco' credita BancoHorasMovimentos como
+// sempre; 'extra' registra o plantao e a escala do dia, mas nao mexe no saldo —
+// a hora sai como extra na folha.
+const PLANTAO_TIPOS_CREDITO = ['banco', 'extra'];
+
+function normalizeTipoCredito(value, fieldName = 'Tipo de credito') {
+    if (value === undefined || value === null || String(value).trim() === '') {
+        return 'banco';
+    }
+
+    return normalizeEnum(value, fieldName, PLANTAO_TIPOS_CREDITO);
+}
+
+function resolveLegacyTipoCredito(row) {
+    const raw = row.tipoCredito ?? row.tipo_credito ?? row.TipoCredito ?? null;
+
+    try {
+        return normalizeTipoCredito(raw);
+    } catch (error) {
+        // Valor estranho no banco nao pode derrubar a leitura da tela: o
+        // comportamento historico (antes da coluna existir) era creditar.
+        return 'banco';
+    }
+}
 
 // Tipo do plantao a partir da data. Feriado tem PRIORIDADE (mesmo caindo no fim
 // de semana): quando `feriados` (Set de datas ISO) contem a data, o tipo e
@@ -122,6 +150,7 @@ function serializePlantaoRecord(row) {
         dataISO,
         colaboradores: normalizeColaboradores(colaboradores),
         tipoPlantao: resolveLegacyPlantaoType(row, dataISO),
+        tipoCredito: resolveLegacyTipoCredito(row),
         horaInicio: extractTimeString(row.hora_inicio ?? row.HoraInicio ?? row.horaInicio),
         horaFim: extractTimeString(row.hora_fim ?? row.HoraFim ?? row.horaFim),
         observacao: row.observacao ?? row.Observacao ?? null,
@@ -160,11 +189,126 @@ function generateUpcomingSaturdays(quantity, referenceDate = new Date()) {
     });
 }
 
+function minutosDoHorario(hora) {
+    const [h, m] = String(hora).split(':').map(Number);
+    return (h * 60) + m;
+}
+
+function horariosSeCruzam(a, b) {
+    return minutosDoHorario(a.horaInicio) < minutosDoHorario(b.horaFim)
+        && minutosDoHorario(b.horaInicio) < minutosDoHorario(a.horaFim);
+}
+
+// Um dia de plantao pode ter VARIOS lancamentos: turnos com horarios, pessoas e
+// destinos diferentes (ex.: um colaborador das 08h as 13h no banco de horas e
+// outro das 13h as 18h como hora extra). Aceita tambem o formato antigo
+// ({ dataISO, colaboradores, horaInicio, horaFim }), que vira um lancamento so —
+// manter os dois evita quebrar chamadas que ainda usem o formato de antes.
+function buildPlantaoDiaPayload(body, feriados = null) {
+    const dataISO = normalizeIsoDate(body.dataISO, 'Data do plantao');
+    const tipoPlantao = normalizePlantaoType(body.tipoPlantao, dataISO, feriados);
+    const observacaoDia = normalizeOptionalText(body.observacao, 'Observacao', { maxLength: 500 });
+
+    const brutos = Array.isArray(body.lancamentos) && body.lancamentos.length > 0
+        ? body.lancamentos
+        : [{
+            horaInicio: body.horaInicio,
+            horaFim: body.horaFim,
+            colaboradores: body.colaboradores,
+            tipoCredito: body.tipoCredito
+        }];
+
+    const lancamentos = brutos.map((item, indice) => {
+        const rotulo = `Lancamento ${indice + 1}`;
+        const horaInicio = normalizeNullableTime(item.horaInicio, `Hora inicial do ${rotulo}`);
+        const horaFim = normalizeNullableTime(item.horaFim, `Hora final do ${rotulo}`);
+
+        if (!horaInicio || !horaFim) {
+            throw new AppError(400, `${rotulo}: informe a hora inicial e a final.`);
+        }
+
+        const colaboradores = normalizeColaboradores(
+            item.colaboradorId !== undefined && item.colaboradorId !== null
+                ? [item.colaboradorId]
+                : item.colaboradores
+        );
+
+        if (colaboradores.length === 0) {
+            throw new AppError(400, `${rotulo}: selecione pelo menos um colaborador.`);
+        }
+
+        return {
+            horaInicio,
+            horaFim,
+            colaboradores,
+            tipoCredito: normalizeTipoCredito(item.tipoCredito, `Tipo de credito do ${rotulo}`),
+            observacao: observacaoDia,
+            duracaoMinutos: calculateIntervalMinutes(horaInicio, horaFim, {
+                startLabel: `Hora inicial do ${rotulo}`,
+                endLabel: `Hora final do ${rotulo}`
+            })
+        };
+    });
+
+    // Ninguem pode estar em dois turnos que se sobrepoem no mesmo dia.
+    for (let i = 0; i < lancamentos.length; i += 1) {
+        for (let j = i + 1; j < lancamentos.length; j += 1) {
+            if (!horariosSeCruzam(lancamentos[i], lancamentos[j])) {
+                continue;
+            }
+
+            const repetido = lancamentos[i].colaboradores
+                .find((id) => lancamentos[j].colaboradores.includes(id));
+
+            if (repetido) {
+                throw new AppError(400, `O colaborador ${repetido} aparece em dois lancamentos com horarios que se sobrepoem.`);
+            }
+        }
+    }
+
+    return { dataISO, tipoPlantao, observacao: observacaoDia, lancamentos };
+}
+
+// Quem compartilha exatamente o mesmo horario E o mesmo destino das horas vira
+// UMA linha, com os colaboradores juntos. Preserva o formato de sempre da
+// tabela (um registro com colaboradores_ids) e evita inflar o banco quando
+// cinco pessoas fazem o mesmo turno. O tipo_credito entra na chave porque e
+// gravado por linha: agrupar banco com extra perderia a distincao.
+function agruparLancamentosPorHorario(lancamentos) {
+    const grupos = new Map();
+
+    for (const lancamento of lancamentos) {
+        const chave = `${lancamento.horaInicio}|${lancamento.horaFim}|${lancamento.tipoCredito}`;
+        const atual = grupos.get(chave);
+
+        if (atual) {
+            for (const id of lancamento.colaboradores) {
+                if (!atual.colaboradores.includes(id)) {
+                    atual.colaboradores.push(id);
+                }
+            }
+
+            continue;
+        }
+
+        grupos.set(chave, { ...lancamento, colaboradores: [...lancamento.colaboradores] });
+    }
+
+    return [...grupos.values()].map((grupo) => ({
+        ...grupo,
+        colaboradores: [...grupo.colaboradores].sort((a, b) => a - b)
+    }));
+}
+
 module.exports = {
+    agruparLancamentosPorHorario,
+    buildPlantaoDiaPayload,
     formatDateToISO,
     generateUpcomingSaturdays,
+    horariosSeCruzam,
     normalizeColaboradores,
     normalizePlantaoType,
+    normalizeTipoCredito,
     resolvePlantaoTypeByDate,
     serializePlantaoRecord
 };

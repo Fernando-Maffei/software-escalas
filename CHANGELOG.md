@@ -2,6 +2,26 @@
 
 Todas as alteracoes relevantes deste projeto serao documentadas neste arquivo.
 
+## [Nao publicado]
+
+### Adicionado
+- Lancar Plantao: cada lancamento escolhe entre **banco de horas** e **hora extra**. Hora extra fica registrada no plantao e continua aparecendo na escala do dia, mas nao gera movimento em `BancoHorasMovimentos` — o saldo do colaborador nao muda, porque a hora e paga em folha.
+- Lancar Plantao: o dia aceita **varios lancamentos** (turnos com horarios, pessoas e destinos diferentes; por exemplo um das 08h as 13h no banco e outro das 13h as 18h como extra). Antes um indice unico por data so deixava um registro por dia.
+- Lancar Plantao: **editar um lancamento** ja adicionado (colaborador, horario e destino das horas) sem precisar remover e digitar de novo.
+- Migration `2026-09-04-plantao-lancamentos.sql`: troca o indice unico `UX_plantoes_data` por um indice comum, cria a coluna `tipo_credito` ('banco'/'extra', padrao 'banco') e libera 'feriado' no CHECK de `tipo_plantao`.
+
+### Alterado
+- Lancar Plantao: a barra lateral deixou de ser um checklist com um horario unico para todo mundo e virou um montador de turnos — formulario de adicionar/editar no topo, lista dos lancamentos do dia com duracao e etiqueta banco/extra por linha, e um resumo que separa quanto vai para o banco e quanto sai como hora extra. O painel passou de 400px para 460px, ganhou etiquetas de tipo do dia e de status no cabecalho e acompanha a rolagem da regua de datas.
+- Lancar Plantao: a lista "Plantoes lancados" agrupa por dia e mostra cada turno do dia como uma faixa, em vez de um card por registro.
+
+- Relatorio de Plantoes: coluna "Destino" (banco de horas / hora extra) e o antigo card "Credito total da equipe" virou dois — "Credito em banco de horas" e "Horas extras (fora do banco)" —, porque somar os dois num numero so nao bate com nenhum saldo. Vale tambem para o PDF, que reaproveita a mesma tabela.
+
+### Corrigido
+- Plantao em feriado de dia util era oferecido pela tela mas recusado pelo banco: o CHECK `CK_plantoes_tipo_plantao` so aceitava 'sabado' e 'domingo'.
+- Calendario/Escala marcavam como "Plantao" so quem estava no primeiro turno do dia: `buscarPlantaoDoDia` parava no primeiro registro da data. Agora junta a equipe de todos os turnos.
+- Dashboard e relatorio contavam turnos como se fossem plantoes: um sabado com dois turnos aparecia como dois. Passam a contar dias.
+- Escala do dia: com mais de um turno no mesmo dia, `escala_dia` (que so aceita uma linha por colaborador/data) ficaria com o ultimo turno gravado. Agora quem faz dois turnos no dia vira um intervalo unico, do primeiro inicio ao ultimo fim.
+
 ## [1.6.1] - 2026-07-24
 
 ### Alterado

@@ -1,6 +1,7 @@
 const assert = require('node:assert/strict');
 
 const {
+    aggregatePlantoesPorColaborador,
     buildColaboradorDefaultSyncRecord,
     canAutoRefreshDefaultEscala,
     createAusenciaEscalaRecord,
@@ -291,6 +292,43 @@ module.exports = [
             assert.equal(slots[6]?.dataISO, '2026-05-03');
             assert.equal(slots[7]?.dataISO, '2026-05-04');
             assert.equal(slots[8]?.dataISO, '2026-05-05');
+        }
+    },
+    {
+        // escala_dia so aceita uma linha por colaborador/data. Quem faz dois
+        // turnos no mesmo dia precisa virar um intervalo unico, senao o segundo
+        // turno gravado apagaria o primeiro na escala.
+        name: 'aggregatePlantoesPorColaborador merges same-day shifts into one span',
+        run() {
+            const agregado = aggregatePlantoesPorColaborador([
+                {
+                    id: 7,
+                    dataISO: '2026-04-25',
+                    horaInicio: '08:00',
+                    horaFim: '13:00',
+                    observacao: 'Fechamento',
+                    colaboradores: [1, 2]
+                },
+                {
+                    id: 4,
+                    dataISO: '2026-04-25',
+                    horaInicio: '13:00',
+                    horaFim: '18:00',
+                    observacao: null,
+                    colaboradores: [1]
+                }
+            ]);
+
+            assert.equal(agregado.size, 2);
+            assert.deepEqual(agregado.get(1), {
+                // Menor id do dia: continua valendo enquanto qualquer turno existir.
+                id: 4,
+                dataISO: '2026-04-25',
+                horaInicio: '08:00',
+                horaFim: '18:00',
+                observacao: 'Fechamento'
+            });
+            assert.equal(agregado.get(2).horaFim, '13:00');
         }
     }
 ];

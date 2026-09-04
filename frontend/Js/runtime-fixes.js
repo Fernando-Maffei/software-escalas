@@ -163,6 +163,8 @@
             ...item,
             dataISO,
             tipoPlantao: item.tipoPlantao || item.tipo_plantao || null,
+            // Registro antigo (antes da coluna tipo_credito) sempre creditava.
+            tipoCredito: String(item.tipoCredito || item.tipo_credito || '').toLowerCase() === 'extra' ? 'extra' : 'banco',
             colaboradores: Array.isArray(item.colaboradores) ? item.colaboradores : [],
             horaInicio: item.horaInicio || item.hora_inicio || null,
             horaFim: item.horaFim || item.hora_fim || null,
@@ -1971,6 +1973,7 @@
             ...item,
             dataISO: obterDataISO(item.dataISO || item.data_plantao),
             tipoPlantao: item.tipoPlantao || item.tipo_plantao || null,
+            tipoCredito: String(item.tipoCredito || item.tipo_credito || '').toLowerCase() === 'extra' ? 'extra' : 'banco',
             horaInicio: obterHoraValor(item.horaInicio || item.hora_inicio),
             horaFim: obterHoraValor(item.horaFim || item.hora_fim),
             observacao: item.observacao || null,
@@ -2303,102 +2306,397 @@
         });
     }
 
-    function renderChecklistColaboradoresAvancado(selecionados = [], disponibilidade = []) {
-        const todosColaboradores = Array.isArray(window.colaboradores) ? window.colaboradores : [];
-        const listaColaboradores = filtrarChecklistPorMeusSetoresPlantao(todosColaboradores, selecionados);
-
-        if (todosColaboradores.length === 0) {
-            return `
-                <div class="empty-msg">
-                    <i class="fas fa-users"></i>
-                    <p>Nenhum colaborador cadastrado</p>
-                </div>
-            `;
+    // ---- Lancamentos do dia ----------------------------------------------
+    // Cada linha da tela e UM colaborador com UM horario e UM destino para as
+    // horas. Um dia pode ter varias. Quem compartilha horario e destino e
+    // agrupado so na hora de gravar, no backend — aqui a linha por pessoa e o
+    // que deixa montar turnos diferentes (um das 08h as 13h, outro das 13h as
+    // 18h) e escolher banco de horas ou hora extra caso a caso.
+    const PLANTAO_CREDITO_META = {
+        banco: {
+            label: 'Banco de horas',
+            curto: 'Banco',
+            icone: 'fa-piggy-bank',
+            ajuda: 'As horas entram como credito no saldo do colaborador.'
+        },
+        extra: {
+            label: 'Hora extra',
+            curto: 'Extra',
+            icone: 'fa-money-bill-wave',
+            ajuda: 'As horas nao entram no banco: saem como extra na folha.'
         }
+    };
 
-        if (listaColaboradores.length === 0) {
-            return `
-                <div class="empty-msg">
-                    <i class="fas fa-users"></i>
-                    <p>Nenhum colaborador nos setores que voce escolheu ver (Meus setores).</p>
-                </div>
-            `;
-        }
+    function normalizarTipoCreditoPlantao(valor) {
+        return String(valor || '').trim().toLowerCase() === 'extra' ? 'extra' : 'banco';
+    }
 
-        const disponibilidadeMap = new Map((disponibilidade || []).map((item) => [Number(item.id), item]));
-        let selecionadosDisponiveis = 0;
+    function nomeColaboradorPlantao(colaboradorId) {
+        const colaborador = (window.colaboradores || [])
+            .find((item) => Number(item.Id) === Number(colaboradorId));
 
-        const html = listaColaboradores.map((colaborador) => {
-            const status = disponibilidadeMap.get(Number(colaborador.Id)) || {
-                disponivel: true,
-                motivoLabel: null
-            };
-            const disponivel = status.disponivel !== false;
-            const checked = disponivel && selecionados.includes(colaborador.Id);
+        return colaborador ? colaborador.Nome : 'Colaborador removido';
+    }
 
-            if (checked) {
-                selecionadosDisponiveis += 1;
+    function minutosDoHorarioPlantao(hora) {
+        const [h, m] = String(hora || '').split(':').map(Number);
+        return Number.isFinite(h) && Number.isFinite(m) ? (h * 60) + m : null;
+    }
+
+    function duracaoLancamentoPlantao(linha) {
+        const inicio = minutosDoHorarioPlantao(linha.horaInicio);
+        const fim = minutosDoHorarioPlantao(linha.horaFim);
+
+        return inicio !== null && fim !== null && fim > inicio ? fim - inicio : null;
+    }
+
+    function ordenarLancamentosPlantao(linhas) {
+        return [...linhas].sort((a, b) => (
+            String(a.horaInicio).localeCompare(String(b.horaInicio))
+            || nomeColaboradorPlantao(a.colaboradorId).localeCompare(nomeColaboradorPlantao(b.colaboradorId))
+        ));
+    }
+
+    // Monta as linhas da tela a partir do que ja esta gravado. Cada registro do
+    // banco pode trazer varios colaboradores no mesmo horario: aqui ele volta a
+    // ser uma linha por pessoa, que e como a tela edita.
+    function lancamentosDoDiaPlantao(dataISO) {
+        const linhas = [];
+
+        (window.plantoesLancados || [])
+            .filter((item) => item.dataISO === dataISO)
+            .forEach((registro) => {
+                const horaInicio = formatarHoraInput(registro.horaInicio) || '';
+                const horaFim = formatarHoraInput(registro.horaFim) || '';
+                const tipoCredito = normalizarTipoCreditoPlantao(registro.tipoCredito);
+
+                (registro.colaboradores || []).forEach((colaboradorId) => {
+                    linhas.push({
+                        colaboradorId: Number(colaboradorId),
+                        horaInicio,
+                        horaFim,
+                        tipoCredito
+                    });
+                });
+            });
+
+        return ordenarLancamentosPlantao(linhas);
+    }
+
+    // Mesma regra do backend: ninguem em dois turnos que se sobrepoem. Ao editar,
+    // a propria linha e ignorada — senao ela sempre colidiria consigo mesma.
+    function conflitoDeLancamentoPlantao(linhas, nova, ignorarIndice = null) {
+        const inicioNovo = minutosDoHorarioPlantao(nova.horaInicio);
+        const fimNovo = minutosDoHorarioPlantao(nova.horaFim);
+
+        return linhas.some((linha, indice) => {
+            if (indice === ignorarIndice) {
+                return false;
             }
 
-            return `
-                <label class="colaborador-checkbox ${disponivel ? '' : 'indisponivel'}">
-                    <input type="checkbox" value="${colaborador.Id}" ${checked ? 'checked' : ''} ${disponivel ? '' : 'disabled'}>
-                    <span class="checkbox-label">
-                        <i class="fas fa-user-circle"></i>
-                        <span>
-                            <strong>${escapeHtml(colaborador.Nome)}</strong>
-                            ${disponivel ? '' : `<small class="status-indisponivel">${escapeHtml(status.motivoLabel || 'Indisponivel')}</small>`}
-                        </span>
-                    </span>
-                </label>
-            `;
-        }).join('');
+            if (Number(linha.colaboradorId) !== Number(nova.colaboradorId)) {
+                return false;
+            }
+
+            const inicio = minutosDoHorarioPlantao(linha.horaInicio);
+            const fim = minutosDoHorarioPlantao(linha.horaFim);
+
+            return inicio < fimNovo && inicioNovo < fim;
+        });
+    }
+
+    // A observacao e do dia inteiro e vive num textarea que sobrevive a varios
+    // redesenhos da lista; sem guardar antes de redesenhar, o texto se perderia.
+    function capturarRascunhoPlantao(state) {
+        if (!state) {
+            return;
+        }
+
+        const observacao = document.getElementById('plantaoObservacao');
+
+        if (observacao) {
+            state.observacao = observacao.value;
+        }
+
+        const inicio = document.getElementById('plantaoNovoInicio');
+        const fim = document.getElementById('plantaoNovoFim');
+        const colaborador = document.getElementById('plantaoNovoColaborador');
+
+        state.rascunho = state.rascunho || {};
+
+        if (inicio) { state.rascunho.horaInicio = inicio.value; }
+        if (fim) { state.rascunho.horaFim = fim.value; }
+        if (colaborador) { state.rascunho.colaboradorId = Number(colaborador.value || 0); }
+    }
+
+    function lerFormularioLancamentoPlantao(state) {
+        return {
+            colaboradorId: Number(document.getElementById('plantaoNovoColaborador')?.value || 0),
+            horaInicio: document.getElementById('plantaoNovoInicio')?.value || '',
+            horaFim: document.getElementById('plantaoNovoFim')?.value || '',
+            tipoCredito: normalizarTipoCreditoPlantao(state?.rascunho?.tipoCredito)
+        };
+    }
+
+    // Troca o destino das horas sem redesenhar o painel: um render completo aqui
+    // roubaria o foco de quem esta no meio do preenchimento.
+    window.definirTipoCreditoPlantao = function definirTipoCreditoPlantao(tipo) {
+        const state = getPlantaoEditorState();
+
+        if (!state) {
+            return;
+        }
+
+        const escolhido = normalizarTipoCreditoPlantao(tipo);
+        state.rascunho = state.rascunho || {};
+        state.rascunho.tipoCredito = escolhido;
+
+        document.querySelectorAll('[data-plantao-credito]').forEach((botao) => {
+            const ativo = botao.getAttribute('data-plantao-credito') === escolhido;
+            botao.classList.toggle('is-active', ativo);
+            botao.setAttribute('aria-pressed', ativo ? 'true' : 'false');
+        });
+
+        const ajuda = document.getElementById('plantaoCreditoAjuda');
+
+        if (ajuda) {
+            ajuda.textContent = PLANTAO_CREDITO_META[escolhido].ajuda;
+        }
+    };
+
+    window.confirmarLancamentoPlantao = function confirmarLancamentoPlantao() {
+        const state = getPlantaoEditorState();
+
+        if (!state) {
+            return;
+        }
+
+        capturarRascunhoPlantao(state);
+
+        const nova = lerFormularioLancamentoPlantao(state);
+        const editando = Number.isInteger(state.editandoIndice) ? state.editandoIndice : null;
+
+        if (!nova.colaboradorId) {
+            mostrarToast('Escolha o colaborador.', 'error');
+            return;
+        }
+
+        if (!nova.horaInicio || !nova.horaFim) {
+            mostrarToast('Informe a hora inicial e a final.', 'error');
+            return;
+        }
+
+        if (nova.horaFim <= nova.horaInicio) {
+            mostrarToast('A hora final precisa ser maior que a inicial.', 'error');
+            return;
+        }
+
+        if (conflitoDeLancamentoPlantao(state.lancamentos, nova, editando)) {
+            mostrarToast(nomeColaboradorPlantao(nova.colaboradorId) + ' ja tem um lancamento que cruza esse horario.', 'error');
+            return;
+        }
+
+        if (editando === null) {
+            state.lancamentos = ordenarLancamentosPlantao([...state.lancamentos, nova]);
+        } else {
+            const atualizados = [...state.lancamentos];
+            atualizados[editando] = nova;
+            state.lancamentos = ordenarLancamentosPlantao(atualizados);
+            mostrarToast('Lancamento atualizado. Salve o dia para gravar.', 'success');
+        }
+
+        // Mantem horario e destino para encadear varios colaboradores no mesmo
+        // turno; so o colaborador volta ao vazio.
+        state.editandoIndice = null;
+        state.rascunho = {
+            colaboradorId: 0,
+            horaInicio: nova.horaInicio,
+            horaFim: nova.horaFim,
+            tipoCredito: nova.tipoCredito
+        };
+
+        renderPlantaoEditor(state);
+        document.getElementById('plantaoNovoColaborador')?.focus();
+    };
+
+    window.editarLancamentoPlantao = function editarLancamentoPlantao(indice) {
+        const state = getPlantaoEditorState();
+        const linha = state?.lancamentos?.[Number(indice)];
+
+        if (!state || !linha) {
+            return;
+        }
+
+        capturarRascunhoPlantao(state);
+
+        state.editandoIndice = Number(indice);
+        state.rascunho = { ...linha };
+
+        renderPlantaoEditor(state);
+        document.getElementById('plantaoNovoColaborador')?.focus();
+    };
+
+    window.cancelarEdicaoLancamentoPlantao = function cancelarEdicaoLancamentoPlantao() {
+        const state = getPlantaoEditorState();
+
+        if (!state) {
+            return;
+        }
+
+        capturarRascunhoPlantao(state);
+
+        state.editandoIndice = null;
+        state.rascunho = {
+            colaboradorId: 0,
+            horaInicio: state.rascunho?.horaInicio || '',
+            horaFim: state.rascunho?.horaFim || '',
+            tipoCredito: normalizarTipoCreditoPlantao(state.rascunho?.tipoCredito)
+        };
+
+        renderPlantaoEditor(state);
+    };
+
+    window.removerLancamentoPlantao = function removerLancamentoPlantao(indice) {
+        const state = getPlantaoEditorState();
+
+        if (!state) {
+            return;
+        }
+
+        capturarRascunhoPlantao(state);
+
+        const posicao = Number(indice);
+        state.lancamentos = state.lancamentos.filter((_, atual) => atual !== posicao);
+
+        // Remover uma linha reindexa a lista: a edicao em curso passaria a
+        // apontar para outra pessoa.
+        if (Number.isInteger(state.editandoIndice)) {
+            if (state.editandoIndice === posicao) {
+                state.editandoIndice = null;
+            } else if (state.editandoIndice > posicao) {
+                state.editandoIndice -= 1;
+            }
+        }
+
+        renderPlantaoEditor(state);
+    };
+
+    function renderResumoLancamentosPlantao(state) {
+        const totais = state.lancamentos.reduce((acumulado, linha) => {
+            acumulado[linha.tipoCredito] += duracaoLancamentoPlantao(linha) || 0;
+            return acumulado;
+        }, { banco: 0, extra: 0 });
+
+        const pessoas = new Set(state.lancamentos.map((linha) => Number(linha.colaboradorId))).size;
+        const parcelas = [];
+
+        if (totais.banco > 0) {
+            parcelas.push(`<span class="plantao-total plantao-total--banco"><i class="fas fa-piggy-bank"></i> ${escapeHtml(minutosParaTexto(totais.banco))} em banco</span>`);
+        }
+
+        if (totais.extra > 0) {
+            parcelas.push(`<span class="plantao-total plantao-total--extra"><i class="fas fa-money-bill-wave"></i> ${escapeHtml(minutosParaTexto(totais.extra))} em hora extra</span>`);
+        }
 
         return `
-            ${html}
-            <div class="selecionados-count">
-                <i class="fas fa-check-circle"></i>
-                <span id="plantaoSelecionadosCount">${selecionadosDisponiveis} colaborador(es) selecionado(s)</span>
+            <div class="plantao-lancamentos-resumo">
+                <span class="plantao-resumo-contagem">
+                    <i class="fas fa-list-check"></i> ${state.lancamentos.length} lancamento(s) &middot; ${pessoas} pessoa(s)
+                </span>
+                ${parcelas.length > 0 ? `<span class="plantao-resumo-totais">${parcelas.join('')}</span>` : ''}
             </div>
         `;
     }
 
-    function updatePlantaoSelectionSummary() {
-        const contador = document.getElementById('plantaoSelecionadosCount');
-        const credito = document.getElementById('plantaoCreditoPreview');
-
-        if (contador) {
-            const selecionados = document.querySelectorAll('#checklistColaboradores input:checked').length;
-            contador.textContent = `${selecionados} colaborador(es) selecionado(s)`;
+    function renderLancamentosPlantao(state) {
+        if (state.lancamentos.length === 0) {
+            return `
+                <p class="plantao-lancamentos-vazio">
+                    <i class="fas fa-inbox"></i>
+                    Nenhum lancamento ainda. Escolha o colaborador, o horario e o destino das horas acima.
+                </p>
+            `;
         }
 
-        if (credito) {
-            const horaInicio = document.getElementById('plantaoHoraInicio')?.value;
-            const horaFim = document.getElementById('plantaoHoraFim')?.value;
+        const indisponiveis = new Set(
+            (state.disponibilidade || [])
+                .filter((item) => item.disponivel === false)
+                .map((item) => Number(item.id))
+        );
 
-            if (!horaInicio || !horaFim) {
-                credito.textContent = 'Credito por colaborador: informe o horario';
-                return;
-            }
+        const linhas = state.lancamentos.map((linha, indice) => {
+            const minutos = duracaoLancamentoPlantao(linha);
+            const indisponivel = indisponiveis.has(Number(linha.colaboradorId));
+            const meta = PLANTAO_CREDITO_META[linha.tipoCredito];
+            const emEdicao = state.editandoIndice === indice;
+            const nome = nomeColaboradorPlantao(linha.colaboradorId);
 
-            const [horaInicioHoras, horaInicioMinutos] = horaInicio.split(':').map(Number);
-            const [horaFimHoras, horaFimMinutos] = horaFim.split(':').map(Number);
-            const minutos = ((horaFimHoras * 60) + horaFimMinutos) - ((horaInicioHoras * 60) + horaInicioMinutos);
+            return `
+                <li class="plantao-lancamento${indisponivel ? ' is-indisponivel' : ''}${emEdicao ? ' is-editando' : ''}">
+                    <div class="plantao-lancamento-info">
+                        <div class="plantao-lancamento-topo">
+                            <span class="plantao-lancamento-hora">${escapeHtml(linha.horaInicio)} - ${escapeHtml(linha.horaFim)}</span>
+                            <span class="plantao-lancamento-credito plantao-credito--${linha.tipoCredito}">
+                                <i class="fas ${meta.icone}"></i> ${escapeHtml(meta.curto)}
+                            </span>
+                        </div>
+                        <div class="plantao-lancamento-nome">
+                            ${escapeHtml(nome)}
+                            ${indisponivel ? '<small class="status-indisponivel">Indisponivel</small>' : ''}
+                        </div>
+                    </div>
+                    <div class="plantao-lancamento-acoes">
+                        <span class="plantao-lancamento-duracao">${minutos ? escapeHtml(minutosParaTexto(minutos)) : '--'}</span>
+                        <button type="button" class="btn-icon-sm edit" title="Editar lancamento" aria-label="Editar lancamento de ${escapeHtml(nome)}" onclick="editarLancamentoPlantao(${indice})">
+                            <i class="fas fa-pen"></i>
+                        </button>
+                        <button type="button" class="btn-icon-sm delete" title="Remover lancamento" aria-label="Remover lancamento de ${escapeHtml(nome)}" onclick="removerLancamentoPlantao(${indice})">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                </li>
+            `;
+        }).join('');
 
-            if (minutos <= 0) {
-                credito.textContent = 'Credito por colaborador: horario invalido';
-                return;
-            }
+        return `
+            <ul class="plantao-lancamentos">${linhas}</ul>
+            ${renderResumoLancamentosPlantao(state)}
+        `;
+    }
 
-            credito.textContent = `Credito por colaborador: ${minutosParaTexto(minutos)}`;
-        }
+    function renderOpcoesColaboradorPlantao(state) {
+        const indisponiveis = new Map(
+            (state.disponibilidade || [])
+                .filter((item) => item.disponivel === false)
+                .map((item) => [Number(item.id), item.motivoLabel || 'Indisponivel'])
+        );
+
+        const lista = filtrarChecklistPorMeusSetoresPlantao(
+            Array.isArray(window.colaboradores) ? window.colaboradores : [],
+            state.lancamentos.map((linha) => linha.colaboradorId)
+        );
+
+        const selecionado = Number(state.rascunho?.colaboradorId || 0);
+
+        return ['<option value="">Selecione o colaborador</option>'].concat(
+            lista.map((colaborador) => {
+                const id = Number(colaborador.Id);
+                const motivo = indisponiveis.get(id);
+                // Quem esta sendo editado continua selecionavel mesmo marcado
+                // como indisponivel; senao o select abriria vazio na edicao.
+                const bloqueado = Boolean(motivo) && id !== selecionado;
+                const rotulo = escapeHtml(colaborador.Nome) + (motivo ? ` (${escapeHtml(motivo)})` : '');
+
+                return `<option value="${id}"${bloqueado ? ' disabled' : ''}${id === selecionado ? ' selected' : ''}>${rotulo}</option>`;
+            })
+        ).join('');
     }
 
     async function carregarDisponibilidadePlantao(state) {
         try {
             const response = await window.API.getPlantaoDisponibilidade(state.dataISO, {
-                horaInicio: state.horaInicio || undefined,
-                horaFim: state.horaFim || undefined
+                horaInicio: state.rascunho?.horaInicio || undefined,
+                horaFim: state.rascunho?.horaFim || undefined
             });
 
             state.disponibilidade = Array.isArray(response?.colaboradores) ? response.colaboradores : [];
@@ -2411,13 +2709,6 @@
             }));
         }
 
-        const disponiveis = new Set(
-            (state.disponibilidade || [])
-                .filter((item) => item.disponivel !== false)
-                .map((item) => Number(item.id))
-        );
-
-        state.selecionados = (state.selecionados || []).filter((item) => disponiveis.has(Number(item)));
         return state;
     }
 
@@ -2430,92 +2721,158 @@
             return;
         }
 
+        const tipo = state.tipoPlantao || 'sabado';
+        const rotuloTipo = rotuloTipoPlantao(tipo, construirMapaFeriadosPlantao().get(state.dataISO));
+        const jaLancado = (window.plantoesLancados || []).some((item) => item.dataISO === state.dataISO);
+        const editando = Number.isInteger(state.editandoIndice);
+        const tipoCredito = normalizarTipoCreditoPlantao(state.rascunho?.tipoCredito);
+
         editorPanel.style.display = 'block';
-        editorTitle.innerText = `Plantao - ${state.dataFormatada}`;
+        editorTitle.innerText = state.dataFormatada;
+
+        // O tipo do dia e detectado pela data e nao e editavel: como campo de
+        // formulario ele so ocupava espaco. Vira etiqueta no cabecalho.
+        const editorSubtitulo = document.getElementById('plantaoEditorSubtitulo');
+
+        if (editorSubtitulo) {
+            editorSubtitulo.innerHTML = `
+                <span class="plantao-tipo-chip plantao-tipo--${tipo}">
+                    <i class="fas fa-circle"></i> ${escapeHtml(rotuloTipo)}
+                </span>
+                <span class="plantao-estado-chip${jaLancado ? ' is-lancado' : ''}">
+                    ${jaLancado ? 'Plantao lancado' : 'Ainda nao lancado'}
+                </span>
+            `;
+        }
 
         editorContent.innerHTML = `
             <div class="editor-plantao">
-                <div class="editor-form-grid">
-                    <div class="editor-form-group">
-                        <label><i class="fas fa-calendar-week"></i> Tipo do plantao</label>
-                        <div class="plantao-tipo-display plantao-tipo--${state.tipoPlantao || 'sabado'}">
-                            <i class="fas fa-circle"></i>
-                            ${escapeHtml(rotuloTipoPlantao(state.tipoPlantao, construirMapaFeriadosPlantao().get(state.dataISO)))}
-                        </div>
-                        <small class="helper-text">Detectado pela data. Plantao permitido em sabado, domingo e feriado.</small>
+                <div class="editor-form-group plantao-form-novo${editando ? ' is-editando' : ''}">
+                    <label>
+                        <i class="fas ${editando ? 'fa-pen' : 'fa-user-plus'}"></i>
+                        ${editando ? 'Editando lancamento' : 'Adicionar lancamento'}
+                    </label>
+
+                    <select id="plantaoNovoColaborador" class="form-control">
+                        ${renderOpcoesColaboradorPlantao(state)}
+                    </select>
+
+                    <div class="plantao-novo-horario">
+                        <input type="time" id="plantaoNovoInicio" class="form-control" value="${escapeHtml(state.rascunho?.horaInicio || '')}" aria-label="Hora inicial">
+                        <span>ate</span>
+                        <input type="time" id="plantaoNovoFim" class="form-control" value="${escapeHtml(state.rascunho?.horaFim || '')}" aria-label="Hora final">
                     </div>
-                    <div class="editor-form-group">
-                        <label><i class="fas fa-clock"></i> Horario do plantao</label>
-                        <div class="time-inputs plantao-time-inputs">
-                            <input type="time" id="plantaoHoraInicio" value="${escapeHtml(formatarHoraInput(state.horaInicio))}">
-                            <span>ate</span>
-                            <input type="time" id="plantaoHoraFim" value="${escapeHtml(formatarHoraInput(state.horaFim))}">
-                        </div>
-                        <small class="helper-text">Essas horas viram credito no banco de horas.</small>
+
+                    <div class="plantao-credito-escolha" role="group" aria-label="Destino das horas">
+                        ${Object.entries(PLANTAO_CREDITO_META).map(([chave, meta]) => `
+                            <button
+                                type="button"
+                                class="plantao-credito-opcao plantao-credito--${chave}${chave === tipoCredito ? ' is-active' : ''}"
+                                data-plantao-credito="${chave}"
+                                aria-pressed="${chave === tipoCredito ? 'true' : 'false'}"
+                                onclick="definirTipoCreditoPlantao('${chave}')"
+                            >
+                                <i class="fas ${meta.icone}"></i> ${escapeHtml(meta.label)}
+                            </button>
+                        `).join('')}
                     </div>
-                    <div class="editor-form-group">
-                        <label><i class="fas fa-wallet"></i> Resumo</label>
-                        <div class="plantao-bank-preview">
-                            <span id="plantaoCreditoPreview">Credito por colaborador: ${state.horaInicio && state.horaFim ? minutosParaTexto((((Number(state.horaFim.slice(0, 2)) * 60) + Number(state.horaFim.slice(3, 5))) - ((Number(state.horaInicio.slice(0, 2)) * 60) + Number(state.horaInicio.slice(3, 5))))) : 'informe o horario'}</span>
-                        </div>
+                    <small class="helper-text" id="plantaoCreditoAjuda">${escapeHtml(PLANTAO_CREDITO_META[tipoCredito].ajuda)}</small>
+
+                    <div class="plantao-form-acoes">
+                        <button type="button" class="btn-primary" onclick="confirmarLancamentoPlantao()">
+                            <i class="fas ${editando ? 'fa-check' : 'fa-plus'}"></i>
+                            ${editando ? 'Salvar lancamento' : 'Adicionar ao dia'}
+                        </button>
+                        ${editando ? `
+                            <button type="button" class="btn-secondary" onclick="cancelarEdicaoLancamentoPlantao()">
+                                <i class="fas fa-times"></i> Cancelar edicao
+                            </button>
+                        ` : ''}
                     </div>
+
+                    ${editando ? '' : '<small class="helper-text">Um colaborador por linha. Para um turno com varias pessoas, repita o mesmo horario.</small>'}
+                </div>
+
+                <div class="editor-form-group">
+                    <label><i class="fas fa-list-check"></i> Lancamentos do dia</label>
+                    ${renderLancamentosPlantao(state)}
                 </div>
 
                 <div class="editor-form-group">
                     <label><i class="fas fa-align-left"></i> Observacao</label>
-                    <textarea id="plantaoObservacao" class="form-control" rows="3" placeholder="Detalhes opcionais para o plantao">${escapeHtml(state.observacao || '')}</textarea>
-                </div>
-
-                <div class="editor-form-group">
-                    <label><i class="fas fa-users"></i> Selecione os colaboradores</label>
-                    <div class="colaboradores-checklist" id="checklistColaboradores">
-                        ${renderChecklistColaboradoresAvancado(state.selecionados, state.disponibilidade)}
-                    </div>
+                    <textarea id="plantaoObservacao" class="form-control" rows="2" placeholder="Detalhes opcionais para o dia">${escapeHtml(state.observacao || '')}</textarea>
                 </div>
 
                 <div class="editor-actions">
-                    <button onclick="salvarPlantao('${state.dataISO}')" class="btn-primary">
-                        <i class="fas fa-save"></i> Salvar Plantao
+                    <button type="button" onclick="salvarPlantao('${state.dataISO}')" class="btn-primary">
+                        <i class="fas fa-save"></i> ${jaLancado ? 'Salvar alteracoes' : 'Salvar dia'}
                     </button>
-                    <button onclick="fecharPlantaoEditor()" class="btn-secondary">
+                    <button type="button" onclick="fecharPlantaoEditor()" class="btn-secondary">
                         <i class="fas fa-times"></i> Cancelar
                     </button>
+                    ${jaLancado ? `
+                        <button type="button" onclick="excluirPlantao('${state.dataISO}')" class="btn-danger-ghost" title="Excluir todos os lancamentos do dia">
+                            <i class="fas fa-trash"></i> Excluir dia
+                        </button>
+                    ` : ''}
                 </div>
             </div>
         `;
 
-        editorContent.querySelectorAll('#checklistColaboradores input[type="checkbox"]').forEach((checkbox) => {
-            checkbox.addEventListener('change', updatePlantaoSelectionSummary);
-        });
+        const novoInicio = document.getElementById('plantaoNovoInicio');
+        const novoFim = document.getElementById('plantaoNovoFim');
+        const novoColaborador = document.getElementById('plantaoNovoColaborador');
 
-        const horaInicio = document.getElementById('plantaoHoraInicio');
-        const horaFim = document.getElementById('plantaoHoraFim');
-
-        [horaInicio, horaFim].forEach((campo) => {
+        // O horario digitado sobrevive ao redesenho da lista e ainda refiltra a
+        // disponibilidade: quem esta ausente naquele intervalo some do select.
+        [novoInicio, novoFim].forEach((campo) => {
             campo?.addEventListener('input', () => {
-                updatePlantaoSelectionSummary();
+                const currentState = getPlantaoEditorState();
+
+                if (!currentState) {
+                    return;
+                }
+
+                currentState.rascunho = currentState.rascunho || {};
+                currentState.rascunho.horaInicio = novoInicio?.value || '';
+                currentState.rascunho.horaFim = novoFim?.value || '';
 
                 if (disponibilidadeTimer) {
                     clearTimeout(disponibilidadeTimer);
                 }
 
                 disponibilidadeTimer = setTimeout(async () => {
-                    const currentState = getPlantaoEditorState();
+                    const ultimoState = getPlantaoEditorState();
 
-                    if (!currentState) {
+                    if (!ultimoState) {
                         return;
                     }
 
-                    currentState.horaInicio = horaInicio?.value || null;
-                    currentState.horaFim = horaFim?.value || null;
-                    await carregarDisponibilidadePlantao(currentState);
-                    renderPlantaoEditor(currentState);
-                    updatePlantaoSelectionSummary();
-                }, 250);
+                    capturarRascunhoPlantao(ultimoState);
+                    await carregarDisponibilidadePlantao(ultimoState);
+                    renderPlantaoEditor(ultimoState);
+                }, 400);
             });
         });
 
-        updatePlantaoSelectionSummary();
+        novoColaborador?.addEventListener('change', () => {
+            const currentState = getPlantaoEditorState();
+
+            if (currentState) {
+                currentState.rascunho = currentState.rascunho || {};
+                currentState.rascunho.colaboradorId = Number(novoColaborador.value || 0);
+            }
+        });
+
+        // Enter em qualquer campo do formulario adiciona/salva a linha.
+        [novoInicio, novoFim, novoColaborador].forEach((campo) => {
+            campo?.addEventListener('keydown', (event) => {
+                if (event.key === 'Enter') {
+                    event.preventDefault();
+                    window.confirmarLancamentoPlantao();
+                }
+            });
+        });
     }
 
     window.carregarBancoHorasResumo = carregarBancoHorasResumo = function carregarBancoHorasResumoComCache() {
@@ -3555,45 +3912,98 @@
         container.innerHTML = renderPlantoesLancados();
     }
 
+    // Um dia pode ter varios turnos, e cada turno e uma linha da tabela. O card
+    // e do DIA: junta os turnos daquela data e mostra cada um como uma faixa.
     window.renderPlantoesLancados = renderPlantoesLancados = function renderPlantoesLancadosAvancado() {
             if (!window.plantoesLancados || window.plantoesLancados.length === 0) {
                 return '<div class="empty-state">Nenhum plantao lancado ainda</div>';
             }
 
-            const ordenados = [...window.plantoesLancados]
-                .filter((plantao) => ehDataPlantaoValida(plantao.dataISO) || ['sabado', 'domingo', 'feriado'].includes(plantao.tipoPlantao))
-                .sort((a, b) => new Date(b.dataISO) - new Date(a.dataISO));
+            const validos = [...window.plantoesLancados]
+                .filter((plantao) => ehDataPlantaoValida(plantao.dataISO) || ['sabado', 'domingo', 'feriado'].includes(plantao.tipoPlantao));
 
-            if (ordenados.length === 0) {
-                return '<div class="empty-state">Nenhum plantao de sabado lancado ainda</div>';
+            if (validos.length === 0) {
+                return '<div class="empty-state">Nenhum plantao de sabado, domingo ou feriado lancado ainda</div>';
             }
 
-            return ordenados.map((plantao) => `
-                <div class="plantao-card">
-                    <div class="plantao-header">
-                        <div>
-                            <div class="plantao-data">${escapeHtml(formatarDataPtBr(plantao.dataISO))}</div>
-                            <div class="plantao-meta">
-                                <span><i class="fas fa-calendar-week"></i> ${escapeHtml((plantao.tipoPlantao || 'sabado').charAt(0).toUpperCase() + (plantao.tipoPlantao || 'sabado').slice(1))}</span>
-                                <span><i class="fas fa-clock"></i> ${escapeHtml(formatarHoraInput(plantao.horaInicio) || '--:--')} - ${escapeHtml(formatarHoraInput(plantao.horaFim) || '--:--')}</span>
-                                <span><i class="fas fa-wallet"></i> ${escapeHtml(plantao.duracaoFormatada || (plantao.horaInicio && plantao.horaFim ? minutosParaTexto((((Number(plantao.horaFim.slice(0, 2)) * 60) + Number(plantao.horaFim.slice(3, 5))) - ((Number(plantao.horaInicio.slice(0, 2)) * 60) + Number(plantao.horaInicio.slice(3, 5))))) : 'Horario pendente'))}</span>
+            const porData = new Map();
+
+            for (const plantao of validos) {
+                if (!porData.has(plantao.dataISO)) {
+                    porData.set(plantao.dataISO, []);
+                }
+
+                porData.get(plantao.dataISO).push(plantao);
+            }
+
+            const dias = [...porData.entries()]
+                .sort((a, b) => new Date(b[0]) - new Date(a[0]));
+
+            return dias.map(([dataISO, turnos]) => {
+                const ordenados = [...turnos].sort((a, b) => (
+                    String(formatarHoraInput(a.horaInicio) || '').localeCompare(String(formatarHoraInput(b.horaInicio) || ''))
+                ));
+                const tipoPlantao = ordenados[0]?.tipoPlantao || 'sabado';
+                const observacao = ordenados.find((item) => item.observacao)?.observacao || '';
+                const pessoas = new Set(ordenados.flatMap((item) => item.colaboradores || [])).size;
+
+                const totais = ordenados.reduce((acumulado, item) => {
+                    const chave = normalizarTipoCreditoPlantao(item.tipoCredito);
+                    const minutos = duracaoLancamentoPlantao({
+                        horaInicio: formatarHoraInput(item.horaInicio),
+                        horaFim: formatarHoraInput(item.horaFim)
+                    }) || 0;
+
+                    acumulado[chave] += minutos * (item.colaboradores || []).length;
+                    return acumulado;
+                }, { banco: 0, extra: 0 });
+
+                const turnosHtml = ordenados.map((item) => {
+                    const chave = normalizarTipoCreditoPlantao(item.tipoCredito);
+                    const meta = PLANTAO_CREDITO_META[chave];
+
+                    return `
+                        <div class="plantao-turno">
+                            <span class="plantao-turno-hora">
+                                <i class="fas fa-clock"></i>
+                                ${escapeHtml(formatarHoraInput(item.horaInicio) || '--:--')} - ${escapeHtml(formatarHoraInput(item.horaFim) || '--:--')}
+                            </span>
+                            <span class="plantao-lancamento-credito plantao-credito--${chave}">
+                                <i class="fas ${meta.icone}"></i> ${escapeHtml(meta.curto)}
+                            </span>
+                            <div class="plantao-colaboradores">
+                                ${renderColaboradoresPlantao(item.colaboradores)}
                             </div>
                         </div>
-                        <div class="plantao-actions">
-                            <button onclick="editarPlantao('${plantao.dataISO}')" class="btn-icon-sm edit" title="Editar">
-                                <i class="fas fa-edit"></i>
-                            </button>
-                            <button onclick="excluirPlantao('${plantao.dataISO}')" class="btn-icon-sm delete" title="Excluir">
-                                <i class="fas fa-trash"></i>
-                            </button>
+                    `;
+                }).join('');
+
+                return `
+                    <div class="plantao-card">
+                        <div class="plantao-header">
+                            <div>
+                                <div class="plantao-data">${escapeHtml(formatarDataPtBr(dataISO))}</div>
+                                <div class="plantao-meta">
+                                    <span><i class="fas fa-calendar-week"></i> ${escapeHtml(tipoPlantao.charAt(0).toUpperCase() + tipoPlantao.slice(1))}</span>
+                                    <span><i class="fas fa-list-check"></i> ${ordenados.length} turno(s) &middot; ${pessoas} pessoa(s)</span>
+                                    ${totais.banco > 0 ? `<span><i class="fas fa-piggy-bank"></i> ${escapeHtml(minutosParaTexto(totais.banco))} em banco</span>` : ''}
+                                    ${totais.extra > 0 ? `<span><i class="fas fa-money-bill-wave"></i> ${escapeHtml(minutosParaTexto(totais.extra))} em hora extra</span>` : ''}
+                                </div>
+                            </div>
+                            <div class="plantao-actions">
+                                <button onclick="editarPlantao('${dataISO}')" class="btn-icon-sm edit" title="Editar dia" aria-label="Editar plantao de ${escapeHtml(formatarDataPtBr(dataISO))}">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button onclick="excluirPlantao('${dataISO}')" class="btn-icon-sm delete" title="Excluir dia" aria-label="Excluir plantao de ${escapeHtml(formatarDataPtBr(dataISO))}">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
                         </div>
+                        ${observacao ? `<p class="plantao-observacao">${escapeHtml(observacao)}</p>` : ''}
+                        <div class="plantao-turnos">${turnosHtml}</div>
                     </div>
-                    ${plantao.observacao ? `<p class="plantao-observacao">${escapeHtml(plantao.observacao)}</p>` : ''}
-                    <div class="plantao-colaboradores">
-                        ${renderColaboradoresPlantao(plantao.colaboradores)}
-                    </div>
-                </div>
-            `).join('');
+                `;
+            }).join('');
         };
 
     window.carregarPlantoesLancadosNaTela = carregarPlantoesLancadosNaTela = function carregarPlantoesLancadosNaTelaAtualizado() {
@@ -3696,15 +4106,18 @@
                 <div id="plantaoEditor" class="editor-sidebar" style="display: none;">
                     <div class="editor-content">
                         <div class="editor-header">
-                            <h3><i class="fas fa-clock"></i> <span id="plantaoDataTitle">Selecione um sabado</span></h3>
-                            <button onclick="fecharPlantaoEditor()" class="btn-close-editor">
+                            <div class="editor-header-titulo">
+                                <h3><i class="fas fa-clock"></i> <span id="plantaoDataTitle">Selecione uma data</span></h3>
+                                <div id="plantaoEditorSubtitulo" class="editor-header-chips"></div>
+                            </div>
+                            <button onclick="fecharPlantaoEditor()" class="btn-close-editor" aria-label="Fechar painel">
                                 <i class="fas fa-times"></i>
                             </button>
                         </div>
                         <div id="plantaoEditorContent" class="editor-form">
                             <div class="editor-empty">
                                 <i class="fas fa-hand-pointer"></i>
-                                <p>Escolha um sabado para abrir o plantao, revisar a equipe e salvar sem duplicar o lancamento.</p>
+                                <p>Escolha uma data para abrir o plantao, montar os turnos do dia e definir o que vai para o banco de horas.</p>
                             </div>
                         </div>
                     </div>
@@ -3785,8 +4198,6 @@
         definirAncoraSabadoPlantao(dataISO);
         atualizarSabadoSelecionadoPlantao(dataISO);
 
-        const existente = (window.plantoesLancados || []).find((item) => item.dataISO === dataISO);
-
         if (!ehDataPlantaoValida(dataISO)) {
             if (typeof mostrarToast === 'function') {
                 mostrarToast('Plantao so pode ser lancado em sabado, domingo ou feriado.', 'warning');
@@ -3794,14 +4205,25 @@
             return;
         }
 
+        const registrosDoDia = (window.plantoesLancados || []).filter((item) => item.dataISO === dataISO);
+        const lancamentos = lancamentosDoDiaPlantao(dataISO);
+        // O ultimo turno gravado vira o padrao do formulario: quase sempre a
+        // proxima pessoa lancada entra no mesmo horario.
+        const ultimo = lancamentos[lancamentos.length - 1] || null;
+
         const state = setPlantaoEditorState({
             dataISO,
             dataFormatada,
             tipoPlantao: resolverTipoPlantaoFront(dataISO) || 'sabado',
-            horaInicio: existente?.horaInicio ? formatarHoraInput(existente.horaInicio) : '',
-            horaFim: existente?.horaFim ? formatarHoraInput(existente.horaFim) : '',
-            observacao: existente?.observacao || '',
-            selecionados: Array.isArray(existente?.colaboradores) ? [...existente.colaboradores] : [],
+            observacao: registrosDoDia.find((item) => item.observacao)?.observacao || '',
+            lancamentos,
+            editandoIndice: null,
+            rascunho: {
+                colaboradorId: 0,
+                horaInicio: ultimo?.horaInicio || '',
+                horaFim: ultimo?.horaFim || '',
+                tipoCredito: ultimo?.tipoCredito || 'banco'
+            },
             disponibilidade: []
         });
 
@@ -3823,9 +4245,15 @@
             editorContent.innerHTML = `
                 <div class="editor-empty">
                     <i class="fas fa-hand-pointer"></i>
-                    <p>Escolha um sabado para abrir o plantao, revisar a equipe e salvar sem duplicar o lancamento.</p>
+                    <p>Escolha uma data para abrir o plantao, montar os turnos do dia e definir o que vai para o banco de horas.</p>
                 </div>
             `;
+        }
+
+        const editorSubtitulo = document.getElementById('plantaoEditorSubtitulo');
+
+        if (editorSubtitulo) {
+            editorSubtitulo.innerHTML = '';
         }
 
         if (editorPanel) {
@@ -3834,30 +4262,29 @@
     };
 
     window.salvarPlantao = salvarPlantao = async function salvarPlantaoAvancado(dataISO) {
-        const tipoPlantao = resolverTipoPlantaoFront(dataISO) || 'sabado';
-        const horaInicio = document.getElementById('plantaoHoraInicio')?.value;
-        const horaFim = document.getElementById('plantaoHoraFim')?.value;
-        const observacao = document.getElementById('plantaoObservacao')?.value || '';
-        const selecionados = Array.from(document.querySelectorAll('#checklistColaboradores input:checked'))
-            .map((checkbox) => Number(checkbox.value));
+        const state = getPlantaoEditorState();
 
-        if (!horaInicio || !horaFim) {
-            mostrarToast('Informe a hora inicial e final do plantao.', 'error');
+        if (!state || state.dataISO !== dataISO) {
+            mostrarToast('Abra a data novamente antes de salvar.', 'error');
             return;
         }
 
-        if (horaFim <= horaInicio) {
-            mostrarToast('A hora final precisa ser maior que a hora inicial.', 'error');
-            return;
-        }
-
-        if (selecionados.length === 0) {
-            mostrarToast('Selecione pelo menos um colaborador disponivel.', 'error');
-            return;
-        }
+        capturarRascunhoPlantao(state);
 
         if (!ehDataPlantaoValida(dataISO)) {
             mostrarToast('Plantao so pode ser lancado em sabado, domingo ou feriado.', 'warning');
+            return;
+        }
+
+        if (Number.isInteger(state.editandoIndice)) {
+            mostrarToast('Termine (ou cancele) a edicao do lancamento antes de salvar o dia.', 'warning');
+            return;
+        }
+
+        // Salvar um dia sem nenhuma linha equivale a apagar o dia — mas isso e
+        // destrutivo demais para acontecer por engano no botao de salvar.
+        if (state.lancamentos.length === 0) {
+            mostrarToast('Adicione pelo menos um lancamento. Para limpar o dia, use "Excluir dia".', 'error');
             return;
         }
 
@@ -3865,11 +4292,14 @@
             window.__plantaoDataFocoISO = dataISO;
             await window.API.salvarPlantao({
                 dataISO,
-                tipoPlantao,
-                horaInicio,
-                horaFim,
-                observacao,
-                colaboradores: selecionados
+                tipoPlantao: resolverTipoPlantaoFront(dataISO) || 'sabado',
+                observacao: state.observacao || '',
+                lancamentos: state.lancamentos.map((linha) => ({
+                    colaboradorId: linha.colaboradorId,
+                    horaInicio: linha.horaInicio,
+                    horaFim: linha.horaFim,
+                    tipoCredito: linha.tipoCredito
+                }))
             });
 
             await atualizarTudo({ silent: true, source: 'plantao' });
@@ -4233,23 +4663,36 @@
 
     function buildPlantaoReportSummary(items) {
         const uniqueCollaborators = new Set();
+        const dias = new Set();
         let totalMinutes = 0;
-        let totalCreditMinutes = 0;
+        // Hora extra nao entra no banco: somar tudo num "credito" so daria um
+        // numero que nao bate com nenhum saldo. Os dois totais vao separados.
+        let bancoMinutes = 0;
+        let extraMinutes = 0;
 
         items.forEach((plantao) => {
             const colaboradoresCount = Array.isArray(plantao.colaboradores) ? plantao.colaboradores.length : 0;
             const durationMinutes = getPlantaoDurationMinutesReport(plantao);
+            const horasEquipe = durationMinutes * Math.max(colaboradoresCount, 0);
 
             (plantao.colaboradores || []).forEach((id) => uniqueCollaborators.add(Number(id)));
+            dias.add(plantao.dataISO);
             totalMinutes += durationMinutes;
-            totalCreditMinutes += durationMinutes * Math.max(colaboradoresCount, 0);
+
+            if (plantao.tipoCredito === 'extra') {
+                extraMinutes += horasEquipe;
+            } else {
+                bancoMinutes += horasEquipe;
+            }
         });
 
         return {
-            totalPlantoes: items.length,
+            // Conta DIAS de plantao: um dia com dois turnos e um plantao so.
+            totalPlantoes: dias.size,
             totalColaboradores: uniqueCollaborators.size,
             horasProgramadas: formatDurationEscala(totalMinutes || 0),
-            horasCreditadas: formatDurationEscala(totalCreditMinutes || 0)
+            horasBanco: formatDurationEscala(bancoMinutes || 0),
+            horasExtra: formatDurationEscala(extraMinutes || 0)
         };
     }
 
@@ -4277,6 +4720,7 @@
                 ...item,
                 dataISO: toISODateEscala(item.dataISO || item.data_plantao),
                 tipoPlantao: item.tipoPlantao || item.tipo_plantao || null,
+                tipoCredito: String(item.tipoCredito || item.tipo_credito || '').toLowerCase() === 'extra' ? 'extra' : 'banco',
                 colaboradores: Array.isArray(item.colaboradores) ? item.colaboradores : [],
                 horaInicio: item.horaInicio || item.hora_inicio || null,
                 horaFim: item.horaFim || item.hora_fim || null,
@@ -4575,10 +5019,17 @@
                         </div>
                     </div>
                     <div class="resumo-card-estatistica">
-                        <i class="fas fa-wallet"></i>
+                        <i class="fas fa-piggy-bank"></i>
                         <div>
-                            <strong>${escapeHtmlEscala(summary.horasCreditadas)}</strong>
-                            <span>Credito total da equipe</span>
+                            <strong>${escapeHtmlEscala(summary.horasBanco)}</strong>
+                            <span>Credito em banco de horas</span>
+                        </div>
+                    </div>
+                    <div class="resumo-card-estatistica">
+                        <i class="fas fa-money-bill-wave"></i>
+                        <div>
+                            <strong>${escapeHtmlEscala(summary.horasExtra)}</strong>
+                            <span>Horas extras (fora do banco)</span>
                         </div>
                     </div>
                 </div>
@@ -4588,33 +5039,41 @@
                             <th>Data</th>
                             <th>Tipo</th>
                             <th>Horario</th>
+                            <th>Destino</th>
                             <th>Status</th>
                             <th>Colaboradores</th>
                             <th>Observacao</th>
-                            <th>Credito</th>
+                            <th>Duracao</th>
                         </tr>
                     </thead>
                     <tbody>
-                        ${[...items].sort((first, second) => String(second.dataISO).localeCompare(String(first.dataISO))).map((plantao) => {
-                            const colaboradores = (plantao.colaboradores || []).map((id) => {
-                                const colaborador = (window.colaboradores || []).find((item) => Number(item.Id) === Number(id));
-                                return colaborador?.Nome || 'Desconhecido';
-                            });
-                            const statusLabel = colaboradores.length > 0 ? 'Equipe definida' : 'Sem equipe';
-                            const statusClass = colaboradores.length > 0 ? 'badge-folga' : 'badge-ausencia';
+                        ${[...items]
+                            .sort((first, second) => (
+                                String(second.dataISO).localeCompare(String(first.dataISO))
+                                || String(first.horaInicio || '').localeCompare(String(second.horaInicio || ''))
+                            ))
+                            .map((plantao) => {
+                                const colaboradores = (plantao.colaboradores || []).map((id) => {
+                                    const colaborador = (window.colaboradores || []).find((item) => Number(item.Id) === Number(id));
+                                    return colaborador?.Nome || 'Desconhecido';
+                                });
+                                const statusLabel = colaboradores.length > 0 ? 'Equipe definida' : 'Sem equipe';
+                                const statusClass = colaboradores.length > 0 ? 'badge-folga' : 'badge-ausencia';
+                                const extra = plantao.tipoCredito === 'extra';
 
-                            return `
-                                <tr>
-                                    <td><strong>${escapeHtmlEscala(formatDatePtBrEscala(plantao.dataISO))}</strong></td>
-                                    <td>${escapeHtmlEscala((plantao.tipoPlantao || 'sabado').charAt(0).toUpperCase() + (plantao.tipoPlantao || 'sabado').slice(1))}</td>
-                                    <td>${escapeHtmlEscala(formatTimeRangeEscala(plantao.horaInicio, plantao.horaFim))}</td>
-                                    <td><span class="evento-tipo ${statusClass}">${escapeHtmlEscala(statusLabel)}</span></td>
-                                    <td>${escapeHtmlEscala(colaboradores.join(', ') || '--')}</td>
-                                    <td>${escapeHtmlEscala(plantao.observacao || '--')}</td>
-                                    <td>${escapeHtmlEscala(plantao.duracaoFormatada || getPlantaoDurationLabelReport(plantao))}</td>
-                                </tr>
-                            `;
-                        }).join('')}
+                                return `
+                                    <tr>
+                                        <td><strong>${escapeHtmlEscala(formatDatePtBrEscala(plantao.dataISO))}</strong></td>
+                                        <td>${escapeHtmlEscala((plantao.tipoPlantao || 'sabado').charAt(0).toUpperCase() + (plantao.tipoPlantao || 'sabado').slice(1))}</td>
+                                        <td>${escapeHtmlEscala(formatTimeRangeEscala(plantao.horaInicio, plantao.horaFim))}</td>
+                                        <td><span class="evento-tipo ${extra ? 'badge-ausencia' : 'badge-folga'}">${extra ? 'Hora extra' : 'Banco de horas'}</span></td>
+                                        <td><span class="evento-tipo ${statusClass}">${escapeHtmlEscala(statusLabel)}</span></td>
+                                        <td>${escapeHtmlEscala(colaboradores.join(', ') || '--')}</td>
+                                        <td>${escapeHtmlEscala(plantao.observacao || '--')}</td>
+                                        <td>${escapeHtmlEscala(plantao.duracaoFormatada || getPlantaoDurationLabelReport(plantao))}</td>
+                                    </tr>
+                                `;
+                            }).join('')}
                     </tbody>
                 </table>
             </div>

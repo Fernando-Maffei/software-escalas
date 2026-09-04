@@ -942,17 +942,25 @@ function buscarPlantaoDoDia(dataISO) {
     const dataBusca = String(dataISO).trim().split('T')[0];
     console.log('📅 Data de busca limpa:', dataBusca);
     
-    const plantao = plantoesLancados.find(p => {
+    // O dia pode ter varios turnos (registros), cada um com sua equipe. Quem
+    // esta em QUALQUER turno esta de plantao naquele dia, entao a busca junta
+    // todos — pegar so o primeiro registro deixaria de fora quem entrou no
+    // turno da tarde.
+    const doDia = plantoesLancados.filter(p => {
         let dataPlantao = p.dataISO || p.data_plantao || '';
         dataPlantao = String(dataPlantao).trim().split('T')[0];
         return dataPlantao === dataBusca;
     });
-    
-    if (plantao) {
-        console.log('✅ Plantão encontrado! Colaboradores:', plantao.colaboradores);
-        return plantao.colaboradores;
+
+    if (doDia.length > 0) {
+        const colaboradoresDoDia = [...new Set(
+            doDia.flatMap(p => Array.isArray(p.colaboradores) ? p.colaboradores : [])
+        )];
+
+        console.log('✅ Plantão encontrado! Colaboradores:', colaboradoresDoDia);
+        return colaboradoresDoDia;
     }
-    
+
     console.log('❌ Nenhum plantão encontrado para', dataBusca);
     return null;
 }

@@ -114,24 +114,6 @@
     white-space: nowrap;
 }
 
-/* Tipo detectado, exibido no editor (substitui o antigo select so-sabado). */
-.plantao-tipo-display {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    font-weight: 600;
-    padding: 9px 14px;
-    border-radius: var(--radius-md);
-    background: var(--card-dark);
-    border: 1px solid var(--border);
-    color: var(--text);
-}
-
-.plantao-tipo-display i { font-size: 8px; }
-.plantao-tipo--sabado i { color: var(--primary); }
-.plantao-tipo--domingo i { color: #4f46e5; }
-.plantao-tipo--feriado i { color: #d97706; }
-
 .sabado-card-badges {
     display: flex;
     justify-content: space-between;
@@ -206,9 +188,17 @@
     letter-spacing: 0.3px;
 }
 
-/* Painel editor */
+/* ================= PAINEL DE LANCAMENTO ================= */
+/* Mais largo que os 400px de antes: o painel deixou de ser um checklist e
+   passou a montar turnos (colaborador + horario + destino das horas), entao
+   cada linha precisa caber sem quebrar. Fica grudado no topo ao rolar, porque
+   a regua de datas ao lado e comprida. */
 #plantaoEditor {
-    width: 400px;
+    width: 460px;
+    flex-shrink: 0;
+    align-self: flex-start;
+    position: sticky;
+    top: 16px;
     background: var(--card);
     border-radius: 24px;
     box-shadow: var(--shadow-xl);
@@ -216,121 +206,64 @@
     animation: slideIn 0.3s ease;
 }
 
-/* Checklist de colaboradores */
-.colaboradores-checklist {
-    max-height: 300px;
+#plantaoEditor .editor-content {
+    max-height: calc(100vh - 64px);
     overflow-y: auto;
-    padding: 8px;
-    background: var(--card-dark);
-    border-radius: 16px;
+}
+
+#plantaoEditor .editor-header {
+    align-items: flex-start;
+}
+
+.editor-header-titulo {
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 8px;
+    min-width: 0;
 }
 
-.colaborador-checkbox {
+#plantaoEditor .editor-header h3 {
+    margin: 0;
+    padding: 0;
+    border-bottom: none;
+    font-size: 18px;
+}
+
+.editor-header-chips {
     display: flex;
-    align-items: center;
-    padding: 6px 8px;
-    border-radius: 8px;
-    background: var(--card);
-    cursor: pointer;
-    transition: all 0.2s ease;
-    border: 1px solid var(--border);
+    flex-wrap: wrap;
+    gap: 6px;
 }
 
-.colaborador-checkbox:hover {
-    background: var(--primary-soft);
-    border-color: var(--primary);
-    transform: translateY(-2px);
-    box-shadow: var(--shadow-sm);
-}
-
-.colaborador-checkbox.indisponivel {
-    opacity: 0.55;
-    cursor: not-allowed;
-    background: #f8fafc;
-    border-style: dashed;
-}
-
-.colaborador-checkbox.indisponivel:hover {
-    transform: none;
-    box-shadow: none;
-    border-color: var(--border);
-}
-
-.colaborador-checkbox input[type="checkbox"] {
-    width: 16px;
-    height: 16px;
-    margin-right: 8px;
-    border-radius: 4px;
-    cursor: pointer;
-}
-
-.colaborador-checkbox input[type="checkbox"]:checked {
-    accent-color: var(--primary);
-}
-
-.checkbox-label {
-    display: flex;
+.plantao-tipo-chip,
+.plantao-estado-chip {
+    display: inline-flex;
     align-items: center;
     gap: 6px;
-    font-size: 12px;
-    color: var(--text);
-    cursor: pointer;
-    flex: 1;
-}
-
-.checkbox-label i {
-    width: 20px;
-    height: 20px;
-    font-size: 12px;
-    border-radius: 5px;
-    background: linear-gradient(135deg, var(--primary-soft) 0%, transparent 100%);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: var(--primary);
-}
-
-.checkbox-label strong {
-    font-size: 12px;
-    font-weight: 600;
-    color: var(--text);
-    margin-left: 4px;
-}
-
-.status-indisponivel {
-    display: inline-flex;
-    margin-left: 8px;
-    padding: 2px 8px;
+    padding: 3px 10px;
     border-radius: 999px;
-    background: #fee2e2;
-    color: #b91c1c;
-    font-size: 10px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.3px;
-}
-
-.selecionados-count {
-    margin-top: 8px;
-    padding: 6px;
     font-size: 11px;
-    gap: 4px;
-    background: var(--primary-soft);
-    border-radius: 12px;
-    text-align: center;
-    color: var(--primary);
-    font-weight: 600;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+    background: var(--card-dark);
     border: 1px solid var(--border);
+    color: var(--text);
 }
 
-.selecionados-count i {
-    font-size: 12px;
+.plantao-tipo-chip i { font-size: 7px; }
+.plantao-tipo--sabado i { color: var(--primary); }
+.plantao-tipo--domingo i { color: #4f46e5; }
+.plantao-tipo--feriado i { color: #d97706; }
+
+.plantao-estado-chip {
+    background: #f1f5f9;
+    color: #64748b;
+}
+
+.plantao-estado-chip.is-lancado {
+    background: #dcfce7;
+    border-color: #86efac;
+    color: #15803d;
 }
 
 #plantaoEditor .editor-form-group label {
@@ -346,24 +279,302 @@
     color: var(--primary);
 }
 
-.plantao-time-inputs {
-    margin-top: 8px;
-}
-
-.plantao-bank-preview {
-    padding: 12px;
-    border-radius: 14px;
-    background: var(--primary-soft);
-    color: var(--primary-dark);
-    font-weight: 600;
-    border: 1px solid var(--border);
-}
-
 #plantaoEditor select.form-control,
-#plantaoEditor select {
+#plantaoEditor select,
+#plantaoEditor textarea.form-control {
     width: 100%;
 }
 
+/* ---- Formulario de adicionar/editar um lancamento ---- */
+.plantao-form-novo {
+    padding: 16px;
+    border-radius: 18px;
+    background: var(--card-dark);
+    border: 1px solid var(--border);
+}
+
+/* Em edicao o bloco muda de cor para deixar claro que o botao "Salvar
+   lancamento" altera uma linha existente em vez de criar outra. */
+.plantao-form-novo.is-editando {
+    background: var(--primary-soft);
+    border-color: var(--primary);
+}
+
+.plantao-novo-horario {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.plantao-novo-horario input[type="time"] {
+    flex: 1;
+    min-width: 0;
+}
+
+.plantao-novo-horario span {
+    font-size: 12px;
+    color: var(--text-light);
+    flex-shrink: 0;
+}
+
+.plantao-credito-escolha {
+    display: flex;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.plantao-credito-opcao {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 10px 8px;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    background: var(--card);
+    color: var(--text-light);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.plantao-credito-opcao:hover {
+    border-color: var(--primary);
+    color: var(--text);
+}
+
+.plantao-credito-opcao.is-active.plantao-credito--banco {
+    background: #eff6ff;
+    border-color: #3b82f6;
+    color: #1d4ed8;
+}
+
+.plantao-credito-opcao.is-active.plantao-credito--extra {
+    background: #fff7ed;
+    border-color: #f97316;
+    color: #c2410c;
+}
+
+.plantao-form-novo .helper-text {
+    display: block;
+    margin-top: 8px;
+    font-size: 11px;
+    color: var(--text-light);
+    line-height: 1.4;
+}
+
+.plantao-form-acoes {
+    display: flex;
+    gap: 8px;
+    margin-top: 12px;
+}
+
+.plantao-form-acoes .btn-primary,
+.plantao-form-acoes .btn-secondary {
+    flex: 1;
+    justify-content: center;
+}
+
+/* ---- Lista de lancamentos do dia ---- */
+.plantao-lancamentos {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.plantao-lancamento {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 10px 12px;
+    border-radius: 14px;
+    background: var(--card-dark);
+    border: 1px solid var(--border);
+}
+
+.plantao-lancamento.is-editando {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 2px var(--primary-soft);
+}
+
+.plantao-lancamento.is-indisponivel {
+    border-style: dashed;
+    background: #fef2f2;
+}
+
+.plantao-lancamento-info {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+}
+
+.plantao-lancamento-topo {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.plantao-lancamento-hora {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--primary);
+    font-variant-numeric: tabular-nums;
+}
+
+.plantao-lancamento-credito {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+
+.plantao-credito--banco {
+    background: #eff6ff;
+    color: #1d4ed8;
+}
+
+.plantao-credito--extra {
+    background: #fff7ed;
+    color: #c2410c;
+}
+
+.plantao-lancamento-nome {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+    overflow-wrap: anywhere;
+}
+
+.plantao-lancamento-acoes {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+}
+
+.plantao-lancamento-duracao {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-light);
+    font-variant-numeric: tabular-nums;
+}
+
+.plantao-lancamentos-vazio {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 16px;
+    border-radius: 14px;
+    border: 1px dashed var(--border);
+    background: var(--card-dark);
+    color: var(--text-light);
+    font-size: 12px;
+    line-height: 1.5;
+}
+
+.plantao-lancamentos-vazio i {
+    font-size: 18px;
+    color: var(--text-light);
+    flex-shrink: 0;
+}
+
+.plantao-lancamentos-resumo {
+    margin-top: 10px;
+    padding: 10px 12px;
+    border-radius: 14px;
+    background: var(--primary-soft);
+    border: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--primary-dark);
+}
+
+.plantao-resumo-totais {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.plantao-total {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 9px;
+    border-radius: 999px;
+    font-size: 11px;
+    background: var(--card);
+}
+
+.plantao-total--banco { color: #1d4ed8; }
+.plantao-total--extra { color: #c2410c; }
+
+#plantaoEditor .editor-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+}
+
+#plantaoEditor .editor-actions .btn-primary,
+#plantaoEditor .editor-actions .btn-secondary {
+    flex: 1;
+    justify-content: center;
+}
+
+/* Excluir o dia inteiro e destrutivo: fica em linha propria e discreto, longe
+   do "Salvar" para nao ser clicado por engano. */
+.btn-danger-ghost {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 10px 14px;
+    border-radius: var(--radius-md);
+    border: 1px solid transparent;
+    background: transparent;
+    color: var(--danger);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn-danger-ghost:hover {
+    background: var(--danger-soft);
+    border-color: var(--danger);
+}
+
+.status-indisponivel {
+    display: inline-flex;
+    margin-left: 8px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: #fee2e2;
+    color: #b91c1c;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
 /* Lista de plantões lançados */
 .plantoes-lancados-container {
     background: var(--card);
@@ -440,6 +651,38 @@
     gap: 8px;
 }
 
+/* Cada turno do dia dentro do card de "Plantoes lancados". */
+.plantao-turnos {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.plantao-turno {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+    border-radius: 14px;
+    background: var(--card);
+    border: 1px solid var(--border);
+}
+
+.plantao-turno-hora {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--primary);
+    font-variant-numeric: tabular-nums;
+}
+
+.plantao-turno .plantao-colaboradores {
+    flex-basis: 100%;
+}
+
 .plantao-meta {
     display: flex;
     flex-wrap: wrap;
@@ -487,34 +730,21 @@
     font-size: 14px;
 }
 
-.empty-msg {
-    text-align: center;
-    padding: 30px;
-    color: var(--text-light);
-    background: var(--card);
-    border-radius: 12px;
-    border: 2px dashed var(--border);
-    font-size: 14px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 10px;
-}
-
-.empty-msg i {
-    font-size: 40px;
-    color: var(--primary);
-    opacity: 0.5;
-}
-
 /* Responsividade */
 @media (max-width: 1200px) {
     .plantao-layout {
         flex-direction: column;
     }
     
+    /* Empilhado, o painel deixa de ser barra lateral: sem sticky e sem teto de
+       altura, ele rola junto com a pagina. */
     #plantaoEditor {
         width: 100%;
+        position: static;
+    }
+
+    #plantaoEditor .editor-content {
+        max-height: none;
     }
 
     .sabados-header {
@@ -527,6 +757,14 @@
 @media (max-width: 768px) {
     .sabados-grid {
         grid-template-columns: repeat(3, 1fr);
+    }
+
+    /* Em telas estreitas os dois botoes de destino nao cabem lado a lado sem
+       cortar o texto, e as acoes do rodape viram uma coluna. */
+    .plantao-credito-escolha,
+    .plantao-form-acoes,
+    #plantaoEditor .editor-actions {
+        flex-direction: column;
     }
 
     .sabados-nav {
@@ -608,39 +846,6 @@
     color: var(--primary);
 }
 
-[data-theme="dark"] .colaboradores-checklist {
-    background: var(--card-dark);
-}
-
-[data-theme="dark"] .colaborador-checkbox {
-    background: var(--card);
-    border-color: var(--border);
-}
-
-[data-theme="dark"] .colaborador-checkbox:hover {
-    background: var(--primary-soft);
-    border-color: var(--primary);
-}
-
-[data-theme="dark"] .checkbox-label {
-    color: var(--text);
-}
-
-[data-theme="dark"] .checkbox-label i {
-    color: var(--primary);
-    background: var(--card-dark);
-}
-
-[data-theme="dark"] .checkbox-label strong {
-    color: var(--text);
-}
-
-[data-theme="dark"] .selecionados-count {
-    background: var(--primary-soft);
-    color: var(--primary);
-    border-color: var(--border);
-}
-
 /* Lista de plantões lançados no tema escuro */
 [data-theme="dark"] .plantoes-lancados-container {
     background: var(--card);
@@ -691,13 +896,86 @@
     color: var(--text-light);
 }
 
-[data-theme="dark"] .empty-msg {
+/* ---- Painel de lancamento no tema escuro ---- */
+[data-theme="dark"] .plantao-form-novo,
+[data-theme="dark"] .plantao-lancamento,
+[data-theme="dark"] .plantao-lancamentos-vazio {
     background: var(--card-dark);
-    color: var(--text-light);
     border-color: var(--border);
 }
 
-[data-theme="dark"] .empty-msg i {
-    color: var(--primary);
-    opacity: 0.5;
+[data-theme="dark"] .plantao-form-novo.is-editando {
+    background: var(--primary-soft);
+    border-color: var(--primary);
+}
+
+[data-theme="dark"] .plantao-lancamento.is-indisponivel {
+    background: rgba(239, 68, 68, 0.12);
+}
+
+[data-theme="dark"] .plantao-lancamento-nome {
+    color: var(--text);
+}
+
+[data-theme="dark"] .plantao-credito-opcao {
+    background: var(--card);
+    border-color: var(--border);
+    color: var(--text-light);
+}
+
+[data-theme="dark"] .plantao-credito-opcao.is-active.plantao-credito--banco {
+    background: rgba(59, 130, 246, 0.18);
+    border-color: #3b82f6;
+    color: #93c5fd;
+}
+
+[data-theme="dark"] .plantao-credito-opcao.is-active.plantao-credito--extra {
+    background: rgba(249, 115, 22, 0.18);
+    border-color: #f97316;
+    color: #fdba74;
+}
+
+[data-theme="dark"] .plantao-credito--banco {
+    background: rgba(59, 130, 246, 0.18);
+    color: #93c5fd;
+}
+
+[data-theme="dark"] .plantao-credito--extra {
+    background: rgba(249, 115, 22, 0.18);
+    color: #fdba74;
+}
+
+[data-theme="dark"] .plantao-tipo-chip,
+[data-theme="dark"] .plantao-estado-chip {
+    background: var(--card-dark);
+    border-color: var(--border);
+    color: var(--text-light);
+}
+
+[data-theme="dark"] .plantao-estado-chip.is-lancado {
+    background: rgba(34, 197, 94, 0.18);
+    border-color: #22c55e;
+    color: #86efac;
+}
+
+[data-theme="dark"] .plantao-lancamentos-resumo {
+    background: var(--primary-soft);
+    border-color: var(--border);
+    color: var(--text);
+}
+
+[data-theme="dark"] .plantao-total {
+    background: var(--card);
+}
+
+[data-theme="dark"] .plantao-total--banco { color: #93c5fd; }
+[data-theme="dark"] .plantao-total--extra { color: #fdba74; }
+
+[data-theme="dark"] .plantao-turno {
+    background: var(--card);
+    border-color: var(--border);
+}
+
+[data-theme="dark"] #plantaoEditor .editor-actions {
+    border-top-color: var(--border);
 }

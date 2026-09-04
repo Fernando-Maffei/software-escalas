@@ -285,7 +285,18 @@ function calcularMetricas(agora, dataHoje, jornadaSemanalIndex, colaboradoresBas
         return diff >= 0 && diff <= 30;
     });
 
-    const plantaoSemEquipe = proximosPlantoes.filter((plantao) => !Array.isArray(plantao.colaboradores) || plantao.colaboradores.length === 0).length;
+    // Um dia pode ter varios turnos, e cada turno e um registro. O painel conta
+    // DIAS de plantao, nao turnos, senao um sabado com dois turnos apareceria
+    // como dois plantoes.
+    const diasComPlantao = new Set(
+        proximosPlantoes.map((plantao) => toISODate(plantao.dataISO || plantao.data_plantao))
+    );
+    const diasSemEquipe = new Set(
+        proximosPlantoes
+            .filter((plantao) => Array.isArray(plantao.colaboradores) && plantao.colaboradores.length > 0)
+            .map((plantao) => toISODate(plantao.dataISO || plantao.data_plantao))
+    );
+    const plantaoSemEquipe = [...diasComPlantao].filter((dia) => !diasSemEquipe.has(dia)).length;
     const coberturaPercentual = ativosHoje.length > 0
         ? Math.round((disponibilidadeHoje / ativosHoje.length) * 100)
         : 0;
@@ -297,7 +308,7 @@ function calcularMetricas(agora, dataHoje, jornadaSemanalIndex, colaboradoresBas
         trabalhandoAgora,
         ausenciasHoje: ausenciasHoje.length,
         feriasHoje,
-        proximosPlantoes: proximosPlantoes.length,
+        proximosPlantoes: diasComPlantao.size,
         plantaoSemEquipe,
         coberturaPercentual
     };

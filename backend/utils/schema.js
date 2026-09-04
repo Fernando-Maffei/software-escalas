@@ -86,7 +86,8 @@ function getBancoHorasCapabilities(schema) {
         hasPlantaoHoraInicio: hasColumn(schema, 'plantoes', 'hora_inicio'),
         hasPlantaoHoraFim: hasColumn(schema, 'plantoes', 'hora_fim'),
         hasPlantaoObservacao: hasColumn(schema, 'plantoes', 'observacao'),
-        hasPlantaoTipo: hasColumn(schema, 'plantoes', 'tipo_plantao')
+        hasPlantaoTipo: hasColumn(schema, 'plantoes', 'tipo_plantao'),
+        hasPlantaoTipoCredito: hasColumn(schema, 'plantoes', 'tipo_credito')
     };
 }
 

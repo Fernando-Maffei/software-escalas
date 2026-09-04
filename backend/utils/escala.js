@@ -1111,6 +1111,10 @@ async function hydrateHistoricSourcesIntoEscala(poolOrTx, schema, existingMap, c
         WHERE ${plantaoClauses.join(' AND ')}
     `);
 
+    // Agrupa por data antes de aplicar: um dia com varios turnos precisa virar
+    // uma linha so por colaborador na escala (ver aggregatePlantoesPorColaborador).
+    const plantoesPorData = new Map();
+
     for (const row of plantoesResult.recordset) {
         const plantao = serializePlantaoRecord(row);
 
@@ -1118,7 +1122,15 @@ async function hydrateHistoricSourcesIntoEscala(poolOrTx, schema, existingMap, c
             continue;
         }
 
-        for (const colaboradorEscalado of plantao.colaboradores) {
+        if (!plantoesPorData.has(plantao.dataISO)) {
+            plantoesPorData.set(plantao.dataISO, []);
+        }
+
+        plantoesPorData.get(plantao.dataISO).push(plantao);
+    }
+
+    for (const plantoesDoDia of plantoesPorData.values()) {
+        for (const [colaboradorEscalado, plantao] of aggregatePlantoesPorColaborador(plantoesDoDia)) {
             if (colaboradorId && Number(colaboradorEscalado) !== Number(colaboradorId)) {
                 continue;
             }
@@ -1227,35 +1239,87 @@ async function syncAusenciaToEscalaDia(poolOrTx, schema, ausencia, colaborador) 
     }
 }
 
-async function syncPlantaoToEscalaDia(poolOrTx, schema, plantaoRow, colaboradores) {
+// escala_dia so aceita UMA linha por colaborador/data (UX_escala_dia_colaborador_data).
+// Como o dia de plantao passou a ter varios turnos, quem faz mais de um no
+// mesmo dia vira uma linha unica que cobre do primeiro inicio ao ultimo fim —
+// senao o ultimo turno gravado apagaria o anterior na escala.
+function aggregatePlantoesPorColaborador(plantoes) {
+    const porColaborador = new Map();
+
+    for (const plantao of plantoes) {
+        for (const colaboradorId of (plantao.colaboradores || [])) {
+            const chave = Number(colaboradorId);
+            const atual = porColaborador.get(chave);
+
+            if (!atual) {
+                porColaborador.set(chave, {
+                    id: plantao.id,
+                    dataISO: plantao.dataISO,
+                    horaInicio: plantao.horaInicio,
+                    horaFim: plantao.horaFim,
+                    observacao: plantao.observacao
+                });
+                continue;
+            }
+
+            if (plantao.horaInicio && (!atual.horaInicio || plantao.horaInicio < atual.horaInicio)) {
+                atual.horaInicio = plantao.horaInicio;
+            }
+
+            if (plantao.horaFim && (!atual.horaFim || plantao.horaFim > atual.horaFim)) {
+                atual.horaFim = plantao.horaFim;
+            }
+
+            // A escala aponta para uma origem so; fica com o menor id do dia,
+            // que e estavel enquanto qualquer turno daquele dia existir.
+            if (plantao.id && (!atual.id || plantao.id < atual.id)) {
+                atual.id = plantao.id;
+            }
+
+            atual.observacao = atual.observacao || plantao.observacao;
+        }
+    }
+
+    return porColaborador;
+}
+
+// Sincroniza TODOS os turnos de um dia de uma vez. Recebe as linhas cruas da
+// tabela plantoes daquela data (o dia inteiro, nao um turno solto).
+async function syncPlantaoDiaToEscalaDia(poolOrTx, schema, dataISO, plantaoRows, colaboradores) {
     ensureEscalaDiaTable(schema);
 
-    const plantao = serializePlantaoRecord(plantaoRow);
+    const plantoes = (plantaoRows || [])
+        .map((row) => serializePlantaoRecord(row))
+        .filter((plantao) => plantao.tipoPlantao === 'sabado');
 
-    if (plantao.tipoPlantao !== 'sabado') {
+    // Limpa a origem de todos os turnos recebidos, inclusive os que sairam da
+    // grade por serem de outro tipo — a escala nao pode ficar apontando para
+    // uma linha que nao existe mais.
+    for (const row of (plantaoRows || [])) {
+        await deleteEscalaDiaByOrigin(poolOrTx, 'plantao', row.id ?? row.Id ?? null);
+    }
+
+    if (plantoes.length === 0) {
         return;
     }
 
-    const colaboradoresIds = Array.isArray(plantao.colaboradores) ? plantao.colaboradores : [];
     const colaboradoresMap = new Map((colaboradores || []).map((item) => [Number(item.Id), item]));
 
-    await deleteEscalaDiaByOrigin(poolOrTx, 'plantao', plantao.id);
-    await ensureEscalaDiaForPeriod(poolOrTx, schema, plantao.dataISO, plantao.dataISO, {
+    await ensureEscalaDiaForPeriod(poolOrTx, schema, dataISO, dataISO, {
         hydrateSources: false
     });
 
-    const existingRows = await listEscalaDiaRows(poolOrTx, plantao.dataISO, plantao.dataISO);
+    const existingRows = await listEscalaDiaRows(poolOrTx, dataISO, dataISO);
     const existingMap = new Map(existingRows.map((row) => [buildEscalaKey(row.colaboradorId, row.dataISO), row]));
 
-    for (const colaboradorId of colaboradoresIds) {
-        const colaborador = colaboradoresMap.get(Number(colaboradorId));
+    for (const [colaboradorId, plantao] of aggregatePlantoesPorColaborador(plantoes)) {
+        const colaborador = colaboradoresMap.get(colaboradorId);
 
         if (!colaborador) {
             continue;
         }
 
-        const key = buildEscalaKey(colaborador.Id, plantao.dataISO);
-        const existing = existingMap.get(key) || null;
+        const existing = existingMap.get(buildEscalaKey(colaborador.Id, plantao.dataISO)) || null;
 
         if (existing && normalizeEscalaTipo(existing.tipo || 'normal') !== 'plantao' && !trimToNull(existing.origemTipo)) {
             continue;
@@ -1268,6 +1332,11 @@ async function syncPlantaoToEscalaDia(poolOrTx, schema, plantaoRow, colaboradore
             { force: false }
         );
     }
+}
+
+async function syncPlantaoToEscalaDia(poolOrTx, schema, plantaoRow, colaboradores) {
+    const dataISO = serializePlantaoRecord(plantaoRow).dataISO;
+    return syncPlantaoDiaToEscalaDia(poolOrTx, schema, dataISO, [plantaoRow], colaboradores);
 }
 
 async function restoreEscalaDefaultsForPeriod(poolOrTx, schema, startISO, endISO, options = {}) {
@@ -1573,6 +1642,8 @@ module.exports = {
     shouldCreateWeekdayBase,
     syncColaboradorDefaultsToEscalaDia,
     syncAusenciaToEscalaDia,
+    aggregatePlantoesPorColaborador,
+    syncPlantaoDiaToEscalaDia,
     syncPlantaoToEscalaDia,
     upsertManualEscalaDia
 };
