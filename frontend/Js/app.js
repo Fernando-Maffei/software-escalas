@@ -1322,6 +1322,11 @@ function cancelarEdicao() {
 // usuario confirma E a verificacao (options.verificar) passa; resolve com null
 // se ele cancelar/fechar. Senha errada mantem a modal aberta com o erro — nada
 // e apagado. Interacao autocontida: nao mexe na modal generica de confirmacao.
+//
+// Sem chamador no momento: o portao de senha era usado por um excluirColaborador
+// que estava morto (apontava para uma rota PUT inexistente) e foi removido. A
+// exclusao definitiva hoje mora em runtime-fixes.js e so pede um confirm().
+// Mantido aqui porque e o portao pronto para religar nesse fluxo.
 function solicitarSenhaModal(options = {}) {
     return new Promise((resolve) => {
         const modal = document.getElementById('modalSenhaExclusao');
@@ -1411,97 +1416,6 @@ function solicitarSenhaModal(options = {}) {
         if (btnFechar) btnFechar.addEventListener('click', aoCancelar);
         input.addEventListener('keydown', aoTeclar);
     });
-}
-
-async function excluirColaborador(id) {
-    // Portao de senha: nada e apagado a menos que o usuario confirme com a
-    // propria senha. A verificacao roda ANTES de qualquer exclusao, porque o
-    // fluxo abaixo apaga lancamentos relacionados antes do colaborador em si.
-    const senhaConfirmada = await solicitarSenhaModal({
-        mensagem: 'Excluir este colaborador e todos os lançamentos relacionados? Esta ação não pode ser desfeita.',
-        verificar: (senha) => window.API.verificarSenha(senha)
-    });
-
-    if (senhaConfirmada === null) return;
-
-    mostrarToast("Excluindo colaborador e lançamentos relacionados...", "warning");
-    
-    try {
-        // 🔥 PRIMEIRO: Buscar todos os lançamentos deste colaborador
-        const ausenciasDoColaborador = window.ausencias.filter(a => {
-            const colaboradorId = a.colaboradorId || a.ColaboradorId;
-            return colaboradorId === id;
-        });
-        
-        console.log(`🗑️ Encontradas ${ausenciasDoColaborador.length} ausências para excluir`);
-        
-        // 🔥 SEGUNDO: Excluir cada lançamento individualmente
-        for (const ausencia of ausenciasDoColaborador) {
-            const ausenciaId = ausencia.id || ausencia.Id;
-            if (!ausenciaId) continue;
-            
-            console.log(`Excluindo ausência ID: ${ausenciaId}`);
-            
-            const response = await fetch(`http://localhost:3000/api/ausencias/${ausenciaId}`, { 
-                method: 'DELETE' 
-            });
-            
-            if (!response.ok) {
-                console.warn(`Erro ao excluir ausência ${ausenciaId}, continuando...`);
-            }
-        }
-        
-        // 🔥 TERCEIRO: Excluir plantões deste colaborador (se houver)
-        if (window.plantoesLancados && window.plantoesLancados.length > 0) {
-            const plantoesDoColaborador = window.plantoesLancados.filter(p => 
-                p.colaboradores && p.colaboradores.includes(id)
-            );
-            
-            for (const plantao of plantoesDoColaborador) {
-                console.log(`Atualizando plantão ${plantao.dataISO} - removendo colaborador`);
-                
-                // Remover o colaborador da lista
-                const novosColaboradores = plantao.colaboradores.filter(cId => cId !== id);
-                
-                // Atualizar o plantão
-                await fetch(`http://localhost:3000/api/plantoes/${plantao.dataISO}`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        colaboradores: novosColaboradores
-                    })
-                });
-            }
-        }
-        
-        // 🔥 QUARTO: Finalmente, excluir o colaborador
-        console.log(`Excluindo colaborador ID: ${id}`);
-        const response = await fetch(`http://localhost:3000/api/colaboradores/${id}`, { 
-            method: 'DELETE' 
-        });
-        
-        if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(`Erro ${response.status}: ${errorText}`);
-        }
-        
-        // 🔥 Recarregar todos os dados
-        await carregarColaboradores();
-        await carregarAusencias();
-        await carregarPlantoes();
-        
-        // Atualizar a interface
-        renderColaboradores();
-        if (typeof gerarResumoHorarios === 'function') {
-            gerarResumoHorarios();
-        }
-        
-        mostrarToast("Colaborador e lançamentos relacionados excluídos com sucesso!", "success");
-        
-    } catch (error) {
-        console.error("Erro ao excluir:", error);
-        mostrarToast(`Erro ao excluir: ${error.message}`, "error");
-    }
 }
 
 /* ===========================

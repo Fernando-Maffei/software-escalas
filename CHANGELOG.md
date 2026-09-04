@@ -15,6 +15,10 @@ Todas as alteracoes relevantes deste projeto serao documentadas neste arquivo.
 - Lancar Plantao: a lista "Plantoes lancados" agrupa por dia e mostra cada turno do dia como uma faixa, em vez de um card por registro.
 
 - Relatorio de Plantoes: coluna "Destino" (banco de horas / hora extra) e o antigo card "Credito total da equipe" virou dois — "Credito em banco de horas" e "Horas extras (fora do banco)" —, porque somar os dois num numero so nao bate com nenhum saldo. Vale tambem para o PDF, que reaproveita a mesma tabela.
+- Extrato do Banco de Horas: secao "Horas extras de plantao" com os plantoes do colaborador lancados como extra (data, horario e total), marcada como paga em folha e fora do saldo. Sem ela, um plantao de hora extra nao aparecia em lugar nenhum do extrato e parecia perdido.
+
+### Removido
+- `excluirColaborador` (app.js): funcao morta que ninguem chamava. Falava com `http://localhost:3000` no braco (so funcionaria em dev), apagava ausencias uma a uma pelo cliente e chamava `PUT /api/plantoes/:dataISO`, rota que nunca existiu — a resposta 404 era ignorada em silencio. A exclusao definitiva real mora em runtime-fixes.js e o backend ja limpa plantoes, movimentos, escala, jornada, almocos e ausencias numa tacada so.
 
 ### Corrigido
 - Plantao em feriado de dia util era oferecido pela tela mas recusado pelo banco: o CHECK `CK_plantoes_tipo_plantao` so aceitava 'sabado' e 'domingo'.

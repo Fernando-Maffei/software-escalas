@@ -2218,8 +2218,9 @@
         }
 
         const items = Array.isArray(payload.items) ? payload.items : [];
+        const horasExtras = Array.isArray(payload.horasExtras) ? payload.horasExtras : [];
 
-        if (items.length === 0) {
+        if (items.length === 0 && horasExtras.length === 0) {
             body.innerHTML = `
                 <div class="empty-state">
                     <i class="fas fa-clock"></i>
@@ -2229,25 +2230,58 @@
             return;
         }
 
-        body.innerHTML = `
-            <div class="banco-horas-extrato-list">
-                ${items.map((item) => `
-                    <article class="banco-horas-movimento ${item.minutos < 0 ? 'debito' : 'credito'}">
-                        <header>
+        const movimentos = items.length > 0
+            ? `
+                <div class="banco-horas-extrato-list">
+                    ${items.map((item) => `
+                        <article class="banco-horas-movimento ${item.minutos < 0 ? 'debito' : 'credito'}">
+                            <header>
+                                <div>
+                                    <strong>${escapeHtml(item.descricao)}</strong>
+                                    <span>${escapeHtml(formatarDataPtBr(item.dataReferencia))}</span>
+                                </div>
+                                <div class="banco-horas-movimento-valores">
+                                    <strong>${escapeHtml(item.minutosFormatado)}</strong>
+                                    <span>Saldo: ${escapeHtml(item.saldoAcumuladoFormatado)}</span>
+                                </div>
+                            </header>
+                            ${item.observacao ? `<p>${escapeHtml(item.observacao)}</p>` : ''}
+                        </article>
+                    `).join('')}
+                </div>
+            `
+            : `
+                <div class="empty-state">
+                    <i class="fas fa-clock"></i>
+                    <p>Nenhum movimento no banco de horas.</p>
+                </div>
+            `;
+
+        // Plantao de hora extra e pago em folha e nao mexe no saldo, entao fica
+        // numa secao propria — misturar com os movimentos daria a entender que
+        // as horas entraram no banco.
+        const extras = horasExtras.length === 0 ? '' : `
+            <section class="banco-horas-extras">
+                <header class="banco-horas-extras-header">
+                    <h4><i class="fas fa-money-bill-wave"></i> Horas extras de plantao</h4>
+                    <strong>${escapeHtml(payload.horasExtrasFormatado || '')}</strong>
+                </header>
+                <p class="banco-horas-extras-aviso">Pagas em folha: nao entram no saldo acima.</p>
+                <div class="banco-horas-extras-list">
+                    ${horasExtras.map((item) => `
+                        <article class="banco-horas-extra">
                             <div>
-                                <strong>${escapeHtml(item.descricao)}</strong>
-                                <span>${escapeHtml(formatarDataPtBr(item.dataReferencia))}</span>
+                                <strong>${escapeHtml(formatarDataPtBr(item.dataReferencia))}</strong>
+                                <span>${escapeHtml(formatarHoraInput(item.horaInicio) || '--:--')} - ${escapeHtml(formatarHoraInput(item.horaFim) || '--:--')}</span>
                             </div>
-                            <div class="banco-horas-movimento-valores">
-                                <strong>${escapeHtml(item.minutosFormatado)}</strong>
-                                <span>Saldo: ${escapeHtml(item.saldoAcumuladoFormatado)}</span>
-                            </div>
-                        </header>
-                        ${item.observacao ? `<p>${escapeHtml(item.observacao)}</p>` : ''}
-                    </article>
-                `).join('')}
-            </div>
+                            <strong class="banco-horas-extra-total">${escapeHtml(item.minutosFormatado)}</strong>
+                        </article>
+                    `).join('')}
+                </div>
+            </section>
         `;
+
+        body.innerHTML = movimentos + extras;
     }
 
     async function abrirExtratoBancoHoras(colaboradorId) {

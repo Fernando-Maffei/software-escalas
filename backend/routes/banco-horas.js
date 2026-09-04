@@ -200,6 +200,43 @@ router.get('/resumo', async (req, res) => {
     });
 });
 
+// Plantoes do colaborador marcados como hora extra, do mais novo para o mais
+// velho. O filtro por colaborador e feito em JS porque colaboradores_ids e um
+// JSON em texto: um LIKE '%2%' casaria tambem com 12 e 21.
+async function listarHorasExtrasDoColaborador(pool, schema, colaboradorId, limit) {
+    if (!getBancoHorasCapabilities(schema).hasPlantaoTipoCredito) {
+        return [];
+    }
+
+    const result = await pool.request().query(`
+        SELECT id, data_plantao, colaboradores_ids, hora_inicio, hora_fim, observacao, tipo_plantao, tipo_credito
+        FROM plantoes
+        WHERE LOWER(tipo_credito) = 'extra'
+        ORDER BY data_plantao DESC, id DESC
+    `);
+
+    return result.recordset
+        .map((row) => serializePlantaoRecord(row))
+        .filter((plantao) => plantao.colaboradores.includes(colaboradorId))
+        .slice(0, limit)
+        .map((plantao) => {
+            const minutos = plantao.horaInicio && plantao.horaFim
+                ? calculateIntervalMinutes(plantao.horaInicio, plantao.horaFim)
+                : 0;
+
+            return {
+                plantaoId: plantao.id,
+                dataReferencia: plantao.dataISO,
+                horaInicio: plantao.horaInicio,
+                horaFim: plantao.horaFim,
+                minutos,
+                minutosFormatado: minutesToDurationLabel(minutos),
+                tipoPlantao: plantao.tipoPlantao,
+                observacao: plantao.observacao
+            };
+        });
+}
+
 router.get('/colaborador/:id', async (req, res) => {
     const colaboradorId = ensurePositiveInt(req.params.id, 'Colaborador');
     const pool = await conectar();
@@ -244,6 +281,14 @@ router.get('/colaborador/:id', async (req, res) => {
             ORDER BY DataReferencia DESC, Id DESC
         `);
 
+    // Plantao lancado como hora extra nao gera movimento no banco de propósito
+    // (a hora e paga em folha), entao ele nao aparece no extrato acima. Sem
+    // isso, quem trabalhou num sabado inteiro nao encontra o registro em lugar
+    // nenhum e parece que o plantao se perdeu. Vai numa lista a parte, fora da
+    // conta do saldo.
+    const horasExtras = await listarHorasExtrasDoColaborador(pool, schema, colaboradorId, limit);
+    const horasExtrasMinutos = horasExtras.reduce((total, item) => total + item.minutos, 0);
+
     res.json({
         colaborador: colaboradorResult.recordset[0],
         items: extratoResult.recordset.map((row) => ({
@@ -260,7 +305,10 @@ router.get('/colaborador/:id', async (req, res) => {
             descricao: row.Descricao,
             observacao: row.Observacao,
             criadoEm: row.CriadoEm
-        }))
+        })),
+        horasExtras,
+        horasExtrasMinutos,
+        horasExtrasFormatado: minutesToDurationLabel(horasExtrasMinutos)
     });
 });
 

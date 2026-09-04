@@ -1059,3 +1059,82 @@
 .banco-horas-movimento.debito {
     border-left: 4px solid var(--danger);
 }
+
+/* Horas extras de plantao no extrato: sao pagas em folha e NAO entram no
+   saldo, entao ficam numa secao separada, visualmente distinta dos
+   movimentos do banco (laranja em vez de verde/vermelho). */
+.banco-horas-extras {
+    margin-top: 20px;
+    padding-top: 16px;
+    border-top: 1px dashed var(--border);
+}
+
+.banco-horas-extras-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.banco-horas-extras-header h4 {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.banco-horas-extras-header h4 i {
+    color: #c2410c;
+}
+
+.banco-horas-extras-header strong {
+    font-size: 15px;
+    color: #c2410c;
+    font-variant-numeric: tabular-nums;
+}
+
+.banco-horas-extras-aviso {
+    margin: 4px 0 12px;
+    font-size: 12px;
+    color: var(--text-light);
+}
+
+.banco-horas-extras-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.banco-horas-extra {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 16px;
+    border-radius: 14px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-left: 4px solid #f97316;
+}
+
+.banco-horas-extra span {
+    display: block;
+    font-size: 12px;
+    color: var(--text-light);
+    margin-top: 4px;
+    font-variant-numeric: tabular-nums;
+}
+
+.banco-horas-extra-total {
+    color: #c2410c;
+    font-variant-numeric: tabular-nums;
+}
+
+[data-theme="dark"] .banco-horas-extras-header h4 i,
+[data-theme="dark"] .banco-horas-extras-header strong,
+[data-theme="dark"] .banco-horas-extra-total {
+    color: #fdba74;
+}
