@@ -21,6 +21,7 @@ Todas as alteracoes relevantes deste projeto serao documentadas neste arquivo.
 - `excluirColaborador` (app.js): funcao morta que ninguem chamava. Falava com `http://localhost:3000` no braco (so funcionaria em dev), apagava ausencias uma a uma pelo cliente e chamava `PUT /api/plantoes/:dataISO`, rota que nunca existiu — a resposta 404 era ignorada em silencio. A exclusao definitiva real mora em runtime-fixes.js e o backend ja limpa plantoes, movimentos, escala, jornada, almocos e ausencias numa tacada so.
 
 ### Corrigido
+- Bootstrap do schema derrubava o app inteiro (503 em todas as rotas de dados, login incluso) num banco que ja tivesse dois turnos na mesma data: `2026-04-27-base-schema.sql` roda antes da migration que libera isso e recriava `UX_plantoes_data`, batendo em "duplicate key was found". O indice por data passa a ser comum (`IX_plantoes_data`) tambem no base-schema, que e a premissa do dia com varios lancamentos.
 - Plantao em feriado de dia util era oferecido pela tela mas recusado pelo banco: o CHECK `CK_plantoes_tipo_plantao` so aceitava 'sabado' e 'domingo'.
 - Calendario/Escala marcavam como "Plantao" so quem estava no primeiro turno do dia: `buscarPlantaoDoDia` parava no primeiro registro da data. Agora junta a equipe de todos os turnos.
 - Dashboard e relatorio contavam turnos como se fossem plantoes: um sabado com dois turnos aparecia como dois. Passam a contar dias.
