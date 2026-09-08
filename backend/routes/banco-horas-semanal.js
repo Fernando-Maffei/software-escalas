@@ -18,9 +18,23 @@ const {
     normalizeIsoDate,
     normalizeOptionalText
 } = require('../utils/validation');
-const { serializePlantaoRecord } = require('../utils/plantoes');
+const { montarRelatorioHorasExtras, serializePlantaoRecord } = require('../utils/plantoes');
+const { getBancoHorasCapabilities, getSchemaInfo } = require('../utils/schema');
 
 const SEMANAS_PADRAO = 8;
+
+// Colunas de plantao usadas nos calculos de credito. tipo_credito so entra
+// quando a coluna existe: num banco anterior a migration 2026-09-04 a leitura
+// nao pode quebrar — la todo plantao era credito de banco de horas.
+function buildPlantaoCreditoColumns(capabilities) {
+    const columns = ['id', 'data_plantao', 'colaboradores_ids', 'hora_inicio', 'hora_fim'];
+
+    if (capabilities.hasPlantaoTipoCredito) {
+        columns.push('tipo_credito');
+    }
+
+    return columns.join(', ');
+}
 
 // Custo de uma folga em minutos (8h). Usado na coluna "Sugestao" do Verificar:
 // quantos dias de folga cabem nas horas em carteira.
@@ -371,6 +385,13 @@ function calcularCreditoPlantaoNaJanela(plantoes, colaboradorId, inicioISO, fimI
             continue;
         }
 
+        // Hora extra e paga em folha e nao entra no saldo. Creditar aqui fazia
+        // a grade semanal e o "em carteira" pagarem a mesma hora duas vezes:
+        // uma na folha e outra em folga.
+        if (plantao.tipoCredito === 'extra') {
+            continue;
+        }
+
         if (!plantao.horaInicio || !plantao.horaFim) {
             avisos.push(`Plantao ${plantao.id}: sem horario, credito ignorado.`);
             continue;
@@ -469,11 +490,12 @@ router.get('/verificar', async (req, res) => {
     let plantoesJanela = [];
 
     if (bases.length > 0) {
+        const colunasPlantao = buildPlantaoCreditoColumns(getBancoHorasCapabilities(await getSchemaInfo(pool)));
         const plantoesResult = await pool.request()
             .input('piso', sql.Date, pisoGlobal)
             .input('data', sql.Date, dataISO)
             .query(`
-                SELECT id, data_plantao, colaboradores_ids, hora_inicio, hora_fim
+                SELECT ${colunasPlantao}
                 FROM plantoes
                 WHERE data_plantao <= @data AND data_plantao >= @piso
             `);
@@ -688,11 +710,12 @@ router.post('/gerar-semana', async (req, res) => {
             ausenciasPorColaborador.get(cid).push(ausencia);
         }
 
+        const colunasPlantao = buildPlantaoCreditoColumns(getBancoHorasCapabilities(await getSchemaInfo(pool)));
         const plantoesResult = await pool.request()
             .input('piso', sql.Date, pisoGlobal)
             .input('alvo', sql.Date, alvoISO)
             .query(`
-                SELECT id, data_plantao, colaboradores_ids, hora_inicio, hora_fim
+                SELECT ${colunasPlantao}
                 FROM plantoes
                 WHERE data_plantao <= @alvo AND data_plantao >= @piso
             `);
@@ -825,6 +848,101 @@ router.delete('/semana/:semana', async (req, res) => {
         success: true,
         semanaSegunda: semanaISO,
         removidos: resultado.recordset[0]?.removidos || 0
+    });
+});
+
+// GET /api/banco-horas-semanal/horas-extras?inicio=&fim=&colaboradorId=
+// Relatorio de horas extras do periodo: os plantoes lancados com destino
+// 'extra' agrupados por colaborador. Essas horas sao pagas em folha e por isso
+// nao entram na grade semanal nem no saldo — sem este relatorio nao existia
+// nenhum lugar que somasse quanto cada um fez de hora extra no mes.
+router.get('/horas-extras', async (req, res) => {
+    const pool = await conectar();
+    const schema = await getSchemaInfo(pool);
+    const capabilities = getBancoHorasCapabilities(schema);
+
+    const hoje = new Date().toISOString().slice(0, 10);
+    const inicioISO = req.query.inicio
+        ? normalizeIsoDate(req.query.inicio, 'Data inicial')
+        : `${hoje.slice(0, 7)}-01`;
+    const fimISO = req.query.fim
+        ? normalizeIsoDate(req.query.fim, 'Data final')
+        : hoje;
+
+    if (inicioISO > fimISO) {
+        throw new AppError(400, 'O inicio do periodo deve ser anterior ao fim.');
+    }
+
+    const colaboradorId = req.query.colaboradorId
+        ? ensurePositiveInt(req.query.colaboradorId, 'Colaborador')
+        : null;
+
+    // Banco sem a coluna tipo_credito: nao ha como saber o que e extra, e
+    // chutar 'banco' para tudo devolveria um relatorio vazio que parece certo.
+    if (!capabilities.hasPlantaoTipoCredito) {
+        res.json({
+            disponivel: false,
+            mensagem: 'Hora extra ainda nao esta disponivel: aplique a migration 2026-09-04-plantao-lancamentos.sql.',
+            inicio: inicioISO,
+            fim: fimISO,
+            itens: [],
+            totalMinutos: 0,
+            totalFormatado: minutosParaRelogio(0),
+            totalColaboradores: 0,
+            totalDias: 0,
+            avisos: []
+        });
+        return;
+    }
+
+    const permitidos = await getSetoresPermitidosRequest(pool, req);
+    const idsPermitidos = new Set(idsPermitidosNumericos(permitidos));
+
+    // Sem filtro de Ativo: quem foi desligado depois de fazer hora extra no
+    // periodo continua tendo direito ao pagamento, entao precisa aparecer.
+    const colaboradoresResult = await pool.request()
+        .query('SELECT Id, Nome, SetorId FROM Colaboradores ORDER BY Nome');
+
+    const colaboradores = idsPermitidos.size
+        ? colaboradoresResult.recordset.filter((item) => idsPermitidos.has(Number(item.SetorId)))
+        : colaboradoresResult.recordset;
+
+    const plantoesResult = await pool.request()
+        .input('inicio', sql.Date, inicioISO)
+        .input('fim', sql.Date, fimISO)
+        .query(`
+            SELECT ${buildPlantaoCreditoColumns(capabilities)}, tipo_plantao, observacao
+            FROM plantoes
+            WHERE LOWER(tipo_credito) = 'extra'
+              AND data_plantao >= @inicio
+              AND data_plantao <= @fim
+            ORDER BY data_plantao DESC, id DESC
+        `);
+
+    const relatorio = montarRelatorioHorasExtras(
+        plantoesResult.recordset.map((row) => serializePlantaoRecord(row)),
+        colaboradores,
+        { inicioISO, fimISO, colaboradorId }
+    );
+
+    res.json({
+        disponivel: true,
+        inicio: inicioISO,
+        fim: fimISO,
+        itens: relatorio.itens.map((item) => ({
+            ...item,
+            totalFormatado: minutosParaRelogio(item.totalMinutos),
+            plantoes: item.plantoes.map((plantao) => ({
+                ...plantao,
+                dataFormatada: formatDateLabelISO(plantao.dataISO),
+                minutosFormatado: minutosParaRelogio(plantao.minutos)
+            }))
+        })),
+        totalMinutos: relatorio.totalMinutos,
+        totalFormatado: minutosParaRelogio(relatorio.totalMinutos),
+        totalColaboradores: relatorio.totalColaboradores,
+        totalDias: relatorio.totalDias,
+        avisos: relatorio.avisos
     });
 });
 

@@ -5,6 +5,7 @@ const {
     buildPlantaoDiaPayload,
     formatDateToISO,
     generateUpcomingSaturdays,
+    montarRelatorioHorasExtras,
     normalizeColaboradores,
     normalizePlantaoType,
     normalizeTipoCredito,
@@ -187,6 +188,120 @@ module.exports = [
             assert.deepEqual(grupos[1].colaboradores, [5]);
             assert.equal(grupos[1].tipoCredito, 'extra');
             assert.deepEqual(grupos[2].colaboradores, [1]);
+        }
+    },
+    {
+        // O relatorio de horas extras existe justamente porque essas horas nao
+        // aparecem em lugar nenhum do banco: so entra tipo_credito 'extra'.
+        name: 'montarRelatorioHorasExtras soma so os plantoes de hora extra',
+        run() {
+            const plantoes = [
+                {
+                    id: 1,
+                    dataISO: '2026-09-05',
+                    colaboradores: [1, 2],
+                    tipoCredito: 'extra',
+                    tipoPlantao: 'sabado',
+                    horaInicio: '08:00',
+                    horaFim: '13:00',
+                    observacao: null
+                },
+                {
+                    id: 2,
+                    dataISO: '2026-09-05',
+                    colaboradores: [1],
+                    tipoCredito: 'banco',
+                    tipoPlantao: 'sabado',
+                    horaInicio: '13:00',
+                    horaFim: '18:00',
+                    observacao: null
+                },
+                {
+                    id: 3,
+                    dataISO: '2026-09-12',
+                    colaboradores: [1],
+                    tipoCredito: 'extra',
+                    tipoPlantao: 'sabado',
+                    horaInicio: '08:00',
+                    horaFim: '10:30',
+                    observacao: 'Fechamento'
+                }
+            ];
+
+            const relatorio = montarRelatorioHorasExtras(plantoes, [
+                { Id: 1, Nome: 'Ana', SetorId: 3 },
+                { Id: 2, Nome: 'Bruno', SetorId: 3 }
+            ]);
+
+            assert.equal(relatorio.itens.length, 2);
+            assert.equal(relatorio.itens[0].nome, 'Ana');
+            assert.equal(relatorio.itens[0].totalMinutos, 450); // 5h + 2h30, sem o turno de banco
+            assert.equal(relatorio.itens[0].plantoes.length, 2);
+            assert.equal(relatorio.itens[0].plantoes[0].dataISO, '2026-09-12'); // mais recente primeiro
+            assert.equal(relatorio.itens[1].totalMinutos, 300);
+            assert.equal(relatorio.totalMinutos, 750);
+            assert.equal(relatorio.totalColaboradores, 2);
+            assert.equal(relatorio.totalDias, 2);
+        }
+    },
+    {
+        // Colaborador fora da lista informada (setor sem permissao ou cadastro
+        // removido) nao pode vazar no relatorio, mesmo estando no plantao.
+        name: 'montarRelatorioHorasExtras respeita janela, filtro de colaborador e lista permitida',
+        run() {
+            const plantoes = [
+                {
+                    id: 1,
+                    dataISO: '2026-08-29',
+                    colaboradores: [1],
+                    tipoCredito: 'extra',
+                    horaInicio: '08:00',
+                    horaFim: '12:00'
+                },
+                {
+                    id: 2,
+                    dataISO: '2026-09-05',
+                    colaboradores: [1, 2, 99],
+                    tipoCredito: 'extra',
+                    horaInicio: '08:00',
+                    horaFim: '12:00'
+                }
+            ];
+            const colaboradores = [
+                { Id: 1, Nome: 'Ana', SetorId: 3 },
+                { Id: 2, Nome: 'Bruno', SetorId: 3 }
+            ];
+
+            const janela = montarRelatorioHorasExtras(plantoes, colaboradores, {
+                inicioISO: '2026-09-01',
+                fimISO: '2026-09-30'
+            });
+
+            assert.equal(janela.itens.length, 2);
+            assert.equal(janela.totalMinutos, 480); // 4h para cada um, so o plantao de setembro
+            assert.ok(!janela.itens.some((item) => item.colaboradorId === 99));
+
+            const porColaborador = montarRelatorioHorasExtras(plantoes, colaboradores, {
+                colaboradorId: 2
+            });
+
+            assert.equal(porColaborador.itens.length, 1);
+            assert.equal(porColaborador.itens[0].nome, 'Bruno');
+            assert.equal(porColaborador.totalMinutos, 240);
+        }
+    },
+    {
+        // Plantao sem horario nao pode virar 0 silencioso: vira aviso na tela.
+        name: 'montarRelatorioHorasExtras avisa quando o plantao extra nao tem horario',
+        run() {
+            const relatorio = montarRelatorioHorasExtras(
+                [{ id: 7, dataISO: '2026-09-05', colaboradores: [1], tipoCredito: 'extra', horaInicio: null, horaFim: null }],
+                [{ Id: 1, Nome: 'Ana', SetorId: 3 }]
+            );
+
+            assert.equal(relatorio.itens.length, 0);
+            assert.equal(relatorio.avisos.length, 1);
+            assert.match(relatorio.avisos[0], /Plantao 7/);
         }
     }
 ];

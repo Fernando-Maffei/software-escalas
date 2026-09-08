@@ -90,6 +90,10 @@ function buildPlantoesSelect(schema) {
         columns.push('tipo_plantao');
     }
 
+    if (capabilities.hasPlantaoTipoCredito) {
+        columns.push('tipo_credito');
+    }
+
     return columns.join(',\n                ');
 }
 
@@ -437,6 +441,13 @@ router.post('/recalcular', async (req, res) => {
 
         for (const row of plantoesResult.recordset) {
             const plantao = serializePlantaoRecord(row);
+
+            // Hora extra e paga em folha e nao gera movimento (mesma regra de
+            // syncPlantaoMovements, em routes/plantoes.js). Sem este corte, o
+            // recalculo devolvia ao saldo as horas que ja tinham sido pagas.
+            if (plantao.tipoCredito === 'extra') {
+                continue;
+            }
 
             if (!plantao.horaInicio || !plantao.horaFim) {
                 warnings.push(`Plantao ${plantao.id}: horario nao informado, credito ignorado.`);

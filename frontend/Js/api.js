@@ -226,6 +226,7 @@ const API = {
     gerarBancoHorasSemana: (data) => API.post('/banco-horas-semanal/gerar-semana', data),
     confirmarBancoHorasSemana: (data) => API.put('/banco-horas-semanal/confirmar-semana', data),
     excluirBancoHorasSemana: (semana) => API.delete(`/banco-horas-semanal/semana/${semana}`),
+    getBancoHorasExtras: (params = {}) => API.get('/banco-horas-semanal/horas-extras', params),
 
     getConfiguracaoBanco: () => API.get('/configuracao-banco'),
     salvarConfiguracaoBanco: (data) => API.post('/configuracao-banco/salvar', data),

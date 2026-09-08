@@ -269,6 +269,117 @@ function buildPlantaoDiaPayload(body, feriados = null) {
     return { dataISO, tipoPlantao, observacao: observacaoDia, lancamentos };
 }
 
+// Relatorio de horas extras: agrupa por colaborador os plantoes lancados como
+// 'extra' dentro da janela [inicioISO, fimISO]. Hora extra e paga em folha e
+// nao gera movimento no banco de horas, entao este e o unico lugar onde essas
+// horas aparecem somadas — na grade semanal e no extrato elas nao entram.
+// Recebe plantoes ja serializados e devolve so minutos: quem chama decide o
+// formato (a tela do Banco de Horas usa H:MM, o extrato usa "05h 00m").
+function montarRelatorioHorasExtras(plantoes, colaboradores, filtros = {}) {
+    const { inicioISO = null, fimISO = null } = filtros;
+    const colaboradorFiltro = filtros.colaboradorId === undefined
+        || filtros.colaboradorId === null
+        || filtros.colaboradorId === ''
+        ? null
+        : Number(filtros.colaboradorId);
+
+    // Colaborador fora desta lista (setor sem permissao, cadastro removido)
+    // simplesmente nao entra no relatorio, como ja acontece no /verificar.
+    const colaboradoresPorId = new Map(
+        (colaboradores || []).map((item) => [Number(item.Id ?? item.id), item])
+    );
+
+    const avisos = [];
+    const acumulado = new Map();
+    const dias = new Set();
+
+    for (const plantao of plantoes || []) {
+        if (plantao.tipoCredito !== 'extra') {
+            continue;
+        }
+
+        if (!plantao.dataISO
+            || (inicioISO && plantao.dataISO < inicioISO)
+            || (fimISO && plantao.dataISO > fimISO)) {
+            continue;
+        }
+
+        if (!plantao.horaInicio || !plantao.horaFim) {
+            avisos.push(`Plantao ${plantao.id}: sem horario, hora extra ignorada.`);
+            continue;
+        }
+
+        let minutos = 0;
+
+        try {
+            minutos = calculateIntervalMinutes(plantao.horaInicio, plantao.horaFim);
+        } catch (error) {
+            avisos.push(`Plantao ${plantao.id}: ${error.message}`);
+            continue;
+        }
+
+        for (const id of plantao.colaboradores || []) {
+            const colaboradorId = Number(id);
+
+            if (colaboradorFiltro !== null && colaboradorId !== colaboradorFiltro) {
+                continue;
+            }
+
+            const colaborador = colaboradoresPorId.get(colaboradorId);
+
+            if (!colaborador) {
+                continue;
+            }
+
+            if (!acumulado.has(colaboradorId)) {
+                const setorId = colaborador.SetorId ?? colaborador.setorId ?? null;
+
+                acumulado.set(colaboradorId, {
+                    colaboradorId,
+                    nome: colaborador.Nome ?? colaborador.nome ?? `Colaborador ${colaboradorId}`,
+                    setorId: setorId === null || setorId === undefined ? null : Number(setorId),
+                    totalMinutos: 0,
+                    plantoes: []
+                });
+            }
+
+            const item = acumulado.get(colaboradorId);
+            item.totalMinutos += minutos;
+            item.plantoes.push({
+                plantaoId: plantao.id,
+                dataISO: plantao.dataISO,
+                tipoPlantao: plantao.tipoPlantao,
+                horaInicio: plantao.horaInicio,
+                horaFim: plantao.horaFim,
+                minutos,
+                observacao: plantao.observacao || null
+            });
+
+            dias.add(plantao.dataISO);
+        }
+    }
+
+    const itens = [...acumulado.values()]
+        .map((item) => ({
+            ...item,
+            // Mais recente primeiro, como nas outras listagens de plantao.
+            plantoes: item.plantoes.sort((a, b) => (
+                String(b.dataISO).localeCompare(String(a.dataISO))
+                || String(a.horaInicio).localeCompare(String(b.horaInicio))
+            ))
+        }))
+        .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+
+    return {
+        itens,
+        totalMinutos: itens.reduce((total, item) => total + item.totalMinutos, 0),
+        totalColaboradores: itens.length,
+        // Conta DIAS, nao turnos: um sabado com dois turnos extras e um dia so.
+        totalDias: dias.size,
+        avisos
+    };
+}
+
 // Quem compartilha exatamente o mesmo horario E o mesmo destino das horas vira
 // UMA linha, com os colaboradores juntos. Preserva o formato de sempre da
 // tabela (um registro com colaboradores_ids) e evita inflar o banco quando
@@ -306,6 +417,7 @@ module.exports = {
     formatDateToISO,
     generateUpcomingSaturdays,
     horariosSeCruzam,
+    montarRelatorioHorasExtras,
     normalizeColaboradores,
     normalizePlantaoType,
     normalizeTipoCredito,

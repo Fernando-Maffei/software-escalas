@@ -9,6 +9,7 @@
 
     let dadosBanco = { colaboradores: [], semanas: [], periodo: null };
     let limiteSemanas = 7; // quantas semanas mostrar (0 = todas)
+    let dadosExtras = null; // ultimo relatorio de horas extras gerado (fonte do PDF)
 
     function toast(mensagem, tipo) {
         if (typeof window.mostrarToast === 'function') {
@@ -160,6 +161,30 @@
                 </div>
                 <div id="bhVerificarResultado" class="bh-verificar-resultado"></div>
             </div>
+
+            <div class="banco-horas-verificar banco-horas-extras-relatorio">
+                <div class="bh-verificar-header">
+                    <h2><i class="fas fa-money-bill-wave"></i> Relatorio de horas extras</h2>
+                    <p>Plantoes lancados como hora extra no periodo. Pagas em folha: nao entram no saldo da grade acima.</p>
+                </div>
+                <div class="bh-verificar-controls">
+                    <label for="bhExtrasInicio">De</label>
+                    <input type="date" id="bhExtrasInicio" class="form-control">
+                    <label for="bhExtrasFim">Ate</label>
+                    <input type="date" id="bhExtrasFim" class="form-control">
+                    <label for="bhExtrasColaborador">Colaborador</label>
+                    <select id="bhExtrasColaborador" class="form-control">
+                        <option value="">Todos os colaboradores</option>
+                    </select>
+                    <button type="button" id="bhBtnExtras" class="btn-primary">
+                        <i class="fas fa-file-alt"></i> Gerar
+                    </button>
+                    <button type="button" id="bhBtnExtrasPdf" class="btn-secondary" disabled>
+                        <i class="fas fa-download"></i> Exportar PDF
+                    </button>
+                </div>
+                <div id="bhExtrasResultado" class="bh-verificar-resultado"></div>
+            </div>
         `;
 
         const inputSemana = document.getElementById('bhNovaSemana');
@@ -196,6 +221,29 @@
             btnVerificar.addEventListener('click', verificar);
         }
 
+        // Periodo padrao do relatorio de horas extras: o mes corrente, que e o
+        // recorte usado no fechamento da folha.
+        const extrasInicio = document.getElementById('bhExtrasInicio');
+        if (extrasInicio) {
+            extrasInicio.value = primeiroDiaDoMesISO();
+        }
+
+        const extrasFim = document.getElementById('bhExtrasFim');
+        if (extrasFim) {
+            extrasFim.value = new Date().toISOString().slice(0, 10);
+        }
+
+        const btnExtras = document.getElementById('bhBtnExtras');
+        if (btnExtras) {
+            btnExtras.addEventListener('click', gerarRelatorioExtras);
+        }
+
+        const btnExtrasPdf = document.getElementById('bhBtnExtrasPdf');
+        if (btnExtrasPdf) {
+            btnExtrasPdf.addEventListener('click', exportarRelatorioExtras);
+        }
+
+        dadosExtras = null;
         carregar();
     }
 
@@ -291,6 +339,7 @@
         try {
             dadosBanco = await window.API.getBancoHorasSemanal();
             renderTabela();
+            preencherColaboradoresExtras();
         } catch (error) {
             wrap.innerHTML = `
                 <div class="bh-erro">
@@ -747,6 +796,321 @@
         const existente = document.getElementById('bhModalGerar');
         if (existente) {
             existente.remove();
+        }
+    }
+
+    // ---- Relatorio de horas extras ----
+    // Hora extra e paga em folha: nao entra na grade acima nem no saldo. Este
+    // relatorio e o unico lugar onde essas horas aparecem somadas por pessoa —
+    // que e o numero que vai para a folha no fim do mes.
+    function primeiroDiaDoMesISO() {
+        return `${new Date().toISOString().slice(0, 7)}-01`;
+    }
+
+    function preencherColaboradoresExtras() {
+        const select = document.getElementById('bhExtrasColaborador');
+        if (!select) {
+            return;
+        }
+
+        const selecionado = select.value;
+        const colaboradores = filtrarPorMeusSetores(dadosBanco.colaboradores || []);
+
+        select.innerHTML = `
+            <option value="">Todos os colaboradores</option>
+            ${colaboradores.map((colaborador) => `
+                <option value="${colaborador.id}">${escapeHtml(colaborador.nome)}</option>
+            `).join('')}
+        `;
+
+        if (selecionado && select.querySelector(`option[value="${selecionado}"]`)) {
+            select.value = selecionado;
+        }
+    }
+
+    function lerFiltrosExtras() {
+        return {
+            inicio: document.getElementById('bhExtrasInicio')?.value || '',
+            fim: document.getElementById('bhExtrasFim')?.value || '',
+            colaboradorId: document.getElementById('bhExtrasColaborador')?.value || ''
+        };
+    }
+
+    function atualizarBotaoPdfExtras() {
+        const botao = document.getElementById('bhBtnExtrasPdf');
+        if (botao) {
+            botao.disabled = !(dadosExtras && (dadosExtras.itens || []).length > 0);
+        }
+    }
+
+    async function gerarRelatorioExtras() {
+        const alvo = document.getElementById('bhExtrasResultado');
+        if (!alvo) {
+            return;
+        }
+
+        const filtros = lerFiltrosExtras();
+
+        if (!filtros.inicio || !filtros.fim) {
+            toast('Informe o periodo do relatorio de horas extras.', 'warning');
+            return;
+        }
+
+        if (filtros.inicio > filtros.fim) {
+            toast('A data inicial deve ser anterior a final.', 'error');
+            return;
+        }
+
+        alvo.innerHTML = '<div class="bh-loading"><i class="fas fa-spinner fa-spin"></i> Gerando...</div>';
+
+        try {
+            dadosExtras = await window.API.getBancoHorasExtras(filtros);
+            renderExtras(dadosExtras, alvo);
+        } catch (error) {
+            dadosExtras = null;
+            atualizarBotaoPdfExtras();
+            alvo.innerHTML = `<div class="bh-erro"><i class="fas fa-triangle-exclamation"></i> ${escapeHtml(error.message || 'Falha ao gerar o relatorio.')}</div>`;
+        }
+    }
+
+    function linhasTabelaExtras(dados) {
+        return (dados.itens || []).map((item) => {
+            const turnos = (item.plantoes || []).map((plantao) => `
+                <tr>
+                    <td>${escapeHtml(plantao.dataFormatada || labelData(plantao.dataISO))}</td>
+                    <td>${escapeHtml(plantao.tipoPlantao || '--')}</td>
+                    <td>${escapeHtml(`${plantao.horaInicio || '--'} as ${plantao.horaFim || '--'}`)}</td>
+                    <td class="bh-extras-duracao">${escapeHtml(plantao.minutosFormatado)}</td>
+                    <td>${escapeHtml(plantao.observacao || '--')}</td>
+                </tr>
+            `).join('');
+
+            return `
+                <tr class="bh-extras-grupo">
+                    <th colspan="3">${escapeHtml(item.nome)}</th>
+                    <th class="bh-extras-duracao">${escapeHtml(item.totalFormatado)}</th>
+                    <th>${(item.plantoes || []).length} turno(s)</th>
+                </tr>
+                ${turnos}
+            `;
+        }).join('');
+    }
+
+    function renderExtras(dados, alvo) {
+        atualizarBotaoPdfExtras();
+
+        if (dados.disponivel === false) {
+            alvo.innerHTML = `<div class="bh-erro"><i class="fas fa-triangle-exclamation"></i> ${escapeHtml(dados.mensagem || 'Hora extra indisponivel neste banco.')}</div>`;
+            return;
+        }
+
+        if ((dados.itens || []).length === 0) {
+            alvo.innerHTML = '<div class="bh-vazio"><i class="fas fa-money-bill-wave"></i> Nenhuma hora extra lancada no periodo.</div>';
+            return;
+        }
+
+        alvo.innerHTML = `
+            <div class="bh-verificar-data">
+                Horas extras de <strong>${escapeHtml(labelData(dados.inicio))}</strong>
+                ate <strong>${escapeHtml(labelData(dados.fim))}</strong>
+            </div>
+            <div class="bh-extras-cards">
+                <div class="bh-extras-card">
+                    <span>Total de horas extras</span>
+                    <strong>${escapeHtml(dados.totalFormatado)}</strong>
+                </div>
+                <div class="bh-extras-card">
+                    <span>Colaboradores</span>
+                    <strong>${dados.totalColaboradores}</strong>
+                </div>
+                <div class="bh-extras-card">
+                    <span>Dias com hora extra</span>
+                    <strong>${dados.totalDias}</strong>
+                </div>
+            </div>
+            <div class="banco-horas-tabela-wrap">
+                <table class="banco-horas-tabela bh-tabela-extras">
+                    <thead>
+                        <tr>
+                            <th>Data</th>
+                            <th>Tipo</th>
+                            <th>Horario</th>
+                            <th>Duracao</th>
+                            <th>Observacao</th>
+                        </tr>
+                    </thead>
+                    <tbody>${linhasTabelaExtras(dados)}</tbody>
+                </table>
+            </div>
+            ${(dados.avisos || []).length > 0
+                ? `<div class="bh-avisos"><i class="fas fa-circle-info"></i> ${dados.avisos.map(escapeHtml).join('<br>')}</div>`
+                : ''}
+        `;
+    }
+
+    // O container temporario do PDF so aproveita as tags <style> deste HTML,
+    // entao ele precisa ser autossuficiente (mesmo padrao do relatorio de
+    // plantoes, em runtime-fixes.js).
+    function gerarHtmlPdfExtras(dados) {
+        return `
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="UTF-8">
+                <title>Relatorio de Horas Extras</title>
+                <style>
+                    * { box-sizing: border-box; margin: 0; padding: 0; }
+                    body {
+                        width: 1480px;
+                        padding: 16px;
+                        background: #ffffff;
+                        color: #0f172a;
+                        font-family: Arial, sans-serif;
+                    }
+                    .pdf-pagina { width: 1448px; min-height: 980px; padding: 18px; background: #ffffff; }
+                    .pdf-header {
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: flex-end;
+                        gap: 18px;
+                        margin-bottom: 16px;
+                        padding-bottom: 12px;
+                        border-bottom: 2px solid #dbeafe;
+                    }
+                    .pdf-header h1 { color: #1e3a5f; font-size: 30px; line-height: 1.1; }
+                    .pdf-header p { color: #64748b; font-size: 13px; font-weight: 700; }
+                    .pdf-aviso {
+                        margin-bottom: 14px;
+                        padding: 10px 12px;
+                        border-radius: 10px;
+                        background: #fef3c7;
+                        color: #92400e;
+                        font-size: 13px;
+                        font-weight: 600;
+                    }
+                    .pdf-cards {
+                        display: grid;
+                        grid-template-columns: repeat(3, minmax(0, 1fr));
+                        gap: 10px;
+                        margin-bottom: 14px;
+                    }
+                    .pdf-card { padding: 12px; border: 1px solid #dbe3ef; border-radius: 10px; background: #f8fafc; }
+                    .pdf-card span { display: block; color: #64748b; font-size: 12px; font-weight: 700; }
+                    .pdf-card strong { display: block; color: #0f172a; font-size: 20px; margin-top: 4px; }
+                    table { width: 100%; border-collapse: collapse; }
+                    th, td {
+                        border: 1px solid #dbe3ef;
+                        padding: 8px 10px;
+                        font-size: 12px;
+                        line-height: 1.3;
+                        text-align: left;
+                        vertical-align: top;
+                    }
+                    thead th { background: #e2e8f0; font-weight: 800; }
+                    .grupo th { background: #eef2ff; color: #312e81; font-size: 13px; }
+                    .duracao { font-weight: 700; white-space: nowrap; }
+                </style>
+            </head>
+            <body>
+                <section class="pdf-pagina">
+                    <header class="pdf-header">
+                        <div>
+                            <h1>Relatorio de Horas Extras</h1>
+                            <p>${escapeHtml(labelData(dados.inicio))} ate ${escapeHtml(labelData(dados.fim))}</p>
+                        </div>
+                        <p>Gerado em ${escapeHtml(new Date().toLocaleDateString('pt-BR'))}</p>
+                    </header>
+                    <div class="pdf-aviso">Horas pagas em folha: nao entram no saldo do banco de horas.</div>
+                    <div class="pdf-cards">
+                        <div class="pdf-card"><span>Total de horas extras</span><strong>${escapeHtml(dados.totalFormatado)}</strong></div>
+                        <div class="pdf-card"><span>Colaboradores</span><strong>${dados.totalColaboradores}</strong></div>
+                        <div class="pdf-card"><span>Dias com hora extra</span><strong>${dados.totalDias}</strong></div>
+                    </div>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Data</th><th>Tipo</th><th>Horario</th><th>Duracao</th><th>Observacao</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${(dados.itens || []).map((item) => `
+                                <tr class="grupo">
+                                    <th colspan="3">${escapeHtml(item.nome)}</th>
+                                    <th class="duracao">${escapeHtml(item.totalFormatado)}</th>
+                                    <th>${(item.plantoes || []).length} turno(s)</th>
+                                </tr>
+                                ${(item.plantoes || []).map((plantao) => `
+                                    <tr>
+                                        <td>${escapeHtml(plantao.dataFormatada || labelData(plantao.dataISO))}</td>
+                                        <td>${escapeHtml(plantao.tipoPlantao || '--')}</td>
+                                        <td>${escapeHtml(`${plantao.horaInicio || '--'} as ${plantao.horaFim || '--'}`)}</td>
+                                        <td class="duracao">${escapeHtml(plantao.minutosFormatado)}</td>
+                                        <td>${escapeHtml(plantao.observacao || '--')}</td>
+                                    </tr>
+                                `).join('')}
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </section>
+            </body>
+            </html>
+        `;
+    }
+
+    async function exportarRelatorioExtras() {
+        if (!dadosExtras || (dadosExtras.itens || []).length === 0) {
+            toast('Gere o relatorio antes de exportar.', 'warning');
+            return;
+        }
+
+        if (typeof html2canvas !== 'function'
+            || !window.jspdf
+            || typeof window.jspdf.jsPDF !== 'function'
+            || typeof window.criarContainerTemporarioRelatorioPdf !== 'function') {
+            toast('Bibliotecas de exportacao nao estao disponiveis.', 'error');
+            return;
+        }
+
+        let container = null;
+        let liberarViewport = null;
+
+        try {
+            toast('Gerando PDF de horas extras...', 'warning');
+
+            container = window.criarContainerTemporarioRelatorioPdf(gerarHtmlPdfExtras(dadosExtras), { width: 1480 });
+            liberarViewport = typeof window.lockPdfViewportOverflow === 'function'
+                ? window.lockPdfViewportOverflow()
+                : null;
+            await window.aguardarLayoutRelatorioPdf();
+
+            const canvas = await window.renderizarPaginaPdfEmCanvas(container, {
+                minWidth: 1600,
+                minHeight: 1000,
+                scale: 1.65,
+                maxCanvasSide: 12000,
+                maxCanvasPixels: 22000000
+            });
+            const { pdf } = window.criarPdfMultipaginasComCanvas(canvas, {
+                preferLandscape: true,
+                marginMm: 6,
+                minScaleMmPerPixel: 0.065,
+                imageFormat: 'JPEG',
+                imageQuality: 0.94,
+                minimumPages: 1,
+                maxSourcePageHeight: 1300
+            });
+            const salvar = typeof window.baixarPdfSemPreview === 'function'
+                ? window.baixarPdfSemPreview
+                : (documento, nome) => documento.save(nome);
+
+            salvar(pdf, `Horas_Extras_${dadosExtras.inicio}_${dadosExtras.fim}.pdf`);
+            toast('PDF de horas extras gerado com sucesso!', 'success');
+        } catch (error) {
+            console.error('Erro ao exportar horas extras:', error);
+            toast(error.message || 'Nao foi possivel exportar o relatorio.', 'error');
+        } finally {
+            liberarViewport?.();
+            container?.remove();
         }
     }
 
