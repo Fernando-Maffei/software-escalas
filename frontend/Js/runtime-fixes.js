@@ -3983,6 +3983,215 @@
         return openPlantaoEditorFromGrid(dataISO);
     };
 
+    // ---- Abas da tela de plantoes ----
+    // A aba ativa e os filtros vivem fora do render: renderLancamentoPlantao e
+    // chamada de novo a cada gravacao, exclusao e passo da regua, e voltar para
+    // "Lancar plantao" (ou limpar o filtro) a cada salvamento tornaria a busca
+    // inutil justamente quando se esta revisando varios dias seguidos.
+    const PLANTAO_FILTROS_VAZIOS = Object.freeze({
+        dataInicio: '',
+        dataFim: '',
+        colaboradorId: '',
+        tipoPlantao: 'todos',
+        tipoCredito: 'todos'
+    });
+
+    let plantaoAbaAtiva = 'lancar';
+    let filtrosPlantoesLancados = { ...PLANTAO_FILTROS_VAZIOS };
+
+    function selecionarAbaPlantao(aba) {
+        plantaoAbaAtiva = aba === 'lancados' ? 'lancados' : 'lancar';
+
+        document.querySelectorAll('[data-plantao-aba]').forEach((botao) => {
+            const ativa = botao.getAttribute('data-plantao-aba') === plantaoAbaAtiva;
+            botao.classList.toggle('is-ativa', ativa);
+            botao.setAttribute('aria-selected', ativa ? 'true' : 'false');
+        });
+
+        document.querySelectorAll('[data-plantao-painel]').forEach((painel) => {
+            painel.hidden = painel.getAttribute('data-plantao-painel') !== plantaoAbaAtiva;
+        });
+    }
+
+    // Turnos que a lista considera: os mesmos que a regua aceita (sabado,
+    // domingo e feriado), ignorando lixo de datas que deixaram de ser validas.
+    function plantoesLancadosValidos() {
+        return (window.plantoesLancados || []).filter((plantao) => (
+            ehDataPlantaoValida(plantao.dataISO)
+            || ['sabado', 'domingo', 'feriado'].includes(plantao.tipoPlantao)
+        ));
+    }
+
+    // O filtro corta TURNOS, nao dias: buscar por um colaborador mostra so os
+    // turnos dele, mesmo num dia em que outras pessoas tambem trabalharam.
+    function filtrarPlantoesLancados(lista, filtros = filtrosPlantoesLancados) {
+        return lista.filter((plantao) => {
+            const dataISO = String(plantao.dataISO || '');
+
+            if (filtros.dataInicio && dataISO < filtros.dataInicio) {
+                return false;
+            }
+
+            if (filtros.dataFim && dataISO > filtros.dataFim) {
+                return false;
+            }
+
+            if (filtros.tipoPlantao !== 'todos' && (plantao.tipoPlantao || 'sabado') !== filtros.tipoPlantao) {
+                return false;
+            }
+
+            if (filtros.tipoCredito !== 'todos'
+                && normalizarTipoCreditoPlantao(plantao.tipoCredito) !== filtros.tipoCredito) {
+                return false;
+            }
+
+            if (filtros.colaboradorId
+                && !(plantao.colaboradores || []).some((id) => Number(id) === Number(filtros.colaboradorId))) {
+                return false;
+            }
+
+            return true;
+        });
+    }
+
+    function contarPlantoesLancados(lista) {
+        const dias = new Set();
+        const pessoas = new Set();
+
+        lista.forEach((plantao) => {
+            dias.add(plantao.dataISO);
+            (plantao.colaboradores || []).forEach((id) => pessoas.add(Number(id)));
+        });
+
+        return { dias: dias.size, turnos: lista.length, pessoas: pessoas.size };
+    }
+
+    function filtrosPlantoesAtivos(filtros = filtrosPlantoesLancados) {
+        return Object.keys(PLANTAO_FILTROS_VAZIOS)
+            .some((chave) => filtros[chave] !== PLANTAO_FILTROS_VAZIOS[chave]);
+    }
+
+    function lerFiltrosPlantoesLancadosUI() {
+        return {
+            dataInicio: document.getElementById('plantoesFiltroInicio')?.value || '',
+            dataFim: document.getElementById('plantoesFiltroFim')?.value || '',
+            colaboradorId: document.getElementById('plantoesFiltroColaborador')?.value || '',
+            tipoPlantao: document.getElementById('plantoesFiltroTipo')?.value || 'todos',
+            tipoCredito: document.getElementById('plantoesFiltroCredito')?.value || 'todos'
+        };
+    }
+
+    function renderFiltrosPlantoesLancados() {
+        const filtros = filtrosPlantoesLancados;
+        const colaboradores = [...(window.colaboradores || [])]
+            .sort((a, b) => String(a.Nome || '').localeCompare(String(b.Nome || ''), 'pt-BR'));
+
+        const opcoes = (lista, selecionado) => lista.map(([valor, rotulo]) => `
+            <option value="${escapeHtml(valor)}" ${String(selecionado) === String(valor) ? 'selected' : ''}>${escapeHtml(rotulo)}</option>
+        `).join('');
+
+        return `
+            <div class="plantoes-filtros">
+                <div class="plantoes-filtro">
+                    <label for="plantoesFiltroInicio">De</label>
+                    <input type="date" id="plantoesFiltroInicio" class="form-control" value="${escapeHtml(filtros.dataInicio)}">
+                </div>
+                <div class="plantoes-filtro">
+                    <label for="plantoesFiltroFim">Ate</label>
+                    <input type="date" id="plantoesFiltroFim" class="form-control" value="${escapeHtml(filtros.dataFim)}">
+                </div>
+                <div class="plantoes-filtro">
+                    <label for="plantoesFiltroColaborador">Colaborador</label>
+                    <select id="plantoesFiltroColaborador" class="form-control">
+                        <option value="">Todos</option>
+                        ${colaboradores.map((colaborador) => `
+                            <option value="${colaborador.Id}" ${String(filtros.colaboradorId) === String(colaborador.Id) ? 'selected' : ''}>
+                                ${escapeHtml(colaborador.Nome)}
+                            </option>
+                        `).join('')}
+                    </select>
+                </div>
+                <div class="plantoes-filtro">
+                    <label for="plantoesFiltroTipo">Tipo do dia</label>
+                    <select id="plantoesFiltroTipo" class="form-control">
+                        ${opcoes([
+                            ['todos', 'Todos'],
+                            ['sabado', 'Sabado'],
+                            ['domingo', 'Domingo'],
+                            ['feriado', 'Feriado']
+                        ], filtros.tipoPlantao)}
+                    </select>
+                </div>
+                <div class="plantoes-filtro">
+                    <label for="plantoesFiltroCredito">Destino das horas</label>
+                    <select id="plantoesFiltroCredito" class="form-control">
+                        ${opcoes([
+                            ['todos', 'Todos'],
+                            ['banco', 'Banco de horas'],
+                            ['extra', 'Hora extra']
+                        ], filtros.tipoCredito)}
+                    </select>
+                </div>
+                <button type="button" id="plantoesFiltroLimpar" class="btn-secondary" ${filtrosPlantoesAtivos() ? '' : 'disabled'}>
+                    <i class="fas fa-eraser"></i> Limpar
+                </button>
+            </div>
+        `;
+    }
+
+    function atualizarContagemPlantoesLancados() {
+        const todos = plantoesLancadosValidos();
+        const filtrados = filtrarPlantoesLancados(todos);
+        const total = contarPlantoesLancados(todos);
+        const visivel = contarPlantoesLancados(filtrados);
+
+        const badge = document.getElementById('plantaoAbaContagem');
+        if (badge) {
+            badge.textContent = String(total.dias);
+        }
+
+        const resumo = document.getElementById('plantoesLancadosResumo');
+        if (resumo) {
+            resumo.textContent = filtrosPlantoesAtivos()
+                ? `${visivel.dias} de ${total.dias} dia(s) · ${visivel.turnos} turno(s) · ${visivel.pessoas} pessoa(s)`
+                : `${total.dias} dia(s) · ${total.turnos} turno(s) · ${total.pessoas} pessoa(s)`;
+        }
+
+        const limpar = document.getElementById('plantoesFiltroLimpar');
+        if (limpar) {
+            limpar.disabled = !filtrosPlantoesAtivos();
+        }
+    }
+
+    function aplicarFiltrosPlantoesLancados() {
+        filtrosPlantoesLancados = lerFiltrosPlantoesLancadosUI();
+        atualizarResumoPlantaoNaTela();
+    }
+
+    function limparFiltrosPlantoesLancados() {
+        filtrosPlantoesLancados = { ...PLANTAO_FILTROS_VAZIOS };
+
+        const container = document.querySelector('.plantoes-filtros');
+        if (container) {
+            container.outerHTML = renderFiltrosPlantoesLancados();
+            ligarFiltrosPlantoesLancados();
+        }
+
+        atualizarResumoPlantaoNaTela();
+    }
+
+    function ligarFiltrosPlantoesLancados() {
+        ['plantoesFiltroInicio', 'plantoesFiltroFim'].forEach((id) => {
+            document.getElementById(id)?.addEventListener('change', aplicarFiltrosPlantoesLancados);
+        });
+
+        ['plantoesFiltroColaborador', 'plantoesFiltroTipo', 'plantoesFiltroCredito'].forEach((id) => {
+            document.getElementById(id)?.addEventListener('change', aplicarFiltrosPlantoesLancados);
+        });
+
+        document.getElementById('plantoesFiltroLimpar')?.addEventListener('click', limparFiltrosPlantoesLancados);
+    }
+
     function atualizarResumoPlantaoNaTela() {
         const container = document.getElementById('listaPlantoesLancados');
 
@@ -3991,20 +4200,26 @@
         }
 
         container.innerHTML = renderPlantoesLancados();
+        atualizarContagemPlantoesLancados();
     }
 
     // Um dia pode ter varios turnos, e cada turno e uma linha da tabela. O card
     // e do DIA: junta os turnos daquela data e mostra cada um como uma faixa.
-    window.renderPlantoesLancados = renderPlantoesLancados = function renderPlantoesLancadosAvancado() {
+    window.renderPlantoesLancados = renderPlantoesLancados = function renderPlantoesLancadosAvancado(filtros) {
             if (!window.plantoesLancados || window.plantoesLancados.length === 0) {
                 return '<div class="empty-state">Nenhum plantao lancado ainda</div>';
             }
 
-            const validos = [...window.plantoesLancados]
-                .filter((plantao) => ehDataPlantaoValida(plantao.dataISO) || ['sabado', 'domingo', 'feriado'].includes(plantao.tipoPlantao));
+            const lancados = plantoesLancadosValidos();
+
+            if (lancados.length === 0) {
+                return '<div class="empty-state">Nenhum plantao de sabado, domingo ou feriado lancado ainda</div>';
+            }
+
+            const validos = filtrarPlantoesLancados(lancados, filtros || filtrosPlantoesLancados);
 
             if (validos.length === 0) {
-                return '<div class="empty-state">Nenhum plantao de sabado, domingo ou feriado lancado ainda</div>';
+                return '<div class="empty-state">Nenhum plantao encontrado com esses filtros. Ajuste o periodo, o colaborador ou o destino das horas.</div>';
             }
 
             const porData = new Map();
@@ -4072,7 +4287,7 @@
                                 </div>
                             </div>
                             <div class="plantao-actions">
-                                <button onclick="editarPlantao('${dataISO}')" class="btn-icon-sm edit" title="Editar dia" aria-label="Editar plantao de ${escapeHtml(formatarDataPtBr(dataISO))}">
+                                <button type="button" data-plantao-editar="${dataISO}" class="btn-icon-sm edit" title="Editar dia" aria-label="Editar plantao de ${escapeHtml(formatarDataPtBr(dataISO))}">
                                     <i class="fas fa-edit"></i>
                                 </button>
                                 <button onclick="excluirPlantao('${dataISO}')" class="btn-icon-sm delete" title="Excluir dia" aria-label="Excluir plantao de ${escapeHtml(formatarDataPtBr(dataISO))}">
@@ -4159,28 +4374,54 @@
                 </div>
             </div>
 
+            <div class="plantao-abas" role="tablist">
+                <button type="button" class="plantao-aba" data-plantao-aba="lancar" role="tab" aria-selected="true">
+                    <i class="fas fa-calendar-day"></i> Lancar plantao
+                </button>
+                <button type="button" class="plantao-aba" data-plantao-aba="lancados" role="tab" aria-selected="false">
+                    <i class="fas fa-list"></i> Plantoes lancados
+                    <span class="plantao-aba-contagem" id="plantaoAbaContagem">0</span>
+                </button>
+            </div>
+
             <div class="plantao-layout">
-                <div class="sabados-container">
-                    <div class="sabados-header">
-                        <div>
-                            <h3><i class="fas fa-calendar-day"></i> Datas disponiveis</h3>
-                            <p class="sabados-subtitle">Sabados, domingos e feriados &middot; ${escapeHtml(primeiraData)} ate ${escapeHtml(ultimaData)}</p>
+                <div class="plantao-abas-conteudo">
+                    <div class="sabados-container" data-plantao-painel="lancar">
+                        <div class="sabados-header">
+                            <div>
+                                <h3><i class="fas fa-calendar-day"></i> Datas disponiveis</h3>
+                                <p class="sabados-subtitle">Sabados, domingos e feriados &middot; ${escapeHtml(primeiraData)} ate ${escapeHtml(ultimaData)}</p>
+                            </div>
+                            <div class="sabados-nav">
+                                <button type="button" class="btn-secondary" id="plantaoAnteriorBtn">
+                                    <i class="fas fa-arrow-left"></i> Anteriores
+                                </button>
+                                <button type="button" class="btn-secondary" id="plantaoHojeBtn">
+                                    <i class="fas fa-bullseye"></i> Atual
+                                </button>
+                                <button type="button" class="btn-secondary" id="plantaoProximoBtn">
+                                    Proximos <i class="fas fa-arrow-right"></i>
+                                </button>
+                            </div>
                         </div>
-                        <div class="sabados-nav">
-                            <button type="button" class="btn-secondary" id="plantaoAnteriorBtn">
-                                <i class="fas fa-arrow-left"></i> Anteriores
-                            </button>
-                            <button type="button" class="btn-secondary" id="plantaoHojeBtn">
-                                <i class="fas fa-bullseye"></i> Atual
-                            </button>
-                            <button type="button" class="btn-secondary" id="plantaoProximoBtn">
-                                Proximos <i class="fas fa-arrow-right"></i>
-                            </button>
+
+                        <div class="sabados-regua" id="listaSabados">
+                            ${renderSabadosPlantaoHistorico(sabados)}
                         </div>
                     </div>
 
-                    <div class="sabados-regua" id="listaSabados">
-                        ${renderSabadosPlantaoHistorico(sabados)}
+                    <div class="plantoes-lancados-container" data-plantao-painel="lancados" hidden>
+                        <div class="plantoes-lancados-header">
+                            <div>
+                                <h3><i class="fas fa-list"></i> Plantoes lancados</h3>
+                                <p class="sabados-subtitle">Filtre os lancamentos e clique em editar para abrir o dia no painel ao lado.</p>
+                            </div>
+                            <span class="plantoes-lancados-resumo" id="plantoesLancadosResumo"></span>
+                        </div>
+                        ${renderFiltrosPlantoesLancados()}
+                        <div id="listaPlantoesLancados" class="plantoes-grid">
+                            ${renderPlantoesLancados()}
+                        </div>
                     </div>
                 </div>
 
@@ -4204,18 +4445,6 @@
                     </div>
                 </div>
             </div>
-
-            <div class="plantoes-lancados-container">
-                <div class="plantoes-lancados-header">
-                    <div>
-                        <h3><i class="fas fa-list"></i> Plantoes lancados</h3>
-                        <p class="sabados-subtitle">Edite sabados anteriores diretamente por esta lista quando preferir.</p>
-                    </div>
-                </div>
-                <div id="listaPlantoesLancados" class="plantoes-grid">
-                    ${renderPlantoesLancados()}
-                </div>
-            </div>
         `;
 
         document.getElementById('plantaoAnteriorBtn')?.addEventListener('click', () => {
@@ -4234,6 +4463,33 @@
             mudarPaginaSabadosPlantao(PLANTAO_SABADOS_PASSO);
             window.__plantaoDataFocoISO = null;
             renderLancamentoPlantao();
+        });
+
+        document.querySelectorAll('[data-plantao-aba]').forEach((botao) => {
+            botao.addEventListener('click', () => selecionarAbaPlantao(botao.getAttribute('data-plantao-aba')));
+        });
+
+        selecionarAbaPlantao(plantaoAbaAtiva);
+        ligarFiltrosPlantoesLancados();
+        atualizarContagemPlantoesLancados();
+
+        // Editar pela lista abre o mesmo painel lateral da regua. O painel e
+        // sticky, mas numa tela estreita ele cai abaixo da lista: sem o scroll
+        // o clique parece nao ter feito nada.
+        document.getElementById('listaPlantoesLancados')?.addEventListener('click', async (event) => {
+            const trigger = event.target.closest('[data-plantao-editar]');
+
+            if (!trigger) {
+                return;
+            }
+
+            await openPlantaoEditorFromGrid(trigger.getAttribute('data-plantao-editar'));
+
+            const editorPanel = document.getElementById('plantaoEditor');
+
+            if (editorPanel && editorPanel.style.display !== 'none') {
+                editorPanel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }
         });
 
         document.getElementById('listaSabados')?.addEventListener('click', async (event) => {

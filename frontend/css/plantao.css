@@ -614,6 +614,121 @@
     letter-spacing: 0.3px;
 }
 /* Lista de plantões lançados */
+/* ---- abas da tela de plantoes ---- */
+/* "Lancar plantao" e "Plantoes lancados" sao tarefas excludentes; o painel
+   lateral de edicao fica FORA das abas para servir as duas. */
+.plantao-abas {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+}
+
+.plantao-aba {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 16px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-full, 999px);
+    background: var(--card);
+    color: var(--text-light);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.plantao-aba:hover {
+    color: var(--text);
+    border-color: var(--border-dark);
+}
+
+.plantao-aba.is-ativa {
+    background: var(--primary);
+    border-color: var(--primary);
+    color: #fff;
+    box-shadow: var(--shadow-primary, none);
+}
+
+.plantao-aba-contagem {
+    min-width: 22px;
+    padding: 1px 7px;
+    border-radius: var(--radius-full, 999px);
+    background: var(--bg-soft);
+    color: var(--text-secondary);
+    font-size: 12px;
+    font-weight: 700;
+    text-align: center;
+}
+
+.plantao-aba.is-ativa .plantao-aba-contagem {
+    background: rgba(255, 255, 255, 0.22);
+    color: #fff;
+}
+
+/* Coluna das abas dentro do layout de duas colunas (a outra e o editor). */
+.plantao-abas-conteudo {
+    flex: 1;
+    min-width: 0;
+}
+
+[data-plantao-painel][hidden] {
+    display: none !important;
+}
+
+/* ---- filtros da lista de lancados ---- */
+.plantoes-filtros {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 12px;
+    margin-bottom: 20px;
+    padding: 14px 16px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg, 16px);
+    background: var(--bg-soft);
+}
+
+.plantoes-filtro {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 150px;
+}
+
+.plantoes-filtro label {
+    color: var(--text-secondary);
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.plantoes-filtro .form-control {
+    width: 100%;
+    min-width: 0;
+}
+
+.plantoes-filtros .btn-secondary {
+    height: 40px;
+}
+
+.plantoes-lancados-resumo {
+    color: var(--text-light);
+    font-size: 13px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+@media (max-width: 720px) {
+    .plantoes-filtro {
+        flex: 1 1 100%;
+    }
+
+    .plantoes-lancados-resumo {
+        white-space: normal;
+    }
+}
+
 .plantoes-lancados-container {
     background: var(--card);
     border-radius: 24px;
