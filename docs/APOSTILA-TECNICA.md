@@ -464,7 +464,9 @@ Todo acesso à API passa por aqui. Isso concentra num só lugar coisas como URL 
 
 #### PWA
 
-`manifest.json` declara nome, ícones e cor de marca, permitindo "instalar" o app. **Não há service worker** de propósito: como o sistema mostra dados ao vivo do banco, cachear telas causaria informação velha. O controle de cache de versão é feito por `?v=1.6.1` nos links de CSS/JS.
+`manifest.json` declara nome, ícones e cor de marca, permitindo "instalar" o app. **Não há service worker** de propósito: como o sistema mostra dados ao vivo do banco, cachear telas causaria informação velha.
+
+O cache de CSS/JS é controlado por **header, não por query string**: `backend/server.js` serve o front-end com `Cache-Control: no-store, must-revalidate` e sem `ETag`/`Last-Modified`, o que cobre também o `index.html` — que, por ser o documento de entrada, não teria onde pendurar um `?v=`. Os links são limpos por isso (`Js/app.js`, não `Js/app.js?v=...`): a query string é anterior ao header, deixou de ter efeito quando ele entrou e só sobrava como um passo manual de bump que ninguém mantinha em dia. A demo publicada na Vercel não passa pelo Express, então declara o mesmo header em `vercel.json`.
 
 ---
 
