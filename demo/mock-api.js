@@ -41,7 +41,9 @@
 
         [/\/api\/setores/, () => json(D.SETORES)],
 
-        [/\/api\/colaboradores$/, () => json(D.COLABORADORES.map((c) => ({
+        // Aceita tambem ?incluirInativos=1, que a modal de lancamentos usa para
+        // montar o diretorio de nomes (inclusive de quem foi desligado).
+        [/\/api\/colaboradores(\?.*)?$/, () => json(D.COLABORADORES.map((c) => ({
             id: c.id,
             nome: c.nome,
             setorId: c.setorId,

@@ -108,6 +108,81 @@ async function carregarFeriados(ano) {
     return feriados;
 }
 
+function normalizarNomeFeriado(valor) {
+    return String(valor ?? '')
+        .normalize('NFD')
+        .replace(/\p{Diacritic}/gu, '')
+        .trim()
+        .toLowerCase();
+}
+
+// Feriado nacional e feriado cadastrado no banco caiam como duas tags separadas
+// na mesma celula, entao um cadastro manual repetindo o nome de um feriado
+// nacional aparecia duplicado no calendario. Casamos por data + nome: nomes
+// iguais viram uma tag so; nomes diferentes no mesmo dia continuam sendo dois
+// eventos legitimos e seguem aparecendo.
+function feriadosDoDia(dataISO) {
+    const nacionais = feriados.filter((feriado) => feriado.date === dataISO);
+
+    const locais = (window.feriadosLocais || [])
+        .filter((item) => extrairDataISO(item.Data || item.data) === dataISO);
+
+    const usados = new Set();
+
+    const tags = nacionais.map((nacional) => {
+        const indice = locais.findIndex((local, posicao) => !usados.has(posicao)
+            && normalizarNomeFeriado(local.Nome || local.nome) === normalizarNomeFeriado(nacional.name));
+
+        if (indice !== -1) {
+            usados.add(indice);
+        }
+
+        const local = indice === -1 ? null : locais[indice];
+
+        return {
+            classe: local ? String(local.Tipo || local.tipo || 'municipal').toLowerCase() : 'federal',
+            rotulo: `BR ${nacional.name}`,
+            titulo: local
+                ? `${nacional.name} — feriado nacional. Ha tambem um cadastro manual duplicado nesta data.`
+                : `${nacional.name} — feriado nacional`
+        };
+    });
+
+    locais.forEach((local, posicao) => {
+        if (usados.has(posicao)) {
+            return;
+        }
+
+        const nome = local.Nome || local.nome || 'Feriado';
+        const tipo = String(local.Tipo || local.tipo || 'municipal').toLowerCase();
+
+        tags.push({ classe: tipo, rotulo: nome, titulo: `${nome} — feriado ${tipo}` });
+    });
+
+    return tags;
+}
+
+// Nome de exibicao de um colaborador. GET /colaboradores esconde quem foi
+// desligado (Ativo = 0), mas os lancamentos dessa pessoa continuam no banco —
+// era dai que vinham as tags "Desconhecido" no calendario. O diretorio completo
+// e mantido por lancamentos.js; aqui so consultamos, com fallback.
+function nomeColaboradorCalendario(colaboradorId) {
+    if (typeof window.resolverColaboradorLancamento === 'function') {
+        const registro = window.resolverColaboradorLancamento(colaboradorId);
+
+        if (registro && registro.nome) {
+            return { nome: registro.nome, ativo: registro.ativo !== false };
+        }
+    }
+
+    const colaborador = (window.colaboradores || [])
+        .find((item) => Number(item.Id ?? item.id) === Number(colaboradorId));
+
+    return colaborador
+        ? { nome: colaborador.Nome || colaborador.nome, ativo: true }
+        : { nome: `Colaborador #${colaboradorId}`, ativo: false };
+}
+
 function gerarCalendario(mes, ano) {
     const calendar = document.getElementById('calendar');
 
@@ -181,23 +256,14 @@ function gerarCalendario(mes, ano) {
             cell.classList.add('today');
         }
 
-        const feriadoNacional = feriados.find((feriado) => feriado.date === dataISO);
-        if (feriadoNacional) {
+        feriadosDoDia(dataISO).forEach((feriado) => {
             cell.classList.add('holiday');
             const tag = document.createElement('div');
-            tag.className = 'holiday-tag federal';
-            tag.textContent = `BR ${feriadoNacional.name}`;
+            tag.className = `holiday-tag ${feriado.classe}`;
+            tag.textContent = feriado.rotulo;
+            tag.title = feriado.titulo;
             cell.appendChild(tag);
-        }
-
-        const feriadoLocal = (window.feriadosLocais || []).find((item) => extrairDataISO(item.Data || item.data) === dataISO);
-        if (feriadoLocal) {
-            cell.classList.add('holiday');
-            const tag = document.createElement('div');
-            tag.className = `holiday-tag ${feriadoLocal.Tipo || feriadoLocal.tipo || 'municipal'}`;
-            tag.textContent = `${feriadoLocal.Nome || feriadoLocal.nome}`;
-            cell.appendChild(tag);
-        }
+        });
 
         const ausenciasDoDia = (window.ausencias || []).filter((ausencia) => {
             const inicio = extrairDataISO(ausencia.DataInicio || ausencia.dataInicio);
@@ -210,19 +276,23 @@ function gerarCalendario(mes, ano) {
 
         ausenciasDoDia.forEach((ausencia) => {
             const colaboradorId = ausencia.colaboradorId || ausencia.ColaboradorId;
-            const colaborador = (window.colaboradores || []).find((item) => item.Id === colaboradorId);
-            const nome = colaborador?.Nome || 'Desconhecido';
+            const { nome, ativo } = nomeColaboradorCalendario(colaboradorId);
             const tipo = String(ausencia.tipo || ausencia.Tipo || '').toLowerCase();
 
             if (!colaboradoresUnicos.has(nome)) {
-                colaboradoresUnicos.set(nome, { nome, tipo });
+                colaboradoresUnicos.set(nome, { nome, tipo, ativo });
             }
         });
 
         colaboradoresUnicos.forEach((info) => {
             const tag = document.createElement('div');
-            tag.className = `ausencia-tag ${info.tipo}`;
+            tag.className = `ausencia-tag ${info.tipo}${info.ativo ? '' : ' inativo'}`;
             tag.textContent = info.nome;
+
+            if (!info.ativo) {
+                tag.title = `${info.nome} — colaborador desligado`;
+            }
+
             cell.appendChild(tag);
         });
 
@@ -310,7 +380,14 @@ function configurarNavegacaoCalendario() {
 }
 
 async function inicializarCalendario() {
-    await carregarFeriados(anoAtual);
+    // O diretorio com desligados precisa estar em memoria antes do primeiro
+    // render, senao as ausencias de quem saiu voltam a virar "Desconhecido".
+    const diretorio = typeof window.carregarDiretorioColaboradores === 'function'
+        ? window.carregarDiretorioColaboradores()
+        : Promise.resolve();
+
+    await Promise.allSettled([carregarFeriados(anoAtual), diretorio]);
+
     gerarDiasSemana();
     gerarCalendario(mesAtual, anoAtual);
     configurarNavegacaoCalendario();
