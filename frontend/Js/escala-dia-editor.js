@@ -1497,11 +1497,39 @@
             </div>`;
         }
 
+        // Ausencia por periodo (ex.: 14:00-15:00). O total de horas ja descontava
+        // e as celulas por baixo ja pintavam 'ausencia-parcial' — mas esta barra
+        // e desenhada POR CIMA das celulas e tapava a marcacao, entao na pratica
+        // a ausencia sumia da escala. Desenhamos aqui o mesmo bloco, no mesmo
+        // esquema do almoco.
+        const partialAbsence = getPartialAbsenceEscala(record.colaboradorId, record.dataISO);
+        const absenceStartRaw = partialAbsence?.horaInicio || partialAbsence?.HoraInicio;
+        const absenceEndRaw = partialAbsence?.horaFim || partialAbsence?.HoraFim;
+        // Recorta na jornada: ausencia que comece antes da entrada ou termine
+        // depois da saida nao pode pintar fora da barra.
+        const absenceRange = getClampedIntervalEscala(
+            getTimeMinutesEscala(absenceStartRaw),
+            getTimeMinutesEscala(absenceEndRaw),
+            start,
+            end
+        );
+
+        let absence = '';
+
+        if (absenceRange) {
+            const absenceLabel = `${formatTimeInputEscala(absenceStartRaw)}–${formatTimeInputEscala(absenceEndRaw)}`;
+
+            absence = `<div class="escala-ausencia-parcial" style="left:${pct(absenceRange.start)}%;width:${pct(absenceRange.end) - pct(absenceRange.start)}%" title="Ausencia parcial ${escapeHtmlEscala(absenceLabel)}">
+                <span class="escala-ausencia-parcial-time">${escapeHtmlEscala(absenceLabel)}</span>
+            </div>`;
+        }
+
         return `<div class="escala-overlay">
             <div class="escala-bar${isPlantao ? ' escala-bar-plantao' : ''}" style="left:${left}%;width:${Math.max(0, right - left)}%">
                 <span class="escala-bar-label">${escapeHtmlEscala(barLabel)}</span>
             </div>
             ${lunch}
+            ${absence}
         </div>`;
     }
 
