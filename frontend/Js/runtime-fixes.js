@@ -129,9 +129,27 @@
         return `${ano}-${mes}-${dia}`;
     }
 
+    // Esta e a UNICA mapAusencia em uso (chamada em carregarAusencias, abaixo)
+    // e portanto o que window.ausencias contem. Subtipo e DescontaBancoHoras
+    // faltavam aqui: o backend os manda, mas eles morriam nesta funcao. O
+    // efeito era duplo — o card do lancamento nao tinha o que exibir, e ao
+    // editar uma ausencia medica sem desconto o formulario reabria com o
+    // padrao ("Comum", desconto marcado) e o Atualizar gravava esse padrao em
+    // cima do que estava salvo, mexendo no saldo do banco de horas.
     function mapAusencia(item) {
         const tipo = window.normalizeRuntimeAusenciaTipo(item.Tipo || item.tipo);
         const periodoTipo = window.normalizeRuntimePeriodoTipo(item.PeriodoTipo || item.periodoTipo || 'dia_inteiro');
+        const subtipo = item.Subtipo || item.subtipo || null;
+
+        // Tres estados distintos: true, false e null (coluna ausente no schema
+        // ou registro antigo). Boolean() achataria null para false e faria um
+        // lancamento antigo parecer "nao desconta".
+        const descontaBruto = item.DescontaBancoHoras ?? item.descontaBancoHoras;
+        const descontaBancoHoras = descontaBruto === null || descontaBruto === undefined
+            ? null
+            : Boolean(descontaBruto);
+
+        const observacao = item.Observacao || item.observacao || null;
 
         return {
             Id: item.Id,
@@ -143,6 +161,9 @@
             PeriodoTipo: periodoTipo,
             HoraInicio: item.HoraInicio,
             HoraFim: item.HoraFim,
+            Subtipo: subtipo,
+            DescontaBancoHoras: descontaBancoHoras,
+            Observacao: observacao,
             id: item.Id,
             colaboradorId: item.ColaboradorId,
             tipo,
@@ -151,8 +172,9 @@
             periodoTipo,
             horaInicio: item.HoraInicio,
             horaFim: item.HoraFim,
-            observacao: item.Observacao || item.observacao || null,
-            Observacao: item.Observacao || item.observacao || null
+            subtipo,
+            descontaBancoHoras,
+            observacao
         };
     }
 
@@ -1932,40 +1954,6 @@
         const horas = String(Math.floor(absoluto / 60)).padStart(2, '0');
         const minutos = String(absoluto % 60).padStart(2, '0');
         return `${signed ? sinal : ''}${horas}h ${minutos}m`;
-    }
-
-    function mapAusencia(item) {
-        const descontaBancoHoras = item.DescontaBancoHoras ?? item.descontaBancoHoras;
-
-        return {
-            Id: item.Id,
-            ColaboradorId: item.ColaboradorId,
-            Tipo: item.Tipo,
-            DataInicio: item.DataInicio,
-            DataFim: item.DataFim,
-            DataCadastro: item.DataCadastro,
-            PeriodoTipo: item.PeriodoTipo || 'dia_inteiro',
-            HoraInicio: item.HoraInicio,
-            HoraFim: item.HoraFim,
-            Subtipo: item.Subtipo || null,
-            DescontaBancoHoras: descontaBancoHoras === null || descontaBancoHoras === undefined
-                ? null
-                : Boolean(descontaBancoHoras),
-            Observacao: item.Observacao || null,
-            id: item.Id,
-            colaboradorId: item.ColaboradorId,
-            tipo: item.Tipo,
-            dataInicio: item.DataInicio,
-            dataFim: item.DataFim,
-            periodoTipo: item.PeriodoTipo || 'dia_inteiro',
-            horaInicio: item.HoraInicio,
-            horaFim: item.HoraFim,
-            subtipo: item.Subtipo || null,
-            descontaBancoHoras: descontaBancoHoras === null || descontaBancoHoras === undefined
-                ? null
-                : Boolean(descontaBancoHoras),
-            observacao: item.Observacao || null
-        };
     }
 
     function mapPlantao(item) {
@@ -4698,7 +4686,11 @@
         const periodoTipo = document.getElementById('periodoTipo')?.value || 'dia_inteiro';
         const horaInicio = document.getElementById('horaInicio')?.value || '';
         const horaFim = document.getElementById('horaFim')?.value || '';
-        const subtipo = document.getElementById('ausenciaSubtipo')?.value || 'comum';
+        // Sem o `|| 'comum'` que havia aqui: para Folga e Ferias o campo fica
+        // escondido e o subtipo e derivado do tipo. Mandar 'comum' na mao
+        // atropelava o resolveDefaultSubtipo do backend, que grava
+        // 'folga'/'ferias'. Vazio vira undefined, sai do JSON e o backend decide.
+        const subtipo = document.getElementById('ausenciaSubtipo')?.value || undefined;
         const descontaBancoHoras = document.getElementById('descontaBancoHoras')?.checked ?? true;
         const observacao = document.getElementById('observacaoLancamento')?.value || '';
 

@@ -454,6 +454,21 @@
     color: var(--warning-text);
 }
 
+#modalLancamento .lc-chip--subtipo {
+    background: var(--accent-soft);
+    color: var(--accent);
+}
+
+/* Valor de meta que descreve uma excecao ("Nao desconta"): destaca sem
+   alarmar, porque nao e erro — foi escolha de quem lancou. */
+#modalLancamento .lc-card-meta .lc-dd--neutro {
+    color: var(--warning-text);
+    background: var(--warning-soft);
+    border-radius: var(--radius-sm);
+    padding: 0 6px;
+    display: inline-block;
+}
+
 #modalLancamento .lc-chip--lock {
     background: var(--neutral-fill);
     color: var(--text-muted);

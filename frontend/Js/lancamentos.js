@@ -195,6 +195,17 @@
         return TIPOS[chave] || { icone: 'fa-calendar-day', texto: chave || 'Lancamento' };
     }
 
+    // Subtipos que valem um chip no card. Ficam de fora, de proposito:
+    // 'comum' (o padrao, nao informa nada) e 'folga'/'ferias' (derivados do
+    // tipo pelo backend, e o tipo ja tem chip proprio). O rotulo aqui e o
+    // mesmo que getAusenciaStatusLabel usa no extrato: "medico" e Atestado.
+    const SUBTIPOS = {
+        medico: { icone: 'fa-stethoscope', texto: 'Atestado' },
+        particular: { icone: 'fa-user', texto: 'Particular' },
+        compensacao: { icone: 'fa-right-left', texto: 'Compensacao' },
+        outro: { icone: 'fa-ellipsis', texto: 'Outro' }
+    };
+
     const ABRANGENCIAS = {
         federal: { icone: 'fa-flag', texto: 'Federal' },
         estadual: { icone: 'fa-map', texto: 'Estadual' },
@@ -352,7 +363,10 @@
                     periodoTipo: item.periodoTipo || item.PeriodoTipo || 'dia_inteiro',
                     horaInicio: formatarHora(item.horaInicio ?? item.HoraInicio),
                     horaFim: formatarHora(item.horaFim ?? item.HoraFim),
-                    subtipo: item.subtipo || item.Subtipo || '',
+                    subtipo: String(item.subtipo || item.Subtipo || '').toLowerCase(),
+                    // null = coluna ausente no schema ou registro antigo; nesse
+                    // caso o card omite a linha em vez de afirmar um dos lados.
+                    descontaBancoHoras: item.descontaBancoHoras ?? item.DescontaBancoHoras ?? null,
                     observacao: item.observacao || item.Observacao || '',
                     colaborador
                 };
@@ -468,8 +482,21 @@
                    <i class="fas fa-user-slash"></i> ${item.colaborador.orfao ? 'Removido' : 'Desligado'}
                </span>`;
 
-        const chipSubtipo = item.subtipo && item.subtipo !== 'comum'
-            ? `<span class="lc-chip">${escapeHtml(item.subtipo)}</span>`
+        // 'comum' e o padrao e nao informa nada; 'folga'/'ferias' apenas
+        // repetem o tipo, que ja tem chip proprio.
+        const subtipoMeta = SUBTIPOS[item.subtipo];
+        const chipSubtipo = subtipoMeta
+            ? `<span class="lc-chip lc-chip--subtipo"><i class="fas ${subtipoMeta.icone}"></i> ${subtipoMeta.texto}</span>`
+            : '';
+
+        // Ferias nunca descontam (o backend zera o debito pelo tipo), entao a
+        // linha seria redundante. Nos outros casos ela e a informacao que nao
+        // dava para ver sem abrir o lancamento para editar.
+        const mostraBanco = item.descontaBancoHoras !== null && item.tipo !== 'ferias';
+        const linhaBanco = mostraBanco
+            ? `<div><dt>Banco de horas</dt><dd class="${item.descontaBancoHoras ? '' : 'lc-dd--neutro'}">${
+                item.descontaBancoHoras ? 'Desconta' : 'Nao desconta'
+              }</dd></div>`
             : '';
 
         return `
@@ -496,6 +523,8 @@
                 <dl class="lc-card-meta">
                     <div><dt>Periodo</dt><dd>${periodo}</dd></div>
                     <div><dt>${porHora ? 'Horario' : 'Duracao'}</dt><dd>${escapeHtml(duracao)}</dd></div>
+                    ${porHora && dias !== null && dias > 1 ? `<div><dt>Dias</dt><dd>${dias} dias</dd></div>` : ''}
+                    ${linhaBanco}
                 </dl>
                 ${item.observacao ? `<p class="lc-card-obs"><i class="fas fa-quote-left"></i> ${escapeHtml(item.observacao)}</p>` : ''}
             </article>
@@ -721,6 +750,13 @@
 
         // Feriado do cadastro e sempre de um dia so.
         el('lcCampoDataFim')?.classList.toggle('hidden', ehFeriado);
+
+        // Subtipo so faz sentido em Ausencia. Em Folga e Ferias o tipo ja
+        // decide o subtipo ('folga'/'ferias'), e runtime-fixes.js travava o
+        // select — que aparecia EM BRANCO, porque esses dois valores nem
+        // constam entre as <option>. Campo travado que so ecoa outro campo e
+        // ruido: escondemos, e o backend deriva o subtipo a partir do tipo.
+        el('lcCampoSubtipo')?.classList.toggle('hidden', ehFeriado || tipo === 'folga' || tipo === 'ferias');
     }
 
     function atualizarCabecalhoFormulario() {
