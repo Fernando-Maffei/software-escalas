@@ -42,6 +42,7 @@ Todas as alteracoes relevantes deste projeto serao documentadas neste arquivo.
 - Calendario/Escala marcavam como "Plantao" so quem estava no primeiro turno do dia: `buscarPlantaoDoDia` parava no primeiro registro da data. Agora junta a equipe de todos os turnos.
 - Dashboard e relatorio contavam turnos como se fossem plantoes: um sabado com dois turnos aparecia como dois. Passam a contar dias.
 - Escala do dia: com mais de um turno no mesmo dia, `escala_dia` (que so aceita uma linha por colaborador/data) ficaria com o ultimo turno gravado. Agora quem faz dois turnos no dia vira um intervalo unico, do primeiro inicio ao ultimo fim.
+- Logo quebrado na demo publica: as tres tags `<img>` de `demo/index.html` (as duas da tela de login e a da barra lateral) apontavam para `assets/branding/central-escalas-logo.png` com caminho relativo. Como a pagina e servida a partir de `/demo/`, resolviam para `/demo/assets/branding/central-escalas-logo.png`, que nao existe — o arquivo esta em `frontend/assets/branding/` —, e cada carga rendia 404. Passam a usar `/frontend/assets/branding/central-escalas-logo.png`, a mesma raiz que o favicon e todos os outros CSS/JS do arquivo ja usavam, e que o `.vercelignore` mantem no deploy.
 
 ## [1.6.1] - 2026-07-24
 
