@@ -167,18 +167,6 @@
     line-height: 1;
 }
 
-.sabado-mes {
-    font-size: 14px;
-    color: var(--text-light);
-    text-transform: uppercase;
-    margin: 4px 0;
-}
-
-.sabado-ano {
-    font-size: 12px;
-    color: var(--text-lighter);
-}
-
 .sabado-tipo {
     margin-top: 6px;
     font-size: 11px;
@@ -970,14 +958,6 @@
 
 [data-theme="dark"] .sabado-dia {
     color: var(--text);
-}
-
-[data-theme="dark"] .sabado-mes {
-    color: var(--text-light);
-}
-
-[data-theme="dark"] .sabado-ano {
-    color: var(--text-lighter);
 }
 
 [data-theme="dark"] .badge-historico {

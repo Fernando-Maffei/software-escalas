@@ -749,43 +749,17 @@
         return map;
     }
 
-    function hasEscalaExportRows(day) {
-        return Array.isArray(day?.rows) && day.rows.length > 0;
+    // O quadro mostra SEMPRE os sete dias, mesmo com o domingo vazio: uma folha
+    // de seis colunas, terminando no sabado, nao deixava o leitor distinguir
+    // "domingo vazio" de "domingo fora do relatorio".
+    function getEscalaExportWeekSlots(week) {
+        return Array.from({ length: 7 }, (_, index) => week?.[index] || null);
     }
 
-    // O quadro mostra SEMPRE os sete dias. Antes o domingo so entrava se
-    // alguem tivesse escala nele, e um setor que nao trabalha no fim de semana
-    // recebia uma folha de seis colunas, terminando no sabado — o leitor nao
-    // conseguia distinguir "domingo vazio" de "domingo fora do relatorio".
-    function shouldIncludeSundayInMonthlyExport() {
-        return true;
-    }
-
-    function getEscalaExportWeekSlots(week, includeSunday) {
-        const slots = Array.from({ length: 7 }, (_, index) => week?.[index] || null);
-        return includeSunday ? slots : slots.slice(0, 6);
-    }
-
-    function getEscalaExportWeekdayLabels(includeSunday) {
-        return includeSunday ? ESCALA_QUADRO_WEEKDAY_HEADERS : ESCALA_QUADRO_WEEKDAY_HEADERS.slice(0, 6);
-    }
-
-    function getEscalaExportEntryMaxRows(weeks, includeSunday) {
+    function getEscalaExportEntryMaxRows(weeks) {
         return Math.max(0, ...weeks.flatMap((week) => (
-            getEscalaExportWeekSlots(week, includeSunday).map((day) => getEscalaExportDayRowCount(day))
+            getEscalaExportWeekSlots(week).map((day) => getEscalaExportDayRowCount(day))
         )));
-    }
-
-    function getEscalaSheetDensityClass(maxRows, weekCount) {
-        if (maxRows >= 17 || (weekCount > 1 && maxRows >= 13)) {
-            return ' is-ultra-dense';
-        }
-
-        if (maxRows >= 11 || (weekCount > 1 && maxRows >= 9)) {
-            return ' is-dense';
-        }
-
-        return '';
     }
 
     // Quantas linhas cabem no dia mais cheio de uma folha com N linhas de
@@ -981,13 +955,13 @@
     // altura para a folha subir de fonte no ajuste que roda depois.
     const MAX_SEMANAS_POR_FOLHA = 3;
 
-    function escolherBlocosDeSemanasPlantao(weeks, includeSunday) {
+    function escolherBlocosDeSemanasPlantao(weeks) {
         const minimoDePaginas = Math.max(1, Math.ceil(weeks.length / MAX_SEMANAS_POR_FOLHA));
 
         for (let paginas = minimoDePaginas; paginas <= weeks.length; paginas += 1) {
             const blocos = dividirSemanasEmBlocos(weeks, paginas);
             const cabe = blocos.every((bloco) => (
-                getEscalaExportEntryMaxRows(bloco, includeSunday) <= getMonthlyEscalaOnePageMaxRows(bloco.length)
+                getEscalaExportEntryMaxRows(bloco) <= getMonthlyEscalaOnePageMaxRows(bloco.length)
             ));
 
             if (cabe) {
@@ -1064,15 +1038,15 @@
     };
 
     function buildMonthlyEscalaExportPageEntries(snapshot) {
-        const compactWeekMaxRows = 12;
-        const maxRowsPerWeekDay = 22;
+        // Uma semana sozinha na folha comporta ate essa quantidade de linhas no
+        // dia mais cheio; e o tamanho de cada fatia quando nem isso basta.
+        const maxRowsPerWeekDay = getMonthlyEscalaOnePageMaxRows(1);
         const sectorEntries = Array.isArray(snapshot.setorGroups) && snapshot.setorGroups.length > 0
             ? snapshot.setorGroups
             : [{
                 setorNome: 'Sem setor',
                 calendarWeeks: Array.isArray(snapshot.calendarWeeks) ? snapshot.calendarWeeks : []
             }];
-        const includeSunday = shouldIncludeSundayInMonthlyExport(snapshot);
 
         return sectorEntries.flatMap((sector) => {
             const weeks = Array.isArray(sector.calendarWeeks) && sector.calendarWeeks.length > 0
@@ -1090,7 +1064,7 @@
             // sair em 5 folhas, e um mes de 6 semanas sair em 3 mesmo com 11.
             // Menos semanas por folha = mais altura para cada dia, entao a
             // divisao ganha capacidade sem precisar encolher a fonte.
-            const blocosPorPagina = escolherBlocosDeSemanasPlantao(weeks, includeSunday);
+            const blocosPorPagina = escolherBlocosDeSemanasPlantao(weeks);
 
             if (blocosPorPagina) {
                 return blocosPorPagina.map((bloco, indice) => {
@@ -1105,7 +1079,6 @@
                         kind: bloco.length > 1 ? 'weeks' : 'week',
                         weekIndex: inicio,
                         endWeekIndex: fim,
-                        includeSunday,
                         label: bloco.length === weeks.length
                             ? 'Mes completo'
                             : (bloco.length > 1
@@ -1116,61 +1089,33 @@
             }
 
             // Nenhuma divisao resolve: ha um dia com mais linhas do que cabe
-            // numa folha inteira. Ai sim a semana e fatiada em partes.
-            const entries = [];
-            let weekIndex = 0;
+            // numa folha inteira. Ai cada semana vai numa folha, e a que nao
+            // cabe e fatiada em partes.
+            return weeks.flatMap((week, weekIndex) => {
+                const currentWeek = Array.isArray(week) ? week : Array(7).fill(null);
+                const partCount = Math.max(1, Math.ceil(getEscalaExportEntryMaxRows([currentWeek]) / maxRowsPerWeekDay));
 
-            while (weekIndex < weeks.length) {
-                const currentWeek = Array.isArray(weeks[weekIndex]) ? weeks[weekIndex] : Array(7).fill(null);
-                const weekMaxRows = Math.max(0, ...currentWeek.map((day) => getEscalaExportDayRowCount(day)));
-                const partCount = Math.max(1, Math.ceil(weekMaxRows / maxRowsPerWeekDay));
-
-                if (partCount > 1) {
-                    Array.from({ length: partCount }, (_, partIndex) => {
-                        const startIndex = partIndex * maxRowsPerWeekDay;
-                        const weekPart = currentWeek.map((day) => sliceEscalaExportDayRows(day, startIndex, maxRowsPerWeekDay));
-
-                        entries.push({
-                            sector,
-                            weeks: [weekPart],
-                            kind: 'week',
-                            weekIndex,
-                            partIndex,
-                            partCount,
-                            includeSunday,
-                            label: `Semana ${weekIndex + 1} - parte ${partIndex + 1}`
-                        });
-                    });
-                    weekIndex += 1;
-                    continue;
+                if (partCount === 1) {
+                    return [{
+                        sector,
+                        weeks: [currentWeek],
+                        kind: 'week',
+                        weekIndex,
+                        endWeekIndex: weekIndex,
+                        label: `Semana ${weekIndex + 1}`
+                    }];
                 }
 
-                const nextWeek = weeks[weekIndex + 1] || null;
-                const nextWeekMaxRows = nextWeek
-                    ? Math.max(0, ...nextWeek.map((day) => getEscalaExportDayRowCount(day)))
-                    : 0;
-                const canPairWeeks = nextWeek
-                    && weekMaxRows <= compactWeekMaxRows
-                    && nextWeekMaxRows <= compactWeekMaxRows;
-                const entryWeeks = canPairWeeks ? [currentWeek, nextWeek] : [currentWeek];
-                const endWeekIndex = weekIndex + entryWeeks.length - 1;
-
-                entries.push({
+                return Array.from({ length: partCount }, (_, partIndex) => ({
                     sector,
-                    weeks: entryWeeks,
-                    kind: entryWeeks.length > 1 ? 'weeks' : 'week',
+                    weeks: [currentWeek.map((day) => sliceEscalaExportDayRows(day, partIndex * maxRowsPerWeekDay, maxRowsPerWeekDay))],
+                    kind: 'week',
                     weekIndex,
-                    endWeekIndex,
-                    includeSunday,
-                    label: entryWeeks.length > 1
-                        ? `Semanas ${weekIndex + 1}-${endWeekIndex + 1}`
-                        : `Semana ${weekIndex + 1}`
-                });
-
-                weekIndex += entryWeeks.length;
-            }
-
-            return entries;
+                    partIndex,
+                    partCount,
+                    label: `Semana ${weekIndex + 1} - parte ${partIndex + 1}`
+                }));
+            });
         });
     }
 
@@ -1179,19 +1124,21 @@
         const holidayMap = buildEscalaExportHolidayMap(snapshot.feriados);
         const pageTitle = formatEscalaMonthHeading(snapshot.filters?.month, snapshot.filters?.year);
 
+        // A densidade (tamanho da fonte) nao e escolhida aqui: sai da medicao
+        // da folha ja montada, em ajustarDensidadeFolhasEscala.
         return pageEntries.map((entry, pageIndex) => `
-            <section class="pdf-pagina escala-export-page escala-export-month-page${getEscalaSheetDensityClass(getEscalaExportEntryMaxRows(entry.weeks, entry.includeSunday), entry.weeks.length)}">
+            <section class="pdf-pagina escala-export-page escala-export-month-page">
                 <div class="escala-sheet-title">${escapeHtmlEscala(pageTitle)}</div>
                 <div class="escala-sheet-meta">
                     <strong>Setor: ${escapeHtmlEscala(entry.sector.setorNome || 'Sem setor')}</strong>
                     <span>${escapeHtmlEscala(entry.label)} - Pagina ${pageIndex + 1} de ${pageEntries.length}</span>
                 </div>
-                <div class="escala-sheet-weekdays" style="--weekday-count:${entry.includeSunday ? 7 : 6};">
-                    ${getEscalaExportWeekdayLabels(entry.includeSunday).map((label) => `<span>${escapeHtmlEscala(label)}</span>`).join('')}
+                <div class="escala-sheet-weekdays" style="--weekday-count:7;">
+                    ${ESCALA_QUADRO_WEEKDAY_HEADERS.map((label) => `<span>${escapeHtmlEscala(label)}</span>`).join('')}
                 </div>
-                <div class="escala-sheet-grid" style="--weekday-count:${entry.includeSunday ? 7 : 6}; --week-count:${entry.weeks.length || 1};">
+                <div class="escala-sheet-grid" style="--weekday-count:7; --week-count:${entry.weeks.length || 1};">
                     ${entry.weeks.flatMap((week) => (
-                        getEscalaExportWeekSlots(week, entry.includeSunday).map((day, weekDayIndex) => renderEscalaSheetDayTable(day, {
+                        getEscalaExportWeekSlots(week).map((day, weekDayIndex) => renderEscalaSheetDayTable(day, {
                             weekDayIndex,
                             holidayMap
                         }))

@@ -201,7 +201,6 @@ const API = {
 
     getPlantoes: (params = {}) => API.get('/plantoes', params),
     salvarPlantao: (data) => API.post('/plantoes', data),
-    getPlantaoDia: (dataISO) => API.get(`/plantoes/${dataISO}`),
     excluirPlantao: (dataISO) => API.delete(`/plantoes/${dataISO}`),
     getPlantaoDisponibilidade: (dataISO, params = {}) => API.get(`/plantoes/disponibilidade/${dataISO}`, params),
 

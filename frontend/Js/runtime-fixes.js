@@ -3667,7 +3667,15 @@
             alvo.querySelectorAll('[data-excluir]').forEach((btn) => {
                 btn.addEventListener('click', async () => {
                     const nome = btn.dataset.nome || 'este colaborador';
-                    if (!window.confirm(`Excluir DEFINITIVAMENTE ${nome} e todo o historico? Esta acao nao pode ser desfeita.`)) {
+                    // Exclusao definitiva apaga o colaborador e todo o historico
+                    // (plantoes, banco de horas, escala, ausencias): so segue com
+                    // a senha de quem esta logado, conferida no servidor.
+                    const senha = await solicitarSenhaModal({
+                        mensagem: `Excluir DEFINITIVAMENTE ${nome} e todo o historico? Esta acao nao pode ser desfeita.`,
+                        verificar: (valor) => window.API.verificarSenha(valor)
+                    });
+
+                    if (senha === null) {
                         return;
                     }
                     try {
@@ -3716,7 +3724,6 @@
     const PLANTAO_SABADOS_ANTERIORES = 8;
     const PLANTAO_SABADOS_POSTERIORES = 10;
     const PLANTAO_SABADOS_PASSO = 8;
-    const PLANTAO_MESES_LABELS = ['JAN', 'FEV', 'MAR', 'ABR', 'MAI', 'JUN', 'JUL', 'AGO', 'SET', 'OUT', 'NOV', 'DEZ'];
     const PLANTAO_MESES_NOMES = ['Janeiro', 'Fevereiro', 'Marco', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
 
     function criarDataLocalPlantao(dataISO) {
@@ -3732,11 +3739,6 @@
     function formatarDataPlantaoCard(dataISO) {
         const [ano, mes, dia] = String(dataISO || '').split('-');
         return ano && mes && dia ? `${dia}/${mes}/${ano}` : '--';
-    }
-
-    function formatarMesPlantaoCard(dataISO) {
-        const [, mes] = String(dataISO || '').split('-').map(Number);
-        return PLANTAO_MESES_LABELS[mes - 1] || '--';
     }
 
     function ajustarAncoraSabadoPlantao(referenciaISO) {
@@ -3852,8 +3854,6 @@
                 dataISO,
                 formatada: formatarDataPlantaoCard(dataISO),
                 dia: String(data.getDate()).padStart(2, '0'),
-                mes: formatarMesPlantaoCard(dataISO),
-                ano: data.getFullYear(),
                 plantao,
                 temPlantao: Boolean(plantao),
                 isPast: dataISO < hojeISO,
@@ -3928,8 +3928,6 @@
                     ${sabado.isPast ? '<span class="badge-historico">Historico</span>' : ''}
                 </div>
                 <div class="sabado-dia">${escapeHtml(sabado.dia)}</div>
-                <div class="sabado-mes">${escapeHtml(sabado.mes)}</div>
-                <div class="sabado-ano">${escapeHtml(String(sabado.ano))}</div>
                 <div class="sabado-tipo">${escapeHtml(sabado.tipoLabel || 'Sabado')}</div>
                 <div class="sabado-status">${sabado.temPlantao ? 'Clique para editar' : 'Clique para lancar'}</div>
             </button>
@@ -4635,7 +4633,7 @@
         }
     };
 
-    window.excluirPlantao = excluirPlantao = async function excluirPlantaoAvancado(dataISO) {
+    window.excluirPlantao = async function excluirPlantaoAvancado(dataISO) {
         if (!window.confirm('Tem certeza que deseja excluir este plantao?')) {
             return;
         }

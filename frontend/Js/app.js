@@ -1322,11 +1322,7 @@ function cancelarEdicao() {
 // usuario confirma E a verificacao (options.verificar) passa; resolve com null
 // se ele cancelar/fechar. Senha errada mantem a modal aberta com o erro — nada
 // e apagado. Interacao autocontida: nao mexe na modal generica de confirmacao.
-//
-// Sem chamador no momento: o portao de senha era usado por um excluirColaborador
-// que estava morto (apontava para uma rota PUT inexistente) e foi removido. A
-// exclusao definitiva hoje mora em runtime-fixes.js e so pede um confirm().
-// Mantido aqui porque e o portao pronto para religar nesse fluxo.
+// Usada pela exclusao definitiva de colaborador desligado (runtime-fixes.js).
 function solicitarSenhaModal(options = {}) {
     return new Promise((resolve) => {
         const modal = document.getElementById('modalSenhaExclusao');
@@ -3144,95 +3140,6 @@ function resetarSistema() {
         } else {
             mostrarToast('Operação cancelada', 'error');
         }
-    }
-}
-
-function gerarProximosSabados(data, quantidade) {
-    const sabados = [];
-    const dataAtual = new Date(data);
-    
-    // 🔥 CORREÇÃO: Resetar horas para evitar problemas de fuso
-    dataAtual.setHours(0, 0, 0, 0);
-    
-    // Encontra o primeiro sábado (6 = sábado)
-    while (dataAtual.getDay() !== 6) {
-        dataAtual.setDate(dataAtual.getDate() + 1);
-    }
-    
-    for (let i = 0; i < quantidade; i++) {
-        const sabado = new Date(dataAtual);
-        sabado.setDate(dataAtual.getDate() + (i * 7));
-        
-        // 🔥 CORREÇÃO: Criar data no formato YYYY-MM-DD sem fuso
-        const ano = sabado.getFullYear();
-        const mes = String(sabado.getMonth() + 1).padStart(2, '0');
-        const dia = String(sabado.getDate()).padStart(2, '0');
-        const dataISO = `${ano}-${mes}-${dia}`;
-        
-        // Verificar se já tem plantão para este sábado
-        const temPlantao = window.plantoesLancados?.some(p => {
-            const dataPlantao = p.dataISO.split('T')[0];
-            return dataPlantao === dataISO;
-        }) || false;
-        
-        sabados.push({
-            data: sabado,
-            dataISO: dataISO,
-            formatada: `${dia}/${mes}/${ano}`,
-            dia: dia,
-            mes: sabado.toLocaleString('pt-BR', { month: 'short' }).replace('.', '').toUpperCase(),
-            ano: ano,
-            temPlantao: temPlantao
-        });
-    }
-    
-    return sabados;
-}
-
-function renderSabados(sabados) {
-    let html = '';
-    
-    sabados.forEach(sabado => {
-        const temPlantao = sabado.temPlantao;
-        const classe = temPlantao ? 'sabado-card lancado' : 'sabado-card';
-        
-        html += `
-            <div class="${classe}" onclick="abrirEditorPlantao('${sabado.dataISO}', '${sabado.formatada}')">
-                <div class="sabado-dia">${sabado.dia}</div>
-                <div class="sabado-mes">${sabado.mes}</div>
-                <div class="sabado-ano">${sabado.ano}</div>
-                ${temPlantao ? '<span class="badge-plantao">✓ Lançado</span>' : ''}
-            </div>
-        `;
-    });
-    
-    return html;
-}
-
-async function excluirPlantao(dataISO) {
-    if (!confirm("Tem certeza que deseja excluir este plantão?")) return;
-    
-    try {
-        // 🔥 CORREÇÃO: Garantir que a data está no formato YYYY-MM-DD
-        const dataLimpa = dataISO.split('T')[0];
-        
-        const response = await fetch(`http://localhost:3000/api/plantoes/${dataLimpa}`, {
-            method: 'DELETE'
-        });
-        
-        if (!response.ok) throw new Error("Erro ao excluir");
-        
-        // Recarregar plantões
-        await carregarPlantoes();
-        
-        // 🔥 Recarregar a tela
-        renderLancamentoPlantao();
-        
-        mostrarToast("Plantão excluído com sucesso!", "success");
-        
-    } catch (error) {
-        console.error("Erro ao excluir plantão:", error);
-        mostrarToast("Erro ao excluir plantão", "error");
     }
 }
 
