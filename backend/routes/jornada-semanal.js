@@ -1,9 +1,9 @@
 const express = require('express');
 
 const { conectar } = require('../db');
-const { getSchemaInfo } = require('../utils/schema');
-const { listJornadaSemanal } = require('../utils/jornada-semanal');
-const { ensurePositiveInt } = require('../utils/validation');
+const { getSchemaInfo } = require('../db/schema');
+const { listJornadaSemanal } = require('../services/jornada-semanal');
+const { ensurePositiveInt } = require('../lib/validation');
 
 const router = express.Router();
 

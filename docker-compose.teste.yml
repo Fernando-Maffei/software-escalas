@@ -1,5 +1,5 @@
 # Instancia de TESTE do App de Escalas, isolada da producao. E nela que o
-# robo de testes (e2e/) roda: ele cria, altera e exclui registros aleatorios,
+# robo de testes (tests/e2e/) roda: ele cria, altera e exclui registros aleatorios,
 # entao nunca pode tocar no banco real.
 #
 # Diferencas para o docker-compose.yml de producao:

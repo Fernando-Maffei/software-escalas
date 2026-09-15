@@ -8,7 +8,7 @@
 // A producao (porta 4450) e recusada de proposito: o robo cria, altera e
 // exclui registros aleatorios.
 const { defineConfig, devices } = require('@playwright/test');
-const { ARQUIVO_SESSAO } = require('./e2e/apoio');
+const { ARQUIVO_SESSAO } = require('./tests/e2e/apoio');
 
 const URL_DEMO = `http://127.0.0.1:${Number(process.env.DEMO_PORTA) || 4470}`;
 const URL_TESTE = process.env.E2E_URL || 'http://localhost:4460';
@@ -24,13 +24,13 @@ if (!process.env.ROBO_SEMENTE) {
 }
 
 module.exports = defineConfig({
-    testDir: './e2e',
-    outputDir: './e2e/resultados',
+    testDir: './tests/e2e',
+    outputDir: './tests/e2e/resultados',
     fullyParallel: true,
     // No Windows, 8 navegadores abrindo juntos as vezes falham com "spawn UNKNOWN".
     workers: process.env.CI ? 2 : 4,
     retries: 0,
-    reporter: [['list'], ['html', { outputFolder: 'e2e/relatorio', open: 'never' }]],
+    reporter: [['list'], ['html', { outputFolder: 'tests/e2e/relatorio', open: 'never' }]],
     use: {
         ...devices['Desktop Chrome'],
         screenshot: 'only-on-failure',
@@ -56,7 +56,7 @@ module.exports = defineConfig({
         }
     ],
     webServer: {
-        command: 'node e2e/servidor-demo.js',
+        command: 'node tests/e2e/servidor-demo.js',
         url: URL_DEMO,
         reuseExistingServer: !process.env.CI
     }

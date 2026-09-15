@@ -6,7 +6,7 @@ const {
     isAusenciaOverlappingPlantao,
     parseBalanceInputToMinutes,
     resolveDefaultDescontaBancoHoras
-} = require('../backend/utils/bancoHoras');
+} = require('../../backend/services/bancoHoras');
 
 const colaboradorBase = {
     TrabalhoInicio: '08:00:00',

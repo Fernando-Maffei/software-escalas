@@ -4,11 +4,11 @@ const path = require('path');
 const {
     normalizeAutoBackupIntervalMinutes,
     normalizeBackupDirectory
-} = require('../backend/utils/backup-config');
+} = require('../../backend/services/backup-config');
 const {
     coerceBackupPayload,
     formatBackupTimestamp
-} = require('../backend/utils/backup-service');
+} = require('../../backend/services/backup-service');
 
 module.exports = [
     {

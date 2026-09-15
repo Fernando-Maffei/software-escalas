@@ -1,6 +1,6 @@
 const assert = require('assert');
 
-const { checkAccess, isAdminOnlyPath, isReadOnlyMethod } = require('../backend/utils/permissoes');
+const { checkAccess, isAdminOnlyPath, isReadOnlyMethod } = require('../../backend/auth/permissoes');
 
 module.exports = [
     {

@@ -1,5 +1,5 @@
-const { AppError } = require('./errors');
-const { extractDateString, extractTimeString, normalizeIsoDate, normalizeTime } = require('./validation');
+const { AppError } = require('../lib/errors');
+const { extractDateString, extractTimeString, normalizeIsoDate, normalizeTime } = require('../lib/validation');
 
 function padNumber(value) {
     return String(value).padStart(2, '0');

@@ -1,7 +1,7 @@
 const { sql } = require('../db');
-const { AppError } = require('./errors');
-const { getSchemaInfo, hasTable } = require('./schema');
-const { ensurePositiveInt, normalizeOptionalText } = require('./validation');
+const { AppError } = require('../lib/errors');
+const { getSchemaInfo, hasTable } = require('../db/schema');
+const { ensurePositiveInt, normalizeOptionalText } = require('../lib/validation');
 
 function serializeSetor(row) {
     return {

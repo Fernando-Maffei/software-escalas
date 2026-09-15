@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const {
     normalizeJornadaSemanalPayload,
     normalizeDiaSemana
-} = require('../backend/utils/jornada-semanal');
+} = require('../../backend/services/jornada-semanal');
 
 module.exports = [
     {

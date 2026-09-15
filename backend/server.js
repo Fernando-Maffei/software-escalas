@@ -8,13 +8,13 @@ const {
     clearAutoBackupScheduler,
     executeAutomaticBackup,
     initializeAutoBackupScheduler
-} = require('./utils/backup-scheduler');
-const { AppError } = require('./utils/errors');
-const { requireAuth, purgeExpiredSessions } = require('./utils/auth');
-const { checkAccess } = require('./utils/permissoes');
-const { ensureApplicationSchema } = require('./utils/database-schema');
-const { isDatabaseConfigured } = require('./utils/database-config');
-const { isSchemaReady, setSchemaReady } = require('./utils/app-state');
+} = require('./services/backup-scheduler');
+const { AppError } = require('./lib/errors');
+const { requireAuth, purgeExpiredSessions } = require('./auth/auth');
+const { checkAccess } = require('./auth/permissoes');
+const { ensureApplicationSchema } = require('./db/database-schema');
+const { isDatabaseConfigured } = require('./db/database-config');
+const { isSchemaReady, setSchemaReady } = require('./lib/app-state');
 
 const authRoutes = require('./routes/auth');
 const colaboradoresRoutes = require('./routes/colaboradores');

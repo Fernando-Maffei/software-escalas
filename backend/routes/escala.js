@@ -1,10 +1,10 @@
 const express = require('express');
 
 const { sql, conectar } = require('../db');
-const { withTransaction } = require('../utils/transactions');
-const { AppError } = require('../utils/errors');
-const { getSchemaInfo } = require('../utils/schema');
-const { getSetoresPermitidosRequest, idsPermitidosNumericos } = require('../utils/acesso-setores');
+const { withTransaction } = require('../db/transactions');
+const { AppError } = require('../lib/errors');
+const { getSchemaInfo } = require('../db/schema');
+const { getSetoresPermitidosRequest, idsPermitidosNumericos } = require('../auth/acesso-setores');
 const {
     applyLunchPeriod,
     ensureEscalaDiaForPeriod,
@@ -14,14 +14,14 @@ const {
     normalizeEscalaTipo,
     resetEscalaLunchesToCadastro,
     upsertManualEscalaDia
-} = require('../utils/escala');
+} = require('../services/escala');
 const {
     buildDateRange,
     ensurePositiveInt,
     normalizeIsoDate,
     normalizeNullableTime,
     normalizeOptionalText
-} = require('../utils/validation');
+} = require('../lib/validation');
 
 const router = express.Router();
 

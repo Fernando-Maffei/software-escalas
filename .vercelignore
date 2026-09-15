@@ -17,6 +17,8 @@ node_modules
 Dockerfile
 docker-compose.yml
 docker-compose.override.yml
+docker-compose.teste.yml
+playwright.config.js
 package.json
 package-lock.json
 

@@ -6,11 +6,11 @@ const { normalizeSubtipo, resolveDefaultDescontaBancoHoras } = require('./bancoH
 const {
     normalizeBackupDirectory
 } = require('./backup-config');
-const { REQUIRED_TABLES } = require('./database-schema');
-const { AppError } = require('./errors');
+const { REQUIRED_TABLES } = require('../db/database-schema');
+const { AppError } = require('../lib/errors');
 const { normalizeDiaSemana } = require('./jornada-semanal');
 const { normalizeColaboradores } = require('./plantoes');
-const { withTransaction } = require('./transactions');
+const { withTransaction } = require('../db/transactions');
 const {
     ensurePositiveInt,
     extractDateString,
@@ -22,7 +22,7 @@ const {
     normalizeOptionalText,
     toSqlTime,
     validateWorkSchedule
-} = require('./validation');
+} = require('../lib/validation');
 
 const AUSENCIA_TIPOS = Object.freeze(['folga', 'ausencia', 'ferias']);
 const AUSENCIA_PERIODO_TIPOS = Object.freeze(['dia_inteiro', 'horas']);

@@ -4,8 +4,8 @@ const {
     getBackupSettings,
     saveBackupSettings
 } = require('./backup-config');
-const { getPublicDatabaseSettings } = require('./database-config');
-const { AppError } = require('./errors');
+const { getPublicDatabaseSettings } = require('../db/database-config');
+const { AppError } = require('../lib/errors');
 const { createSystemBackup } = require('./backup-service');
 
 let autoBackupTimer = null;

@@ -1,8 +1,8 @@
 const { sql } = require('../db');
-const { AppError } = require('./errors');
+const { AppError } = require('../lib/errors');
 const { listJornadaSemanal } = require('./jornada-semanal');
 const { serializePlantaoRecord } = require('./plantoes');
-const { getBancoHorasCapabilities, hasTable } = require('./schema');
+const { getBancoHorasCapabilities, hasTable } = require('../db/schema');
 const {
     buildDateRange,
     compareTimes,
@@ -15,7 +15,7 @@ const {
     normalizeOptionalText,
     toSqlTime,
     validateWorkSchedule
-} = require('./validation');
+} = require('../lib/validation');
 
 const ESCALA_TIPOS = ['normal', 'plantao', 'folga', 'ferias', 'ausencia', 'ajuste'];
 const DIA_SEMANA_LABELS = [

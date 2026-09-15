@@ -1,4 +1,4 @@
-const { AppError } = require('./errors');
+const { AppError } = require('../lib/errors');
 const { minutesToDurationLabel } = require('./bancoHoras');
 const {
     ensurePositiveInt,
@@ -9,7 +9,7 @@ const {
     normalizeNullableTime,
     normalizeNumericArray,
     normalizeOptionalText
-} = require('./validation');
+} = require('../lib/validation');
 const { calculateIntervalMinutes } = require('./bancoHoras');
 
 function formatDateToISO(date) {

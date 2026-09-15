@@ -1,6 +1,6 @@
 const { sql } = require('../db');
-const { AppError } = require('./errors');
-const { hasTable } = require('./schema');
+const { AppError } = require('../lib/errors');
+const { hasTable } = require('../db/schema');
 const {
     ensurePositiveInt,
     extractTimeString,
@@ -8,7 +8,7 @@ const {
     normalizeNullableTime,
     toSqlTime,
     validateWorkSchedule
-} = require('./validation');
+} = require('../lib/validation');
 
 const DIAS_SEMANA_VALIDOS = Object.freeze([0, 1, 2, 3, 4, 5, 6]);
 

@@ -1,8 +1,8 @@
 const fs = require('fs');
 const path = require('path');
 
-const { AppError } = require('./errors');
-const { ensureDataDirectory, resolveDataPath } = require('./app-paths');
+const { AppError } = require('../lib/errors');
+const { ensureDataDirectory, resolveDataPath } = require('../lib/app-paths');
 
 const CONFIG_PATH = resolveDataPath('backup.local.json');
 

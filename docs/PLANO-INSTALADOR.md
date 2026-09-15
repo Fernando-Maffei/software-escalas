@@ -31,7 +31,7 @@ do SQL Server rodando** para ser anexado/restaurado. Portanto:
 1. O SQL Express vira **pré-requisito** (detectado / baixado à parte).
 2. O **esquema do banco o próprio app já gera** a partir das migrations que ele
    carrega (`ensureApplicationSchema` em
-   [backend/utils/database-schema.js](backend/utils/database-schema.js)), lidas de
+   [backend/db/database-schema.js](../backend/db/database-schema.js)), lidas de
    [database/migrations/](database/migrations/). São ~36 KB de texto versionado,
    sempre coerentes com a versão do sistema — muito melhor que um `.mdf` binário.
 3. Os **dados iniciais** (para o banco não começar vazio) vêm do template de
@@ -59,9 +59,9 @@ do SQL Server rodando** para ser anexado/restaurado. Portanto:
 1. Copia o app + `node.exe` embutido para `C:\Program Files\App de Escalas`.
 2. Cria a pasta de dados `C:\ProgramData\App de Escalas` e define a variável
    `APP_DE_ESCALAS_DATA_DIR` apontando para ela (o código já suporta — ver
-   [backend/utils/app-paths.js:4](backend/utils/app-paths.js)).
+   [backend/lib/app-paths.js:4](../backend/lib/app-paths.js)).
 3. Pergunta a **senha do admin** e injeta como `ADMIN_PASSWORD` (o código já
-   aceita — ver [backend/utils/auth.js:190](backend/utils/auth.js)). Sem isso,
+   aceita — ver [backend/auth/auth.js:190](../backend/auth/auth.js)). Sem isso,
    como serviço SYSTEM não há console para ler a senha gerada → ninguém logaria.
 4. **Pré-requisito SQL Express** (ver seção 5).
 5. Cria o banco vazio (1 comando `CREATE DATABASE`, via `sqlcmd`) e grava
@@ -92,7 +92,7 @@ Comece pela **A**; evolua para **B** só se for repetir a instalação muitas ve
 
 ## 6. Ajuste de código necessário (pequeno, obrigatório)
 
-Hoje [backend/utils/background-service.js](backend/utils/background-service.js)
+Hoje [backend/lib/background-service.js](../backend/lib/background-service.js)
 registra a tarefa com `/SC ONLOGON /RL LIMITED` — o servidor só sobe quando
 **alguém loga no Windows**. Para "ligou a máquina, já está no ar" é preciso um
 serviço que suba no boot, sem login. Duas opções:

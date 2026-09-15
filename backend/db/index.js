@@ -4,7 +4,7 @@ const {
     buildMssqlConfig,
     getDatabaseSettingsFingerprint,
     getEffectiveDatabaseSettings
-} = require('./utils/database-config');
+} = require('./database-config');
 
 let poolPromise = null;
 let activePoolFingerprint = null;

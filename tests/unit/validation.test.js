@@ -8,7 +8,7 @@ const {
     normalizeIsoDate,
     normalizeTime,
     validateWorkSchedule
-} = require('../backend/utils/validation');
+} = require('../../backend/lib/validation');
 
 module.exports = [
     {

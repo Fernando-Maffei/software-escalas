@@ -7,11 +7,11 @@ const {
     createAusenciaEscalaRecord,
     createPlantaoEscalaRecord,
     iterateIsoDates
-} = require('../backend/utils/escala');
+} = require('../../backend/services/escala');
 const {
     buildEscalaQuadroCalendarSlots,
     buildEscalaQuadroMensal
-} = require('../frontend/Js/escala-report-utils');
+} = require('../../frontend/Js/escala-report-utils');
 
 module.exports = [
     {

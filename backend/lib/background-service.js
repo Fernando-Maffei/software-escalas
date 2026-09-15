@@ -100,7 +100,7 @@ function installBackgroundServerTask() {
     // depender de alguem logar no Windows — que e o requisito do servidor
     // central ("ligou a maquina, o sistema esta no ar"). Como SYSTEM roda sem
     // sessao interativa, nao ha console para ler credenciais: a senha do admin
-    // precisa vir de ADMIN_PASSWORD (ver backend/utils/auth.js) definida no
+    // precisa vir de ADMIN_PASSWORD (ver backend/auth/auth.js) definida no
     // ambiente da maquina. Criar tarefa como SYSTEM exige privilegio de
     // administrador — por isso o tratamento de "acesso negado" abaixo.
     const result = runWindowsCommand('schtasks.exe', [

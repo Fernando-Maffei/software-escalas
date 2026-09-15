@@ -1,9 +1,9 @@
 const fs = require('fs');
 const path = require('path');
 
-const { AppError } = require('./errors');
+const { AppError } = require('../lib/errors');
 const { clearSchemaCache } = require('./schema');
-const { ensureDefaultAdmin } = require('./auth');
+const { ensureDefaultAdmin } = require('../auth/auth');
 
 const REQUIRED_TABLES = Object.freeze([
     'Colaboradores',

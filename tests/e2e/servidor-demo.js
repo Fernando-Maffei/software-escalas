@@ -6,7 +6,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 
-const RAIZ = path.join(__dirname, '..');
+const RAIZ = path.join(__dirname, '..', '..');
 const PASTAS_PERMITIDAS = ['demo', 'frontend'];
 const PORTA = Number(process.env.DEMO_PORTA) || 4470;
 const TIPOS = {

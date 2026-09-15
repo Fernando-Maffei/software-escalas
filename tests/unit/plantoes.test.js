@@ -11,7 +11,7 @@ const {
     normalizeTipoCredito,
     resolvePlantaoTypeByDate,
     serializePlantaoRecord
-} = require('../backend/utils/plantoes');
+} = require('../../backend/services/plantoes');
 
 module.exports = [
     {

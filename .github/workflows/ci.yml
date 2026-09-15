@@ -74,5 +74,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: relatorio-robo-demo
-          path: e2e/relatorio
+          path: tests/e2e/relatorio
           retention-days: 14

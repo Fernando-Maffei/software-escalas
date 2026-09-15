@@ -1,4 +1,4 @@
-const { AppError } = require('./errors');
+const { AppError } = require('../lib/errors');
 
 const SCHEMA_CACHE_TTL_MS = 10000;
 const TRACKED_TABLES = [

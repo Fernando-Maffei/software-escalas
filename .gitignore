@@ -23,9 +23,9 @@ backend/config/*.json
 *.sqlite3
 
 # Robo de testes (Playwright)
-e2e/relatorio/
-e2e/resultados/
-e2e/.auth/
+tests/e2e/relatorio/
+tests/e2e/resultados/
+tests/e2e/.auth/
 
 # Temporários
 *.tmp

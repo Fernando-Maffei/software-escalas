@@ -2,13 +2,13 @@ const express = require('express');
 const router = express.Router();
 
 const { sql, conectar } = require('../db');
-const { AppError } = require('../utils/errors');
+const { AppError } = require('../lib/errors');
 const {
     ensurePositiveInt,
     extractDateString,
     normalizeIsoDate,
     normalizeOptionalText
-} = require('../utils/validation');
+} = require('../lib/validation');
 
 function buildFeriadoPayload(body, fallback = {}) {
     const nome = body.nome !== undefined

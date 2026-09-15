@@ -2,19 +2,19 @@ const express = require('express');
 const router = express.Router();
 
 const { sql, conectar } = require('../db');
-const { AppError } = require('../utils/errors');
+const { AppError } = require('../lib/errors');
 const {
     calculateAusenciaDebitMinutes,
     describeAusenciaMovement,
     normalizeSubtipo,
     resolveDefaultDescontaBancoHoras
-} = require('../utils/bancoHoras');
-const { getBancoHorasCapabilities, getSchemaInfo, hasTable } = require('../utils/schema');
+} = require('../services/bancoHoras');
+const { getBancoHorasCapabilities, getSchemaInfo, hasTable } = require('../db/schema');
 const {
     restoreEscalaDefaultsForPeriod,
     syncAusenciaToEscalaDia
-} = require('../utils/escala');
-const { withTransaction } = require('../utils/transactions');
+} = require('../services/escala');
+const { withTransaction } = require('../db/transactions');
 const {
     buildDateRange,
     ensurePositiveInt,
@@ -26,7 +26,7 @@ const {
     normalizeNullableTime,
     normalizeOptionalText,
     toSqlTime
-} = require('../utils/validation');
+} = require('../lib/validation');
 
 const AUSENCIA_TIPOS = ['folga', 'ausencia', 'ferias'];
 const PERIODO_TIPOS = ['dia_inteiro', 'horas'];

@@ -1,8 +1,8 @@
 const crypto = require('crypto');
 
 const { sql, conectar } = require('../db');
-const { AppError } = require('./errors');
-const { normalizeOptionalText } = require('./validation');
+const { AppError } = require('../lib/errors');
+const { normalizeOptionalText } = require('../lib/validation');
 
 const SCRYPT_KEYLEN = 64;
 const SESSION_COOKIE_NAME = 'escalas_sid';

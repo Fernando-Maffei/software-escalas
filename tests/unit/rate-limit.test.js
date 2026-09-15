@@ -1,6 +1,6 @@
 const assert = require('assert');
 
-const { createRateLimiter } = require('../backend/utils/rate-limit');
+const { createRateLimiter } = require('../../backend/auth/rate-limit');
 
 function comRelogio() {
     let agora = 1000000;

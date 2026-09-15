@@ -1,4 +1,4 @@
-const { AppError } = require('./errors');
+const { AppError } = require('../lib/errors');
 
 function extractRawDatabaseMessage(error) {
     return String(

@@ -2,7 +2,7 @@
 
 Um "usuario automatico" que abre o sistema no navegador, entra em cada tela do
 menu e sai clicando, abrindo modais e preenchendo campos com dados aleatorios,
-varias vezes seguidas, anotando tudo que quebra. Fica em `e2e/` e usa o
+varias vezes seguidas, anotando tudo que quebra. Fica em `tests/e2e/` e usa o
 [Playwright](https://playwright.dev).
 
 Ele conta como problema:
@@ -30,7 +30,7 @@ producao**. A configuracao recusa a porta 4450 de proposito.
   Pega erro de tela e de JavaScript.
 - **teste**: uma instancia Docker separada (`docker-compose.teste.yml`), com
   banco proprio, na porta 4460. Pega tambem erro de backend e de SQL. Antes do
-  robo, ela recebe os dados de exemplo e roda os roteiros de `e2e/fluxos.spec.js`.
+  robo, ela recebe os dados de exemplo e roda os roteiros de `tests/e2e/fluxos.spec.js`.
 
 ## Como usar
 
@@ -99,11 +99,11 @@ $env:ROBO_SEMENTE="556099231"; $env:ROBO_ACOES="15"; npx playwright test --proje
 Sair, trocar a senha, a configuracao do banco, pasta de backup, importar e
 restaurar backup, resetar o sistema e seletores de arquivo. Sao acoes que
 tirariam o proprio robo do ar ou abririam janelas do sistema operacional. A
-lista fica em `SELETORES_BLOQUEADOS` e `TEXTO_BLOQUEADO` (`e2e/robo.spec.js`).
+lista fica em `SELETORES_BLOQUEADOS` e `TEXTO_BLOQUEADO` (`tests/e2e/robo.spec.js`).
 
 ## Roteiros de ponta a ponta
 
 Clique aleatorio acha o que *quebra*. Ele nao acha o dado que aparece *errado*,
 como uma ausencia que nao entra na escala. Para isso existem os roteiros em
-`e2e/fluxos.spec.js`: cada um faz um caminho completo e confere o resultado.
+`tests/e2e/fluxos.spec.js`: cada um faz um caminho completo e confere o resultado.
 Ao corrigir um bug desse tipo, vale acrescentar um roteiro que o cubra.

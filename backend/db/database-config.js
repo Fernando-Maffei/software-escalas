@@ -1,7 +1,7 @@
 const fs = require('fs');
 
-const { AppError } = require('./errors');
-const { ensureDataDirectory, resolveDataPath } = require('./app-paths');
+const { AppError } = require('../lib/errors');
+const { ensureDataDirectory, resolveDataPath } = require('../lib/app-paths');
 
 const CONFIG_PATH = resolveDataPath('database.local.json');
 const AUTHENTICATION_TYPES = Object.freeze({
