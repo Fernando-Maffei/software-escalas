@@ -1,0 +1,67 @@
+# Robo de testes noturno: todo dia as 03:00 (horario de Brasilia) sobe uma
+# instancia isolada do app, com banco proprio, e deixa o robo clicando em
+# tudo com mais acoes e mais rodadas do que no CI. Se achar problema, o run
+# fica vermelho (o GitHub avisa por e-mail) e o relatorio com prints, passos
+# e a semente para reproduzir fica nos artefatos do run.
+#
+# Roda na maquina do GitHub, nao no servidor da empresa: a producao nunca e
+# tocada e o PC nao precisa estar ligado.
+
+name: Robo noturno
+
+on:
+  schedule:
+    - cron: '0 6 * * *'   # 06:00 UTC = 03:00 em Brasilia
+  workflow_dispatch:
+    inputs:
+      acoes:
+        description: 'Acoes por tela'
+        default: '80'
+      rodadas:
+        description: 'Rodadas por todas as telas'
+        default: '3'
+
+jobs:
+  robo:
+    name: Robo de testes
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      ROBO_ACOES: ${{ inputs.acoes || '80' }}
+      ROBO_RODADAS: ${{ inputs.rodadas || '3' }}
+
+    steps:
+      - name: Baixar o codigo
+        uses: actions/checkout@v4
+
+      - name: Preparar Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Instalar o navegador do robo
+        run: npx playwright install --with-deps chromium
+
+      - name: Subir instancia de teste (app + SQL Server)
+        run: npm run teste:subir
+
+      # Uma execucao so para os dois alvos (demo e instancia de teste), para
+      # sair um relatorio unico.
+      - name: Robo e roteiros
+        run: npm run e2e
+
+      - name: Log do app de teste
+        if: failure()
+        run: docker compose -f docker-compose.teste.yml logs app --tail 300
+
+      - name: Guardar relatorio
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: relatorio-robo
+          path: e2e/relatorio
+          retention-days: 14

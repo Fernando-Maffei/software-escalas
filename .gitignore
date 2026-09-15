@@ -22,6 +22,11 @@ backend/config/*.json
 *.sqlite
 *.sqlite3
 
+# Robo de testes (Playwright)
+e2e/relatorio/
+e2e/resultados/
+e2e/.auth/
+
 # Temporários
 *.tmp
 *.temp

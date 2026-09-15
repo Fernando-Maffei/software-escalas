@@ -4,6 +4,8 @@
 #
 # Nao precisa de banco: a suite cobre as regras puras (escala, banco de horas,
 # plantoes, permissoes, validacao, backup, rate limit) sem tocar no SQL Server.
+# O robo de testes roda aqui so no modo demo; a versao com banco de verdade e
+# mais acoes fica no robo noturno (robo-noturno.yml).
 
 name: CI
 
@@ -38,3 +40,39 @@ jobs:
 
       - name: Suite de testes
         run: npm test
+
+  robo-demo:
+    name: Robo de testes (demo)
+    runs-on: ubuntu-latest
+    env:
+      # Semente fixa: o PR nao fica vermelho por sorteio. A exploracao com
+      # sementes novas a cada execucao e papel do robo noturno.
+      ROBO_SEMENTE: '2026'
+      ROBO_ACOES: '25'
+
+    steps:
+      - name: Baixar o codigo
+        uses: actions/checkout@v4
+
+      - name: Preparar Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Instalar o navegador do robo
+        run: npx playwright install --with-deps chromium
+
+      - name: Robo na demo
+        run: npm run e2e:demo
+
+      - name: Guardar relatorio
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: relatorio-robo-demo
+          path: e2e/relatorio
+          retention-days: 14
