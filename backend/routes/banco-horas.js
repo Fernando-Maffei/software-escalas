@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 
 const { sql, conectar } = require('../db');
-const { AppError } = require('../utils/errors');
+const { AppError } = require('../lib/errors');
 const {
     calculateAusenciaDebitMinutes,
     calculateIntervalMinutes,
@@ -11,16 +11,16 @@ const {
     minutesToBalanceLabel,
     minutesToDurationLabel,
     parseBalanceInputToMinutes
-} = require('../utils/bancoHoras');
+} = require('../services/bancoHoras');
 const {
     describeBancoHorasMissingPieces,
     ensureBancoHorasTable,
     getBancoHorasCapabilities,
     getSchemaInfo
-} = require('../utils/schema');
-const { withTransaction } = require('../utils/transactions');
-const { ensurePositiveInt, extractDateString, normalizeOptionalText } = require('../utils/validation');
-const { serializePlantaoRecord } = require('../utils/plantoes');
+} = require('../db/schema');
+const { withTransaction } = require('../db/transactions');
+const { ensurePositiveInt, extractDateString, normalizeOptionalText } = require('../lib/validation');
+const { serializePlantaoRecord } = require('../services/plantoes');
 
 function mapResumoRow(row) {
     return {

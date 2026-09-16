@@ -1,10 +1,10 @@
 const express = require('express');
 
 const { sql, conectar } = require('../db');
-const { AppError } = require('../utils/errors');
-const { getSchemaInfo, hasTable } = require('../utils/schema');
-const { withTransaction } = require('../utils/transactions');
-const { listSetores, normalizeSetorNome } = require('../utils/setores');
+const { AppError } = require('../lib/errors');
+const { getSchemaInfo, hasTable } = require('../db/schema');
+const { withTransaction } = require('../db/transactions');
+const { listSetores, normalizeSetorNome } = require('../services/setores');
 
 const router = express.Router();
 

@@ -1,0 +1,65 @@
+# Instancia de TESTE do App de Escalas, isolada da producao. E nela que o
+# robo de testes (tests/e2e/) roda: ele cria, altera e exclui registros aleatorios,
+# entao nunca pode tocar no banco real.
+#
+# Diferencas para o docker-compose.yml de producao:
+#   - projeto, containers, imagem e volumes com nome proprio (app-de-escalas-teste)
+#   - app na porta 4460; o banco nao e publicado no host (nao disputa a 1433)
+#   - senhas fixas de teste, sem .env, e sem restart automatico
+#
+# Uso:
+#   npm run teste:subir      sobe (ou atualiza) a instancia
+#   npm run e2e:teste        roda o robo e os roteiros contra ela
+#   npm run teste:derrubar   apaga containers E volumes (o banco volta a zero)
+
+name: app-de-escalas-teste
+
+services:
+  db:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: escalas-teste-db
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: "Teste!Escalas2026"
+      MSSQL_PID: "Express"
+    volumes:
+      - db-data:/var/opt/mssql
+
+  db-init:
+    image: mcr.microsoft.com/mssql-tools:latest
+    container_name: escalas-teste-db-init
+    depends_on:
+      - db
+    environment:
+      DB_PASSWORD: "Teste!Escalas2026"
+    volumes:
+      - ./docker/init-db.sh:/init-db.sh:ro
+    entrypoint: ["/bin/bash", "/init-db.sh"]
+
+  app:
+    build: .
+    container_name: escalas-teste-app
+    depends_on:
+      db-init:
+        condition: service_completed_successfully
+    environment:
+      PORT: "4450"
+      DB_HOST: "db"
+      DB_PORT: "1433"
+      DB_DATABASE: "SoftwareEscalas"
+      DB_USER: "sa"
+      DB_PASSWORD: "Teste!Escalas2026"
+      DB_AUTH_TYPE: "sql"
+      DB_ENCRYPT: "true"
+      DB_TRUST_CERT: "true"
+      ADMIN_USERNAME: "admin"
+      ADMIN_PASSWORD: "Robo!Teste2026"
+      APP_DE_ESCALAS_DATA_DIR: "/data"
+    ports:
+      - "4460:4450"
+    volumes:
+      - app-data:/data
+
+volumes:
+  db-data:
+  app-data:

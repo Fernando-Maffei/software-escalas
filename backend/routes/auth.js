@@ -1,7 +1,7 @@
 const express = require('express');
 
 const { conectar } = require('../db');
-const { AppError } = require('../utils/errors');
+const { AppError } = require('../lib/errors');
 const {
     clearSessionCookie,
     createSession,
@@ -17,9 +17,9 @@ const {
     updateUserPassword,
     updateUserSetoresVisiveis,
     verifyPassword
-} = require('../utils/auth');
+} = require('../auth/auth');
 
-const { createRateLimiter } = require('../utils/rate-limit');
+const { createRateLimiter } = require('../auth/rate-limit');
 
 const router = express.Router();
 

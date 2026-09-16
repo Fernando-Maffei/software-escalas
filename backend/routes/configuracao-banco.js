@@ -1,11 +1,11 @@
 const express = require('express');
 
 const { conectar, fecharConexao, testarConexao } = require('../db');
-const { createSystemBackup, ensureBackupDirectory, restoreSystemBackup } = require('../utils/backup-service');
-const { initializeAutoBackupScheduler } = require('../utils/backup-scheduler');
-const { openNativeFolderPicker } = require('../utils/folder-picker');
-const { AppError } = require('../utils/errors');
-const { mapDatabaseConnectionError } = require('../utils/database-connection-error');
+const { createSystemBackup, ensureBackupDirectory, restoreSystemBackup } = require('../services/backup-service');
+const { initializeAutoBackupScheduler } = require('../services/backup-scheduler');
+const { openNativeFolderPicker } = require('../lib/folder-picker');
+const { AppError } = require('../lib/errors');
+const { mapDatabaseConnectionError } = require('../db/database-connection-error');
 const {
     buildBackupExecutionSettings,
     buildBackupRestoreSettings,
@@ -13,17 +13,17 @@ const {
     getPublicBackupSettings,
     normalizeBackupDirectory,
     saveBackupSettings
-} = require('../utils/backup-config');
+} = require('../services/backup-config');
 const {
     getDefaultDatabaseSettings,
     getEffectiveDatabaseSettings,
     getPublicDatabaseSettings,
     normalizeDatabaseSettings,
     saveDatabaseSettings
-} = require('../utils/database-config');
-const { ensureApplicationSchema, applyExampleSeed, REQUIRED_TABLES } = require('../utils/database-schema');
-const { clearSchemaCache } = require('../utils/schema');
-const { setSchemaReady } = require('../utils/app-state');
+} = require('../db/database-config');
+const { ensureApplicationSchema, applyExampleSeed, REQUIRED_TABLES } = require('../db/database-schema');
+const { clearSchemaCache } = require('../db/schema');
+const { setSchemaReady } = require('../lib/app-state');
 
 const router = express.Router();
 

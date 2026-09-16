@@ -15,7 +15,7 @@
 3. [Estrutura de pastas e arquivos](#3-estrutura-de-pastas-e-arquivos)
 4. [Documentação do código](#4-documentação-do-código)
    - 4.1 [Backend — ponto de entrada e infraestrutura](#41-backend--ponto-de-entrada-e-infraestrutura)
-   - 4.2 [Backend — utilitários (regras e serviços)](#42-backend--utilitários-regras-e-serviços)
+   - 4.2 [Backend — banco, segurança e regras de negócio](#42-backend--banco-segurança-e-regras-de-negócio)
    - 4.3 [Backend — rotas (a API REST)](#43-backend--rotas-a-api-rest)
    - 4.4 [Banco de dados — migrations e seed](#44-banco-de-dados--migrations-e-seed)
    - 4.5 [Frontend — arquitetura e módulos](#45-frontend--arquitetura-e-módulos)
@@ -84,7 +84,7 @@ Para cada tecnologia: **o que é**, **para que serve** e **por que/como foi usad
 ### SQL Server (Microsoft) + driver `mssql`
 - **O que é:** o SQL Server é um banco de dados relacional da Microsoft; `mssql` é a biblioteca Node que conversa com ele.
 - **Para que serve:** guardar os dados de forma estruturada (tabelas, relações) e consultá-los com SQL.
-- **Como foi usado aqui:** é a **fonte de verdade** do sistema. O código usa `mssql` com **pool de conexão** ([`backend/db.js`](../backend/db.js)) e queries parametrizadas (`@id`) para evitar injeção de SQL. O esquema é criado por **migrations** (seção 4.4).
+- **Como foi usado aqui:** é a **fonte de verdade** do sistema. O código usa `mssql` com **pool de conexão** ([`backend/db/index.js`](../backend/db/index.js)) e queries parametrizadas (`@id`) para evitar injeção de SQL. O esquema é criado por **migrations** (seção 4.4).
 
 ### JavaScript "puro" (Vanilla JS) no front-end
 - **O que é:** JavaScript sem framework (sem React/Vue/Angular).
@@ -111,7 +111,7 @@ Para cada tecnologia: **o que é**, **para que serve** e **por que/como foi usad
 
 ### Serviço do Windows (schtasks / NSSM)
 - **O que é:** formas de fazer um programa iniciar sozinho junto com o Windows.
-- **Como foi usado aqui:** [`backend/utils/background-service.js`](../backend/utils/background-service.js) registra uma tarefa (`schtasks /SC ONSTART /RU SYSTEM`) para o servidor subir no **boot da máquina, sem login**. O NSSM é a alternativa mais robusta documentada nos guias.
+- **Como foi usado aqui:** [`backend/lib/background-service.js`](../backend/lib/background-service.js) registra uma tarefa (`schtasks /SC ONSTART /RU SYSTEM`) para o servidor subir no **boot da máquina, sem login**. O NSSM é a alternativa mais robusta documentada nos guias.
 
 ### Git
 - **O que é:** sistema de controle de versão.
@@ -119,7 +119,7 @@ Para cada tecnologia: **o que é**, **para que serve** e **por que/como foi usad
 
 ### Testes em Node puro
 - **O que é:** um pequeno executor de testes próprio, sem framework externo.
-- **Como foi usado aqui:** [`tests/run-tests.js`](../tests/run-tests.js) roda os testes de regra de negócio (banco de horas, escala, permissões, validação, etc.) com `npm test`. Foca na **lógica pura**, sem precisar de banco.
+- **Como foi usado aqui:** [`tests/unit/run-tests.js`](../tests/unit/run-tests.js) roda os testes de regra de negócio (banco de horas, escala, permissões, validação, etc.) com `npm test`. Foca na **lógica pura**, sem precisar de banco.
 
 ---
 
@@ -131,18 +131,20 @@ Visão de alto nível (ignorando `node_modules`, `.git` e afins):
 App de escalas/
 ├── backend/                    ← todo o servidor (Node/Express)
 │   ├── server.js               ← ponto de entrada: middlewares, rotas, erro, boot
-│   ├── db.js                   ← conexão com o SQL Server (pool)
 │   ├── config/                 ← config local (database.local.json) — NÃO versionado
 │   ├── routes/                 ← a API REST, um arquivo por domínio
 │   │   ├── colaboradores.js, escala.js, ausencias.js, feriados.js,
 │   │   ├── plantoes.js, banco-horas.js, setores.js, jornada-semanal.js,
 │   │   └── auth.js, usuarios.js, configuracao-banco.js, sistema.js
-│   └── utils/                  ← regras de negócio + serviços (sem HTTP)
-│       ├── auth.js, permissoes.js, rate-limit.js       (segurança)
-│       ├── database-config.js, database-schema.js, schema.js, app-paths.js
-│       ├── db-* / backup-*     (backup e configuração)
-│       ├── escala.js, bancoHoras.js, plantoes.js, jornada-semanal.js, setores.js
-│       ├── validation.js, transactions.js, errors.js
+│   ├── db/                     ← acesso ao SQL Server
+│   │   ├── index.js            ← conexão (pool)
+│   │   └── database-config.js, database-schema.js, schema.js, transactions.js, ...
+│   ├── auth/                   ← segurança: sessão/login, permissões, rate limit, acesso por setor
+│   ├── services/               ← regras de negócio (sem HTTP)
+│   │   ├── escala.js, bancoHoras.js, plantoes.js, jornada-semanal.js, setores.js
+│   │   └── backup-config.js, backup-service.js, backup-scheduler.js
+│   └── lib/                    ← utilitários gerais
+│       ├── errors.js, validation.js, app-paths.js, app-state.js
 │       └── background-service.js, folder-picker.js     (integração Windows)
 │
 ├── frontend/                   ← tudo que roda no navegador
@@ -163,18 +165,23 @@ App de escalas/
 │   ├── migrations/             ← evolução do esquema (arquivos SQL datados)
 │   └── seeds/dados-exemplo.sql ← dados de exemplo (setores, colaboradores)
 │
-├── docs/                       ← guias (Docker, servidor, time) + esta apostila
-├── tests/                      ← testes de lógica (Node puro)
+├── docs/                       ← guias (Docker, servidor, time, robô de testes,
+│                                  plano do instalador) + esta apostila
+├── tests/
+│   ├── unit/                   ← testes de lógica (Node puro, npm test)
+│   ├── e2e/                    ← robô de testes no navegador (Playwright)
+│   └── smoke.js                ← checagem de sintaxe (npm run smoke)
 │
 ├── Dockerfile, docker-compose.yml   ← execução em contêiner
+├── docker-compose.teste.yml         ← instância isolada para o robô de testes
 ├── docker/init-db.sh                ← cria o banco na primeira subida
 ├── package.json                     ← dependências e scripts (npm)
-└── *.md                             ← README, CHANGELOG, planos, relatórios
+└── *.md                             ← README, CHANGELOG, CONTRIBUTING, SECURITY
 ```
 
 ### A lógica por trás dessa organização
 
-- **`backend/routes/` x `backend/utils/`:** as *rotas* só cuidam de HTTP (ler o pedido, validar, responder). A *regra de negócio* fica nos *utils*, isolada — assim ela pode ser **testada sem subir servidor** (é o que os `tests/` fazem).
+- **`backend/routes/` x `backend/services/`:** as *rotas* só cuidam de HTTP (ler o pedido, validar, responder). A *regra de negócio* fica em `services/`, isolada — assim ela pode ser **testada sem subir servidor** (é o que os `tests/unit/` fazem). O acesso ao banco fica em `db/`, a segurança em `auth/` e os utilitários gerais em `lib/`.
 - **`frontend/Js/` um arquivo por tela:** o front-end é grande (~18 mil linhas); separar por tela evita um arquivo único impossível de manter. O `api.js` centraliza **todo** acesso à API, então trocar algo na comunicação mexe em um lugar só.
 - **`database/migrations/`:** o esquema não é criado "na mão"; cada mudança é um arquivo SQL datado, aplicado em ordem. Isso deixa o banco **reproduzível** e versionado junto do código.
 
@@ -245,7 +252,7 @@ app.use('/api/escala', escalaRoutes);
 
 **Ciclo de vida do servidor (a partir da 375):** `start()` sobe o `app.listen`, e no callback tenta conectar no banco e rodar `ensureApplicationSchema` (criar/verificar tabelas). Repare (visto na seção sobre o boot): se o banco falhar aqui, o servidor **continua no ar** e apenas loga o erro, em vez de derrubar tudo. Há também tratamento de `EADDRINUSE` (porta ocupada) e desligamento gracioso (fecha o pool ao receber sinal de encerramento).
 
-#### `backend/db.js` — a conexão com o banco
+#### `backend/db/index.js` — a conexão com o banco
 
 Arquivo curto e central. Gerencia **um pool de conexões** reaproveitável.
 
@@ -264,9 +271,9 @@ let activePoolFingerprint = null;
 
 ---
 
-### 4.2 Backend — utilitários (regras e serviços)
+### 4.2 Backend — banco, segurança e regras de negócio
 
-A pasta `utils/` guarda tudo que **não** é HTTP: segurança, acesso ao banco, regras de negócio. Estão aqui porque podem (e devem) ser testados isoladamente.
+Tudo que **não** é HTTP fica fora de `routes/`, em quatro pastas: `db/` (acesso ao banco), `auth/` (segurança), `services/` (regras de negócio) e `lib/` (utilitários gerais). Ficam separados porque podem (e devem) ser testados isoladamente.
 
 #### Segurança
 
@@ -332,8 +339,8 @@ Cada arquivo em `routes/` é um **Router do Express** que agrupa os endpoints de
 const express = require('express');
 const router = express.Router();
 const { sql, conectar } = require('../db');
-const { AppError } = require('../utils/errors');
-const { /* validadores */ } = require('../utils/validation');
+const { AppError } = require('../lib/errors');
+const { /* validadores */ } = require('../lib/validation');
 
 // 1) Uma função que monta e valida o "payload" a partir do corpo da requisição
 function buildColaboradorPayload(body, fallback = {}) { /* valida cada campo */ }
@@ -356,7 +363,7 @@ Três princípios se repetem:
 
 - **`buildColaboradorPayload(body, fallback)` (linhas 24+):** monta o objeto do colaborador validando cada campo — `nome` (obrigatório, até 300 caracteres), horários de trabalho/almoço (`normalizeNullableTime`), `setorId` (existe?), e por fim `validateWorkSchedule` (o fim é depois do início? o almoço cabe no expediente?). O parâmetro `fallback` permite atualizações parciais: se o `body` não trouxe um campo, usa o valor atual do registro.
 - Ao criar/editar, além de gravar o colaborador, a rota chama `syncColaboradorDefaultsToEscalaDia` (de `escala.js`) — para que mudar o horário padrão do colaborador **reflita** na escala do dia. Operações que mexem em várias tabelas usam `withTransaction` (tudo ou nada).
-- Repare nos imports: a rota puxa regras de vários utils (`escala`, `jornada-semanal`, `setores`, `schema`, `validation`). Isso mostra o desenho: **a rota coordena; os utils fazem**.
+- Repare nos imports: a rota puxa regras de `services/` (`escala`, `jornada-semanal`, `setores`), do banco (`db/schema`) e de `lib/validation`. Isso mostra o desenho: **a rota coordena; os serviços fazem**.
 
 #### Papel de cada arquivo de rota
 
@@ -417,7 +424,7 @@ Ordem dos arquivos:
 
 #### O seed de exemplo — `database/seeds/dados-exemplo.sql`
 
-Um script **opcional** e **idempotente** para um banco novo não começar vazio. Só faz `INSERT` com guarda `IF NOT EXISTS` — **nunca** apaga nem sobrescreve dados existentes. Adiciona: alguns setores e colaboradores de demonstração (marcados "(exemplo)"). Feriado nacional **não** entra: o sistema calcula (ver `backend/utils/feriados-nacionais.js`), e gravar no banco fazia o mesmo dia aparecer duas vezes na tela. É acionado pelo botão "Carregar Dados de Exemplo" (ou pelo endpoint `POST /configuracao-banco/carregar-exemplos`).
+Um script **opcional** e **idempotente** para um banco novo não começar vazio. Só faz `INSERT` com guarda `IF NOT EXISTS` — **nunca** apaga nem sobrescreve dados existentes. Adiciona: alguns setores e colaboradores de demonstração (marcados "(exemplo)"). Feriado nacional **não** entra: o sistema calcula (ver `backend/services/feriados-nacionais.js`), e gravar no banco fazia o mesmo dia aparecer duas vezes na tela. É acionado pelo botão "Carregar Dados de Exemplo" (ou pelo endpoint `POST /configuracao-banco/carregar-exemplos`).
 
 ---
 

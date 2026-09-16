@@ -64,7 +64,7 @@ GO
 -- Feriados
 -- ----------------------------------------------------------------------------
 -- Nada a inserir aqui. Os feriados NACIONAIS sao calculados pelo sistema
--- (backend/utils/feriados-nacionais.js) e nao ficam na tabela: quando eram
+-- (backend/services/feriados-nacionais.js) e nao ficam na tabela: quando eram
 -- gravados por este seed, o mesmo dia aparecia duas vezes na tela — uma vinda
 -- do banco e outra da lista de nacionais. A tabela dbo.Feriados guarda somente
 -- feriado municipal/estadual, que e o que o sistema nao tem como calcular.

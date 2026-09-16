@@ -2,26 +2,26 @@ const express = require('express');
 const router = express.Router();
 
 const { sql, conectar } = require('../db');
-const { AppError } = require('../utils/errors');
+const { AppError } = require('../lib/errors');
 const {
     buildDisponibilidadeColaborador,
     calculateIntervalMinutes,
     describePlantaoMovement,
     minutesToDurationLabel
-} = require('../utils/bancoHoras');
-const { getBancoHorasCapabilities, getSchemaInfo, hasColumn, hasTable } = require('../utils/schema');
+} = require('../services/bancoHoras');
+const { getBancoHorasCapabilities, getSchemaInfo, hasColumn, hasTable } = require('../db/schema');
 const {
     deleteEscalaDiaByOrigin,
     restoreEscalaDefaultsForPeriod,
     syncPlantaoDiaToEscalaDia
-} = require('../utils/escala');
-const { withTransaction } = require('../utils/transactions');
+} = require('../services/escala');
+const { withTransaction } = require('../db/transactions');
 const {
     extractDateString,
     normalizeIsoDate,
     normalizeNullableTime,
     toSqlTime
-} = require('../utils/validation');
+} = require('../lib/validation');
 const {
     agruparLancamentosPorHorario,
     buildPlantaoDiaPayload,
@@ -29,7 +29,7 @@ const {
     normalizePlantaoType,
     resolvePlantaoTypeByDate,
     serializePlantaoRecord
-} = require('../utils/plantoes');
+} = require('../services/plantoes');
 
 function buildPlantaoSelect(schema) {
     const capabilities = getBancoHorasCapabilities(schema);

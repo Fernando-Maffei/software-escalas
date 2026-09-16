@@ -2,8 +2,8 @@ const express = require('express');
 const router = express.Router();
 
 const { sql, conectar } = require('../db');
-const { AppError } = require('../utils/errors');
-const { getSetoresPermitidosRequest, idsPermitidosNumericos } = require('../utils/acesso-setores');
+const { AppError } = require('../lib/errors');
+const { getSetoresPermitidosRequest, idsPermitidosNumericos } = require('../auth/acesso-setores');
 const {
     calculateDailyWorkMinutes,
     calculateIntervalMinutes,
@@ -11,15 +11,15 @@ const {
     normalizeSubtipo,
     parseBalanceInputToMinutes,
     resolveDefaultDescontaBancoHoras
-} = require('../utils/bancoHoras');
+} = require('../services/bancoHoras');
 const {
     ensurePositiveInt,
     extractDateString,
     normalizeIsoDate,
     normalizeOptionalText
-} = require('../utils/validation');
-const { montarRelatorioHorasExtras, serializePlantaoRecord } = require('../utils/plantoes');
-const { getBancoHorasCapabilities, getSchemaInfo } = require('../utils/schema');
+} = require('../lib/validation');
+const { montarRelatorioHorasExtras, serializePlantaoRecord } = require('../services/plantoes');
+const { getBancoHorasCapabilities, getSchemaInfo } = require('../db/schema');
 
 const SEMANAS_PADRAO = 8;
 

@@ -22,6 +22,8 @@ backend/config/*.json
 .editorconfig
 prototipos
 tests
+playwright.config.js
+docker-compose.teste.yml
 docs
 *.md
 *.log

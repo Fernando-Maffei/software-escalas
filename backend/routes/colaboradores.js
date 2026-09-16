@@ -2,17 +2,17 @@ const express = require('express');
 const router = express.Router();
 
 const { sql, conectar } = require('../db');
-const { AppError } = require('../utils/errors');
-const { getSetoresPermitidosRequest, idsPermitidosNumericos } = require('../utils/acesso-setores');
-const { syncColaboradorDefaultsToEscalaDia } = require('../utils/escala');
+const { AppError } = require('../lib/errors');
+const { getSetoresPermitidosRequest, idsPermitidosNumericos } = require('../auth/acesso-setores');
+const { syncColaboradorDefaultsToEscalaDia } = require('../services/escala');
 const {
     listJornadaSemanal,
     normalizeJornadaSemanalPayload,
     replaceColaboradorJornadaSemanal
-} = require('../utils/jornada-semanal');
-const { getBancoHorasCapabilities, getSchemaInfo, hasColumn, hasTable } = require('../utils/schema');
-const { ensureSetorExists, normalizeNullableSetorId } = require('../utils/setores');
-const { withTransaction } = require('../utils/transactions');
+} = require('../services/jornada-semanal');
+const { getBancoHorasCapabilities, getSchemaInfo, hasColumn, hasTable } = require('../db/schema');
+const { ensureSetorExists, normalizeNullableSetorId } = require('../services/setores');
+const { withTransaction } = require('../db/transactions');
 const {
     ensurePositiveInt,
     extractDateString,
@@ -22,7 +22,7 @@ const {
     normalizeOptionalText,
     toSqlTime,
     validateWorkSchedule
-} = require('../utils/validation');
+} = require('../lib/validation');
 
 function buildColaboradorPayload(body, fallback = {}) {
     const nome = body.nome !== undefined

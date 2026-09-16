@@ -1,7 +1,7 @@
 // Remove da tabela Feriados as linhas que o sistema agora calcula sozinho.
 //
 // Os feriados nacionais eram gravados no banco pelo script de dados de exemplo.
-// Desde que o backend passou a calcula-los (backend/utils/feriados-nacionais.js),
+// Desde que o backend passou a calcula-los (backend/services/feriados-nacionais.js),
 // essas linhas nao servem para nada e ainda fazem o mesmo dia aparecer duas
 // vezes na tela. Este script apaga so elas.
 //
@@ -16,7 +16,7 @@
 // FACA BACKUP ANTES DE USAR --aplicar. A exclusao nao tem desfazer.
 
 const { sql, conectar, fecharConexao } = require('../backend/db');
-const { nomeFeriadoNacional } = require('../backend/utils/feriados-nacionais');
+const { nomeFeriadoNacional } = require('../backend/services/feriados-nacionais');
 
 function normalizarNome(valor) {
     return String(valor ?? '')

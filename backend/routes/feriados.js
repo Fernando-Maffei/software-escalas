@@ -2,14 +2,14 @@ const express = require('express');
 const router = express.Router();
 
 const { sql, conectar } = require('../db');
-const { AppError } = require('../utils/errors');
-const { feriadosNacionaisDoAno, nomeFeriadoNacional } = require('../utils/feriados-nacionais');
+const { AppError } = require('../lib/errors');
+const { feriadosNacionaisDoAno, nomeFeriadoNacional } = require('../services/feriados-nacionais');
 const {
     ensurePositiveInt,
     extractDateString,
     normalizeIsoDate,
     normalizeOptionalText
-} = require('../utils/validation');
+} = require('../lib/validation');
 
 function buildFeriadoPayload(body, fallback = {}) {
     const nome = body.nome !== undefined
@@ -35,7 +35,7 @@ function buildFeriadoPayload(body, fallback = {}) {
     };
 }
 
-// Feriado nacional nao vai para a tabela: o sistema calcula (utils/
+// Feriado nacional nao vai para a tabela: o sistema calcula (services/
 // feriados-nacionais.js) e o front-end ja mostra a etiqueta. Cadastrar
 // tambem no banco era o que deixava o dia duplicado na tela.
 function ensureDataSemFeriadoNacional(dataISO) {

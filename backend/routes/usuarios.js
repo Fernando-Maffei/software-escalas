@@ -1,7 +1,7 @@
 const express = require('express');
 
 const { conectar } = require('../db');
-const { AppError } = require('../utils/errors');
+const { AppError } = require('../lib/errors');
 const {
     countOtherActiveAdmins,
     createUser,
@@ -17,7 +17,7 @@ const {
     updateUserFlags,
     updateUserPassword,
     updateUserSetoresPermitidos
-} = require('../utils/auth');
+} = require('../auth/auth');
 
 const router = express.Router();
 

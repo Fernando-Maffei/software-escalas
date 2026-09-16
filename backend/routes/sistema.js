@@ -1,13 +1,13 @@
 const express = require('express');
 
-const { AppError } = require('../utils/errors');
+const { AppError } = require('../lib/errors');
 const {
     installBackgroundServerTask,
     queryBackgroundServerTask,
     startBackgroundServerTask,
     stopBackgroundServerTask,
     uninstallBackgroundServerTask
-} = require('../utils/background-service');
+} = require('../lib/background-service');
 
 const router = express.Router();
 
