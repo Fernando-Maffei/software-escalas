@@ -89,7 +89,7 @@ Para cada tecnologia: **o que é**, **para que serve** e **por que/como foi usad
 ### JavaScript "puro" (Vanilla JS) no front-end
 - **O que é:** JavaScript sem framework (sem React/Vue/Angular).
 - **Para que serve:** dar comportamento às telas (montar HTML, tratar cliques, chamar a API).
-- **Como foi usado aqui:** todo o front-end é Vanilla JS, dividido em **módulos por tela** ([`frontend/Js/`](../frontend/Js/)). Cada módulo se registra em `window` e é orquestrado pelo `app.js`. Não há build/compilação — os arquivos são servidos direto.
+- **Como foi usado aqui:** todo o front-end é Vanilla JS, dividido em **módulos por tela** ([`frontend/js/`](../frontend/js/): `core/`, `telas/` e `lib/`). Cada módulo se registra em `window` e é orquestrado pelo `app.js`. Não há build/compilação — os arquivos são servidos direto.
 
 ### HTML5 + CSS3
 - **O que é:** as linguagens de estrutura (HTML) e estilo (CSS) das páginas web.
@@ -102,7 +102,7 @@ Para cada tecnologia: **o que é**, **para que serve** e **por que/como foi usad
 
 ### jsPDF (no navegador)
 - **O que é:** biblioteca JavaScript que gera arquivos PDF no lado do cliente.
-- **Como foi usado aqui:** exportar relatórios de escala/mensais em PDF direto do navegador ([`frontend/Js/pdf-utils.js`](../frontend/Js/pdf-utils.js), [`escala-relatorio.js`](../frontend/Js/escala-relatorio.js)).
+- **Como foi usado aqui:** exportar relatórios de escala/mensais em PDF direto do navegador ([`frontend/js/lib/pdf-utils.js`](../frontend/js/lib/pdf-utils.js), [`escala-relatorio.js`](../frontend/js/telas/escala-relatorio.js)).
 
 ### Docker + Docker Compose
 - **O que é:** Docker empacota um programa (com tudo que precisa) em um "contêiner" isolado; o Compose sobe vários contêineres juntos.
@@ -151,15 +151,18 @@ App de escalas/
 │   ├── index.html              ← página única; telas montadas via JS
 │   ├── manifest.json           ← PWA
 │   ├── style.css, css/*.css    ← estilos, separados por tela
-│   └── Js/                     ← módulos por tela (Vanilla JS)
-│       ├── app.js              ← orquestrador das telas
-│       ├── api.js              ← camada única de acesso à API
-│       ├── auth.js             ← tela e fluxo de login
-│       ├── escala-dia-editor.js / escala-dia-shared.js  ← a Escala do Dia
-│       ├── lancamentos.js, dashboard.js, calendar.js
-│       ├── escala-relatorio.js / escala-report-utils.js / pdf-utils.js
-│       ├── configuracoes-backup.js / configuracoes-usuarios.js / permissoes.js
-│       └── runtime-fixes.js    ← funcionalidades diversas (apesar do nome)
+│   └── js/                     ← módulos Vanilla JS
+│       ├── core/               ← base carregada por todas as telas
+│       │   ├── app.js          ← orquestrador das telas
+│       │   ├── api.js          ← camada única de acesso à API
+│       │   ├── auth.js, permissoes.js, meus-setores.js  ← login, perfil e setores
+│       │   └── runtime-fixes.js ← funcionalidades diversas (apesar do nome)
+│       ├── telas/              ← um arquivo por tela
+│       │   ├── escala-dia-editor.js / escala-dia-shared.js / escala-relatorio.js
+│       │   ├── banco-horas.js, lancamentos.js, dashboard.js, calendar.js
+│       │   └── configuracoes-backup.js / configuracoes-usuarios.js
+│       └── lib/                ← utilitários sem tela
+│           └── pdf-utils.js, escala-report-utils.js
 │
 ├── database/
 │   ├── migrations/             ← evolução do esquema (arquivos SQL datados)
@@ -182,7 +185,7 @@ App de escalas/
 ### A lógica por trás dessa organização
 
 - **`backend/routes/` x `backend/services/`:** as *rotas* só cuidam de HTTP (ler o pedido, validar, responder). A *regra de negócio* fica em `services/`, isolada — assim ela pode ser **testada sem subir servidor** (é o que os `tests/unit/` fazem). O acesso ao banco fica em `db/`, a segurança em `auth/` e os utilitários gerais em `lib/`.
-- **`frontend/Js/` um arquivo por tela:** o front-end é grande (~18 mil linhas); separar por tela evita um arquivo único impossível de manter. O `api.js` centraliza **todo** acesso à API, então trocar algo na comunicação mexe em um lugar só.
+- **`frontend/js/` um arquivo por tela:** o front-end é grande (~18 mil linhas); separar por tela evita um arquivo único impossível de manter. Em `core/` fica o que toda tela usa, em `telas/` um arquivo por tela e em `lib/` os utilitários sem interface. Não há `import`: os scripts se enxergam por variáveis globais, então a **ordem das tags `<script>` no `index.html` importa**. O `api.js` centraliza **todo** acesso à API, então trocar algo na comunicação mexe em um lugar só.
 - **`database/migrations/`:** o esquema não é criado "na mão"; cada mudança é um arquivo SQL datado, aplicado em ordem. Isso deixa o banco **reproduzível** e versionado junto do código.
 
 ---
@@ -436,7 +439,7 @@ Uma **única página** (`index.html`) que carrega vários **módulos JavaScript*
 
 **Por que sem framework?** É uma escolha de simplicidade: qualquer navegador roda direto, não precisa de Node/npm no cliente, e o deploy é só copiar arquivos. O custo é que a organização fica por conta da disciplina do código (um arquivo por tela, `api.js` central).
 
-#### `Js/api.js` — a camada única de comunicação (central)
+#### `js/core/api.js` — a camada única de comunicação (central)
 
 Todo acesso à API passa por aqui. Isso concentra num só lugar coisas como URL base, tratamento de sessão expirada e formato de erro.
 
@@ -451,21 +454,23 @@ Todo acesso à API passa por aqui. Isso concentra num só lugar coisas como URL 
 
 #### Os módulos de tela (por responsabilidade)
 
+Caminhos relativos a `frontend/js/`.
+
 | Arquivo | Responsabilidade |
 |---|---|
-| `app.js` (~4.400 linhas) | O **orquestrador**. Monta o HTML das telas, controla a navegação entre elas, inicializa cada tela (`inicializarConfiguracaoBancoTela`, etc.), a barra lateral do app e as configurações. É grande porque concentra o "esqueleto" de várias telas. |
-| `auth.js` | A tela e o fluxo de **login** (enviar credenciais, tratar erro, reagir ao evento `auth:expired`). |
-| `escala-dia-editor.js` (~1.826 linhas) | A **Escala do Dia**: monta a grade de horários (timeline), o arrasta-e-solta do almoço, o painel lateral de edição, a navegação por dia. |
-| `escala-dia-shared.js` | Funções compartilhadas da Escala do Dia (conversões de horário, helpers usados pelo editor e por outros). |
-| `lancamentos.js` (~1.754 linhas) | O cadastro/edição de lançamentos (colaboradores, jornada, etc.) via modais. |
-| `dashboard.js` | A tela inicial / painel com indicadores. |
-| `calendar.js` | Componente de calendário (seleção de datas, feriados). |
-| `escala-relatorio.js` (~1.822 linhas) + `escala-report-utils.js` | Geração dos relatórios de escala (mensal, por escala). |
-| `pdf-utils.js` | Helpers de PDF (jsPDF/canvas) usados pelos relatórios. |
-| `configuracoes-backup.js` | A tela de configuração de **banco e backup** (testar/salvar conexão, gerar/restaurar backup, carregar exemplos). |
-| `configuracoes-usuarios.js` | A tela de gestão de **usuários** (admin). |
-| `permissoes.js` | Aplica no front-end o que o perfil pode ver/fazer (esconde botões que o usuário comum não usa). |
-| `runtime-fixes.js` (~4.556 linhas) | Apesar do nome, contém **funcionalidades de verdade** (cerca de dois terços do arquivo), além de ajustes. Historicamente cresceu como um "extra" ao `app.js`. |
+| `core/app.js` (~4.400 linhas) | O **orquestrador**. Monta o HTML das telas, controla a navegação entre elas, inicializa cada tela (`inicializarConfiguracaoBancoTela`, etc.), a barra lateral do app e as configurações. É grande porque concentra o "esqueleto" de várias telas. |
+| `core/auth.js` | A tela e o fluxo de **login** (enviar credenciais, tratar erro, reagir ao evento `auth:expired`). |
+| `telas/escala-dia-editor.js` (~1.826 linhas) | A **Escala do Dia**: monta a grade de horários (timeline), o arrasta-e-solta do almoço, o painel lateral de edição, a navegação por dia. |
+| `telas/escala-dia-shared.js` | Funções compartilhadas da Escala do Dia (conversões de horário, helpers usados pelo editor e por outros). |
+| `telas/lancamentos.js` (~1.754 linhas) | O cadastro/edição de lançamentos (colaboradores, jornada, etc.) via modais. |
+| `telas/dashboard.js` | A tela inicial / painel com indicadores. |
+| `telas/calendar.js` | Componente de calendário (seleção de datas, feriados). |
+| `telas/escala-relatorio.js` (~1.822 linhas) + `lib/escala-report-utils.js` | Geração dos relatórios de escala (mensal, por escala). |
+| `lib/pdf-utils.js` | Helpers de PDF (jsPDF/canvas) usados pelos relatórios. |
+| `telas/configuracoes-backup.js` | A tela de configuração de **banco e backup** (testar/salvar conexão, gerar/restaurar backup, carregar exemplos). |
+| `telas/configuracoes-usuarios.js` | A tela de gestão de **usuários** (admin). |
+| `core/permissoes.js` | Aplica no front-end o que o perfil pode ver/fazer (esconde botões que o usuário comum não usa). |
+| `core/runtime-fixes.js` (~4.556 linhas) | Apesar do nome, contém **funcionalidades de verdade** (cerca de dois terços do arquivo), além de ajustes. Historicamente cresceu como um "extra" ao `app.js`. |
 
 > **Nota de manutenção:** `app.js` e `runtime-fixes.js` são os dois arquivos gigantes do front-end e concentram a maior parte da complexidade. Um trabalho contínuo do projeto é ir extraindo pedaços deles para módulos menores e nomeados — foi assim que nasceram `configuracoes-backup.js`, `pdf-utils.js`, `escala-dia-editor.js`, etc.
 
@@ -473,7 +478,7 @@ Todo acesso à API passa por aqui. Isso concentra num só lugar coisas como URL 
 
 `manifest.json` declara nome, ícones e cor de marca, permitindo "instalar" o app. **Não há service worker** de propósito: como o sistema mostra dados ao vivo do banco, cachear telas causaria informação velha.
 
-O cache de CSS/JS é controlado por **header, não por query string**: `backend/server.js` serve o front-end com `Cache-Control: no-store, must-revalidate` e sem `ETag`/`Last-Modified`, o que cobre também o `index.html` — que, por ser o documento de entrada, não teria onde pendurar um `?v=`. Os links são limpos por isso (`Js/app.js`, não `Js/app.js?v=...`): a query string é anterior ao header, deixou de ter efeito quando ele entrou e só sobrava como um passo manual de bump que ninguém mantinha em dia. A demo publicada na Vercel não passa pelo Express, então declara o mesmo header em `vercel.json`.
+O cache de CSS/JS é controlado por **header, não por query string**: `backend/server.js` serve o front-end com `Cache-Control: no-store, must-revalidate` e sem `ETag`/`Last-Modified`, o que cobre também o `index.html` — que, por ser o documento de entrada, não teria onde pendurar um `?v=`. Os links são limpos por isso (`js/core/app.js`, não `js/core/app.js?v=...`): a query string é anterior ao header, deixou de ter efeito quando ele entrou e só sobrava como um passo manual de bump que ninguém mantinha em dia. A demo publicada na Vercel não passa pelo Express, então declara o mesmo header em `vercel.json`.
 
 ---
 

@@ -71,7 +71,7 @@
     border-right: none;
 }
 
-/* Densidade das linhas, alternada pelos botoes em Js/escala-dia-editor.js
+/* Densidade das linhas, alternada pelos botoes em js/telas/escala-dia-editor.js
    (gravam data-densidade no .escala-page). O modo compacto mexe so na
    ALTURA da linha, nao nas larguras de coluna: as larguras ja variam por
    breakpoint mais abaixo, e sobrepo-las aqui faria a versao "compacta"
@@ -2972,7 +2972,7 @@
    derrubava esse sticky e o rotulo "Total" saia do lugar ao rolar. */
 .escala-page[data-horas-densas="1"] .timeline-header .hora-header:not(.total-header) {
     padding: 0 2px;
-    /* Definida em Js/escala-dia-editor.js (ajustarFonteHorasEscala) a partir
+    /* Definida em js/telas/escala-dia-editor.js (ajustarFonteHorasEscala) a partir
        da largura real da coluna: abrir a barra lateral e o painel de ajustes
        juntos aperta a grade, e a fonte encolhe junto em vez de deixar os
        rotulos se encostarem. O 11px e o fallback do dia folgado. */

@@ -1,11 +1,11 @@
 /* Modo demonstracao: responde as chamadas de API sem backend nem banco.
  *
- * A intercepcao e feita no fetch, e nao trocando os metodos de Js/api.js.
+ * A intercepcao e feita no fetch, e nao trocando os metodos de js/core/api.js.
  * Assim o app roda EXATAMENTE como em producao — mesma tela, mesmo fluxo,
  * mesmas rotas — e so a resposta da rede e que vem de dados ficticios. Se a
  * API mudar, aqui muda junto ou aparece no console, em vez de a demo silenciar.
  *
- * Precisa ser carregado ANTES de Js/api.js.
+ * Precisa ser carregado ANTES de js/core/api.js.
  */
 (function () {
     'use strict';

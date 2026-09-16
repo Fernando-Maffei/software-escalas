@@ -1,7 +1,7 @@
 /* eslint-disable */
 // Motor de Relatorio de Escala: dois submodos, Quadro Mensal e Detalhado, mais a
 // geracao de PDF/export compartilhada entre eles. Depende de
-// frontend/Js/escala-dia-shared.js (deve carregar antes deste arquivo).
+// frontend/js/telas/escala-dia-shared.js (deve carregar antes deste arquivo).
 // Script global (sem IIFE) de proposito: o Relatorio de Plantoes que ficou em
 // runtime-fixes.js chama varias funcoes internas daqui por nome solto
 // (buildSetorOptionsRelatorioEscala, buildTipoOptionsEscala, buildColaboradorOptionsEscala,

@@ -109,7 +109,7 @@
   background: white;
 }
 
-/* Aplicada por Js/calendar.js quando o usuario logado nao e admin: o dia
+/* Aplicada por js/telas/calendar.js quando o usuario logado nao e admin: o dia
    continua legivel, mas perde as pistas visuais de que e clicavel, porque
    nesse perfil nao ha modal de lancamento para abrir. */
 .day.calendario-somente-leitura {

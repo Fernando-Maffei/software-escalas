@@ -715,7 +715,7 @@ function inicializarAplicacaoUmaVez() {
         // Espera o perfil do usuario antes de renderizar: sem isso, um
         // usuario comum veria o dashboard aparecer e so depois ser trocado
         // pelo calendario. Usa window.carregarPagina (e nao a funcao local)
-        // porque e nela que Js/permissoes.js instala o filtro de perfil.
+        // porque e nela que js/core/permissoes.js instala o filtro de perfil.
         if (typeof window.aguardarUsuarioAutenticado === 'function') {
             await window.aguardarUsuarioAutenticado();
         }

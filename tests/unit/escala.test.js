@@ -11,7 +11,7 @@ const {
 const {
     buildEscalaQuadroCalendarSlots,
     buildEscalaQuadroMensal
-} = require('../../frontend/Js/escala-report-utils');
+} = require('../../frontend/js/lib/escala-report-utils');
 
 module.exports = [
     {

@@ -1,6 +1,6 @@
 /* eslint-disable */
 // Editor de Escala do Dia (grade de horarios com arrasta-e-solta do almoco).
-// Depende de frontend/Js/escala-dia-shared.js (deve carregar antes deste arquivo).
+// Depende de frontend/js/telas/escala-dia-shared.js (deve carregar antes deste arquivo).
 // Script global (sem IIFE) de proposito: o codigo de roteamento de paginas que
 // ficou em runtime-fixes.js chama varias funcoes internas daqui por nome solto
 // (carregarEscalaDiaEscala, obterDataSelecionadaEscala, atualizarAcoesCabecalhoEscala,

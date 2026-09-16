@@ -110,7 +110,7 @@ function observarErros(page) {
     page.on('console', (msg) => {
         const texto = msg.text();
 
-        // mostrarToast (frontend/Js/app.js) loga "Toast: <mensagem> (<tipo>)":
+        // mostrarToast (frontend/js/core/app.js) loga "Toast: <mensagem> (<tipo>)":
         // e assim que o robo sabe que o app avisou o usuario de um erro.
         if (msg.type() === 'log' && /^Toast: [\s\S]* \((error|warning)\)$/.test(texto)) {
             estado.erroTratado = true;
