@@ -61,7 +61,22 @@ module.exports = [
         }
     },
     {
-        // Um feriado em dia util so resolve quando o Set de feriados e passado;
+        // Feriado NACIONAL e calculado (utils/feriados-nacionais.js), entao um
+        // 07/09 numa segunda-feira resolve como feriado mesmo sem o Set — e sem
+        // nenhuma linha na tabela Feriados.
+        name: 'resolvePlantaoTypeByDate marks a national holiday without the holiday set',
+        run() {
+            assert.equal(resolvePlantaoTypeByDate('2026-09-07'), 'feriado');
+            assert.equal(resolvePlantaoTypeByDate('2026-02-17'), 'feriado');
+            assert.equal(normalizePlantaoType('feriado', '2026-09-07'), 'feriado');
+            assert.throws(
+                () => normalizePlantaoType('sabado', '2026-09-07'),
+                /corresponde a feriado/i
+            );
+        }
+    },
+    {
+        // Um feriado municipal em dia util so resolve quando o Set de feriados e passado;
         // sem ele, a mesma data cai na recusa de dia util.
         name: 'resolvePlantaoTypeByDate marks a weekday as holiday only with the holiday set',
         run() {

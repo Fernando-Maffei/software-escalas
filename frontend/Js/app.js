@@ -3509,15 +3509,12 @@ async function carregarListaFeriados() {
         const mesAtual = window.mesAtual !== undefined ? window.mesAtual : new Date().getMonth();
         const anoAtual = window.anoAtual !== undefined ? window.anoAtual : new Date().getFullYear();
         
-        // ===== 1. FERIADOS DA API =====
+        // ===== 1. FERIADOS NACIONAIS (calculados pelo servidor) =====
         let feriadosAPI = [];
         try {
-            const response = await fetch(`https://brasilapi.com.br/api/feriados/v1/${anoAtual}`);
-            if (response.ok) {
-                feriadosAPI = await response.json();
-            }
+            feriadosAPI = await window.buscarFeriadosNacionais(anoAtual);
         } catch (e) {
-            console.error("❌ Erro API:", e);
+            console.error("❌ Erro ao carregar feriados nacionais:", e);
         }
         
         // ===== 2. FERIADOS MANUAIS (do banco) =====
@@ -4158,25 +4155,17 @@ function toggleCamposHora(select) {
 }
 
 
-// ========== FUNÇÃO PARA CARREGAR FERIADOS DA API ==========
+// ========== FUNÇÃO PARA CARREGAR OS FERIADOS NACIONAIS ==========
+// A lista vem do servidor (que a calcula); a BrasilAPI ficou como reserva
+// dentro de buscarFeriadosNacionais, em api.js.
 async function carregarFeriadosAPI(ano) {
     try {
-        console.log(`📡 Carregando feriados da API para ${ano}...`);
-        const response = await fetch(`https://brasilapi.com.br/api/feriados/v1/${ano}`);
-        
-        if (response.ok) {
-            feriadosAPI = await response.json();
-            window.feriadosAPI = feriadosAPI; // Disponibilizar globalmente
-            console.log(`✅ Feriados da API carregados: ${feriadosAPI.length}`);
-            return feriadosAPI;
-        } else {
-            console.error("❌ Erro ao carregar feriados da API:", response.status);
-            feriadosAPI = [];
-            window.feriadosAPI = [];
-            return [];
-        }
+        feriadosAPI = await window.buscarFeriadosNacionais(ano);
+        window.feriadosAPI = feriadosAPI; // Disponibilizar globalmente
+        console.log(`✅ Feriados nacionais carregados: ${feriadosAPI.length}`);
+        return feriadosAPI;
     } catch (error) {
-        console.error("❌ Erro na requisição da API:", error);
+        console.error("❌ Erro ao carregar feriados nacionais:", error);
         feriadosAPI = [];
         window.feriadosAPI = [];
         return [];

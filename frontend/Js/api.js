@@ -240,3 +240,59 @@ const API = {
 };
 
 window.API = API;
+
+// Feriados nacionais: quem calcula e o servidor (GET /feriados/nacionais/:ano),
+// a mesma lista que ele usa para dizer se um plantao e de feriado. Antes cada
+// tela buscava na BrasilAPI, o que dependia de internet e podia divergir do
+// backend. A BrasilAPI fica como reserva para a demo (que nao tem backend) e
+// para servidor ainda sem o endpoint.
+const cacheFeriadosNacionaisPorAno = new Map();
+
+async function buscarFeriadosNacionais(ano) {
+    const anoNumero = Number(ano);
+
+    if (!Number.isInteger(anoNumero)) {
+        return [];
+    }
+
+    if (cacheFeriadosNacionaisPorAno.has(anoNumero)) {
+        return cacheFeriadosNacionaisPorAno.get(anoNumero);
+    }
+
+    const lista = await carregarFeriadosNacionaisDaOrigem(anoNumero);
+    cacheFeriadosNacionaisPorAno.set(anoNumero, lista);
+    return lista;
+}
+
+// Formato de saida igual ao da BrasilAPI ({ date, name }), que e o que as telas
+// leem hoje.
+async function carregarFeriadosNacionaisDaOrigem(ano) {
+    try {
+        const doServidor = await API.get(`/feriados/nacionais/${ano}`);
+
+        if (Array.isArray(doServidor) && doServidor.length > 0) {
+            return doServidor.map((item) => ({
+                date: item.data,
+                name: item.nome,
+                type: 'national'
+            }));
+        }
+    } catch (error) {
+        console.warn('Feriados nacionais: servidor nao respondeu, tentando a BrasilAPI.', error);
+    }
+
+    try {
+        const resposta = await fetch(`https://brasilapi.com.br/api/feriados/v1/${ano}`);
+
+        if (resposta.ok) {
+            const lista = await resposta.json();
+            return Array.isArray(lista) ? lista : [];
+        }
+    } catch (error) {
+        console.warn('Feriados nacionais: BrasilAPI indisponivel.', error);
+    }
+
+    return [];
+}
+
+window.buscarFeriadosNacionais = buscarFeriadosNacionais;

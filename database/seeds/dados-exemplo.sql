@@ -1,6 +1,6 @@
 -- Template de dados de exemplo ("dados-exemplo").
--- Serve para um banco recem-criado nao comecar vazio: cria alguns setores,
--- colaboradores de demonstracao e os feriados nacionais de 2026/2027.
+-- Serve para um banco recem-criado nao comecar vazio: cria alguns setores e
+-- colaboradores de demonstracao.
 --
 -- Regras de seguranca deste script:
 --   * E idempotente: cada INSERT so acontece se o registro ainda nao existir
@@ -61,82 +61,10 @@ END;
 GO
 
 -- ----------------------------------------------------------------------------
--- Feriados nacionais (fixos + moveis) de 2026 e 2027.
--- Guarda por Data para nao duplicar em reexecucoes.
+-- Feriados
 -- ----------------------------------------------------------------------------
-
--- 2026 --------------------------------------------------------------
-IF NOT EXISTS (SELECT 1 FROM dbo.Feriados WHERE Data = '2026-01-01')
-    INSERT INTO dbo.Feriados (Nome, Data, Tipo) VALUES (N'Confraternização Universal', '2026-01-01', 'nacional');
-GO
-IF NOT EXISTS (SELECT 1 FROM dbo.Feriados WHERE Data = '2026-02-17')
-    INSERT INTO dbo.Feriados (Nome, Data, Tipo) VALUES (N'Carnaval', '2026-02-17', 'nacional');
-GO
-IF NOT EXISTS (SELECT 1 FROM dbo.Feriados WHERE Data = '2026-04-03')
-    INSERT INTO dbo.Feriados (Nome, Data, Tipo) VALUES (N'Sexta-feira Santa', '2026-04-03', 'nacional');
-GO
-IF NOT EXISTS (SELECT 1 FROM dbo.Feriados WHERE Data = '2026-04-21')
-    INSERT INTO dbo.Feriados (Nome, Data, Tipo) VALUES (N'Tiradentes', '2026-04-21', 'nacional');
-GO
-IF NOT EXISTS (SELECT 1 FROM dbo.Feriados WHERE Data = '2026-05-01')
-    INSERT INTO dbo.Feriados (Nome, Data, Tipo) VALUES (N'Dia do Trabalho', '2026-05-01', 'nacional');
-GO
-IF NOT EXISTS (SELECT 1 FROM dbo.Feriados WHERE Data = '2026-06-04')
-    INSERT INTO dbo.Feriados (Nome, Data, Tipo) VALUES (N'Corpus Christi', '2026-06-04', 'nacional');
-GO
-IF NOT EXISTS (SELECT 1 FROM dbo.Feriados WHERE Data = '2026-09-07')
-    INSERT INTO dbo.Feriados (Nome, Data, Tipo) VALUES (N'Independência do Brasil', '2026-09-07', 'nacional');
-GO
-IF NOT EXISTS (SELECT 1 FROM dbo.Feriados WHERE Data = '2026-10-12')
-    INSERT INTO dbo.Feriados (Nome, Data, Tipo) VALUES (N'Nossa Senhora Aparecida', '2026-10-12', 'nacional');
-GO
-IF NOT EXISTS (SELECT 1 FROM dbo.Feriados WHERE Data = '2026-11-02')
-    INSERT INTO dbo.Feriados (Nome, Data, Tipo) VALUES (N'Finados', '2026-11-02', 'nacional');
-GO
-IF NOT EXISTS (SELECT 1 FROM dbo.Feriados WHERE Data = '2026-11-15')
-    INSERT INTO dbo.Feriados (Nome, Data, Tipo) VALUES (N'Proclamação da República', '2026-11-15', 'nacional');
-GO
-IF NOT EXISTS (SELECT 1 FROM dbo.Feriados WHERE Data = '2026-11-20')
-    INSERT INTO dbo.Feriados (Nome, Data, Tipo) VALUES (N'Dia da Consciência Negra', '2026-11-20', 'nacional');
-GO
-IF NOT EXISTS (SELECT 1 FROM dbo.Feriados WHERE Data = '2026-12-25')
-    INSERT INTO dbo.Feriados (Nome, Data, Tipo) VALUES (N'Natal', '2026-12-25', 'nacional');
-GO
-
--- 2027 --------------------------------------------------------------
-IF NOT EXISTS (SELECT 1 FROM dbo.Feriados WHERE Data = '2027-01-01')
-    INSERT INTO dbo.Feriados (Nome, Data, Tipo) VALUES (N'Confraternização Universal', '2027-01-01', 'nacional');
-GO
-IF NOT EXISTS (SELECT 1 FROM dbo.Feriados WHERE Data = '2027-02-09')
-    INSERT INTO dbo.Feriados (Nome, Data, Tipo) VALUES (N'Carnaval', '2027-02-09', 'nacional');
-GO
-IF NOT EXISTS (SELECT 1 FROM dbo.Feriados WHERE Data = '2027-03-26')
-    INSERT INTO dbo.Feriados (Nome, Data, Tipo) VALUES (N'Sexta-feira Santa', '2027-03-26', 'nacional');
-GO
-IF NOT EXISTS (SELECT 1 FROM dbo.Feriados WHERE Data = '2027-04-21')
-    INSERT INTO dbo.Feriados (Nome, Data, Tipo) VALUES (N'Tiradentes', '2027-04-21', 'nacional');
-GO
-IF NOT EXISTS (SELECT 1 FROM dbo.Feriados WHERE Data = '2027-05-01')
-    INSERT INTO dbo.Feriados (Nome, Data, Tipo) VALUES (N'Dia do Trabalho', '2027-05-01', 'nacional');
-GO
-IF NOT EXISTS (SELECT 1 FROM dbo.Feriados WHERE Data = '2027-05-27')
-    INSERT INTO dbo.Feriados (Nome, Data, Tipo) VALUES (N'Corpus Christi', '2027-05-27', 'nacional');
-GO
-IF NOT EXISTS (SELECT 1 FROM dbo.Feriados WHERE Data = '2027-09-07')
-    INSERT INTO dbo.Feriados (Nome, Data, Tipo) VALUES (N'Independência do Brasil', '2027-09-07', 'nacional');
-GO
-IF NOT EXISTS (SELECT 1 FROM dbo.Feriados WHERE Data = '2027-10-12')
-    INSERT INTO dbo.Feriados (Nome, Data, Tipo) VALUES (N'Nossa Senhora Aparecida', '2027-10-12', 'nacional');
-GO
-IF NOT EXISTS (SELECT 1 FROM dbo.Feriados WHERE Data = '2027-11-02')
-    INSERT INTO dbo.Feriados (Nome, Data, Tipo) VALUES (N'Finados', '2027-11-02', 'nacional');
-GO
-IF NOT EXISTS (SELECT 1 FROM dbo.Feriados WHERE Data = '2027-11-15')
-    INSERT INTO dbo.Feriados (Nome, Data, Tipo) VALUES (N'Proclamação da República', '2027-11-15', 'nacional');
-GO
-IF NOT EXISTS (SELECT 1 FROM dbo.Feriados WHERE Data = '2027-11-20')
-    INSERT INTO dbo.Feriados (Nome, Data, Tipo) VALUES (N'Dia da Consciência Negra', '2027-11-20', 'nacional');
-GO
-IF NOT EXISTS (SELECT 1 FROM dbo.Feriados WHERE Data = '2027-12-25')
-    INSERT INTO dbo.Feriados (Nome, Data, Tipo) VALUES (N'Natal', '2027-12-25', 'nacional');
-GO
+-- Nada a inserir aqui. Os feriados NACIONAIS sao calculados pelo sistema
+-- (backend/utils/feriados-nacionais.js) e nao ficam na tabela: quando eram
+-- gravados por este seed, o mesmo dia aparecia duas vezes na tela — uma vinda
+-- do banco e outra da lista de nacionais. A tabela dbo.Feriados guarda somente
+-- feriado municipal/estadual, que e o que o sistema nao tem como calcular.

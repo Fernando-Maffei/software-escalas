@@ -82,7 +82,9 @@ async function findPlantoesByDate(poolOrTx, dataISO, schema) {
 }
 
 // Datas de feriado (ISO) cadastradas, como Set — para o tipo do plantao poder
-// ser 'feriado' (inclusive em dia util). A tabela Feriados e obrigatoria.
+// ser 'feriado' (inclusive em dia util). Aqui vem so o feriado municipal/
+// estadual: os nacionais resolvePlantaoTypeByDate calcula sozinho, entao um
+// 07/09 continua sendo feriado mesmo sem nenhuma linha na tabela Feriados.
 async function loadFeriadosSet(poolOrTx) {
     const result = await poolOrTx.request().query('SELECT Data FROM Feriados');
     const set = new Set();
