@@ -161,7 +161,7 @@ App de escalas/
 │
 ├── database/
 │   ├── migrations/             ← evolução do esquema (arquivos SQL datados)
-│   └── seeds/dados-exemplo.sql ← dados de exemplo (setores, colaboradores, feriados)
+│   └── seeds/dados-exemplo.sql ← dados de exemplo (setores, colaboradores)
 │
 ├── docs/                       ← guias (Docker, servidor, time) + esta apostila
 ├── tests/                      ← testes de lógica (Node puro)
@@ -417,7 +417,7 @@ Ordem dos arquivos:
 
 #### O seed de exemplo — `database/seeds/dados-exemplo.sql`
 
-Um script **opcional** e **idempotente** para um banco novo não começar vazio. Só faz `INSERT` com guarda `IF NOT EXISTS` — **nunca** apaga nem sobrescreve dados existentes. Adiciona: alguns setores, colaboradores de demonstração (marcados "(exemplo)") e os feriados nacionais de 2026/2027. É acionado pelo botão "Carregar Dados de Exemplo" (ou pelo endpoint `POST /configuracao-banco/carregar-exemplos`).
+Um script **opcional** e **idempotente** para um banco novo não começar vazio. Só faz `INSERT` com guarda `IF NOT EXISTS` — **nunca** apaga nem sobrescreve dados existentes. Adiciona: alguns setores e colaboradores de demonstração (marcados "(exemplo)"). Feriado nacional **não** entra: o sistema calcula (ver `backend/utils/feriados-nacionais.js`), e gravar no banco fazia o mesmo dia aparecer duas vezes na tela. É acionado pelo botão "Carregar Dados de Exemplo" (ou pelo endpoint `POST /configuracao-banco/carregar-exemplos`).
 
 ---
 

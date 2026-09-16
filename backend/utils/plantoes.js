@@ -1,5 +1,6 @@
 const { AppError } = require('./errors');
 const { minutesToDurationLabel } = require('./bancoHoras');
+const { isFeriadoNacional } = require('./feriados-nacionais');
 const {
     ensurePositiveInt,
     extractDateString,
@@ -52,11 +53,17 @@ function resolveLegacyTipoCredito(row) {
 }
 
 // Tipo do plantao a partir da data. Feriado tem PRIORIDADE (mesmo caindo no fim
-// de semana): quando `feriados` (Set de datas ISO) contem a data, o tipo e
-// 'feriado'. Sem o Set (chamadas que so validam fim de semana), sabado/domingo
-// ainda resolvem; um feriado em dia util so e aceito quando o Set e passado.
+// de semana), e vem de duas fontes: os feriados nacionais, que sao calculados
+// (nao dependem do banco nem do Set), e `feriados` — Set de datas ISO com o
+// que esta na tabela Feriados, de onde sai o feriado municipal/estadual. Sem o
+// Set, um feriado nacional em dia util ainda resolve; um municipal em dia util
+// so e aceito quando o Set e passado.
 function resolvePlantaoTypeByDate(dataISO, feriados = null) {
     const normalized = normalizeIsoDate(dataISO, 'Data do plantao');
+
+    if (isFeriadoNacional(normalized)) {
+        return 'feriado';
+    }
 
     if (feriados && typeof feriados.has === 'function' && feriados.has(normalized)) {
         return 'feriado';

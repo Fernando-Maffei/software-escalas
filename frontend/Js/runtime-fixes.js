@@ -4292,9 +4292,9 @@
         atualizarResumoPlantaoNaTela();
     };
 
-    // Garante os feriados NACIONAIS (BrasilAPI) dos anos da janela em
-    // window.feriadosAPI. carregarFeriadosAPI substitui a lista a cada chamada,
-    // entao aqui juntamos os anos manualmente (dedup por data).
+    // Garante os feriados NACIONAIS dos anos da janela em window.feriadosAPI.
+    // carregarFeriadosAPI substitui a lista a cada chamada, entao aqui juntamos
+    // os anos manualmente (dedup por data).
     async function garantirFeriadosApiPlantao(anos) {
         const porData = new Map(
             (Array.isArray(window.feriadosAPI) ? window.feriadosAPI : [])
@@ -4304,17 +4304,14 @@
 
         for (const ano of anos) {
             try {
-                const resposta = await fetch(`https://brasilapi.com.br/api/feriados/v1/${ano}`);
-                if (resposta.ok) {
-                    const lista = await resposta.json();
-                    (Array.isArray(lista) ? lista : []).forEach((item) => {
-                        if (item && item.date) {
-                            porData.set(item.date, item);
-                        }
-                    });
-                }
+                const lista = await window.buscarFeriadosNacionais(ano);
+                (Array.isArray(lista) ? lista : []).forEach((item) => {
+                    if (item && item.date) {
+                        porData.set(item.date, item);
+                    }
+                });
             } catch (error) {
-                // Sem rede/API fora do ar: segue com os feriados locais/ja carregados.
+                // Servidor/API fora do ar: segue com os feriados locais/ja carregados.
             }
         }
 

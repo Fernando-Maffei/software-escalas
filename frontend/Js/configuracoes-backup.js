@@ -196,7 +196,7 @@
 
     async function carregarExemplosBanco() {
         const confirmar = typeof window.confirm === 'function'
-            ? window.confirm('Carregar dados de exemplo (setores, colaboradores de demonstracao e feriados nacionais)?\n\nNenhum dado existente sera apagado — apenas o que ainda faltar sera adicionado.')
+            ? window.confirm('Carregar dados de exemplo (setores e colaboradores de demonstracao)?\n\nNenhum dado existente sera apagado — apenas o que ainda faltar sera adicionado.')
             : true;
 
         if (!confirmar) {

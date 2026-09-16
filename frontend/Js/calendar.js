@@ -91,16 +91,10 @@ async function carregarFeriados(ano) {
     }
 
     try {
-        const response = await fetch(`https://brasilapi.com.br/api/feriados/v1/${ano}`);
-
-        if (!response.ok) {
-            throw new Error(`Erro ${response.status}`);
-        }
-
-        feriados = await response.json();
+        feriados = await window.buscarFeriadosNacionais(ano);
         cacheFeriadosPorAno.set(ano, feriados);
     } catch (erro) {
-        console.error('Erro ao carregar feriados da API:', erro);
+        console.error('Erro ao carregar feriados nacionais:', erro);
         feriados = [];
     }
 

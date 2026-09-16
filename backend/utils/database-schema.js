@@ -185,8 +185,8 @@ async function ensureApplicationSchema(pool) {
     };
 }
 
-// Carrega o template de dados de exemplo (setores, colaboradores de
-// demonstracao e feriados nacionais). O script SQL e idempotente e nunca
+// Carrega o template de dados de exemplo (setores e colaboradores de
+// demonstracao). O script SQL e idempotente e nunca
 // apaga/sobrescreve dados existentes, entao e seguro rodar num banco que ja
 // tem conteudo — apenas preenche o que ainda faltar. Serve para um banco
 // recem-instalado nao comecar totalmente vazio.

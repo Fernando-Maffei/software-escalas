@@ -60,6 +60,9 @@
             items: D.escalaDoDia(m[1])
         })],
 
+        // A demo nao tem backend para calcular os nacionais: devolve vazio e o
+        // api.js cai na BrasilAPI. Precisa vir antes da rota generica abaixo.
+        [/\/api\/feriados\/nacionais/, () => json([])],
         [/\/api\/feriados/, () => json(D.FERIADOS)],
         [/\/api\/ausencias/, () => json([])],
         [/\/api\/plantoes\/disponibilidade/, () => json({ disponiveis: D.COLABORADORES.map((c) => c.id) })],
