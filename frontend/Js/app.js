@@ -1306,8 +1306,8 @@ function filtrarColaboradores(termo) {
         return;
     }
     
-    const filtrados = colaboradores.filter(c => 
-        c.Nome.toLowerCase().includes(termo.toLowerCase())
+    const filtrados = colaboradores.filter(c =>
+        String(c.Nome || c.nome || '').toLowerCase().includes(termo.toLowerCase())
     );
     
     renderListaColaboradores(filtrados);

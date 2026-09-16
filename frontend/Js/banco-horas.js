@@ -666,6 +666,10 @@
             return;
         }
 
+        if (!Array.isArray(dadosBanco.semanas)) {
+            dadosBanco.semanas = [];
+        }
+
         dadosBanco.semanas.push({
             semanaSegunda: semanaISO,
             label: labelData(semanaISO),
