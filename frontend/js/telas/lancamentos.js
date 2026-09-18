@@ -808,6 +808,10 @@
         if (el('periodoTipo')) el('periodoTipo').value = 'dia_inteiro';
         if (el('feriadoNome')) el('feriadoNome').value = '';
         if (el('feriadoTipo')) el('feriadoTipo').value = 'municipal';
+        // A observacao so era limpa no "Cancelar edicao": depois de salvar (ou
+        // ao reabrir a modal) o texto anterior ficava no campo e ia junto no
+        // proximo lancamento.
+        if (el('observacaoLancamento')) el('observacaoLancamento').value = '';
 
         setEdicao(null);
 

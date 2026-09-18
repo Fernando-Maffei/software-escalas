@@ -316,6 +316,14 @@
             return;
         }
 
+        // Clique duplo em "Sim, excluir" mandava dois DELETE: o segundo voltava
+        // 404 e a tela mostrava erro e sucesso ao mesmo tempo.
+        if (window.__exclusaoEmAndamento) {
+            return;
+        }
+
+        window.__exclusaoEmAndamento = true;
+
         try {
             if (tipo === 'feriado') {
                 await window.API.excluirFeriado(id);
@@ -337,6 +345,7 @@
                 mostrarToast(`Erro ao excluir: ${error.message}`, 'error');
             }
         } finally {
+            window.__exclusaoEmAndamento = false;
             limparExclusaoPendente();
             fecharModalSeguro('modalConfirmacao');
         }

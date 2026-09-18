@@ -6,6 +6,10 @@ const TRACKED_TABLES = [
     'BancoHorasMovimentos',
     'Colaboradores',
     'ColaboradorJornadaSemanal',
+    // Sem ela, hasTable(schema, 'Feriados') dava sempre falso e a escala so
+    // reconhecia os feriados nacionais — o municipal/estadual cadastrado
+    // continuava com escala padrao (ver loadFeriadosDoPeriodo).
+    'Feriados',
     'Setores',
     'plantoes',
     'escala_dia',

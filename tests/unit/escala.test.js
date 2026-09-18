@@ -17,6 +17,25 @@ const {
 
 module.exports = [
     {
+        name: 'getSchemaInfo rastreia a tabela Feriados (senao o feriado cadastrado nao suprime a escala)',
+        async run() {
+            const { getSchemaInfo, hasTable } = require('../../backend/db/schema');
+            let consulta = '';
+            const fakePool = {
+                request: () => ({
+                    query: async (sqlText) => {
+                        consulta = sqlText;
+                        return { recordset: [{ TABLE_NAME: 'Feriados', COLUMN_NAME: 'Data' }] };
+                    }
+                })
+            };
+
+            const schema = await getSchemaInfo(fakePool, { forceRefresh: true });
+            assert.ok(consulta.includes("'Feriados'"), 'a consulta de schema precisa incluir Feriados');
+            assert.equal(hasTable(schema, 'Feriados'), true);
+        }
+    },
+    {
         name: 'loadFeriadosDoPeriodo junta feriados nacionais e os cadastrados no banco',
         async run() {
             const fakePool = {
