@@ -3446,6 +3446,19 @@
             return;
         }
 
+        // Clique duplo em "Salvar" mandava dois POST e criava o colaborador em
+        // dobro. Enquanto uma gravacao esta em andamento, as outras sao ignoradas.
+        if (salvandoColaboradorEditor) {
+            return;
+        }
+
+        salvandoColaboradorEditor = true;
+        const botaoSalvar = document.querySelector('#colaboradorEditor .editor-actions .btn-primary');
+
+        if (botaoSalvar) {
+            botaoSalvar.disabled = true;
+        }
+
         try {
             const metodo = id ? 'PUT' : 'POST';
             const url = id
@@ -3511,8 +3524,16 @@
         } catch (error) {
             console.error('Erro ao salvar:', error);
             mostrarToast(error.message || 'Erro ao salvar colaborador', 'error');
+        } finally {
+            salvandoColaboradorEditor = false;
+
+            if (botaoSalvar) {
+                botaoSalvar.disabled = false;
+            }
         }
     };
+
+    let salvandoColaboradorEditor = false;
 
     function fecharModalColab() {
         const existente = document.getElementById('modalColabGeral');
