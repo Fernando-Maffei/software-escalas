@@ -1,5 +1,6 @@
 const { sql } = require('../db');
 const { AppError } = require('../lib/errors');
+const { isFeriadoNacional } = require('./feriados-nacionais');
 const { listJornadaSemanal } = require('./jornada-semanal');
 const { serializePlantaoRecord } = require('./plantoes');
 const { getBancoHorasCapabilities, hasTable } = require('../db/schema');
@@ -18,6 +19,9 @@ const {
 } = require('../lib/validation');
 
 const ESCALA_TIPOS = ['normal', 'plantao', 'folga', 'ferias', 'ausencia', 'ajuste'];
+// Plantoes que viram linha na escala do dia. Antes so o de sabado entrava, e o
+// lancamento de domingo/feriado nao aparecia na escala nem no relatorio.
+const ESCALA_PLANTAO_TIPOS = ['sabado', 'domingo', 'feriado'];
 const DIA_SEMANA_LABELS = [
     'Domingo',
     'Segunda-feira',
@@ -84,6 +88,32 @@ function isSunday(dataISO) {
 function shouldCreateWeekdayBase(dataISO) {
     const weekday = getDayOfWeek(dataISO);
     return weekday >= 1 && weekday <= 5;
+}
+
+// Datas de feriado do periodo: nacionais (calculados) e os cadastrados na
+// tabela Feriados (municipal/estadual). Em feriado a escala padrao nao e
+// gerada — so aparece quem tem lancamento de plantao no dia.
+async function loadFeriadosDoPeriodo(poolOrTx, schema, startISO, endISO) {
+    const datas = new Set(iterateIsoDates(startISO, endISO).filter((dataISO) => isFeriadoNacional(dataISO)));
+
+    if (!hasTable(schema, 'Feriados')) {
+        return datas;
+    }
+
+    const result = await poolOrTx.request()
+        .input('dataInicio', sql.Date, normalizeIsoDate(startISO, 'Data inicial'))
+        .input('dataFim', sql.Date, normalizeIsoDate(endISO, 'Data final'))
+        .query('SELECT Data FROM Feriados WHERE Data BETWEEN @dataInicio AND @dataFim');
+
+    for (const row of result.recordset) {
+        const dataISO = extractDateString(row.Data);
+
+        if (dataISO) {
+            datas.add(dataISO);
+        }
+    }
+
+    return datas;
 }
 
 function iterateIsoDates(startISO, endISO) {
@@ -696,6 +726,7 @@ async function ensureEscalaBaseForPeriod(poolOrTx, schema, startISO, endISO, opt
     const hasJornadaSemanalSupport = hasTable(schema, 'ColaboradorJornadaSemanal');
     const existingRows = await listEscalaDiaRows(poolOrTx, startISO, endISO, { colaboradorId });
     const existingMap = new Map(existingRows.map((row) => [buildEscalaKey(row.colaboradorId, row.dataISO), row]));
+    const feriados = await loadFeriadosDoPeriodo(poolOrTx, schema, startISO, endISO);
     const counters = {
         created: 0,
         updated: 0,
@@ -705,6 +736,7 @@ async function ensureEscalaBaseForPeriod(poolOrTx, schema, startISO, endISO, opt
 
     for (const dataISO of iterateIsoDates(startISO, endISO)) {
         const weekday = getDayOfWeek(dataISO);
+        const isFeriado = feriados.has(dataISO);
 
         for (const colaborador of colaboradores) {
             const key = buildEscalaKey(colaborador.Id, dataISO);
@@ -715,7 +747,10 @@ async function ensureEscalaBaseForPeriod(poolOrTx, schema, startISO, endISO, opt
             };
             let defaultRecord = null;
 
-            if (hasJornadaSemanalSupport && jornadaInfo.hasRows) {
+            if (isFeriado) {
+                // Feriado: sem escala padrao. A linha automatica que ja existia
+                // e removida abaixo; o plantao do feriado entra na hidratacao.
+            } else if (hasJornadaSemanalSupport && jornadaInfo.hasRows) {
                 const jornadaDia = jornadaInfo.activeByDay.get(weekday);
 
                 if (jornadaDia) {
@@ -1118,7 +1153,7 @@ async function hydrateHistoricSourcesIntoEscala(poolOrTx, schema, existingMap, c
     for (const row of plantoesResult.recordset) {
         const plantao = serializePlantaoRecord(row);
 
-        if (plantao.tipoPlantao !== 'sabado') {
+        if (!ESCALA_PLANTAO_TIPOS.includes(plantao.tipoPlantao)) {
             continue;
         }
 
@@ -1290,7 +1325,7 @@ async function syncPlantaoDiaToEscalaDia(poolOrTx, schema, dataISO, plantaoRows,
 
     const plantoes = (plantaoRows || [])
         .map((row) => serializePlantaoRecord(row))
-        .filter((plantao) => plantao.tipoPlantao === 'sabado');
+        .filter((plantao) => ESCALA_PLANTAO_TIPOS.includes(plantao.tipoPlantao));
 
     // Limpa a origem de todos os turnos recebidos, inclusive os que sairam da
     // grade por serem de outro tipo — a escala nao pode ficar apontando para
@@ -1657,6 +1692,7 @@ module.exports = {
     iterateIsoDates,
     listEscalaDiaByDate,
     listEscalaReport,
+    loadFeriadosDoPeriodo,
     normalizeEscalaTipo,
     persistEscalaDiaRecord,
     resetEscalaLunchesToCadastro,

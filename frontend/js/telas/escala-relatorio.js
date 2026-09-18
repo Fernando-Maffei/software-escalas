@@ -784,15 +784,20 @@
         return true;
     }
 
-    // Nome em vermelho so em domingo e feriado. Antes a cor vinha do tipo do
-    // lancamento, e o sabado (gravado como 'ajuste') saia todo em vermelho.
-    function isEscalaSheetDestaqueDia(day, holidayLabel) {
+    // Nome em vermelho so no lancamento de plantao em domingo ou feriado.
+    // Sabado e trabalho normal (vai para o banco de horas) e quem tem o domingo
+    // na jornada semanal (linha 'normal') tambem nao e destacado.
+    function isEscalaSheetDomingoOuFeriado(day, holidayLabel) {
         if (holidayLabel) {
             return true;
         }
 
         const utils = window.EscalaReportUtils;
         return Boolean(day?.dataISO && utils && utils.getIsoDayOfWeek(day.dataISO) === 0);
+    }
+
+    function isEscalaSheetNomeDestacado(row, domingoOuFeriado) {
+        return domingoOuFeriado && String(row?.tipo || '').toLowerCase() === 'plantao';
     }
 
     function renderEscalaSheetDayTable(day, options = {}) {
@@ -808,7 +813,7 @@
         const hasRows = day.hasScale && rows.length > 0;
         const emptyLabel = holidayLabel ? 'FERIADO' : 'Sem escala';
         const titleAttribute = holidayLabel ? ` title="${escapeHtmlEscala(holidayLabel)}"` : '';
-        const destaqueDia = isEscalaSheetDestaqueDia(day, holidayLabel);
+        const domingoOuFeriado = isEscalaSheetDomingoOuFeriado(day, holidayLabel);
 
         return `
             <article class="escala-sheet-day${hasRows ? '' : ' is-empty'}${holidayLabel ? ' is-holiday' : ''}">
@@ -830,7 +835,7 @@
                         ${hasRows ? rows.map((row) => `
                             <tr>
                                 ${includeLunch && row.showAlmoco ? `<td rowspan="${row.almocoRowspan || 1}" class="escala-sheet-group${row.almocoForaDoCadastro ? ' is-destaque' : ''}">${escapeHtmlEscala(row.almocoLabel || '--')}</td>` : ''}
-                                <td class="escala-sheet-name${destaqueDia ? ' is-destaque' : ''}">${escapeHtmlEscala(row.colaboradorNome || '--')}</td>
+                                <td class="escala-sheet-name${isEscalaSheetNomeDestacado(row, domingoOuFeriado) ? ' is-destaque' : ''}">${escapeHtmlEscala(row.colaboradorNome || '--')}</td>
                                 ${row.showJornada ? `<td rowspan="${row.jornadaRowspan || 1}" class="escala-sheet-group">${escapeHtmlEscala(row.jornadaLabel || '--')}</td>` : ''}
                             </tr>
                         `).join('') : `

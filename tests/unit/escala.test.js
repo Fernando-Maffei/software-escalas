@@ -7,7 +7,8 @@ const {
     createAusenciaEscalaRecord,
     createPlantaoEscalaRecord,
     isLunchOutsideCadastro,
-    iterateIsoDates
+    iterateIsoDates,
+    loadFeriadosDoPeriodo
 } = require('../../backend/services/escala');
 const {
     buildEscalaQuadroCalendarSlots,
@@ -15,6 +16,30 @@ const {
 } = require('../../frontend/js/lib/escala-report-utils');
 
 module.exports = [
+    {
+        name: 'loadFeriadosDoPeriodo junta feriados nacionais e os cadastrados no banco',
+        async run() {
+            const fakePool = {
+                request() {
+                    const request = {
+                        input: () => request,
+                        query: async () => ({ recordset: [{ Data: new Date('2026-09-20T00:00:00Z') }] })
+                    };
+                    return request;
+                }
+            };
+            const schema = { tables: { feriados: true } };
+            const semTabela = { tables: {} };
+
+            const datas = await loadFeriadosDoPeriodo(fakePool, schema, '2026-09-01', '2026-09-30');
+            assert.ok(datas.has('2026-09-07'), 'Independencia (nacional) deve estar na lista');
+            assert.ok(datas.has('2026-09-20'), 'feriado cadastrado deve estar na lista');
+            assert.equal(datas.has('2026-09-08'), false);
+
+            const soNacionais = await loadFeriadosDoPeriodo(fakePool, semTabela, '2026-09-01', '2026-09-30');
+            assert.deepEqual([...soNacionais], ['2026-09-07']);
+        }
+    },
     {
         name: 'isLunchOutsideCadastro flags only a lunch that differs from the colaborador cadastro',
         run() {
@@ -46,7 +71,8 @@ module.exports = [
             assert.equal(day.rows[2].showAlmoco, true);
             assert.equal(day.rows[2].almocoRowspan, 1);
         }
-    },    {
+    },
+    {
         name: 'iterateIsoDates includes both ends of the selected period',
         run() {
             assert.deepEqual(

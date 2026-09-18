@@ -13,9 +13,10 @@ const suites = [
 let passed = 0;
 let failed = 0;
 
+(async () => {
 for (const suite of suites) {
     try {
-        suite.run();
+        await suite.run();
         passed += 1;
         console.log(`PASS ${suite.name}`);
     } catch (error) {
@@ -30,3 +31,4 @@ console.log(`\n${passed} teste(s) passaram, ${failed} falharam.`);
 if (failed > 0) {
     process.exitCode = 1;
 }
+})();
