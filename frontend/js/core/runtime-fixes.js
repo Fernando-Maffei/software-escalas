@@ -3944,13 +3944,15 @@
         `).join('');
     }
 
+    // Sem onclick inline: o clique ja e tratado pelo listener delegado em
+    // #listaSabados (renderLancamentoPlantao). Com os dois, cada clique abria o
+    // painel duas vezes em paralelo (duas buscas de disponibilidade).
     function renderCardSabadoPlantao(sabado) {
         return `
             <button
                 type="button"
                 class="sabado-card sabado-card--${sabado.tipo || 'sabado'} ${sabado.temPlantao ? 'lancado' : ''} ${sabado.isPast ? 'passado' : ''} ${sabado.isToday ? 'hoje' : ''} ${sabado.isActive ? 'is-active' : ''}"
                 data-plantao-sabado="${sabado.dataISO}"
-                onclick="abrirPlantaoPorData('${sabado.dataISO}')"
                 title="${escapeHtml(sabado.formatada)}${sabado.feriadoNome ? ' - ' + escapeHtml(sabado.feriadoNome) : ''}${sabado.temPlantao ? ' - Plantao ja lancado' : ''}"
             >
                 <div class="sabado-card-badges">
