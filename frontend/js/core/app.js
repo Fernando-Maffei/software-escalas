@@ -862,11 +862,17 @@ function configurarNavegacao() {
    console.log('Navegação configurada');
 }
 
+// Pagina que esta montada agora. O popstate abaixo usa para ignorar o eco da
+// propria troca de hash (ver comentario no listener).
+let paginaCarregadaAtual = null;
+
 function carregarPagina(pagina) {
     console.log('Carregando página:', pagina);
-    
+
     if (!appContent) return;
-    
+
+    paginaCarregadaAtual = pagina;
+
     // 🔥 NOVO: Atualiza a URL sem recarregar a página
     window.location.hash = pagina;
     
@@ -4120,8 +4126,17 @@ function getPaginaFromURL() {
     return 'dashboard';
 }
 
+// carregarPagina troca window.location.hash, e no navegador isso tambem dispara
+// popstate: cada navegacao montava a tela duas vezes (na Escala do Dia, duas
+// requisicoes que gravam a escala do mesmo dia ao mesmo tempo). Aqui so
+// recarrega quando a URL aponta para outra pagina — o "voltar" do navegador.
 window.addEventListener('popstate', () => {
     const pagina = getPaginaFromURL();
+
+    if (pagina === paginaCarregadaAtual) {
+        return;
+    }
+
     carregarPagina(pagina);
 });
 
