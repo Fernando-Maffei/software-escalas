@@ -29,8 +29,19 @@
         return date.toISOString().slice(0, 10);
     }
 
+    // Data de HOJE no fuso do navegador. toISOString() e UTC: no Brasil, depois
+    // das 21h ja virava o dia seguinte — no dia 30 a noite o relatorio de horas
+    // extras abria no mes seguinte, e no domingo a noite a semana sugerida era
+    // a proxima.
+    function hojeLocalISO() {
+        const agora = new Date();
+        const mes = String(agora.getMonth() + 1).padStart(2, '0');
+        const dia = String(agora.getDate()).padStart(2, '0');
+        return `${agora.getFullYear()}-${mes}-${dia}`;
+    }
+
     function hojeMondayISO() {
-        return toMondayISO(new Date().toISOString().slice(0, 10));
+        return toMondayISO(hojeLocalISO());
     }
 
     function addDiasISO(dateISO, dias) {
@@ -213,7 +224,7 @@
 
         const inputVerificar = document.getElementById('bhVerificarData');
         if (inputVerificar) {
-            inputVerificar.value = new Date().toISOString().slice(0, 10);
+            inputVerificar.value = hojeLocalISO();
         }
 
         const btnVerificar = document.getElementById('bhBtnVerificar');
@@ -230,7 +241,7 @@
 
         const extrasFim = document.getElementById('bhExtrasFim');
         if (extrasFim) {
-            extrasFim.value = new Date().toISOString().slice(0, 10);
+            extrasFim.value = hojeLocalISO();
         }
 
         const btnExtras = document.getElementById('bhBtnExtras');
@@ -808,7 +819,7 @@
     // relatorio e o unico lugar onde essas horas aparecem somadas por pessoa —
     // que e o numero que vai para a folha no fim do mes.
     function primeiroDiaDoMesISO() {
-        return `${new Date().toISOString().slice(0, 7)}-01`;
+        return `${hojeLocalISO().slice(0, 7)}-01`;
     }
 
     function preencherColaboradoresExtras() {
