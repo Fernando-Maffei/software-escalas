@@ -125,7 +125,8 @@
             horaFim: formatTimeInput(record?.horaFim || record?.HoraFim || record?.hora_fim),
             almocoInicio: formatTimeInput(record?.almocoInicio || record?.AlmocoInicio || record?.almoco_inicio),
             almocoFim: formatTimeInput(record?.almocoFim || record?.AlmocoFim || record?.almoco_fim),
-            tipo: String(record?.tipo || record?.Tipo || 'normal').trim().toLowerCase()
+            tipo: String(record?.tipo || record?.Tipo || 'normal').trim().toLowerCase(),
+            almocoForaDoCadastro: Boolean(record?.almocoForaDoCadastro)
         };
     }
 
@@ -161,6 +162,12 @@
             return (firstLunch || 0) - (secondLunch || 0);
         }
 
+        // Mesmo almoco: os fora do cadastro ficam juntos, para a celula
+        // mesclada nao se partir no meio do grupo.
+        if (Boolean(first.almocoForaDoCadastro) !== Boolean(second.almocoForaDoCadastro)) {
+            return first.almocoForaDoCadastro ? 1 : -1;
+        }
+
         const firstStart = getTimeMinutes(first.horaInicio);
         const secondStart = getTimeMinutes(second.horaInicio);
 
@@ -181,14 +188,19 @@
         });
     }
 
-    function applyRowspan(rows, labelKey, showKey, rowspanKey) {
+    // groupKey (opcional) impede a fusao de linhas com o mesmo rotulo mas
+    // destaque diferente: um almoco fora do cadastro nao pode dividir a celula
+    // com um almoco igual ao cadastro.
+    function applyRowspan(rows, labelKey, showKey, rowspanKey, groupKey) {
         let index = 0;
 
         while (index < rows.length) {
             const currentLabel = rows[index][labelKey];
+            const currentGroup = groupKey ? rows[index][groupKey] : undefined;
             let end = index + 1;
 
-            while (end < rows.length && rows[end][labelKey] === currentLabel) {
+            while (end < rows.length && rows[end][labelKey] === currentLabel
+                && (!groupKey || rows[end][groupKey] === currentGroup)) {
                 end += 1;
             }
 
@@ -215,13 +227,14 @@
                 almocoLabel: formatCompactRange(item.almocoInicio, item.almocoFim),
                 jornadaLabel: formatCompactRange(item.horaInicio, item.horaFim),
                 tipo: item.tipo,
+                almocoForaDoCadastro: item.almocoForaDoCadastro,
                 showAlmoco: true,
                 almocoRowspan: 1,
                 showJornada: true,
                 jornadaRowspan: 1
             }));
 
-        applyRowspan(rows, 'almocoLabel', 'showAlmoco', 'almocoRowspan');
+        applyRowspan(rows, 'almocoLabel', 'showAlmoco', 'almocoRowspan', 'almocoForaDoCadastro');
         applyRowspan(rows, 'jornadaLabel', 'showJornada', 'jornadaRowspan');
 
         return rows;
@@ -316,6 +329,7 @@
         formatDatePtBr,
         formatTimeInput,
         getIsoDayOfWeek,
+        applyRowspan,
         normalizeBoardRecord,
         shouldIncludeBoardRecord
     };

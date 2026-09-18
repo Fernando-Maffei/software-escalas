@@ -6,6 +6,7 @@ const {
     canAutoRefreshDefaultEscala,
     createAusenciaEscalaRecord,
     createPlantaoEscalaRecord,
+    isLunchOutsideCadastro,
     iterateIsoDates
 } = require('../../backend/services/escala');
 const {
@@ -15,6 +16,37 @@ const {
 
 module.exports = [
     {
+        name: 'isLunchOutsideCadastro flags only a lunch that differs from the colaborador cadastro',
+        run() {
+            const colaborador = { Id: 1, AlmocoInicio: '12:00:00', AlmocoFim: '13:00:00' };
+
+            assert.equal(isLunchOutsideCadastro({ almocoInicio: '12:00', almocoFim: '13:00' }, colaborador), false);
+            assert.equal(isLunchOutsideCadastro({ almocoInicio: '11:00', almocoFim: '12:00' }, colaborador), true);
+            assert.equal(isLunchOutsideCadastro({ almocoInicio: '12:00', almocoFim: '13:30' }, colaborador), true);
+            // Dia sem almoco (ex.: sabado curto) ou cadastro sem almoco: nada a comparar.
+            assert.equal(isLunchOutsideCadastro({ almocoInicio: null, almocoFim: null }, colaborador), false);
+            assert.equal(isLunchOutsideCadastro({ almocoInicio: '11:00', almocoFim: '12:00' }, { Id: 2 }), false);
+            assert.equal(isLunchOutsideCadastro({ almocoInicio: '11:00', almocoFim: '12:00' }, null), false);
+        }
+    },
+    {
+        name: 'buildEscalaQuadroMensal does not merge a lunch outside the cadastro with a regular one',
+        run() {
+            const base = { dataISO: '2026-05-04', tipo: 'normal', horaInicio: '07:00', horaFim: '16:00', almocoInicio: '12:00', almocoFim: '13:00' };
+            const days = buildEscalaQuadroMensal([
+                { ...base, colaboradorNome: 'Ana', almocoForaDoCadastro: true },
+                { ...base, colaboradorNome: 'Bruno' },
+                { ...base, colaboradorNome: 'Carla' }
+            ], { year: 2026, month: 5 });
+            const day = days.find((item) => item.dataISO === '2026-05-04');
+
+            assert.deepEqual(day.rows.map((row) => row.colaboradorNome), ['Bruno', 'Carla', 'Ana']);
+            assert.deepEqual(day.rows.map((row) => row.almocoForaDoCadastro), [false, false, true]);
+            assert.equal(day.rows[0].almocoRowspan, 2);
+            assert.equal(day.rows[2].showAlmoco, true);
+            assert.equal(day.rows[2].almocoRowspan, 1);
+        }
+    },    {
         name: 'iterateIsoDates includes both ends of the selected period',
         run() {
             assert.deepEqual(

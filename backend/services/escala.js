@@ -1592,6 +1592,10 @@ async function listEscalaReport(poolOrTx, schema, filters) {
         setorId: filters.setorId || null,
         tipo: filters.tipo || null
     });
+    const colaboradores = await listColaboradores(poolOrTx, {
+        colaboradorId: filters.colaboradorId || null
+    });
+    const colaboradoresMap = new Map(colaboradores.map((item) => [Number(item.Id), item]));
 
     return rows.map((row) => ({
         id: row.id,
@@ -1607,9 +1611,27 @@ async function listEscalaReport(poolOrTx, schema, filters) {
         almocoFim: formatTimeToDisplay(row.almocoFim),
         horario: buildTimeRangeLabel(row.horaInicio, row.horaFim),
         almoco: buildTimeRangeLabel(row.almocoInicio, row.almocoFim),
+        almocoForaDoCadastro: isLunchOutsideCadastro(row, colaboradoresMap.get(Number(row.colaboradorId))),
         tipo: row.tipo,
         observacao: row.observacao || null
     }));
+}
+
+// O relatorio destaca em vermelho o almoco que difere do cadastro do
+// colaborador. Dia sem almoco lancado, ou colaborador sem almoco no cadastro,
+// nao tem com o que comparar e fica sem destaque.
+function isLunchOutsideCadastro(row, colaborador) {
+    if (!colaborador || !row.almocoInicio || !row.almocoFim) {
+        return false;
+    }
+
+    const defaults = getColaboradorDefaultLunchTimes(colaborador);
+
+    if (!defaults.almocoInicio || !defaults.almocoFim) {
+        return false;
+    }
+
+    return !areSameLunchTimes(row.almocoInicio, row.almocoFim, defaults.almocoInicio, defaults.almocoFim);
 }
 
 module.exports = {
@@ -1630,6 +1652,7 @@ module.exports = {
     getDayOfWeek,
     getDayOfWeekLabel,
     getColaboradorDefaultLunchTimes,
+    isLunchOutsideCadastro,
     isSunday,
     iterateIsoDates,
     listEscalaDiaByDate,

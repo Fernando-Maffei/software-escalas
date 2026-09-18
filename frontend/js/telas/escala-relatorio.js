@@ -687,14 +687,16 @@
         return Array.isArray(day?.rows) ? day.rows.length : 0;
     }
 
-    function applyEscalaExportRowspan(rows, labelKey, showKey, rowspanKey) {
+    function applyEscalaExportRowspan(rows, labelKey, showKey, rowspanKey, groupKey) {
         let index = 0;
 
         while (index < rows.length) {
             const currentLabel = rows[index][labelKey];
+            const currentGroup = groupKey ? rows[index][groupKey] : undefined;
             let end = index + 1;
 
-            while (end < rows.length && rows[end][labelKey] === currentLabel) {
+            while (end < rows.length && rows[end][labelKey] === currentLabel
+                && (!groupKey || rows[end][groupKey] === currentGroup)) {
                 end += 1;
             }
 
@@ -719,7 +721,7 @@
 
         const rows = day.rows.slice(startIndex, startIndex + maxRows).map((row) => ({ ...row }));
 
-        applyEscalaExportRowspan(rows, 'almocoLabel', 'showAlmoco', 'almocoRowspan');
+        applyEscalaExportRowspan(rows, 'almocoLabel', 'showAlmoco', 'almocoRowspan', 'almocoForaDoCadastro');
         applyEscalaExportRowspan(rows, 'jornadaLabel', 'showJornada', 'jornadaRowspan');
 
         return {
@@ -782,14 +784,15 @@
         return true;
     }
 
-    function getEscalaSheetRowClassName(row) {
-        const tipo = String(row?.tipo || 'normal').toLowerCase();
-
-        if (!tipo || tipo === 'normal') {
-            return '';
+    // Nome em vermelho so em domingo e feriado. Antes a cor vinha do tipo do
+    // lancamento, e o sabado (gravado como 'ajuste') saia todo em vermelho.
+    function isEscalaSheetDestaqueDia(day, holidayLabel) {
+        if (holidayLabel) {
+            return true;
         }
 
-        return ` is-${tipo}`;
+        const utils = window.EscalaReportUtils;
+        return Boolean(day?.dataISO && utils && utils.getIsoDayOfWeek(day.dataISO) === 0);
     }
 
     function renderEscalaSheetDayTable(day, options = {}) {
@@ -805,6 +808,7 @@
         const hasRows = day.hasScale && rows.length > 0;
         const emptyLabel = holidayLabel ? 'FERIADO' : 'Sem escala';
         const titleAttribute = holidayLabel ? ` title="${escapeHtmlEscala(holidayLabel)}"` : '';
+        const destaqueDia = isEscalaSheetDestaqueDia(day, holidayLabel);
 
         return `
             <article class="escala-sheet-day${hasRows ? '' : ' is-empty'}${holidayLabel ? ' is-holiday' : ''}">
@@ -824,9 +828,9 @@
                     </thead>
                     <tbody>
                         ${hasRows ? rows.map((row) => `
-                            <tr class="${getEscalaSheetRowClassName(row)}">
-                                ${includeLunch && row.showAlmoco ? `<td rowspan="${row.almocoRowspan || 1}" class="escala-sheet-group">${escapeHtmlEscala(row.almocoLabel || '--')}</td>` : ''}
-                                <td class="escala-sheet-name">${escapeHtmlEscala(row.colaboradorNome || '--')}</td>
+                            <tr>
+                                ${includeLunch && row.showAlmoco ? `<td rowspan="${row.almocoRowspan || 1}" class="escala-sheet-group${row.almocoForaDoCadastro ? ' is-destaque' : ''}">${escapeHtmlEscala(row.almocoLabel || '--')}</td>` : ''}
+                                <td class="escala-sheet-name${destaqueDia ? ' is-destaque' : ''}">${escapeHtmlEscala(row.colaboradorNome || '--')}</td>
                                 ${row.showJornada ? `<td rowspan="${row.jornadaRowspan || 1}" class="escala-sheet-group">${escapeHtmlEscala(row.jornadaLabel || '--')}</td>` : ''}
                             </tr>
                         `).join('') : `
@@ -1409,9 +1413,7 @@
                         text-overflow: ellipsis;
                         white-space: nowrap;
                     }
-                    .escala-sheet-table tr.is-plantao .escala-sheet-name,
-                    .escala-sheet-table tr.is-ajuste .escala-sheet-name,
-                    .escala-sheet-table tr.is-ausencia .escala-sheet-name {
+                    .escala-sheet-table td.is-destaque {
                         color: #d00000;
                         font-weight: 800;
                     }
