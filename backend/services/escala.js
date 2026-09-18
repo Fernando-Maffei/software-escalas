@@ -819,7 +819,8 @@ async function ensureEscalaBaseForPeriod(poolOrTx, schema, startISO, endISO, opt
     return {
         counters,
         existingMap,
-        colaboradores
+        colaboradores,
+        feriados
     };
 }
 
@@ -989,11 +990,20 @@ async function hydrateLunchOverridesIntoEscala(poolOrTx, schema, existingMap, co
         colaboradorId: options.colaboradorId || null
     });
     const colaboradoresMap = new Map((colaboradores || []).map((item) => [Number(item.Id), item]));
+    const feriados = options.feriados || new Set();
 
     for (const override of overrides) {
         const colaborador = colaboradoresMap.get(Number(override.colaboradorId));
 
         if (!colaborador) {
+            continue;
+        }
+
+        // Feriado nao tem escala padrao. Um almoco personalizado gravado antes
+        // (ex.: "aplicar almoco no periodo" cobrindo o feriado) recriava aqui a
+        // linha que a base acabou de remover, com o horario do cadastro. Quem
+        // trabalha no feriado vem do plantao, que nao tem almoco.
+        if (feriados.has(override.dataISO)) {
             continue;
         }
 
@@ -1231,7 +1241,7 @@ async function ensureEscalaDiaForPeriod(poolOrTx, schema, startISO, endISO, opti
         baseResult.colaboradores,
         startISO,
         endISO,
-        { colaboradorId }
+        { colaboradorId, feriados: baseResult.feriados }
     );
 
     return {
@@ -1631,6 +1641,15 @@ async function listEscalaReport(poolOrTx, schema, filters) {
         colaboradorId: filters.colaboradorId || null
     });
     const colaboradoresMap = new Map(colaboradores.map((item) => [Number(item.Id), item]));
+    // Mesma fonte que a escala padrao usa (ensureEscalaBaseForPeriod): quem
+    // tem jornada semanal tem o almoco do dia definido la, nao na ficha.
+    const jornadaSemanalIndex = hasTable(schema, 'ColaboradorJornadaSemanal')
+        ? buildJornadaSemanalIndex(await listJornadaSemanal(poolOrTx, schema, {
+            colaboradorId: filters.colaboradorId || null,
+            onlyActive: false,
+            allowMissingTable: true
+        }))
+        : new Map();
 
     return rows.map((row) => ({
         id: row.id,
@@ -1646,7 +1665,11 @@ async function listEscalaReport(poolOrTx, schema, filters) {
         almocoFim: formatTimeToDisplay(row.almocoFim),
         horario: buildTimeRangeLabel(row.horaInicio, row.horaFim),
         almoco: buildTimeRangeLabel(row.almocoInicio, row.almocoFim),
-        almocoForaDoCadastro: isLunchOutsideCadastro(row, colaboradoresMap.get(Number(row.colaboradorId))),
+        almocoForaDoCadastro: isLunchOutsideCadastro(
+            row,
+            colaboradoresMap.get(Number(row.colaboradorId)),
+            jornadaSemanalIndex.get(Number(row.colaboradorId)) || null
+        ),
         tipo: row.tipo,
         observacao: row.observacao || null
     }));
@@ -1655,12 +1678,29 @@ async function listEscalaReport(poolOrTx, schema, filters) {
 // O relatorio destaca em vermelho o almoco que difere do cadastro do
 // colaborador. Dia sem almoco lancado, ou colaborador sem almoco no cadastro,
 // nao tem com o que comparar e fica sem destaque.
-function isLunchOutsideCadastro(row, colaborador) {
+//
+// "Cadastro" segue a mesma regra da escala padrao: com jornada semanal vale o
+// almoco daquele dia da semana; sem jornada, o almoco da ficha. Dia fora da
+// jornada (ex.: plantao no sabado) nao tem referencia e nao e destacado.
+function getCadastroLunchForDate(colaborador, jornadaInfo, dataISO) {
+    if (jornadaInfo && jornadaInfo.hasRows) {
+        const jornadaDia = jornadaInfo.activeByDay.get(getDayOfWeek(dataISO));
+
+        return {
+            almocoInicio: jornadaDia ? extractTimeString(jornadaDia.almocoInicio ?? jornadaDia.AlmocoInicio) : null,
+            almocoFim: jornadaDia ? extractTimeString(jornadaDia.almocoFim ?? jornadaDia.AlmocoFim) : null
+        };
+    }
+
+    return getColaboradorDefaultLunchTimes(colaborador);
+}
+
+function isLunchOutsideCadastro(row, colaborador, jornadaInfo = null) {
     if (!colaborador || !row.almocoInicio || !row.almocoFim) {
         return false;
     }
 
-    const defaults = getColaboradorDefaultLunchTimes(colaborador);
+    const defaults = getCadastroLunchForDate(colaborador, jornadaInfo, row.dataISO);
 
     if (!defaults.almocoInicio || !defaults.almocoFim) {
         return false;

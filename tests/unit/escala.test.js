@@ -55,6 +55,26 @@ module.exports = [
         }
     },
     {
+        name: 'isLunchOutsideCadastro usa o almoco da jornada semanal do dia quando o colaborador tem jornada',
+        run() {
+            // Ficha sem almoco; almoco so na jornada (13-15 de segunda a sexta).
+            const colaborador = { Id: 4, AlmocoInicio: null, AlmocoFim: null };
+            const jornadaInfo = {
+                hasRows: true,
+                activeByDay: new Map([[1, { almocoInicio: '13:00:00', almocoFim: '15:00:00' }]])
+            };
+
+            // 2026-09-14 e segunda-feira.
+            assert.equal(isLunchOutsideCadastro({ dataISO: '2026-09-14', almocoInicio: '13:00', almocoFim: '15:00' }, colaborador, jornadaInfo), false);
+            assert.equal(isLunchOutsideCadastro({ dataISO: '2026-09-14', almocoInicio: '12:00', almocoFim: '14:00' }, colaborador, jornadaInfo), true);
+            // Sabado fora da jornada: sem referencia, sem destaque.
+            assert.equal(isLunchOutsideCadastro({ dataISO: '2026-09-12', almocoInicio: '12:00', almocoFim: '14:00' }, colaborador, jornadaInfo), false);
+            // Ficha com almoco diferente nao vale quando existe jornada semanal.
+            const comFicha = { Id: 5, AlmocoInicio: '11:00:00', AlmocoFim: '12:00:00' };
+            assert.equal(isLunchOutsideCadastro({ dataISO: '2026-09-14', almocoInicio: '13:00', almocoFim: '15:00' }, comFicha, jornadaInfo), false);
+        }
+    },
+    {
         name: 'buildEscalaQuadroMensal does not merge a lunch outside the cadastro with a regular one',
         run() {
             const base = { dataISO: '2026-05-04', tipo: 'normal', horaInicio: '07:00', horaFim: '16:00', almocoInicio: '12:00', almocoFim: '13:00' };
