@@ -796,7 +796,13 @@
         return Boolean(day?.dataISO && utils && utils.getIsoDayOfWeek(day.dataISO) === 0);
     }
 
+    // O nome tambem acompanha o almoco fora do cadastro: so a celula do
+    // almoco vermelha nao deixava claro de quem era o horario alterado.
     function isEscalaSheetNomeDestacado(row, domingoOuFeriado) {
+        if (row?.almocoForaDoCadastro) {
+            return true;
+        }
+
         return domingoOuFeriado && String(row?.tipo || '').toLowerCase() === 'plantao';
     }
 
