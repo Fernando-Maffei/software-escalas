@@ -18,7 +18,11 @@
         folga: 'Folga',
         ferias: 'Ferias',
         ausencia: 'Ausencia',
-        ajuste: 'Ajuste'
+        ajuste: 'Ajuste',
+        domingo_folgado: 'Domingo folgado',
+        folga_compensatoria: 'Folga compensatoria',
+        reposicao: 'Reposicao',
+        cobertura: 'Cobertura'
     };
     const RELATORIO_ESCALA_MODOS = {
         QUADRO_MENSAL: 'quadro_mensal',

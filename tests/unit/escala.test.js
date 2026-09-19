@@ -17,6 +17,65 @@ const {
 
 module.exports = [
     {
+        name: 'PROTOTIPO: tipos do dia de cobertura/compensacao sao aceitos com o nome exato',
+        run() {
+            const { normalizeEscalaTipo } = require('../../backend/services/escala');
+            assert.equal(normalizeEscalaTipo('domingo_folgado'), 'domingo_folgado');
+            // Nao pode cair no prefixo "folga".
+            assert.equal(normalizeEscalaTipo('folga_compensatoria'), 'folga_compensatoria');
+            assert.equal(normalizeEscalaTipo('Reposição'), 'reposicao');
+            assert.equal(normalizeEscalaTipo('cobertura'), 'cobertura');
+            assert.equal(normalizeEscalaTipo('folga'), 'folga');
+        }
+    },
+    {
+        name: 'PROTOTIPO: cobertura exige duas pessoas diferentes e horario valido',
+        run() {
+            const { normalizeCoberturaPayload } = require('../../backend/services/coberturas');
+            const base = { dataISO: '2026-10-01', colaboradorId: 2, cobertoColaboradorId: 1, horaInicio: '07:00', horaFim: '19:00' };
+
+            const ok = normalizeCoberturaPayload(base);
+            assert.equal(ok.geraHoraExtra, true, 'hora extra marcada por padrao');
+            assert.throws(() => normalizeCoberturaPayload({ ...base, cobertoColaboradorId: 2 }), /si mesma/);
+            assert.throws(() => normalizeCoberturaPayload({ ...base, horaFim: '06:00' }), /hora final/i);
+            assert.throws(() => normalizeCoberturaPayload({ ...base, horaInicio: '' }), /horario/i);
+            assert.equal(normalizeCoberturaPayload({ ...base, geraHoraExtra: false }).geraHoraExtra, false);
+        }
+    },
+    {
+        name: 'PROTOTIPO: domingo folgado precisa ser domingo e a reposicao em outro dia',
+        run() {
+            const { normalizeCompensacaoPayload } = require('../../backend/services/coberturas');
+            const base = { colaboradorId: 1, tipo: 'domingo_folgado', dataFolga: '2026-10-25', dataTrabalho: '2026-10-29' };
+
+            assert.equal(normalizeCompensacaoPayload(base).tipo, 'domingo_folgado');
+            assert.throws(() => normalizeCompensacaoPayload({ ...base, dataFolga: '2026-10-24' }), /nao e domingo/);
+            assert.throws(() => normalizeCompensacaoPayload({ ...base, dataTrabalho: '2026-10-25' }), /diferentes/);
+            assert.throws(() => normalizeCompensacaoPayload({ ...base, trabalhoInicio: '07:00' }), /inicio e fim/);
+            // Folga compensatoria pode cair em qualquer dia.
+            assert.equal(normalizeCompensacaoPayload({ ...base, tipo: 'folga_compensatoria', dataFolga: '2026-10-24' }).tipo, 'folga_compensatoria');
+            assert.throws(() => normalizeCompensacaoPayload({ ...base, tipo: 'qualquer' }));
+        }
+    },
+    {
+        name: 'PROTOTIPO: o quadro mensal so repassa a classificacao gravada (hora extra e vinculo)',
+        run() {
+            const base = { dataISO: '2026-10-25', horaInicio: '07:00', horaFim: '19:00', almocoInicio: null, almocoFim: null };
+            const days = buildEscalaQuadroMensal([
+                { ...base, colaboradorNome: 'Carlos', tipo: 'cobertura', geraHoraExtra: true, vinculo: { tipo: 'cobertura', cobertoNome: 'Paulo' } },
+                { ...base, dataISO: '2026-10-29', colaboradorNome: 'Paulo', tipo: 'reposicao', vinculo: { tipo: 'compensacao', papel: 'reposicao', dataVinculada: '2026-10-25' } },
+                { dataISO: '2026-10-25', colaboradorNome: 'Paulo', tipo: 'domingo_folgado' }
+            ], { year: 2026, month: 10 });
+
+            const dia25 = days.find((d) => d.dataISO === '2026-10-25');
+            assert.deepEqual(dia25.rows.map((r) => r.colaboradorNome), ['Carlos'], 'domingo folgado (sem horario) nao aparece como escalado');
+            assert.equal(dia25.rows[0].geraHoraExtra, true);
+            assert.equal(dia25.rows[0].vinculoTexto, 'Cobre Paulo');
+            const dia29 = days.find((d) => d.dataISO === '2026-10-29');
+            assert.equal(dia29.rows[0].vinculoTexto, 'Reposicao da folga de 25/10');
+        }
+    },
+    {
         name: 'getSchemaInfo rastreia a tabela Feriados (senao o feriado cadastrado nao suprime a escala)',
         async run() {
             const { getSchemaInfo, hasTable } = require('../../backend/db/schema');

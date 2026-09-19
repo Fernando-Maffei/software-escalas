@@ -211,6 +211,17 @@ const API = {
     restaurarAlmocosCadastroEscala: (dataISO, data = {}) => API.put(`/escala/dia/${dataISO}/almocos/cadastro`, data),
     sincronizarEscala: (data) => API.post('/escala/rebuild', data),
 
+    // PROTOTIPO: cobertura (quem cobriu quem) e compensacao (folga <-> reposicao)
+    getCoberturas: (params = {}) => API.get('/coberturas', params),
+    salvarCobertura: (data) => data.id
+        ? API.put(`/coberturas/${data.id}`, data)
+        : API.post('/coberturas', data),
+    excluirCobertura: (id) => API.delete(`/coberturas/${id}`),
+    salvarCompensacao: (data) => data.id
+        ? API.put(`/coberturas/compensacoes/${data.id}`, data)
+        : API.post('/coberturas/compensacoes', data),
+    excluirCompensacao: (id) => API.delete(`/coberturas/compensacoes/${id}`),
+
     getBancoHorasStatus: () => API.get('/banco-horas/status'),
     getBancoHorasResumo: (params = {}) => API.get('/banco-horas/resumo', params),
     getBancoHorasExtrato: (colaboradorId, params = {}) => API.get(`/banco-horas/colaborador/${colaboradorId}`, params),

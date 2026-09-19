@@ -799,7 +799,7 @@
     // O nome tambem acompanha o almoco fora do cadastro: so a celula do
     // almoco vermelha nao deixava claro de quem era o horario alterado.
     function isEscalaSheetNomeDestacado(row, domingoOuFeriado) {
-        if (row?.almocoForaDoCadastro) {
+        if (row?.almocoForaDoCadastro || row?.geraHoraExtra) {
             return true;
         }
 
@@ -841,7 +841,7 @@
                         ${hasRows ? rows.map((row) => `
                             <tr>
                                 ${includeLunch && row.showAlmoco ? `<td rowspan="${row.almocoRowspan || 1}" class="escala-sheet-group${row.almocoForaDoCadastro ? ' is-destaque' : ''}">${escapeHtmlEscala(row.almocoLabel || '--')}</td>` : ''}
-                                <td class="escala-sheet-name${isEscalaSheetNomeDestacado(row, domingoOuFeriado) ? ' is-destaque' : ''}">${escapeHtmlEscala(row.colaboradorNome || '--')}</td>
+                                <td class="escala-sheet-name${isEscalaSheetNomeDestacado(row, domingoOuFeriado) ? ' is-destaque' : ''}"${row.vinculoTexto ? ` title="${escapeHtmlEscala(row.vinculoTexto)}"` : ''}>${escapeHtmlEscala(row.colaboradorNome || '--')}</td>
                                 ${row.showJornada ? `<td rowspan="${row.jornadaRowspan || 1}" class="escala-sheet-group">${escapeHtmlEscala(row.jornadaLabel || '--')}</td>` : ''}
                             </tr>
                         `).join('') : `

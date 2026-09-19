@@ -41,6 +41,12 @@
     root.normalizeRuntimeEscalaTipo = function normalizeRuntimeEscalaTipo(value) {
         const token = root.normalizeRuntimeToken(value);
 
+        // Tipos vindos de cobertura/compensacao: nome exato antes dos prefixos
+        // ("folga_compensatoria" nao pode virar "folga").
+        if (['domingo_folgado', 'folga_compensatoria', 'reposicao', 'cobertura'].includes(token)) {
+            return token;
+        }
+
         if (token.startsWith('plantao')) {
             return 'plantao';
         }

@@ -1,4 +1,6 @@
 const express = require('express');
+const { listCoberturasComoHoraExtra } = require('../services/coberturas');
+
 const router = express.Router();
 
 const { sql, conectar } = require('../db');
@@ -919,8 +921,11 @@ router.get('/horas-extras', async (req, res) => {
             ORDER BY data_plantao DESC, id DESC
         `);
 
+    // PROTOTIPO: coberturas marcadas como hora extra entram no mesmo relatorio.
+    const coberturasExtra = await listCoberturasComoHoraExtra(pool, schema, { inicio: inicioISO, fim: fimISO });
+
     const relatorio = montarRelatorioHorasExtras(
-        plantoesResult.recordset.map((row) => serializePlantaoRecord(row)),
+        plantoesResult.recordset.map((row) => serializePlantaoRecord(row)).concat(coberturasExtra),
         colaboradores,
         { inicioISO, fimISO, colaboradorId }
     );

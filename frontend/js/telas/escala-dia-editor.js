@@ -417,7 +417,7 @@
     }
 
     function isFullDayOffEscala(record) {
-        return ['folga', 'ferias', 'ausencia'].includes(String(record?.tipo || '').toLowerCase())
+        return ['folga', 'ferias', 'ausencia', 'domingo_folgado', 'folga_compensatoria'].includes(String(record?.tipo || '').toLowerCase())
             && !getPartialAbsenceEscala(record.colaboradorId, record.dataISO);
     }
 
@@ -567,6 +567,10 @@
             return { className: 'folga', status: 'Folga' };
         }
 
+        if (tipo === 'domingo_folgado' || tipo === 'folga_compensatoria') {
+            return { className: 'folga', status: TIPO_LABELS[tipo] };
+        }
+
         if (tipo === 'ausencia' && !partialAbsence) {
             return { className: 'ausencia', status: 'Ausencia' };
         }
@@ -606,7 +610,7 @@
 
         return {
             className: 'trabalhando',
-            status: tipo === 'plantao' ? 'Plantao' : 'Trabalhando'
+            status: tipo === 'plantao' || tipo === 'reposicao' || tipo === 'cobertura' ? TIPO_LABELS[tipo] : 'Trabalhando'
         };
     }
 
@@ -1393,7 +1397,7 @@
 
             if (tipo === 'ferias' && !partial) {
                 ferias += 1;
-            } else if (tipo === 'folga' && !partial) {
+            } else if ((tipo === 'folga' || tipo === 'domingo_folgado' || tipo === 'folga_compensatoria') && !partial) {
                 folgas += 1;
             } else if (tipo === 'ausencia' && !partial) {
                 ausencias += 1;
@@ -1466,7 +1470,9 @@
         if (isFullDayOffEscala(record)) {
             const label = TIPO_LABELS[type] || 'Ausencia';
             const motivo = record.observacao ? escapeHtmlEscala(record.observacao) : '';
-            const bandType = ['ferias', 'folga', 'ausencia'].includes(type) ? type : 'ausencia';
+            const bandType = ['ferias', 'folga', 'ausencia'].includes(type)
+                ? type
+                : (type === 'domingo_folgado' || type === 'folga_compensatoria' ? 'folga' : 'ausencia');
             return `<div class="escala-overlay">
                 <div class="escala-band escala-band-${bandType}">
                     <span class="escala-band-label">${escapeHtmlEscala(label)}</span>
@@ -2624,6 +2630,9 @@
                         <button id="btnNovoLancamentoEscala" class="btn-secondary escala-acao-icone" type="button" title="Novo lancamento (ausencia/folga)" aria-label="Novo lancamento (ausencia/folga)">
                             <i class="fas fa-calendar-plus"></i>
                         </button>
+                        <button id="btnCoberturaEscala" class="btn-secondary escala-acao-icone" type="button" title="Cobertura e compensacoes (prototipo)" aria-label="Cobertura e compensacoes">
+                            <i class="fas fa-people-arrows"></i>
+                        </button>
                         <button id="btnCriarColaboradorEscala" class="btn-primary escala-acao-principal" type="button">
                             <i class="fas fa-user-plus"></i> Criar colaborador
                         </button>
@@ -2749,6 +2758,11 @@
         });
 
         document.getElementById('btnNovoLancamentoEscala')?.addEventListener('click', abrirLancamentoPessoalEscala);
+        document.getElementById('btnCoberturaEscala')?.addEventListener('click', () => {
+            if (typeof window.abrirModalCoberturas === 'function') {
+                window.abrirModalCoberturas(obterDataSelecionadaEscala());
+            }
+        });
         document.getElementById('btnCriarColaboradorEscala')?.addEventListener('click', () => {
             // O editor de colaborador vive na tela Colaboradores. Navega para
             // la (clicando no item do menu) e, quando a tela montar, abre o

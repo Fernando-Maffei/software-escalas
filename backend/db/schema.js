@@ -13,7 +13,9 @@ const TRACKED_TABLES = [
     'Setores',
     'plantoes',
     'escala_dia',
-    'AlmocosPersonalizados'
+    'AlmocosPersonalizados',
+    'Coberturas',
+    'Compensacoes'
 ];
 
 let schemaCache = null;

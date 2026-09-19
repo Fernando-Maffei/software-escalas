@@ -18,7 +18,14 @@ const {
     validateWorkSchedule
 } = require('../lib/validation');
 
-const ESCALA_TIPOS = ['normal', 'plantao', 'folga', 'ferias', 'ausencia', 'ajuste'];
+const ESCALA_TIPOS = [
+    'normal', 'plantao', 'folga', 'ferias', 'ausencia', 'ajuste',
+    // Tipos que vem de um registro com vinculo (Coberturas / Compensacoes):
+    'domingo_folgado', 'folga_compensatoria', 'reposicao', 'cobertura'
+];
+// Origens cujo dia ja chega classificado e com vinculo: a hidratacao de
+// ausencias/plantoes nao pode sobrescrever esses dias.
+const ESCALA_ORIGENS_VINCULADAS = ['cobertura', 'compensacao'];
 // Plantoes que viram linha na escala do dia. Antes so o de sabado entrava, e o
 // lancamento de domingo/feriado nao aparecia na escala nem no relatorio.
 const ESCALA_PLANTAO_TIPOS = ['sabado', 'domingo', 'feriado'];
@@ -44,6 +51,12 @@ function normalizeEscalaTipo(value, fieldName = 'Tipo') {
         .replace(/[\u0300-\u036f]/g, '')
         .replace(/[\s-]+/g, '_')
         .replace(/_+/g, '_');
+
+    // Nomes exatos antes dos prefixos: "folga_compensatoria" nao pode cair no
+    // startsWith('folga') abaixo.
+    if (['domingo_folgado', 'folga_compensatoria', 'reposicao', 'cobertura'].includes(normalized)) {
+        return normalized;
+    }
 
     if (normalized.startsWith('plantao')) {
         return 'plantao';
@@ -1125,7 +1138,7 @@ async function hydrateHistoricSourcesIntoEscala(poolOrTx, schema, existingMap, c
             const key = buildEscalaKey(colaborador.Id, dataISO);
             const existing = existingMap.get(key) || null;
 
-            if (!existing) {
+            if (!existing || ESCALA_ORIGENS_VINCULADAS.includes(trimToNull(existing.origemTipo))) {
                 counters.skipped += 1;
                 continue;
             }
@@ -1189,7 +1202,7 @@ async function hydrateHistoricSourcesIntoEscala(poolOrTx, schema, existingMap, c
             const key = buildEscalaKey(colaborador.Id, plantao.dataISO);
             const existing = existingMap.get(key) || null;
 
-            if (existing && normalizeEscalaTipo(existing.tipo || 'normal') !== 'plantao' && !trimToNull(existing.origemTipo)) {
+            if (existing && ((normalizeEscalaTipo(existing.tipo || 'normal') !== 'plantao' && !trimToNull(existing.origemTipo)) || ESCALA_ORIGENS_VINCULADAS.includes(trimToNull(existing.origemTipo)))) {
                 counters.skipped += 1;
                 continue;
             }
@@ -1366,7 +1379,7 @@ async function syncPlantaoDiaToEscalaDia(poolOrTx, schema, dataISO, plantaoRows,
 
         const existing = existingMap.get(buildEscalaKey(colaborador.Id, plantao.dataISO)) || null;
 
-        if (existing && normalizeEscalaTipo(existing.tipo || 'normal') !== 'plantao' && !trimToNull(existing.origemTipo)) {
+        if (existing && ((normalizeEscalaTipo(existing.tipo || 'normal') !== 'plantao' && !trimToNull(existing.origemTipo)) || ESCALA_ORIGENS_VINCULADAS.includes(trimToNull(existing.origemTipo)))) {
             continue;
         }
 
@@ -1650,6 +1663,7 @@ async function listEscalaReport(poolOrTx, schema, filters) {
             allowMissingTable: true
         }))
         : new Map();
+    const vinculos = await loadVinculosDoPeriodo(poolOrTx, schema, dataInicio, dataFim);
 
     return rows.map((row) => ({
         id: row.id,
@@ -1671,8 +1685,87 @@ async function listEscalaReport(poolOrTx, schema, filters) {
             jornadaSemanalIndex.get(Number(row.colaboradorId)) || null
         ),
         tipo: row.tipo,
-        observacao: row.observacao || null
+        observacao: row.observacao || null,
+        // Vinculo explicito (cobertura / compensacao) ja gravado: o relatorio
+        // so repassa, nao deduz nada.
+        vinculo: vinculos.get(buildEscalaKey(row.colaboradorId, row.dataISO)) || null,
+        geraHoraExtra: vinculos.get(buildEscalaKey(row.colaboradorId, row.dataISO))?.geraHoraExtra === true
     }));
+}
+
+// Cobertura e compensacao do periodo, indexadas por colaborador+dia. Cada dia
+// envolvido recebe o seu lado do vinculo: quem cobriu (e se gerou hora extra),
+// quem foi coberto, o dia de folga e o dia da reposicao.
+async function loadVinculosDoPeriodo(poolOrTx, schema, startISO, endISO) {
+    const vinculos = new Map();
+    const inicio = normalizeIsoDate(startISO, 'Data inicial');
+    const fim = normalizeIsoDate(endISO, 'Data final');
+
+    if (hasTable(schema, 'Coberturas')) {
+        const coberturas = await poolOrTx.request()
+            .input('inicio', sql.Date, inicio)
+            .input('fim', sql.Date, fim)
+            .query(`
+                SELECT c.Id, CONVERT(VARCHAR(10), c.Data, 23) AS dataISO, c.ColaboradorId,
+                       c.CobertoColaboradorId, c.GeraHoraExtra,
+                       quem.Nome AS CobreNome, coberto.Nome AS CobertoNome
+                FROM Coberturas c
+                INNER JOIN Colaboradores quem ON quem.Id = c.ColaboradorId
+                INNER JOIN Colaboradores coberto ON coberto.Id = c.CobertoColaboradorId
+                WHERE c.Data BETWEEN @inicio AND @fim
+            `);
+
+        for (const row of coberturas.recordset) {
+            vinculos.set(buildEscalaKey(row.ColaboradorId, row.dataISO), {
+                tipo: 'cobertura',
+                coberturaId: row.Id,
+                cobertoColaboradorId: row.CobertoColaboradorId,
+                cobertoNome: row.CobertoNome,
+                geraHoraExtra: coerceBoolean(row.GeraHoraExtra)
+            });
+
+            const chaveCoberto = buildEscalaKey(row.CobertoColaboradorId, row.dataISO);
+
+            if (!vinculos.has(chaveCoberto)) {
+                vinculos.set(chaveCoberto, {
+                    tipo: 'coberto',
+                    coberturaId: row.Id,
+                    cobertoPorColaboradorId: row.ColaboradorId,
+                    cobertoPorNome: row.CobreNome
+                });
+            }
+        }
+    }
+
+    if (hasTable(schema, 'Compensacoes')) {
+        const compensacoes = await poolOrTx.request()
+            .input('inicio', sql.Date, inicio)
+            .input('fim', sql.Date, fim)
+            .query(`
+                SELECT Id, ColaboradorId, Tipo,
+                       CONVERT(VARCHAR(10), DataFolga, 23) AS dataFolga,
+                       CONVERT(VARCHAR(10), DataTrabalho, 23) AS dataTrabalho
+                FROM Compensacoes
+                WHERE DataFolga BETWEEN @inicio AND @fim
+                   OR DataTrabalho BETWEEN @inicio AND @fim
+            `);
+
+        for (const row of compensacoes.recordset) {
+            const base = { tipo: 'compensacao', compensacaoId: row.Id, compensacaoTipo: row.Tipo };
+            vinculos.set(buildEscalaKey(row.ColaboradorId, row.dataFolga), {
+                ...base,
+                papel: 'folga',
+                dataVinculada: row.dataTrabalho
+            });
+            vinculos.set(buildEscalaKey(row.ColaboradorId, row.dataTrabalho), {
+                ...base,
+                papel: 'reposicao',
+                dataVinculada: row.dataFolga
+            });
+        }
+    }
+
+    return vinculos;
 }
 
 // O relatorio destaca em vermelho o almoco que difere do cadastro do
@@ -1711,7 +1804,10 @@ function isLunchOutsideCadastro(row, colaborador, jornadaInfo = null) {
 
 module.exports = {
     ESCALA_TIPOS,
+    applyAutomaticEscalaRecord,
     applyLunchPeriod,
+    buildEscalaKey,
+    listEscalaDiaRows,
     buildColaboradorDefaultSyncRecord,
     buildTimeRangeLabel,
     canAutoRefreshDefaultEscala,

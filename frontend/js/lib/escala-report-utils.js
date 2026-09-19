@@ -117,6 +117,28 @@
         return new Date(year, month, 0).getDate();
     }
 
+    // Texto curto do vinculo gravado. So descreve: nao decide nada.
+    function descreverVinculo(vinculo) {
+        if (!vinculo) {
+            return '';
+        }
+
+        if (vinculo.tipo === 'cobertura') {
+            return `Cobre ${vinculo.cobertoNome || ''}`.trim();
+        }
+
+        if (vinculo.tipo === 'coberto') {
+            return `Coberto por ${vinculo.cobertoPorNome || ''}`.trim();
+        }
+
+        if (vinculo.tipo === 'compensacao') {
+            const data = formatDatePtBr(vinculo.dataVinculada).slice(0, 5);
+            return vinculo.papel === 'reposicao' ? `Reposicao da folga de ${data}` : `Folga reposta em ${data}`;
+        }
+
+        return '';
+    }
+
     function normalizeBoardRecord(record) {
         return {
             dataISO: toISODate(record?.dataISO || record?.DataISO || record?.data || record?.Data),
@@ -126,7 +148,10 @@
             almocoInicio: formatTimeInput(record?.almocoInicio || record?.AlmocoInicio || record?.almoco_inicio),
             almocoFim: formatTimeInput(record?.almocoFim || record?.AlmocoFim || record?.almoco_fim),
             tipo: String(record?.tipo || record?.Tipo || 'normal').trim().toLowerCase(),
-            almocoForaDoCadastro: Boolean(record?.almocoForaDoCadastro)
+            almocoForaDoCadastro: Boolean(record?.almocoForaDoCadastro),
+            // Classificacao ja gravada no lancamento (cobertura/compensacao).
+            geraHoraExtra: Boolean(record?.geraHoraExtra),
+            vinculoTexto: descreverVinculo(record?.vinculo)
         };
     }
 
@@ -228,6 +253,8 @@
                 jornadaLabel: formatCompactRange(item.horaInicio, item.horaFim),
                 tipo: item.tipo,
                 almocoForaDoCadastro: item.almocoForaDoCadastro,
+                geraHoraExtra: item.geraHoraExtra,
+                vinculoTexto: item.vinculoTexto,
                 showAlmoco: true,
                 almocoRowspan: 1,
                 showJornada: true,

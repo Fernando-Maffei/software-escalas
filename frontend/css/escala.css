@@ -4368,3 +4368,15 @@
 .escala-page .timeline-row.total-row .total-nome--full {
     grid-column: 1 / span 2;
 }
+
+/* ===== PROTOTIPO: modal Cobertura e compensacoes ===== */
+.cob-modal { max-width: 980px; width: 96vw; }
+.cob-formularios { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
+.cob-form { display: flex; flex-direction: column; gap: 8px; padding: 12px; border: 1px solid var(--border, #e2e8f0); border-radius: 10px; }
+.cob-form label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-weight: 600; }
+.cob-form .cob-check { flex-direction: row; align-items: center; gap: 8px; }
+.cob-linha { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.cob-subtitulo { margin: 8px 0 6px; font-size: 15px; }
+.cob-lista { margin-top: 16px; }
+.cob-tabela { width: 100%; }
+.cob-he { display: inline-block; padding: 2px 8px; border-radius: 999px; background: #fee2e2; color: #b91c1c; font-size: 12px; font-weight: 700; }
