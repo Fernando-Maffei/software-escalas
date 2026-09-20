@@ -24,6 +24,13 @@
             return { className: 'ausencia', status: 'Ausencia' };
         }
 
+        // Domingo folgado e folga compensatoria sao folga na celula (mesma cor
+        // e comportamento), mas o status diz qual e — e a distincao que o
+        // relatorio precisa preservar.
+        if (ehTipoSemTrabalho(tipo) && !partialAbsence) {
+            return { className: 'folga', status: TIPO_LABELS[tipo] || 'Folga' };
+        }
+
         const workOverlap = getIntervalOverlapMinutesEscala(currentHourStart, currentHourEnd, start, end);
 
         if (start === null || end === null || end <= start || workOverlap <= 0) {

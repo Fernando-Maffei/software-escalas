@@ -37,7 +37,7 @@
     }
 
     function isFullDayOffEscala(record) {
-        return ['folga', 'ferias', 'ausencia'].includes(String(record?.tipo || '').toLowerCase())
+        return ehTipoSemTrabalho(record?.tipo)
             && !getPartialAbsenceEscala(record.colaboradorId, record.dataISO);
     }
 

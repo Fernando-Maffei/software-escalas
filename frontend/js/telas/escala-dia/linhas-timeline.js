@@ -96,7 +96,12 @@
         if (isFullDayOffEscala(record)) {
             const label = TIPO_LABELS[type] || 'Ausencia';
             const motivo = record.observacao ? escapeHtmlEscala(record.observacao) : '';
-            const bandType = ['ferias', 'folga', 'ausencia'].includes(type) ? type : 'ausencia';
+            // So existe CSS para estas tres faixas. Os tipos novos sem
+            // trabalho herdam a cor de 'folga', que e o que eles sao na
+            // pratica — o rotulo acima ja diz qual deles e.
+            const bandType = ['ferias', 'folga', 'ausencia'].includes(type)
+                ? type
+                : (ehTipoSemTrabalho(type) ? 'folga' : 'ausencia');
             return `<div class="escala-overlay">
                 <div class="escala-band escala-band-${bandType}">
                     <span class="escala-band-label">${escapeHtmlEscala(label)}</span>

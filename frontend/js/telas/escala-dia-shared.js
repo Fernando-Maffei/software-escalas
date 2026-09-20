@@ -18,8 +18,22 @@
         folga: 'Folga',
         ferias: 'Ferias',
         ausencia: 'Ausencia',
-        ajuste: 'Ajuste'
+        ajuste: 'Ajuste',
+        domingo_folgado: 'Domingo folgado',
+        reposicao: 'Reposicao',
+        folga_compensatoria: 'Folga compensatoria',
+        cobertura: 'Cobertura'
     };
+
+    // Dias em que a pessoa NAO trabalha: nao levam horario, aparecem como
+    // faixa em vez de barra na timeline e ficam fora do quadro mensal.
+    // Uma lista so, porque antes cada tela repetia ['folga','ferias','ausencia']
+    // no braco e um tipo novo teria que ser lembrado em cada uma delas.
+    const TIPOS_SEM_TRABALHO = ['folga', 'ferias', 'ausencia', 'domingo_folgado', 'folga_compensatoria'];
+
+    function ehTipoSemTrabalho(tipo) {
+        return TIPOS_SEM_TRABALHO.includes(String(tipo || '').trim().toLowerCase());
+    }
     const RELATORIO_ESCALA_MODOS = {
         QUADRO_MENSAL: 'quadro_mensal',
         DETALHADO: 'detalhado'
