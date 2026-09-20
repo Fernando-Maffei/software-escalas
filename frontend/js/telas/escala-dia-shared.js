@@ -1,7 +1,7 @@
 /* eslint-disable */
 // Constantes e helpers de data/hora compartilhados entre o editor de Escala do Dia
 // (escala-dia-editor.js), o motor de Relatorio de Escala (escala-relatorio.js) e o
-// Relatorio de Plantoes que continua em runtime-fixes.js. Script global (sem IIFE)
+// Relatorio de Plantoes que continua em core/runtime/plantao-colaboradores/. Script global (sem IIFE)
 // de proposito: os tres consumidores referenciam estes nomes como identificadores
 // soltos, entao precisam ficar no escopo global, carregado antes de todos eles.
 

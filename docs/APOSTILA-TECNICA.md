@@ -153,13 +153,19 @@ App de escalas/
 │   ├── style.css, css/*.css    ← estilos, separados por tela
 │   └── js/                     ← módulos Vanilla JS
 │       ├── core/               ← base carregada por todas as telas
-│       │   ├── app.js          ← orquestrador das telas
+│       │   ├── app.js          ← estado global e bootstrap (207 linhas)
+│       │   ├── app/            ← 13 partes do antigo app.js, por responsabilidade
 │       │   ├── api.js          ← camada única de acesso à API
 │       │   ├── auth.js, permissoes.js, meus-setores.js  ← login, perfil e setores
-│       │   └── runtime-fixes.js ← funcionalidades diversas (apesar do nome)
-│       ├── telas/              ← um arquivo por tela
-│       │   ├── escala-dia-editor.js / escala-dia-shared.js / escala-relatorio.js
-│       │   ├── banco-horas.js, lancamentos.js, dashboard.js, calendar.js
+│       │   └── runtime/        ← o antigo runtime-fixes.js, dividido
+│       │       ├── normalizacao.js, dados-e-modais.js, relatorio-mensal.js
+│       │       ├── escala-e-relatorios.js
+│       │       └── plantao-colaboradores/  ← plantão, colaboradores, jornada
+│       ├── telas/              ← uma pasta ou arquivo por tela
+│       │   ├── escala-dia/ + escala-dia-editor.js, escala-dia-shared.js
+│       │   ├── escala-relatorio/ + escala-relatorio.js
+│       │   ├── dashboard/ + dashboard.js
+│       │   ├── banco-horas.js, lancamentos.js, calendar.js
 │       │   └── configuracoes-backup.js / configuracoes-usuarios.js
 │       └── lib/                ← utilitários sem tela
 │           └── pdf-utils.js, escala-report-utils.js
@@ -470,9 +476,13 @@ Caminhos relativos a `frontend/js/`.
 | `telas/configuracoes-backup.js` | A tela de configuração de **banco e backup** (testar/salvar conexão, gerar/restaurar backup, carregar exemplos). |
 | `telas/configuracoes-usuarios.js` | A tela de gestão de **usuários** (admin). |
 | `core/permissoes.js` | Aplica no front-end o que o perfil pode ver/fazer (esconde botões que o usuário comum não usa). |
-| `core/runtime-fixes.js` (~4.556 linhas) | Apesar do nome, contém **funcionalidades de verdade** (cerca de dois terços do arquivo), além de ajustes. Historicamente cresceu como um "extra" ao `app.js`. |
+| `core/runtime/` | O antigo `runtime-fixes.js`. Apesar do nome antigo, contém **funcionalidades de verdade**, não só ajustes: caches e modais (`dados-e-modais.js`), relatório do calendário (`relatorio-mensal.js`), escala e relatórios de plantão (`escala-e-relatorios.js`) e a pasta `plantao-colaboradores/` com a tela de plantão, o editor de colaborador e a jornada semanal. |
 
-> **Nota de manutenção:** `app.js` e `runtime-fixes.js` são os dois arquivos gigantes do front-end e concentram a maior parte da complexidade. Um trabalho contínuo do projeto é ir extraindo pedaços deles para módulos menores e nomeados — foi assim que nasceram `configuracoes-backup.js`, `pdf-utils.js`, `escala-dia-editor.js`, etc.
+> **Nota de manutenção:** o front não tem bundler — são `<script>` clássicos em escopo global, **com ordem de carga fixa listada em dois lugares que precisam andar juntos**: `frontend/index.html` e `demo/index.html`.
+>
+> Ao dividir um arquivo, duas armadilhas: (1) `app.js` fazia `window.X = X` no topo referenciando funções declaradas centenas de linhas abaixo, o que só funciona por *hoisting dentro do mesmo arquivo* — por isso todo código executável de topo ficou no arquivo residual, carregado **por último** entre as partes; (2) os arquivos de `core/runtime/` fazem monkey-patch dos globais (`window.X = X = function...`) e precisam continuar carregando **depois** de quem declara `X`.
+>
+> Arquivos ainda envolvidos num IIFE (`lancamentos.js`, `banco-horas.js`, `relatorio-mensal.js`, `escala-e-relatorios.js`, `configuracoes-*.js`) compartilham um escopo privado: cortá-los exige antes renomear os helpers que colidem com globais já existentes (`escapeHtml`, `obterDataISO`, `withInFlight`, `fecharModalSeguro`, `inflight`, `mapPlantao`).
 
 #### PWA
 

@@ -338,7 +338,7 @@ function cancelarEdicao() {
 // usuario confirma E a verificacao (options.verificar) passa; resolve com null
 // se ele cancelar/fechar. Senha errada mantem a modal aberta com o erro — nada
 // e apagado. Interacao autocontida: nao mexe na modal generica de confirmacao.
-// Usada pela exclusao definitiva de colaborador desligado (runtime-fixes.js).
+// Usada pela exclusao definitiva de colaborador desligado (core/runtime/plantao-colaboradores/colaboradores-e-jornada.js).
 function solicitarSenhaModal(options = {}) {
     return new Promise((resolve) => {
         const modal = document.getElementById('modalSenhaExclusao');
