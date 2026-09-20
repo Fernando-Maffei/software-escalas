@@ -97,5 +97,48 @@ window.DemoDados = (function () {
             });
     }
 
-    return { SETORES, COLABORADORES, FERIADOS, escalaDoDia, diaDaSemana };
+    // Moldes de padrao semanal. O plantonista trabalha de sabado a quarta e
+    // folga quinta e sexta — e o caso que o modelo de Tipo de Escala existe
+    // para representar sem booleano nem regra no codigo.
+    function diasDoTipo(diasTrabalhados, inicio, fim, almocoInicio, almocoFim) {
+        return [0, 1, 2, 3, 4, 5, 6].map((diaSemana) => {
+            const trabalha = diasTrabalhados.includes(diaSemana);
+
+            return {
+                diaSemana,
+                trabalha,
+                trabalhoInicio: trabalha ? `${inicio}:00` : null,
+                trabalhoFim: trabalha ? `${fim}:00` : null,
+                almocoInicio: trabalha ? `${almocoInicio}:00` : null,
+                almocoFim: trabalha ? `${almocoFim}:00` : null
+            };
+        });
+    }
+
+    const TIPOS_ESCALA = [
+        {
+            id: 1,
+            nome: '5x2 Comercial',
+            cicloTipo: 'semanal',
+            domingosFolgaCada: null,
+            exigeReposicao: false,
+            ativo: true,
+            ordem: 1,
+            observacao: 'Segunda a sexta.',
+            dias: diasDoTipo([1, 2, 3, 4, 5], '08:00', '18:00', '12:00', '13:00')
+        },
+        {
+            id: 2,
+            nome: 'Plantonista Sáb-Qua',
+            cicloTipo: 'semanal',
+            domingosFolgaCada: 4,
+            exigeReposicao: true,
+            ativo: true,
+            ordem: 2,
+            observacao: 'Trabalha de sabado a quarta, folga quinta e sexta.',
+            dias: diasDoTipo([6, 0, 1, 2, 3], '13:00', '22:00', '17:00', '18:00')
+        }
+    ];
+
+    return { SETORES, COLABORADORES, FERIADOS, TIPOS_ESCALA, escalaDoDia, diaDaSemana };
 })();

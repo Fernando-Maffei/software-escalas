@@ -18,7 +18,21 @@ const {
     validateWorkSchedule
 } = require('../lib/validation');
 
-const ESCALA_TIPOS = ['normal', 'plantao', 'folga', 'ferias', 'ausencia', 'ajuste'];
+const ESCALA_TIPOS = [
+    'normal',
+    'plantao',
+    'folga',
+    'ferias',
+    'ausencia',
+    'ajuste',
+    // Tipos do plantonista. 'cobertura' e separada de 'plantao': plantao e
+    // turno extra num dia sem expediente; cobertura e assumir o posto de quem
+    // estava de folga, e sai do vinculo, nao de escolha do usuario.
+    'domingo_folgado',
+    'reposicao',
+    'folga_compensatoria',
+    'cobertura'
+];
 // Plantoes que viram linha na escala do dia. Antes so o de sabado entrava, e o
 // lancamento de domingo/feriado nao aparecia na escala nem no relatorio.
 const ESCALA_PLANTAO_TIPOS = ['sabado', 'domingo', 'feriado'];
@@ -44,6 +58,14 @@ function normalizeEscalaTipo(value, fieldName = 'Tipo') {
         .replace(/[\u0300-\u036f]/g, '')
         .replace(/[\s-]+/g, '_')
         .replace(/_+/g, '_');
+
+    // Valor exato PRIMEIRO. Os startsWith abaixo existem para dado legado
+    // (acentuado, ou variantes como 'plantao_sabado'), mas engoliriam os tipos
+    // novos: 'folga_compensatoria' comeca com 'folga' e viraria 'folga',
+    // perdendo em silencio a distincao que esta fase existe para criar.
+    if (ESCALA_TIPOS.includes(normalized)) {
+        return normalized;
+    }
 
     if (normalized.startsWith('plantao')) {
         return 'plantao';

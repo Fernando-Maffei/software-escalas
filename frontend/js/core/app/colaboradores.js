@@ -1,0 +1,510 @@
+function renderColaboradores() {
+    appContent.innerHTML = `
+        <div class="page-header colaboradores-page-header">
+            <h1>Colaboradores</h1>
+            <div class="colaboradores-header-actions">
+                <button id="btnColaboradoresDesligados" class="btn-secondary" type="button">
+                    <i class="fas fa-user-slash"></i> Desligados
+                </button>
+                <button id="btnNovoColaborador" class="btn-primary">
+                    <i class="fas fa-plus"></i> Novo Colaborador
+                </button>
+            </div>
+        </div>
+
+        <div class="colaboradores-layout">
+            <!-- LISTA DE COLABORADORES -->
+            <div class="colaboradores-container">
+                <div class="colaboradores-header">
+                    <div class="search-box">
+                        <i class="fas fa-search"></i>
+                        <input type="text" id="searchColaborador" placeholder="Buscar colaborador..." class="form-control">
+                    </div>
+                    <span class="total-colaboradores">
+                        <i class="fas fa-users"></i> Total: ${colaboradores.length}
+                    </span>
+                </div>
+                
+                <div id="listaColaboradores" class="colaboradores-grid"></div>
+            </div>
+
+            <!-- PAINEL LATERAL DE EDIÇÃO (sempre visível quando aberto) -->
+            <div id="colaboradorEditor" class="editor-sidebar" style="display: none;">
+                <div class="editor-content" style="opacity: 1; visibility: visible;">
+                    <div class="editor-header">
+                        <h3><i class="fas fa-user-edit"></i> <span id="editorTitle">Novo Colaborador</span></h3>
+                        <button onclick="fecharColaboradorEditor()" class="btn-close-editor">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    <div id="colaboradorEditorContent" class="editor-form"></div>
+                </div>
+            </div>
+        </div>
+    `;
+
+    renderListaColaboradores();
+    
+    // Evento do botão novo colaborador
+    document.getElementById('btnNovoColaborador').addEventListener('click', function() {
+        abrirEditorColaborador(null);
+    });
+
+    // Evento do botão "Desligados" (soft delete / retencao / limpeza)
+    const btnDesligados = document.getElementById('btnColaboradoresDesligados');
+    if (btnDesligados && typeof window.abrirDesligadosColaboradores === 'function') {
+        btnDesligados.addEventListener('click', function() {
+            window.abrirDesligadosColaboradores();
+        });
+    }
+    
+    // Evento de busca
+    document.getElementById('searchColaborador').addEventListener('input', function(e) {
+        filtrarColaboradores(e.target.value);
+    });
+
+    ajustarOffsetCabecalhoColaboradores();
+}
+
+// A barra de busca e fixa logo abaixo do cabecalho da pagina, mas os dois
+// ficam em pais diferentes, entao o CSS precisava de um "top" fixo (88px)
+// que nao correspondia a altura real do cabecalho (83px). A diferenca abria
+// uma fresta por onde os cards apareciam ao rolar. Aqui a altura e medida e
+// publicada como variavel CSS, o que tambem acompanha o cabecalho quando ele
+// quebra em duas linhas em telas estreitas.
+function ajustarOffsetCabecalhoColaboradores() {
+    const cabecalho = document.querySelector('.colaboradores-page-header');
+    const layout = document.querySelector('.colaboradores-layout');
+
+    if (!cabecalho || !layout) {
+        return;
+    }
+
+    const aplicar = () => {
+        const alvo = document.querySelector('.colaboradores-page-header');
+        const destino = document.querySelector('.colaboradores-layout');
+
+        if (!alvo || !destino) {
+            return;
+        }
+
+        const altura = Math.round(alvo.getBoundingClientRect().height);
+
+        if (altura > 0) {
+            // 1px de sobreposicao evita fresta por arredondamento de subpixel.
+            destino.style.setProperty('--colaboradores-offset-topo', `${altura - 1}px`);
+        }
+    };
+
+    aplicar();
+
+    // A referencia do observer precisa ficar guardada: um ResizeObserver sem
+    // referencia forte pode ser coletado e simplesmente parar de disparar.
+    // O listener de resize cobre o caso de o observer nao estar disponivel.
+    if (window.__colaboradoresOffsetObserver) {
+        window.__colaboradoresOffsetObserver.disconnect();
+    }
+
+    if (typeof ResizeObserver === 'function') {
+        window.__colaboradoresOffsetObserver = new ResizeObserver(aplicar);
+        window.__colaboradoresOffsetObserver.observe(cabecalho);
+    }
+
+    if (!window.__colaboradoresOffsetResizeLigado) {
+        window.__colaboradoresOffsetResizeLigado = true;
+        window.addEventListener('resize', aplicar);
+    }
+}
+
+function fecharColaboradorEditor() {
+    const editorPanel = document.getElementById('colaboradorEditor');
+    if (editorPanel) {
+        editorPanel.style.display = 'none';
+    }
+    editandoId = null;
+}
+
+function getBancoHorasResumoEditor(colaboradorId) {
+    return (window.bancoHorasResumo || []).find((item) => Number(item.colaboradorId) === Number(colaboradorId)) || null;
+}
+
+function formatarSaldoBancoHorasInput(minutos) {
+    const safe = Number.isFinite(Number(minutos)) ? Math.round(Number(minutos)) : 0;
+    const sign = safe < 0 ? '-' : '+';
+    const total = Math.abs(safe);
+    const horas = Math.floor(total / 60);
+    const restante = total % 60;
+
+    return `${sign}${String(horas).padStart(2, '0')}:${String(restante).padStart(2, '0')}`;
+}
+
+function parseSaldoBancoHorasEditorParts(value) {
+    const normalized = String(value || '').trim();
+    const match = normalized.match(/^([+-])?\s*(\d+):(\d{2})$/);
+
+    if (!match) {
+        return {
+            sign: '+',
+            hours: 0,
+            minutes: 0,
+            raw: '+00:00'
+        };
+    }
+
+    const sign = match[1] === '-' ? '-' : '+';
+    const hours = Number(match[2]) || 0;
+    const minutes = Math.min(Math.max(Number(match[3]) || 0, 0), 59);
+
+    return {
+        sign,
+        hours,
+        minutes,
+        raw: `${sign}${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`
+    };
+}
+
+function formatarSaldoBancoHorasPreview(sign, hours, minutes) {
+    const prefix = sign === '-' ? '-' : '+';
+    return `${prefix}${String(hours).padStart(2, '0')}h ${String(minutes).padStart(2, '0')}m`;
+}
+
+function atualizarPreviewBancoHorasEditor(sign, hours, minutes) {
+    const preview = document.getElementById('editorBancoHorasPreview');
+
+    if (!preview) {
+        return;
+    }
+
+    preview.textContent = formatarSaldoBancoHorasPreview(sign, hours, minutes);
+    preview.classList.toggle('negativo', sign === '-');
+    preview.classList.toggle('positivo', sign !== '-');
+}
+
+function sincronizarBancoHorasEditor() {
+    const sign = document.getElementById('editorBancoHorasSinal')?.value === '-' ? '-' : '+';
+    const hours = Math.max(Number(document.getElementById('editorBancoHorasHoras')?.value || 0), 0);
+    const minutes = Math.min(Math.max(Number(document.getElementById('editorBancoHorasMinutos')?.value || 0), 0), 59);
+
+    atualizarPreviewBancoHorasEditor(
+        sign,
+        Number.isFinite(hours) ? hours : 0,
+        Number.isFinite(minutes) ? minutes : 0
+    );
+}
+
+function alternarSinalBancoHorasEditor(sign) {
+    const safeSign = sign === '-' ? '-' : '+';
+    const signInput = document.getElementById('editorBancoHorasSinal');
+
+    if (signInput) {
+        signInput.value = safeSign;
+    }
+
+    document.querySelectorAll('[data-banco-horas-sinal]').forEach((button) => {
+        const ativo = button.dataset.bancoHorasSinal === safeSign;
+        button.classList.toggle('is-active', ativo);
+        button.classList.toggle('is-negative', ativo && safeSign === '-');
+        button.classList.toggle('is-positive', ativo && safeSign !== '-');
+    });
+
+    sincronizarBancoHorasEditor();
+}
+
+function obterSaldoBancoHorasEditorValue() {
+    const sign = document.getElementById('editorBancoHorasSinal')?.value === '-' ? '-' : '+';
+    const hoursValue = String(document.getElementById('editorBancoHorasHoras')?.value || '').trim();
+    const minutesValue = String(document.getElementById('editorBancoHorasMinutos')?.value || '').trim();
+
+    if (!/^\d+$/.test(hoursValue)) {
+        throw new Error('Informe as horas do banco de horas.');
+    }
+
+    if (!/^\d+$/.test(minutesValue)) {
+        throw new Error('Informe os minutos do banco de horas.');
+    }
+
+    const hours = Number(hoursValue);
+    const minutes = Number(minutesValue);
+
+    if (!Number.isFinite(hours) || hours < 0) {
+        throw new Error('As horas do banco de horas precisam ser um numero valido.');
+    }
+
+    if (!Number.isFinite(minutes) || minutes < 0 || minutes > 59) {
+        throw new Error('Os minutos do banco de horas precisam ficar entre 0 e 59.');
+    }
+
+    return `${sign}${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+}
+
+function buildBancoHorasEditorMarkup(colaborador = null) {
+    const resumoBancoHoras = colaborador ? getBancoHorasResumoEditor(colaborador.Id) : null;
+    const bancoHorasDisponivel = !window.bancoHorasStatus || window.bancoHorasStatus.enabled !== false;
+    const saldoBancoHoras = formatarSaldoBancoHorasInput(resumoBancoHoras?.saldoMinutos || 0);
+    const saldoAtual = parseSaldoBancoHorasEditorParts(saldoBancoHoras);
+    const helperText = bancoHorasDisponivel
+        ? 'Defina o saldo final do colaborador sem precisar digitar o formato manualmente.'
+        : 'Banco de horas indisponivel agora. O cadastro sera salvo sem alterar o saldo.';
+
+    return `
+        <div class="editor-form-group banco-horas-editor-group">
+            <label><i class="fas fa-clock"></i> Banco de horas</label>
+            <div class="banco-horas-editor-shell ${bancoHorasDisponivel ? '' : 'is-disabled'}" data-enabled="${bancoHorasDisponivel ? 'true' : 'false'}">
+                <div class="banco-horas-editor-summary">
+                    <div>
+                        <span class="banco-horas-label">Saldo final</span>
+                        <strong id="editorBancoHorasPreview" class="${saldoAtual.sign === '-' ? 'negativo' : 'positivo'}">${formatarSaldoBancoHorasPreview(saldoAtual.sign, saldoAtual.hours, saldoAtual.minutes)}</strong>
+                    </div>
+                    <small class="banco-horas-current">Atual: ${resumoBancoHoras?.saldoFormatado || '+00h 00m'}</small>
+                </div>
+
+                <div class="banco-horas-editor-controls">
+                    <div class="banco-horas-signal-toggle" role="group" aria-label="Tipo de saldo">
+                        <button
+                            type="button"
+                            class="banco-horas-signal-btn ${saldoAtual.sign === '+' ? 'is-active is-positive' : ''}"
+                            data-banco-horas-sinal="+"
+                            onclick="alternarSinalBancoHorasEditor('+')"
+                            ${bancoHorasDisponivel ? '' : 'disabled'}
+                        >
+                            <i class="fas fa-arrow-up"></i> Credito
+                        </button>
+                        <button
+                            type="button"
+                            class="banco-horas-signal-btn ${saldoAtual.sign === '-' ? 'is-active is-negative' : ''}"
+                            data-banco-horas-sinal="-"
+                            onclick="alternarSinalBancoHorasEditor('-')"
+                            ${bancoHorasDisponivel ? '' : 'disabled'}
+                        >
+                            <i class="fas fa-arrow-down"></i> Debito
+                        </button>
+                    </div>
+
+                    <div class="time-inputs banco-horas-time-inputs">
+                        <input
+                            type="number"
+                            id="editorBancoHorasHoras"
+                            value="${saldoAtual.hours}"
+                            min="0"
+                            step="1"
+                            class="form-control banco-horas-input"
+                            inputmode="numeric"
+                            oninput="sincronizarBancoHorasEditor()"
+                            ${bancoHorasDisponivel ? '' : 'disabled'}
+                        >
+                        <span>h</span>
+                        <input
+                            type="number"
+                            id="editorBancoHorasMinutos"
+                            value="${String(saldoAtual.minutes).padStart(2, '0')}"
+                            min="0"
+                            max="59"
+                            step="1"
+                            class="form-control banco-horas-input"
+                            inputmode="numeric"
+                            oninput="sincronizarBancoHorasEditor()"
+                            ${bancoHorasDisponivel ? '' : 'disabled'}
+                        >
+                        <span>min</span>
+                    </div>
+                </div>
+            </div>
+            <input type="hidden" id="editorBancoHorasSinal" value="${saldoAtual.sign}">
+            <input type="hidden" id="editorBancoHorasSaldoOriginal" value="${saldoBancoHoras}">
+            <small class="helper-text">${helperText}</small>
+        </div>
+    `;
+}
+
+function filtrarColaboradores(termo) {
+    if (!termo) {
+        renderListaColaboradores();
+        return;
+    }
+    
+    const filtrados = colaboradores.filter(c =>
+        String(c.Nome || c.nome || '').toLowerCase().includes(termo.toLowerCase())
+    );
+    
+    renderListaColaboradores(filtrados);
+}
+
+function cancelarEdicao() {
+    editandoId = null;
+    renderColaboradores();
+}
+
+// Abre a modal #modalSenhaExclusao e resolve com a senha digitada quando o
+// usuario confirma E a verificacao (options.verificar) passa; resolve com null
+// se ele cancelar/fechar. Senha errada mantem a modal aberta com o erro — nada
+// e apagado. Interacao autocontida: nao mexe na modal generica de confirmacao.
+// Usada pela exclusao definitiva de colaborador desligado (core/runtime/plantao-colaboradores/colaboradores-e-jornada.js).
+function solicitarSenhaModal(options = {}) {
+    return new Promise((resolve) => {
+        const modal = document.getElementById('modalSenhaExclusao');
+        const mensagem = document.getElementById('senhaExclusaoMensagem');
+        const input = document.getElementById('senhaExclusaoInput');
+        const erro = document.getElementById('senhaExclusaoErro');
+        const btnOk = document.getElementById('confirmarSenhaExclusaoBtn');
+        const btnCancelar = document.getElementById('cancelarSenhaExclusaoBtn');
+        const btnFechar = document.getElementById('fecharModalSenhaExclusaoBtn');
+
+        if (!modal || !input || !btnOk || !btnCancelar) {
+            resolve(null);
+            return;
+        }
+
+        if (mensagem) mensagem.textContent = options.mensagem || 'Esta ação não pode ser desfeita.';
+        input.value = '';
+        if (erro) { erro.textContent = ''; erro.hidden = true; }
+        // O CSS mostra os modais via .modal.active (opacity/visibility). Sem
+        // adicionar .active o modal ficava display:flex porem opacity:0 —
+        // invisivel — dando a impressao de que "clicar nao faz nada".
+        modal.classList.remove('hidden');
+        modal.classList.add('active');
+        setTimeout(() => input.focus(), 50);
+
+        let ocupado = false;
+
+        function limpar() {
+            btnOk.removeEventListener('click', aoConfirmar);
+            btnCancelar.removeEventListener('click', aoCancelar);
+            if (btnFechar) btnFechar.removeEventListener('click', aoCancelar);
+            input.removeEventListener('keydown', aoTeclar);
+            modal.classList.remove('active');
+            modal.classList.add('hidden');
+        }
+
+        function mostrarErro(texto) {
+            if (erro) { erro.textContent = texto; erro.hidden = false; }
+            input.focus();
+            input.select();
+        }
+
+        async function aoConfirmar() {
+            if (ocupado) return;
+            const senha = input.value;
+
+            if (!senha) {
+                mostrarErro('Informe sua senha.');
+                return;
+            }
+
+            ocupado = true;
+            btnOk.disabled = true;
+
+            try {
+                if (typeof options.verificar === 'function') {
+                    await options.verificar(senha);
+                }
+                limpar();
+                btnOk.disabled = false;
+                resolve(senha);
+            } catch (error) {
+                ocupado = false;
+                btnOk.disabled = false;
+                mostrarErro(error && error.status === 403
+                    ? 'Senha incorreta.'
+                    : (error?.message || 'Não foi possível verificar a senha.'));
+            }
+        }
+
+        function aoCancelar() {
+            limpar();
+            resolve(null);
+        }
+
+        function aoTeclar(event) {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                aoConfirmar();
+            } else if (event.key === 'Escape') {
+                aoCancelar();
+            }
+        }
+
+        btnOk.addEventListener('click', aoConfirmar);
+        btnCancelar.addEventListener('click', aoCancelar);
+        if (btnFechar) btnFechar.addEventListener('click', aoCancelar);
+        input.addEventListener('keydown', aoTeclar);
+    });
+}
+
+/* ===========================
+   CARREGAR DADOS
+=========================== */
+async function carregarColaboradores() {
+    try {
+        const res = await fetch('http://localhost:3000/api/colaboradores');
+        if (!res.ok) throw new Error(`Erro ${res.status}: ${res.statusText}`);
+        const data = await res.json();
+        colaboradores = Array.isArray(data) ? data : [];
+        
+        // 🔥 ATUALIZAR WINDOW
+        window.colaboradores = colaboradores;
+        
+        console.log(`Colaboradores carregados: ${colaboradores.length}`);
+        return colaboradores;
+    } catch (error) {
+        console.error("Erro ao carregar colaboradores:", error);
+        colaboradores = [];
+        window.colaboradores = [];
+        return [];
+    }
+}
+
+async function carregarSetores() {
+    try {
+        const res = await fetch(`${getApiBaseUrl()}/setores`);
+        if (!res.ok) throw new Error(`Erro ${res.status}: ${res.statusText}`);
+        const data = await res.json();
+        setores = Array.isArray(data) ? data : [];
+        window.setores = setores;
+        return setores;
+    } catch (error) {
+        console.error("Erro ao carregar setores:", error);
+        setores = [];
+        window.setores = [];
+        return [];
+    }
+}
+
+function buildSetorOptionsHtml(selectedId = null) {
+    const currentSetores = Array.isArray(window.setores) ? window.setores : [];
+
+    return [
+        '<option value="">Selecione...</option>',
+        ...currentSetores.map((setor) => `
+            <option value="${setor.id}" ${Number(selectedId) === Number(setor.id) ? 'selected' : ''}>${setor.nome}</option>
+        `)
+    ].join('');
+}
+
+async function adicionarSetorRapido() {
+    const nome = window.prompt('Nome do novo setor:');
+
+    if (!nome || !String(nome).trim()) {
+        return;
+    }
+
+    try {
+        await window.API.salvarSetor({ nome });
+        await carregarSetores();
+
+        const select = document.getElementById('editorSetorId');
+        const setorCriado = (window.setores || []).find((item) => item.nome.toLowerCase() === String(nome).trim().toLowerCase());
+
+        if (select) {
+            select.innerHTML = buildSetorOptionsHtml(setorCriado?.id || null);
+
+            if (setorCriado?.id) {
+                select.value = String(setorCriado.id);
+            }
+        }
+
+        mostrarToast('Setor salvo com sucesso!', 'success');
+    } catch (error) {
+        mostrarToast(error.message || 'Erro ao salvar setor.', 'error');
+    }
+}
+

@@ -7,6 +7,10 @@
     root.EscalaReportUtils = factory();
 }(typeof globalThis !== 'undefined' ? globalThis : this, function buildEscalaReportUtils() {
     const DIA_LABELS = ['Domingo', 'Segunda', 'Terca', 'Quarta', 'Quinta', 'Sexta', 'Sabado'];
+    // Espelha TIPOS_SEM_TRABALHO de telas/escala-dia-shared.js. Duplicado de
+    // proposito: este arquivo e UMD e roda tambem no runner de testes, sem o
+    // escopo global das telas.
+    const TIPOS_SEM_TRABALHO_QUADRO = ['folga', 'ferias', 'domingo_folgado', 'folga_compensatoria'];
 
     function padNumber(value) {
         return String(value).padStart(2, '0');
@@ -139,7 +143,13 @@
             return false;
         }
 
-        if (record.tipo === 'folga' || record.tipo === 'ferias') {
+        // Dias sem trabalho ficam fora do quadro: ele mostra quem esta
+        // escalado. hasWorkSchedule ja barra a maioria (sao gravados sem
+        // horario), mas a lista e explicita para um registro com horario
+        // residual nao vazar para o quadro como se fosse expediente.
+        // 'reposicao' e 'cobertura' NAO entram aqui de proposito: sao dias
+        // trabalhados e precisam aparecer.
+        if (TIPOS_SEM_TRABALHO_QUADRO.includes(record.tipo)) {
             return false;
         }
 

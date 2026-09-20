@@ -9,7 +9,7 @@
    uma vez so e render puro a partir do estado.
 
    Contratos preservados por outros arquivos (nao renomear):
-   - IDs do formulario, consumidos por runtime-fixes.js (banco de horas):
+   - IDs do formulario, consumidos por core/runtime/plantao-colaboradores/banco-horas-lancamento.js:
      tipoLancamento, colaboradorSelect, periodoTipo, feriadoTipo,
      dataInicio, dataFim, horaInicio, horaFim, feriadoNome,
      camposBancoHorasPessoal, ausenciaSubtipo, descontaBancoHoras,
@@ -218,7 +218,7 @@
     }
 
     // Unico ponto que altera o modo de edicao. Alem do estado interno, publica
-    // editandoLancamentoId / editandoTipoLancamento no window: runtime-fixes.js
+    // editandoLancamentoId / editandoTipoLancamento no window: core/runtime/
     // le essas duas globais (sem declarar) para decidir se salvarAusencia manda
     // um POST ou um PUT. Ler global inexistente lanca ReferenceError, entao elas
     // precisam existir sempre — inclusive como null.
@@ -752,7 +752,7 @@
         el('lcCampoDataFim')?.classList.toggle('hidden', ehFeriado);
 
         // Subtipo so faz sentido em Ausencia. Em Folga e Ferias o tipo ja
-        // decide o subtipo ('folga'/'ferias'), e runtime-fixes.js travava o
+        // decide o subtipo ('folga'/'ferias'), e core/runtime/ travava o
         // select — que aparecia EM BRANCO, porque esses dois valores nem
         // constam entre as <option>. Campo travado que so ecoa outro campo e
         // ruido: escondemos, e o backend deriva o subtipo a partir do tipo.
@@ -819,7 +819,7 @@
         atualizarCabecalhoFormulario();
 
         // Devolve o painel de banco de horas ao padrao do tipo escolhido
-        // (runtime-fixes.js escuta este change).
+        // (core/runtime/ escuta este change).
         tipoSelect?.dispatchEvent(new Event('change', { bubbles: true }));
     }
 
@@ -930,7 +930,7 @@
             descricao = `${colaborador.nome} - ${formatarDataBR(item.DataInicio ?? item.dataInicio)}`;
         }
 
-        // Contrato de runtime-fixes.js: confirmarExclusao() le estes globais.
+        // Contrato de core/runtime/dados-e-modais.js: confirmarExclusao() le estes globais.
         window.exclusaoPendenteId = alvo;
         window.exclusaoTipo = tipo === 'feriado' ? 'feriado' : 'ausencia';
 
@@ -1001,7 +1001,7 @@
             if (ehFeriado) {
                 await salvarFeriadoDoFormulario(dataInicio);
             } else {
-                // salvarAusencia vem de runtime-fixes.js e ja monta o payload de
+                // salvarAusencia vem de core/runtime/ e ja monta o payload de
                 // banco de horas a partir dos campos do formulario.
                 await window.salvarAusencia(tipo, dataInicio, dataFim);
             }
@@ -1010,7 +1010,7 @@
             setEdicao(null);
 
             if (typeof window.atualizarTudo === 'function') {
-                // atualizarTudo (runtime-fixes.js) recarrega os dados e ja
+                // atualizarTudo (core/runtime/) recarrega os dados e ja
                 // repinta as listas da modal chamando carregarListagens /
                 // carregarListagensComFiltro daqui — nao recarregue de novo.
                 await window.atualizarTudo({ silent: true, source: 'lancamento' });
@@ -1069,7 +1069,7 @@
         state.busca = '';
         setEdicao(null);
 
-        // Compatibilidade: calendar.js e runtime-fixes.js leem estes globais
+        // Compatibilidade: calendar.js e core/runtime/ leem estes globais
         // para recarregar a modal quando o mes muda ou apos uma exclusao.
         window.modalFiltroData = state.escopo === 'dia';
         window.modalDataSelecionada = state.dataISO;
@@ -1159,7 +1159,7 @@
             const alvoId = acao.dataset.id;
 
             if (acao.dataset.acao === 'editar') {
-                // window.editarLancamento e envolvido por runtime-fixes.js para
+                // window.editarLancamento e envolvido por core/runtime/ para
                 // repor os campos de banco de horas; chamamos a versao publica.
                 window.editarLancamento(alvoTipo, alvoId);
             } else if (acao.dataset.acao === 'excluir') {
@@ -1225,7 +1225,7 @@
 
     /* ================= COMPATIBILIDADE ================= */
 
-    // Assinaturas antigas, ainda chamadas por calendar.js e runtime-fixes.js.
+    // Assinaturas antigas, ainda chamadas por calendar.js e core/runtime/.
     async function carregarListagens() {
         state.escopo = 'mes';
         window.modalFiltroData = false;

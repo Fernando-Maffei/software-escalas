@@ -8,14 +8,58 @@ const {
     createPlantaoEscalaRecord,
     isLunchOutsideCadastro,
     iterateIsoDates,
-    loadFeriadosDoPeriodo
+    loadFeriadosDoPeriodo,
+    normalizeEscalaTipo
 } = require('../../backend/services/escala');
 const {
     buildEscalaQuadroCalendarSlots,
-    buildEscalaQuadroMensal
+    buildEscalaQuadroMensal,
+    shouldIncludeBoardRecord
 } = require('../../frontend/js/lib/escala-report-utils');
 
 module.exports = [
+    {
+        // A armadilha desta fase: normalizeEscalaTipo casava por PREFIXO, e
+        // 'folga_compensatoria' comeca com 'folga'. Sem o casamento exato antes
+        // dos startsWith, o tipo novo viraria 'folga' ao ser gravado e a
+        // distincao se perderia em silencio — sem erro, sem aviso.
+        name: 'normalizeEscalaTipo nao deixa folga_compensatoria virar folga',
+        run() {
+            assert.equal(normalizeEscalaTipo('folga_compensatoria'), 'folga_compensatoria');
+            assert.equal(normalizeEscalaTipo('Folga Compensatória'), 'folga_compensatoria');
+            assert.equal(normalizeEscalaTipo('domingo_folgado'), 'domingo_folgado');
+            assert.equal(normalizeEscalaTipo('reposicao'), 'reposicao');
+            assert.equal(normalizeEscalaTipo('Cobertura'), 'cobertura');
+        }
+    },
+    {
+        // O casamento por prefixo continua valendo para o dado legado: e o que
+        // faz 'Férias' acentuado e variantes como 'plantao_sabado' entrarem.
+        name: 'normalizeEscalaTipo preserva o casamento por prefixo do dado legado',
+        run() {
+            assert.equal(normalizeEscalaTipo('plantao_sabado'), 'plantao');
+            assert.equal(normalizeEscalaTipo('Férias'), 'ferias');
+            assert.equal(normalizeEscalaTipo('Ausência'), 'ausencia');
+            assert.equal(normalizeEscalaTipo('folga'), 'folga');
+            assert.throws(() => normalizeEscalaTipo('inventado'), /invalido/i);
+        }
+    },
+    {
+        // O quadro mensal mostra quem esta ESCALADO. Reposicao e cobertura sao
+        // dias trabalhados e precisam aparecer; domingo folgado e folga
+        // compensatoria, nao.
+        name: 'shouldIncludeBoardRecord mantem reposicao e cobertura, tira os dias sem trabalho',
+        run() {
+            const comHorario = (tipo) => ({ tipo, horaInicio: '13:00', horaFim: '22:00' });
+
+            assert.equal(shouldIncludeBoardRecord(comHorario('reposicao')), true);
+            assert.equal(shouldIncludeBoardRecord(comHorario('cobertura')), true);
+            assert.equal(shouldIncludeBoardRecord(comHorario('domingo_folgado')), false);
+            assert.equal(shouldIncludeBoardRecord(comHorario('folga_compensatoria')), false);
+            // Sem horario ninguem entra, seja qual for o tipo.
+            assert.equal(shouldIncludeBoardRecord({ tipo: 'reposicao' }), false);
+        }
+    },
     {
         name: 'getSchemaInfo rastreia a tabela Feriados (senao o feriado cadastrado nao suprime a escala)',
         async run() {

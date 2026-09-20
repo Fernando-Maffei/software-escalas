@@ -40,11 +40,18 @@ const BACKUP_DELETE_ORDER = Object.freeze([
     'Ausencias',
     'plantoes',
     'Feriados',
+    // Colaboradores referencia TiposEscala, entao sai antes dele; TipoEscalaDia
+    // tambem e filha de TiposEscala.
     'Colaboradores',
-    'Setores'
+    'Setores',
+    'TipoEscalaDia',
+    'TiposEscala'
 ]);
 const BACKUP_INSERT_ORDER = Object.freeze([
     'Setores',
+    // Antes de Colaboradores: a FK TipoEscalaId aponta para ca.
+    'TiposEscala',
+    'TipoEscalaDia',
     'Colaboradores',
     'ColaboradorJornadaSemanal',
     'Feriados',
@@ -69,7 +76,38 @@ const TABLE_INSERT_SPECS = Object.freeze({
             // coluna DataCadastro (so Ausencias e ColaboradorJornadaSemanal
             // tem), entao ela nao pode entrar aqui: inserir nela dava
             // "Invalid column name 'DataCadastro'" e quebrava toda restauracao.
-            ['SetorId', sql.Int]
+            ['SetorId', sql.Int],
+            // Mesmo motivo do SetorId: sem ele a restauracao perdia o tipo de
+            // escala de cada colaborador.
+            ['TipoEscalaId', sql.Int]
+        ]
+    },
+    TiposEscala: {
+        identityColumn: 'Id',
+        columns: [
+            ['Id', sql.Int],
+            ['Nome', sql.NVarChar(120)],
+            ['CicloTipo', sql.NVarChar(20)],
+            ['DomingosFolgaCada', sql.Int],
+            ['ExigeReposicao', sql.Bit],
+            ['Ativo', sql.Bit],
+            ['Ordem', sql.Int],
+            ['Observacao', sql.NVarChar(500)],
+            ['CriadoEm', sql.DateTime],
+            ['AtualizadoEm', sql.DateTime]
+        ]
+    },
+    TipoEscalaDia: {
+        identityColumn: 'Id',
+        columns: [
+            ['Id', sql.Int],
+            ['TipoEscalaId', sql.Int],
+            ['DiaSemana', sql.TinyInt],
+            ['Trabalha', sql.Bit],
+            ['TrabalhoInicio', sql.Time],
+            ['TrabalhoFim', sql.Time],
+            ['AlmocoInicio', sql.Time],
+            ['AlmocoFim', sql.Time]
         ]
     },
     ColaboradorJornadaSemanal: {

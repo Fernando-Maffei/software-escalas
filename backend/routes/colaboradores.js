@@ -60,9 +60,19 @@ function buildColaboradorPayload(body, fallback = {}) {
         almocoFim
     });
 
+    // O tipo de escala e so o VINCULO (o molde que este colaborador segue).
+    // Ele nao reescreve a jornada semanal sozinho: quem aplica o padrao e o
+    // botao da tela (POST /tipos-escala/:id/aplicar/:colaboradorId) ou a
+    // propria jornada enviada neste save. Assim o tipo nunca contradiz em
+    // silencio os dias que estao gravados.
+    const tipoEscalaId = body.tipoEscalaId !== undefined
+        ? normalizeNullableId(body.tipoEscalaId, 'Tipo de escala')
+        : normalizeNullableId(fallback.TipoEscalaId ?? fallback.tipoEscalaId, 'Tipo de escala');
+
     return {
         nome,
         setorId,
+        tipoEscalaId,
         trabalhoInicio,
         trabalhoFim,
         almocoInicio,
@@ -70,9 +80,21 @@ function buildColaboradorPayload(body, fallback = {}) {
     };
 }
 
+function normalizeNullableId(value, fieldName) {
+    if (value === undefined || value === null || String(value).trim() === '') {
+        return null;
+    }
+
+    return ensurePositiveInt(value, fieldName);
+}
+
 function hasSetorSupport(schema) {
     const capabilities = getBancoHorasCapabilities(schema);
     return capabilities.hasSetoresTable && capabilities.hasColaboradorSetorId;
+}
+
+function hasTipoEscalaSupport(schema) {
+    return hasTable(schema, 'TiposEscala') && hasColumn(schema, 'Colaboradores', 'TipoEscalaId');
 }
 
 function buildColaboradorSelectQuery(schema, options = {}) {
@@ -306,6 +328,12 @@ router.post('/', async (req, res) => {
             request.input('setorId', sql.Int, payload.setorId);
         }
 
+        if (hasTipoEscalaSupport(schema)) {
+            fields.push('TipoEscalaId');
+            values.push('@tipoEscalaId');
+            request.input('tipoEscalaId', sql.Int, payload.tipoEscalaId);
+        }
+
         const result = await request.query(`
             INSERT INTO Colaboradores (${fields.join(', ')})
             OUTPUT INSERTED.*
@@ -371,6 +399,11 @@ router.put('/:id', async (req, res) => {
         if (supportsSetor) {
             setParts.splice(1, 0, 'SetorId = @setorId');
             request.input('setorId', sql.Int, payload.setorId);
+        }
+
+        if (hasTipoEscalaSupport(schema)) {
+            setParts.push('TipoEscalaId = @tipoEscalaId');
+            request.input('tipoEscalaId', sql.Int, payload.tipoEscalaId);
         }
 
         const result = await request.query(`

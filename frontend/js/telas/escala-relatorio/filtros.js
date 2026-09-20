@@ -1,0 +1,138 @@
+    function buildColaboradorOptionsEscala(selectedId = '') {
+        return `
+            <option value="">Todos os colaboradores</option>
+            ${(window.colaboradores || []).map((item) => `
+                <option value="${item.Id}" ${String(selectedId) === String(item.Id) ? 'selected' : ''}>
+                    ${escapeHtmlEscala(item.Nome)}
+                </option>
+            `).join('')}
+        `;
+    }
+
+    function getSetorIdFromItemEscala(item) {
+        return item?.id ?? item?.Id ?? item?.setorId ?? item?.SetorId ?? null;
+    }
+
+    function getSetorNomeFromItemEscala(item) {
+        return item?.nome ?? item?.Nome ?? item?.setorNome ?? item?.SetorNome ?? '';
+    }
+
+    function buildSetorOptionsRelatorioEscala(selectedId = '') {
+        const setoresOrdenados = [...(window.setores || [])]
+            .map((item) => ({
+                id: getSetorIdFromItemEscala(item),
+                nome: getSetorNomeFromItemEscala(item)
+            }))
+            .filter((item) => item.id !== null && item.id !== undefined && String(item.id).trim() !== '')
+            .sort((first, second) => String(first.nome || '').localeCompare(String(second.nome || ''), 'pt-BR', { sensitivity: 'base' }));
+
+        return `
+            <option value="">Todos os setores</option>
+            ${setoresOrdenados.map((setor) => `
+                <option value="${escapeHtmlEscala(String(setor.id))}" ${String(selectedId) === String(setor.id) ? 'selected' : ''}>
+                    ${escapeHtmlEscala(setor.nome || 'Sem nome')}
+                </option>
+            `).join('')}
+        `;
+    }
+
+    function getRelatorioEscalaSetorId() {
+        const value = document.getElementById('relatorioEscalaSetor')?.value || '';
+        return value ? String(value) : '';
+    }
+
+    function getRelatorioEscalaSetorNome(setorId = getRelatorioEscalaSetorId()) {
+        if (!setorId) {
+            return 'Todos os setores';
+        }
+
+        const setor = (window.setores || []).find((item) => String(getSetorIdFromItemEscala(item)) === String(setorId));
+        const nome = getSetorNomeFromItemEscala(setor);
+        return nome || `Setor ${setorId}`;
+    }
+
+    function getRelatorioEscalaSetorFileSuffix(setorId = getRelatorioEscalaSetorId()) {
+        if (!setorId) {
+            return '';
+        }
+
+        return `_${getRelatorioEscalaSetorNome(setorId)
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .replace(/[^a-zA-Z0-9]+/g, '_')
+            .replace(/^_+|_+$/g, '')
+            .slice(0, 40) || `Setor_${setorId}`}`;
+    }
+
+    function renderRelatorioEscalaFiltrosAtivos(filters = {}) {
+        const setorNome = filters.setorNome || getRelatorioEscalaSetorNome(filters.setorId);
+
+        if (!filters.setorId) {
+            return '';
+        }
+
+        return `
+            <div class="relatorio-filtros-ativos">
+                <span><i class="fas fa-building"></i> Setor: <strong>${escapeHtmlEscala(setorNome)}</strong></span>
+            </div>
+        `;
+    }
+
+    function buildTipoOptionsEscala(selectedType = '') {
+        return `
+            <option value="">Todos os tipos</option>
+            ${Object.entries(TIPO_LABELS).map(([value, label]) => `
+                <option value="${value}" ${selectedType === value ? 'selected' : ''}>${label}</option>
+            `).join('')}
+        `;
+    }
+
+    // Config de colunas da tabela detalhada: UMA fonte de verdade para header
+    // e body. Antes os dois eram blocos de HTML separados e hardcoded, o que
+    // deixava fácil header e body divergirem (a causa-raiz de "colunas
+    // desalinhadas"). Aqui, adicionar/reordenar coluna é editar uma lista só.
+    const COLUNAS_ESCALA_DETALHADA = [
+        { titulo: 'Data', html: true, valor: (i) => `<strong>${escapeHtmlEscala(formatDatePtBrEscala(i.dataISO))}</strong>` },
+        { titulo: 'Dia', valor: (i) => i.diaSemana || getDayLabelEscala(i.dataISO) },
+        { titulo: 'Colaborador', truncar: true, valor: (i) => i.colaboradorNome || '--' },
+        { titulo: 'Entrada', valor: (i) => i.horaInicio || '--' },
+        { titulo: 'Saida', valor: (i) => i.horaFim || '--' },
+        { titulo: 'Almoco', valor: (i) => i.almoco || '--' },
+        { titulo: 'Tipo', html: true, valor: (i) => `<span class="evento-tipo badge-${escapeHtmlEscala(i.tipo)}">${escapeHtmlEscala(TIPO_LABELS[i.tipo] || i.tipo || '--')}</span>` },
+        { titulo: 'Observacoes', valor: (i) => i.observacao || '--' }
+    ];
+
+    // Helper genérico de tabela de relatório: header, `scope="col"` e body
+    // derivam da MESMA config de colunas. Só emite HTML quando `col.html` for
+    // true (ex.: o badge de tipo); nos demais casos, escapa o valor.
+    function renderTabelaRelatorio(config) {
+        const colunas = Array.isArray(config && config.colunas) ? config.colunas : [];
+        const linhas = Array.isArray(config && config.linhas) ? config.linhas : [];
+        const classeTabela = config && config.classe ? ` ${config.classe}` : '';
+
+        const head = colunas
+            .map((col) => `<th scope="col">${escapeHtmlEscala(col.titulo || '')}</th>`)
+            .join('');
+
+        const body = linhas.map((linha) => {
+            const celulas = colunas.map((col) => {
+                const bruto = typeof col.valor === 'function' ? col.valor(linha) : (linha ? linha[col.chave] : null);
+                const conteudo = col.html
+                    ? (bruto == null ? '' : String(bruto))
+                    : escapeHtmlEscala(bruto == null ? '--' : bruto);
+                const classe = col.truncar ? ' class="is-truncada"' : '';
+                return `<td${classe}>${conteudo}</td>`;
+            }).join('');
+            return `<tr>${celulas}</tr>`;
+        }).join('');
+
+        return `
+            <div class="relatorio-tabela-scroll">
+                <table class="relatorio-tabela${classeTabela}">
+                    <thead><tr>${head}</tr></thead>
+                    <tbody>${body}</tbody>
+                </table>
+            </div>
+        `;
+    }
+

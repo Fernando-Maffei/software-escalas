@@ -965,7 +965,7 @@
 
     // O container temporario do PDF so aproveita as tags <style> deste HTML,
     // entao ele precisa ser autossuficiente (mesmo padrao do relatorio de
-    // plantoes, em runtime-fixes.js).
+    // plantoes, em core/runtime/plantao-colaboradores/).
     function gerarHtmlPdfExtras(dados) {
         return `
             <!DOCTYPE html>

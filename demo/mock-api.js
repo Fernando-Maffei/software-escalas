@@ -110,6 +110,7 @@
         [/\/api\/plantoes\/disponibilidade/, () => json({ disponiveis: D.COLABORADORES.map((c) => c.id) })],
         [/\/api\/plantoes/, () => json([])],
         [/\/api\/jornada-semanal/, () => json([])],
+        [/\/api\/tipos-escala/, () => json({ total: D.TIPOS_ESCALA.length, items: D.TIPOS_ESCALA })],
         // A grade semanal e suas sub-rotas vem ANTES de /api/banco-horas e esta
         // e ancorada: sem isso o prefixo capturava /api/banco-horas-semanal e a
         // tela recebia { itens, resumo } no lugar de { periodo, colaboradores, semanas }.
