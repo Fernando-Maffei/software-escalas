@@ -8,6 +8,8 @@ const { ensureDefaultAdmin } = require('../auth/auth');
 const REQUIRED_TABLES = Object.freeze([
     'Colaboradores',
     'ColaboradorJornadaSemanal',
+    'TiposEscala',
+    'TipoEscalaDia',
     'Setores',
     'Ausencias',
     'Feriados',
@@ -34,7 +36,8 @@ const SCHEMA_SCRIPT_PATHS = Object.freeze([
     path.join(__dirname, '..', '..', 'database', 'migrations', '2026-08-26-sessoes.sql'),
     path.join(__dirname, '..', '..', 'database', 'migrations', '2026-08-27-banco-horas-semanal.sql'),
     path.join(__dirname, '..', '..', 'database', 'migrations', '2026-08-28-colaborador-desligamento.sql'),
-    path.join(__dirname, '..', '..', 'database', 'migrations', '2026-09-04-plantao-lancamentos.sql')
+    path.join(__dirname, '..', '..', 'database', 'migrations', '2026-09-04-plantao-lancamentos.sql'),
+    path.join(__dirname, '..', '..', 'database', 'migrations', '2026-09-21-tipos-escala.sql')
 ]);
 
 const EXAMPLE_SEED_SCRIPT_PATH = path.join(__dirname, '..', '..', 'database', 'seeds', 'dados-exemplo.sql');

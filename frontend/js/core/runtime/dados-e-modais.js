@@ -169,6 +169,25 @@
         });
     };
 
+    // Tipos de escala: o molde do padrao semanal. Banco ainda sem a migration
+    // devolve 409/404 — nesse caso a lista fica vazia e o select de tipo
+    // simplesmente nao aparece no editor, em vez de derrubar a tela.
+    window.carregarTiposEscala = function carregarTiposEscalaComCache() {
+        return withInFlight('tiposEscala', async () => {
+            let lista = [];
+
+            try {
+                const data = await window.API.getTiposEscala();
+                lista = Array.isArray(data?.items) ? data.items : (Array.isArray(data) ? data : []);
+            } catch (error) {
+                lista = [];
+            }
+
+            window.tiposEscala = lista;
+            return lista;
+        });
+    };
+
     window.carregarAusencias = carregarAusencias = function carregarAusenciasComCache() {
         return withInFlight('ausencias', async () => {
             let lista = [];

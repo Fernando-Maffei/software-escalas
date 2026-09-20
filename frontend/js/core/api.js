@@ -171,6 +171,7 @@ const API = {
 
     getColaboradores: (params = {}) => API.get('/colaboradores', params),
     getSetores: (params = {}) => API.get('/setores', params),
+    getTiposEscala: (params = {}) => API.get('/tipos-escala', params),
     salvarSetor: (data) => API.post('/setores', data),
     salvarColaborador: (data) => data.id
         ? API.put(`/colaboradores/${data.id}`, data)

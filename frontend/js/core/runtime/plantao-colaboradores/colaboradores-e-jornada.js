@@ -7,6 +7,102 @@
         ].join('');
     }
 
+    // Tipo de Escala e so um MOLDE: escolher no select grava o vinculo, mas
+    // nao mexe sozinho nos dias. Quem preenche a grade e o botao "Aplicar
+    // padrao do tipo", e so depois de o usuario salvar. Assim o tipo nunca
+    // sobrescreve em silencio uma jornada ajustada a mao.
+    function buildTipoEscalaEditorOptions(selectedId = '') {
+        return [
+            '<option value="">Sem tipo definido</option>',
+            ...((window.tiposEscala || []).map((tipo) => `
+                <option value="${tipo.id}" ${Number(selectedId) === Number(tipo.id) ? 'selected' : ''}>${escapeHtml(tipo.nome)}</option>
+            `))
+        ].join('');
+    }
+
+    function buildTipoEscalaEditorMarkup(selectedId = '') {
+        // Banco sem a migration devolve lista vazia: nesse caso o bloco inteiro
+        // some, em vez de mostrar um select que nao tem o que oferecer.
+        if (!(window.tiposEscala || []).length) {
+            return '';
+        }
+
+        return `
+            <div class="editor-form-group">
+                <label><i class="fas fa-calendar-check"></i> Tipo de escala</label>
+                <div class="setor-inputs">
+                    <select id="editorTipoEscalaId" class="form-control">
+                        ${buildTipoEscalaEditorOptions(selectedId)}
+                    </select>
+                    <button type="button" class="btn-secondary btn-setor-rapido" id="btnAplicarTipoEscala">
+                        <i class="fas fa-wand-magic-sparkles"></i> Aplicar padrao do tipo
+                    </button>
+                </div>
+                <div class="helper-text" id="tipoEscalaHint"></div>
+            </div>
+        `;
+    }
+
+    // Preenche a grade da jornada com os dias do tipo escolhido, SEM salvar —
+    // mesmo comportamento do "Sugerir jornada com base no horario padrao".
+    function aplicarTipoEscalaNaGrade() {
+        const select = document.getElementById('editorTipoEscalaId');
+        const tipo = (window.tiposEscala || []).find((item) => Number(item.id) === Number(select?.value));
+
+        if (!tipo) {
+            mostrarToast('Escolha um tipo de escala antes de aplicar o padrao.', 'warning');
+            return;
+        }
+
+        const diasTrabalhados = (tipo.dias || []).filter((dia) => dia.trabalha);
+        setJornadaSemanalDays(diasTrabalhados.map((dia) => dia.diaSemana));
+
+        diasTrabalhados.forEach((dia) => {
+            const entrada = document.querySelector(`[data-jornada-entrada="${dia.diaSemana}"]`);
+            const saida = document.querySelector(`[data-jornada-saida="${dia.diaSemana}"]`);
+            const almocoInicio = document.querySelector(`[data-jornada-almoco-inicio="${dia.diaSemana}"]`);
+            const almocoFim = document.querySelector(`[data-jornada-almoco-fim="${dia.diaSemana}"]`);
+
+            if (entrada) entrada.value = formatarHora(dia.trabalhoInicio) || '';
+            if (saida) saida.value = formatarHora(dia.trabalhoFim) || '';
+            if (almocoInicio) almocoInicio.value = formatarHora(dia.almocoInicio) || '';
+            if (almocoFim) almocoFim.value = formatarHora(dia.almocoFim) || '';
+        });
+
+        atualizarHintTipoEscala();
+        mostrarToast(`Padrao de "${tipo.nome}" aplicado na grade. Revise e clique em Salvar.`, 'success');
+    }
+
+    function atualizarHintTipoEscala() {
+        const hint = document.getElementById('tipoEscalaHint');
+        const select = document.getElementById('editorTipoEscalaId');
+
+        if (!hint) {
+            return;
+        }
+
+        const tipo = (window.tiposEscala || []).find((item) => Number(item.id) === Number(select?.value));
+
+        if (!tipo) {
+            hint.innerText = 'Sem tipo: a jornada semanal abaixo vale sozinha.';
+            return;
+        }
+
+        const partes = [];
+
+        if (tipo.domingosFolgaCada) {
+            partes.push(`folga um domingo a cada ${tipo.domingosFolgaCada}`);
+        }
+
+        if (tipo.exigeReposicao) {
+            partes.push('repoe o domingo folgado num dia de folga');
+        }
+
+        hint.innerText = partes.length
+            ? `Regra do tipo: ${partes.join('; ')}. O sistema apenas registra — ainda nao gera essas datas.`
+            : 'O tipo e um ponto de partida: aplicar preenche a grade abaixo, que voce pode ajustar antes de salvar.';
+    }
+
     const JORNADA_SEMANAL_DIAS = [
         { diaSemana: 0, label: 'Domingo' },
         { diaSemana: 1, label: 'Segunda' },
@@ -322,6 +418,13 @@
             await carregarSetores();
         }
 
+        if (
+            !Array.isArray(window.tiposEscala)
+            && typeof window.carregarTiposEscala === 'function'
+        ) {
+            await window.carregarTiposEscala();
+        }
+
         const colaborador = id ? (window.colaboradores || []).find((item) => Number(item.Id) === Number(id)) : null;
         const editorPanel = document.getElementById('colaboradorEditor');
         const editorTitle = document.getElementById('editorTitle');
@@ -358,6 +461,8 @@
                         </button>
                     </div>
                 </div>
+
+                ${buildTipoEscalaEditorMarkup(colaborador?.TipoEscalaId || '')}
 
                 <div class="editor-form-group">
                     <label><i class="fas fa-briefcase"></i> Horario de entrada e saida</label>
@@ -399,6 +504,10 @@
                 ` : ''}
             </div>
         `;
+
+        document.getElementById('btnAplicarTipoEscala')?.addEventListener('click', aplicarTipoEscalaNaGrade);
+        document.getElementById('editorTipoEscalaId')?.addEventListener('change', atualizarHintTipoEscala);
+        atualizarHintTipoEscala();
 
         if (colaborador?.Id) {
             hydrateJornadaSemanalEditor(colaborador.Id);
@@ -467,6 +576,15 @@
                 almocoInicio,
                 almocoFim
             };
+
+            // O select so aparece quando o banco ja tem os tipos de escala.
+            // Sem ele, nao mandamos o campo — evita apagar o vinculo de quem
+            // salvou por uma tela antiga.
+            const selectTipoEscala = document.getElementById('editorTipoEscalaId');
+
+            if (selectTipoEscala) {
+                body.tipoEscalaId = selectTipoEscala.value || null;
+            }
 
             if (invalidJornadaDia) {
                 const dayInfo = JORNADA_SEMANAL_DIAS.find((day) => Number(day.diaSemana) === Number(invalidJornadaDia.diaSemana));

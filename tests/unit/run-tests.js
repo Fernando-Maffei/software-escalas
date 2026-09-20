@@ -4,6 +4,7 @@ const suites = [
     ...require('./plantoes.test.js'),
     ...require('./bancoHoras.test.js'),
     ...require('./jornadaSemanal.test.js'),
+    ...require('./tiposEscala.test.js'),
     ...require('./escala.test.js'),
     ...require('./backup.test.js'),
     ...require('./permissoes.test.js'),
