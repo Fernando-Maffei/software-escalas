@@ -8,6 +8,7 @@ const TRACKED_TABLES = [
     'ColaboradorJornadaSemanal',
     'TiposEscala',
     'TipoEscalaDia',
+    'FolgasDomingo',
     // Sem ela, hasTable(schema, 'Feriados') dava sempre falso e a escala so
     // reconhecia os feriados nacionais — o municipal/estadual cadastrado
     // continuava com escala padrao (ver loadFeriadosDoPeriodo).

@@ -358,6 +358,50 @@ function createPlantaoEscalaRecord(colaborador, plantao) {
     });
 }
 
+// Os tres registros que uma folga de domingo produz. Puros de proposito: e a
+// parte com regra de verdade, e assim da para testar sem banco.
+function createDomingoFolgadoEscalaRecord(colaborador, folga) {
+    return createDefaultEscalaRecord(colaborador, folga.dataDomingo, {
+        tipo: 'domingo_folgado',
+        horaInicio: null,
+        horaFim: null,
+        almocoInicio: null,
+        almocoFim: null,
+        observacao: buildEscalaObservationParts('Domingo de folga', trimToNull(folga.observacao)),
+        origemTipo: 'folga_domingo',
+        origemId: folga.id
+    });
+}
+
+function createReposicaoEscalaRecord(colaborador, folga) {
+    return createDefaultEscalaRecord(colaborador, folga.dataReposicao, {
+        tipo: 'reposicao',
+        horaInicio: extractTimeString(folga.reposicaoHoraInicio),
+        horaFim: extractTimeString(folga.reposicaoHoraFim),
+        // Sem almoco: o dia reposto nao tem jornada de onde herdar um, e
+        // inventar um intervalo seria dado que ninguem informou.
+        almocoInicio: null,
+        almocoFim: null,
+        observacao: `Reposicao do domingo ${folga.dataDomingo}`,
+        origemTipo: 'folga_domingo',
+        origemId: folga.id
+    });
+}
+
+// A cobertura NAO troca a origem: aquela linha pertence ao plantao e continua
+// apontando para ele. Apagar a folga faz a proxima geracao nao reclassificar,
+// e a linha volta a ser plantao sozinha.
+function createCoberturaEscalaRecord(registroDoPlantao, nomeDeQuemFolgou) {
+    return {
+        ...registroDoPlantao,
+        tipo: 'cobertura',
+        observacao: buildEscalaObservationParts(
+            `Cobrindo ${nomeDeQuemFolgou}`,
+            trimToNull(registroDoPlantao.observacao)
+        )
+    };
+}
+
 function buildColaboradorDefaultSyncRecord(colaborador, existingRecord) {
     return createDefaultEscalaRecord(colaborador, existingRecord.dataISO, {
         tipo: existingRecord.tipo || 'normal',
@@ -1227,7 +1271,114 @@ async function hydrateHistoricSourcesIntoEscala(poolOrTx, schema, existingMap, c
         }
     }
 
+    // DEPOIS dos plantoes, de proposito: a cobertura reclassifica a linha que a
+    // passada de plantao acabou de criar para quem cobriu o posto.
+    await hydrateFolgasDomingoIntoEscala(poolOrTx, schema, existingMap, colaboradoresMap, startISO, endISO, counters);
+
     return counters;
+}
+
+// Uma linha de FolgasDomingo vira ate tres linhas de escala:
+//   DataDomingo   -> o plantonista fica 'domingo_folgado' (sem horario)
+//   DataReposicao -> o plantonista fica 'reposicao' (com o horario gravado)
+//   DataDomingo   -> quem cobriu passa de 'plantao' para 'cobertura'
+//
+// Tudo com origem_tipo 'folga_domingo', menos a cobertura: aquela linha ja
+// pertence ao plantao e continua apontando para ele. Se a folga for apagada, a
+// proxima geracao simplesmente nao reclassifica e a linha volta a ser plantao,
+// sem precisar de limpeza.
+async function hydrateFolgasDomingoIntoEscala(poolOrTx, schema, existingMap, colaboradoresMap, startISO, endISO, counters) {
+    if (!hasTable(schema, 'FolgasDomingo')) {
+        return;
+    }
+
+    const result = await poolOrTx.request()
+        .input('dataInicio', sql.Date, normalizeIsoDate(startISO, 'Data inicial'))
+        .input('dataFim', sql.Date, normalizeIsoDate(endISO, 'Data final'))
+        .query(`
+            SELECT
+                Id,
+                ColaboradorId,
+                CONVERT(VARCHAR(10), DataDomingo, 23) AS DataDomingo,
+                CONVERT(VARCHAR(10), DataReposicao, 23) AS DataReposicao,
+                ReposicaoHoraInicio,
+                ReposicaoHoraFim,
+                CobertoPorColaboradorId,
+                Observacao
+            FROM FolgasDomingo
+            WHERE (DataDomingo BETWEEN @dataInicio AND @dataFim)
+               OR (DataReposicao BETWEEN @dataInicio AND @dataFim)
+        `);
+
+    const conta = (acao) => { counters[acao] = (counters[acao] || 0) + 1; };
+
+    for (const folga of result.recordset) {
+        const colaborador = colaboradoresMap.get(Number(folga.ColaboradorId));
+
+        if (!colaborador) {
+            continue;
+        }
+
+        const dataDomingo = extractDateString(folga.DataDomingo);
+        const dataReposicao = extractDateString(folga.DataReposicao);
+        const noPeriodo = (dataISO) => Boolean(dataISO) && dataISO >= startISO && dataISO <= endISO;
+
+        const dadosDaFolga = {
+            id: folga.Id,
+            dataDomingo,
+            dataReposicao,
+            reposicaoHoraInicio: folga.ReposicaoHoraInicio,
+            reposicaoHoraFim: folga.ReposicaoHoraFim,
+            observacao: folga.Observacao
+        };
+
+        if (noPeriodo(dataDomingo)) {
+            const aplicado = await applyAutomaticEscalaRecord(
+                poolOrTx,
+                existingMap,
+                createDomingoFolgadoEscalaRecord(colaborador, dadosDaFolga),
+                { force: false }
+            );
+
+            conta(aplicado.action);
+        }
+
+        // A reposicao cai num dia que a jornada marca como folga, entao a
+        // geracao base NAO criou linha nenhuma — esta aqui cria do zero. E o
+        // motivo de o horario ficar guardado na propria FolgasDomingo: nao ha
+        // jornada daquele dia de onde puxar.
+        if (noPeriodo(dataReposicao)) {
+            const aplicado = await applyAutomaticEscalaRecord(
+                poolOrTx,
+                existingMap,
+                createReposicaoEscalaRecord(colaborador, dadosDaFolga),
+                { force: false }
+            );
+
+            conta(aplicado.action);
+        }
+
+        if (folga.CobertoPorColaboradorId && noPeriodo(dataDomingo)) {
+            const cobridor = colaboradoresMap.get(Number(folga.CobertoPorColaboradorId));
+            const existente = cobridor
+                ? existingMap.get(buildEscalaKey(cobridor.Id, dataDomingo))
+                : null;
+
+            // So reclassifica quem ja esta escalado naquele domingo. Sem linha,
+            // a cobertura nao foi lancada como plantao — o vinculo diz quem
+            // cobriria, mas quem gera a escala do dia e o plantao.
+            if (existente) {
+                const aplicado = await applyAutomaticEscalaRecord(
+                    poolOrTx,
+                    existingMap,
+                    createCoberturaEscalaRecord(existente, colaborador.Nome),
+                    { force: false }
+                );
+
+                conta(aplicado.action);
+            }
+        }
+    }
 }
 
 async function ensureEscalaDiaForPeriod(poolOrTx, schema, startISO, endISO, options = {}) {
@@ -1739,7 +1890,10 @@ module.exports = {
     canAutoRefreshDefaultEscala,
     createAusenciaEscalaRecord,
     createDefaultEscalaRecord,
+    createCoberturaEscalaRecord,
+    createDomingoFolgadoEscalaRecord,
     createPlantaoEscalaRecord,
+    createReposicaoEscalaRecord,
     deleteEscalaDiaByOrigin,
     ensureEscalaDiaForPeriod,
     ensureEscalaDiaTable,
