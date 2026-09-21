@@ -140,5 +140,23 @@ window.DemoDados = (function () {
         }
     ];
 
-    return { SETORES, COLABORADORES, FERIADOS, TIPOS_ESCALA, escalaDoDia, diaDaSemana };
+    // Uma folga de domingo ja registrada, para o painel ter o que mostrar.
+    // 27/09/2026 e domingo; 01/10 e quinta, dia em que o plantonista folgaria.
+    const FOLGAS_DOMINGO = [
+        {
+            id: 1,
+            colaboradorId: 10,
+            colaboradorNome: 'Rafael Siqueira',
+            dataDomingo: '2026-09-27',
+            dataReposicao: '2026-10-01',
+            reposicaoHoraInicio: '13:00:00',
+            reposicaoHoraFim: '22:00:00',
+            cobertoPorColaboradorId: 2,
+            cobertoPorNome: 'Bruno Tavares',
+            plantaoId: null,
+            observacao: 'Folga de domingo do mes'
+        }
+    ];
+
+    return { SETORES, COLABORADORES, FERIADOS, TIPOS_ESCALA, FOLGAS_DOMINGO, escalaDoDia, diaDaSemana };
 })();

@@ -1,0 +1,287 @@
+/* =====================================================================
+   PAINEL DE FOLGA DE DOMINGO (dentro de Lancar Plantao)
+   ---------------------------------------------------------------------
+   Aparece so quando a data aberta na regua e um DOMINGO. Fica aqui, e nao
+   numa tela propria, porque o fluxo real e um so: "domingo tal, fulano
+   folga, beltrano cobre" — lancar a cobertura e registrar a folga no
+   mesmo lugar evita ir e voltar entre telas.
+
+   O painel do plantao se redesenha a cada tecla digitada no formulario
+   (renderPlantaoEditor e chamado de varios lugares). Por isso a lista de
+   folgas NAO e montada dentro do innerHTML dele: o HTML sai com um
+   container vazio e esta funcao preenche depois, em cima do container.
+   Assim digitar no plantao nao dispara uma requisicao por tecla.
+   ===================================================================== */
+(function initPainelFolgasDomingo() {
+    if (window.__painelFolgasDomingoCarregado) {
+        return;
+    }
+
+    window.__painelFolgasDomingoCarregado = true;
+
+    const DIAS_CURTOS = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sab'];
+
+    // Cache por data: evita refazer a chamada a cada redesenho do painel.
+    // Invalidado na mao depois de gravar ou remover.
+    const cachePorData = new Map();
+
+    function esc(valor) {
+        return String(valor ?? '')
+            .replaceAll('&', '&amp;')
+            .replaceAll('<', '&lt;')
+            .replaceAll('>', '&gt;')
+            .replaceAll('"', '&quot;')
+            .replaceAll("'", '&#39;');
+    }
+
+    function ehDomingo(dataISO) {
+        const partes = String(dataISO || '').split('-').map(Number);
+
+        if (partes.length !== 3 || partes.some(Number.isNaN)) {
+            return false;
+        }
+
+        return new Date(Date.UTC(partes[0], partes[1] - 1, partes[2], 12)).getUTCDay() === 0;
+    }
+
+    function rotuloData(dataISO) {
+        const partes = String(dataISO || '').split('-');
+
+        if (partes.length !== 3) {
+            return '--';
+        }
+
+        const dia = new Date(Date.UTC(Number(partes[0]), Number(partes[1]) - 1, Number(partes[2]), 12)).getUTCDay();
+        return `${DIAS_CURTOS[dia]} ${partes[2]}/${partes[1]}`;
+    }
+
+    function hora(valor) {
+        const bruto = String(valor || '').trim();
+        return bruto.includes(':') ? bruto.slice(0, 5) : '';
+    }
+
+    function opcoesColaborador(selecionado, { excluir = null } = {}) {
+        return [
+            '<option value="">Selecione...</option>',
+            ...(window.colaboradores || [])
+                .filter((c) => !excluir || Number(c.Id) !== Number(excluir))
+                .map((c) => `<option value="${c.Id}" ${Number(selecionado) === Number(c.Id) ? 'selected' : ''}>${esc(c.Nome)}</option>`)
+        ].join('');
+    }
+
+    // O HTML do painel. Sem a lista: ela chega depois, por carregarLista().
+    window.renderPainelFolgasDomingo = function renderPainelFolgasDomingo(dataISO) {
+        if (!ehDomingo(dataISO)) {
+            return '';
+        }
+
+        return `
+            <div class="editor-form-group folga-domingo-bloco" data-folga-domingo-data="${esc(dataISO)}">
+                <label><i class="fas fa-scale-balanced"></i> Folga de domingo</label>
+                <p class="helper-text">
+                    Registra quem folgou este domingo, em que dia repoe e quem cobriu o posto.
+                    A escala do mes passa a mostrar os tres dias ligados.
+                </p>
+
+                <div id="folgaDomingoLista" class="folga-domingo-lista">
+                    <div class="folga-domingo-vazio">Carregando...</div>
+                </div>
+
+                <div class="folga-domingo-form">
+                    <div class="folga-domingo-campo">
+                        <small>Quem folgou</small>
+                        <select id="folgaDomingoColaborador" class="form-control">${opcoesColaborador('')}</select>
+                    </div>
+                    <div class="folga-domingo-campo">
+                        <small>Quem cobriu (opcional)</small>
+                        <select id="folgaDomingoCobertoPor" class="form-control">${opcoesColaborador('')}</select>
+                    </div>
+                    <div class="folga-domingo-campo">
+                        <small>Repoe em (opcional)</small>
+                        <input type="date" id="folgaDomingoDataReposicao" class="form-control">
+                    </div>
+                    <div class="folga-domingo-campo">
+                        <small>Horario da reposicao</small>
+                        <div class="folga-domingo-par">
+                            <input type="time" id="folgaDomingoHoraInicio" class="form-control">
+                            <span>ate</span>
+                            <input type="time" id="folgaDomingoHoraFim" class="form-control">
+                        </div>
+                    </div>
+                    <div class="folga-domingo-campo folga-domingo-campo--largo">
+                        <small>Observacao</small>
+                        <input type="text" id="folgaDomingoObservacao" class="form-control" maxlength="500">
+                    </div>
+                    <button type="button" class="btn-primary" id="btnRegistrarFolgaDomingo">
+                        <i class="fas fa-plus"></i> Registrar folga
+                    </button>
+                </div>
+            </div>
+        `;
+    };
+
+    function renderLista(folgas) {
+        const alvo = document.getElementById('folgaDomingoLista');
+
+        if (!alvo) {
+            return;
+        }
+
+        if (!folgas.length) {
+            alvo.innerHTML = '<div class="folga-domingo-vazio">Nenhuma folga registrada neste domingo.</div>';
+            return;
+        }
+
+        alvo.innerHTML = folgas.map((folga) => {
+            const reposicao = folga.dataReposicao
+                ? `repoe ${rotuloData(folga.dataReposicao)} ${hora(folga.reposicaoHoraInicio)}–${hora(folga.reposicaoHoraFim)}`
+                : '<span class="folga-domingo-pendente">reposicao nao marcada</span>';
+            const cobertura = folga.cobertoPorNome
+                ? `coberta por ${esc(folga.cobertoPorNome)}`
+                : '<span class="folga-domingo-pendente">sem cobertura</span>';
+
+            return `
+                <div class="folga-domingo-item">
+                    <div>
+                        <strong>${esc(folga.colaboradorNome)}</strong>
+                        <p>${reposicao} · ${cobertura}</p>
+                        ${folga.observacao ? `<p class="folga-domingo-obs">${esc(folga.observacao)}</p>` : ''}
+                    </div>
+                    <button type="button" class="btn-danger-ghost" data-remover-folga="${folga.id}" title="Remover registro">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            `;
+        }).join('');
+    }
+
+    async function carregarLista(dataISO, { forcar = false } = {}) {
+        if (forcar) {
+            cachePorData.delete(dataISO);
+        }
+
+        if (cachePorData.has(dataISO)) {
+            renderLista(cachePorData.get(dataISO));
+            return;
+        }
+
+        let folgas = [];
+
+        try {
+            const dados = await window.API.getFolgasDomingo({ dataInicio: dataISO, dataFim: dataISO });
+            folgas = Array.isArray(dados?.items) ? dados.items : [];
+        } catch (erro) {
+            // Banco sem a migracao, ou rede fora: a lista fica vazia com aviso,
+            // e o resto do painel do plantao segue utilizavel.
+            const alvo = document.getElementById('folgaDomingoLista');
+
+            if (alvo) {
+                alvo.innerHTML = `<div class="folga-domingo-vazio">Nao foi possivel carregar: ${esc(erro.message)}</div>`;
+            }
+
+            return;
+        }
+
+        cachePorData.set(dataISO, folgas);
+        renderLista(folgas);
+    }
+
+    async function registrar(dataISO) {
+        const botao = document.getElementById('btnRegistrarFolgaDomingo');
+
+        if (botao?.disabled) {
+            return;
+        }
+
+        const colaboradorId = document.getElementById('folgaDomingoColaborador')?.value;
+
+        if (!colaboradorId) {
+            mostrarToast('Escolha quem folgou neste domingo.', 'warning');
+            return;
+        }
+
+        const payload = {
+            colaboradorId,
+            dataDomingo: dataISO,
+            cobertoPorColaboradorId: document.getElementById('folgaDomingoCobertoPor')?.value || null,
+            dataReposicao: document.getElementById('folgaDomingoDataReposicao')?.value || null,
+            reposicaoHoraInicio: document.getElementById('folgaDomingoHoraInicio')?.value || null,
+            reposicaoHoraFim: document.getElementById('folgaDomingoHoraFim')?.value || null,
+            observacao: document.getElementById('folgaDomingoObservacao')?.value.trim() || null
+        };
+
+        if (botao) {
+            botao.disabled = true;
+        }
+
+        try {
+            const dados = await window.API.post('/folgas-domingo', payload);
+            mostrarToast(dados?.message || 'Folga registrada!', 'success');
+            await carregarLista(dataISO, { forcar: true });
+            limparFormulario();
+        } catch (erro) {
+            mostrarToast(erro.message, 'error');
+        } finally {
+            if (botao) {
+                botao.disabled = false;
+            }
+        }
+    }
+
+    function limparFormulario() {
+        ['folgaDomingoColaborador', 'folgaDomingoCobertoPor', 'folgaDomingoDataReposicao',
+            'folgaDomingoHoraInicio', 'folgaDomingoHoraFim', 'folgaDomingoObservacao']
+            .forEach((id) => {
+                const campo = document.getElementById(id);
+
+                if (campo) {
+                    campo.value = '';
+                }
+            });
+    }
+
+    async function remover(dataISO, folgaId) {
+        if (!window.confirm('Remover o registro desta folga de domingo?')) {
+            return;
+        }
+
+        try {
+            const dados = await window.API.delete(`/folgas-domingo/${folgaId}`);
+            mostrarToast(dados?.message || 'Folga removida.', 'success');
+            await carregarLista(dataISO, { forcar: true });
+        } catch (erro) {
+            mostrarToast(erro.message, 'error');
+        }
+    }
+
+    // Liga os eventos depois que o painel do plantao trocou o innerHTML.
+    window.bindPainelFolgasDomingo = function bindPainelFolgasDomingo(dataISO) {
+        const bloco = document.querySelector('[data-folga-domingo-data]');
+
+        if (!bloco || !ehDomingo(dataISO)) {
+            return;
+        }
+
+        // Quem folgou nao pode ser quem cobre: o backend barra, mas tirar a
+        // pessoa do outro select evita o erro antes de acontecer.
+        const selColaborador = document.getElementById('folgaDomingoColaborador');
+        const selCobertura = document.getElementById('folgaDomingoCobertoPor');
+
+        selColaborador?.addEventListener('change', () => {
+            const atual = selCobertura?.value;
+            selCobertura.innerHTML = opcoesColaborador(atual, { excluir: selColaborador.value });
+        });
+
+        document.getElementById('btnRegistrarFolgaDomingo')?.addEventListener('click', () => registrar(dataISO));
+
+        document.getElementById('folgaDomingoLista')?.addEventListener('click', (evento) => {
+            const botao = evento.target.closest('[data-remover-folga]');
+
+            if (botao) {
+                remover(dataISO, botao.getAttribute('data-remover-folga'));
+            }
+        });
+
+        carregarLista(dataISO);
+    };
+}());
