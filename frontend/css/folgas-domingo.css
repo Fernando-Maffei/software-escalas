@@ -1,0 +1,104 @@
+/* ===========================================================
+   FOLGA DE DOMINGO (painel dentro de Lancar Plantao)
+   -----------------------------------------------------------
+   Arquivo proprio em vez de crescer plantao.css, que ja passa de
+   mil linhas. Usa os tokens de tema (--surface-raised, --border,
+   --text-light), que themes.css redefine por tema.
+   =========================================================== */
+
+.folga-domingo-bloco {
+    border-top: 1px dashed var(--border);
+    padding-top: 14px;
+    margin-top: 6px;
+}
+
+.folga-domingo-lista {
+    display: grid;
+    gap: 6px;
+    margin: 10px 0;
+}
+
+.folga-domingo-vazio {
+    padding: 12px;
+    border: 1px dashed var(--border);
+    border-radius: 10px;
+    color: var(--text-light);
+    font-size: 12px;
+    text-align: center;
+}
+
+.folga-domingo-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--surface-raised);
+}
+
+.folga-domingo-item strong {
+    font-size: 13px;
+    color: var(--text);
+}
+
+.folga-domingo-item p {
+    margin: 2px 0 0;
+    font-size: 12px;
+    color: var(--text-light);
+}
+
+.folga-domingo-obs {
+    font-style: italic;
+}
+
+/* Reposicao ou cobertura ainda em aberto: o registro vale, mas esta
+   incompleto. Sinaliza sem alarmar — nao e erro, e pendencia. */
+.folga-domingo-pendente {
+    color: var(--warning, #b45309);
+    font-weight: 600;
+}
+
+.folga-domingo-form {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 10px;
+    align-items: end;
+}
+
+.folga-domingo-campo {
+    display: grid;
+    gap: 4px;
+    min-width: 0;
+}
+
+.folga-domingo-campo--largo {
+    grid-column: 1 / -1;
+}
+
+.folga-domingo-campo small {
+    color: var(--text-light);
+    font-size: 10px;
+    font-weight: 800;
+    text-transform: uppercase;
+}
+
+.folga-domingo-par {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 24px minmax(0, 1fr);
+    gap: 6px;
+    align-items: center;
+}
+
+.folga-domingo-par span {
+    color: var(--text-light);
+    font-size: 11px;
+    font-weight: 700;
+    text-align: center;
+}
+
+.folga-domingo-form .btn-primary {
+    grid-column: 1 / -1;
+    justify-self: start;
+}

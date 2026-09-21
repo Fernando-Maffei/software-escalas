@@ -529,8 +529,19 @@
                         </button>
                     ` : ''}
                 </div>
+
+                ${typeof window.renderPainelFolgasDomingo === 'function'
+                    ? window.renderPainelFolgasDomingo(state.dataISO)
+                    : ''}
             </div>
         `;
+
+        // Depois do innerHTML: o painel de folga liga os proprios eventos e
+        // busca a lista dele. Em dia que nao e domingo ele nao renderiza nada
+        // e esta chamada sai na hora.
+        if (typeof window.bindPainelFolgasDomingo === 'function') {
+            window.bindPainelFolgasDomingo(state.dataISO);
+        }
 
         const novoInicio = document.getElementById('plantaoNovoInicio');
         const novoFim = document.getElementById('plantaoNovoFim');

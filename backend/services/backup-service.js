@@ -10,6 +10,7 @@ const { REQUIRED_TABLES } = require('../db/database-schema');
 const { AppError } = require('../lib/errors');
 const { normalizeDiaSemana } = require('./jornada-semanal');
 const { normalizeColaboradores } = require('./plantoes');
+const { ESCALA_TIPOS } = require('./escala');
 const { withTransaction } = require('../db/transactions');
 const {
     ensurePositiveInt,
@@ -26,7 +27,10 @@ const {
 
 const AUSENCIA_TIPOS = Object.freeze(['folga', 'ausencia', 'ferias']);
 const AUSENCIA_PERIODO_TIPOS = Object.freeze(['dia_inteiro', 'horas']);
-const ESCALA_DIA_TIPOS = Object.freeze(['normal', 'plantao', 'folga', 'ferias', 'ausencia', 'ajuste']);
+// Vem de escala.js em vez de copia local: esta lista ficou para tras quando os
+// tipos do plantonista entraram, e restaurar um backup com domingo_folgado
+// abortava a restauracao INTEIRA com "Tipo da escala diaria invalido".
+const ESCALA_DIA_TIPOS = Object.freeze([...ESCALA_TIPOS]);
 // Ordem respeitando as foreign keys. Grafo: tudo referencia Colaboradores, e
 // Colaboradores referencia Setores. Ao apagar, filhos primeiro; ao inserir,
 // pais primeiro. AlmocosPersonalizados e Setores faltavam nas duas listas — o
@@ -40,6 +44,7 @@ const BACKUP_DELETE_ORDER = Object.freeze([
     'Ausencias',
     'plantoes',
     'Feriados',
+    'FolgasDomingo',
     // Colaboradores referencia TiposEscala, entao sai antes dele; TipoEscalaDia
     // tambem e filha de TiposEscala.
     'Colaboradores',
@@ -53,6 +58,7 @@ const BACKUP_INSERT_ORDER = Object.freeze([
     'TiposEscala',
     'TipoEscalaDia',
     'Colaboradores',
+    'FolgasDomingo',
     'ColaboradorJornadaSemanal',
     'Feriados',
     'Ausencias',
@@ -108,6 +114,22 @@ const TABLE_INSERT_SPECS = Object.freeze({
             ['TrabalhoFim', sql.Time],
             ['AlmocoInicio', sql.Time],
             ['AlmocoFim', sql.Time]
+        ]
+    },
+    FolgasDomingo: {
+        identityColumn: 'Id',
+        columns: [
+            ['Id', sql.Int],
+            ['ColaboradorId', sql.Int],
+            ['DataDomingo', sql.Date],
+            ['DataReposicao', sql.Date],
+            ['ReposicaoHoraInicio', sql.Time],
+            ['ReposicaoHoraFim', sql.Time],
+            ['CobertoPorColaboradorId', sql.Int],
+            ['PlantaoId', sql.Int],
+            ['Observacao', sql.NVarChar(500)],
+            ['CriadoEm', sql.DateTime],
+            ['AtualizadoEm', sql.DateTime]
         ]
     },
     ColaboradorJornadaSemanal: {

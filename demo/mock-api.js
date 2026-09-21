@@ -111,6 +111,17 @@
         [/\/api\/plantoes/, () => json([])],
         [/\/api\/jornada-semanal/, () => json([])],
         [/\/api\/tipos-escala/, () => json({ total: D.TIPOS_ESCALA.length, items: D.TIPOS_ESCALA })],
+        // Filtra por data como a API real: o painel do plantao pede um domingo
+        // so, entao sem o filtro a folga apareceria em todos os domingos.
+        [/\/api\/folgas-domingo/, (m, url) => {
+            const inicio = parametro(url, 'dataInicio');
+            const fim = parametro(url, 'dataFim');
+            const itens = D.FOLGAS_DOMINGO.filter((f) => (
+                (!inicio || f.dataDomingo >= inicio || (f.dataReposicao && f.dataReposicao >= inicio))
+                && (!fim || f.dataDomingo <= fim || (f.dataReposicao && f.dataReposicao <= fim))
+            ));
+            return json({ total: itens.length, items: itens });
+        }],
         // A grade semanal e suas sub-rotas vem ANTES de /api/banco-horas e esta
         // e ancorada: sem isso o prefixo capturava /api/banco-horas-semanal e a
         // tela recebia { itens, resumo } no lugar de { periodo, colaboradores, semanas }.
