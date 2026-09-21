@@ -13,6 +13,12 @@ const CONFIGURACOES_SECOES = [
         description: 'Preferencias gerais'
     },
     {
+        id: 'escalas',
+        label: 'Escalas',
+        icon: 'calendar-check',
+        description: 'Tipos de escala'
+    },
+    {
         id: 'banco',
         label: 'Conexao banco',
         icon: 'database',

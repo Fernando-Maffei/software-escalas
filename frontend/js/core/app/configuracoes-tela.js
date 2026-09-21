@@ -137,6 +137,32 @@ function renderConfiguracoes() {
             </div>
 
             <!-- CARD SOBRE O SISTEMA -->
+            <div class="config-card config-card-wide" data-config-section="escalas">
+                <div class="config-card-header">
+                    <i class="fas fa-calendar-check"></i>
+                    <h2>Tipos de escala</h2>
+                </div>
+
+                <div class="config-card-body">
+                    <p class="helper-text">
+                        Moldes de padrao semanal (5x2, plantonista, ...). Aplicar um molde a alguem
+                        acontece no cadastro do colaborador, nao aqui.
+                    </p>
+
+                    <div class="tipos-escala-acoes-topo">
+                        <button type="button" class="btn-primary" id="btnNovoTipoEscala">
+                            <i class="fas fa-plus"></i> Novo tipo
+                        </button>
+                        <button type="button" class="btn-secondary" id="btnRecarregarTiposEscala">
+                            <i class="fas fa-rotate"></i> Recarregar
+                        </button>
+                    </div>
+
+                    <div id="tiposEscalaLista" class="tipos-escala-lista"></div>
+                    <div id="tiposEscalaEditor" class="tipos-escala-editor is-hidden"></div>
+                </div>
+            </div>
+
             <div class="config-card" data-config-section="sobre">
                 <div class="config-card-header">
                     <i class="fas fa-info-circle"></i>
@@ -558,6 +584,12 @@ function renderConfiguracoes() {
 
     inicializarDiagnosticoRede();
     inicializarServidorSegundoPlano();
+
+    // Banco sem a migracao dos tipos de escala: a lista fica vazia com um
+    // aviso, e o resto das Configuracoes segue funcionando.
+    if (typeof window.inicializarTiposEscala === 'function') {
+        window.inicializarTiposEscala();
+    }
 }
 
 // Função para mudar o tema
