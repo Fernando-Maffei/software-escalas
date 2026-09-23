@@ -6,6 +6,10 @@
    folga, beltrano cobre" — lancar a cobertura e registrar a folga no
    mesmo lugar evita ir e voltar entre telas.
 
+   Nao ha campo "quem cobriu": quem esta lancado no plantao daquele domingo
+   JA e quem cobriu, entao o campo duplicaria a informacao. A escala marca
+   esses lancamentos como cobertura sozinha.
+
    O painel do plantao se redesenha a cada tecla digitada no formulario
    (renderPlantaoEditor e chamado de varios lugares). Por isso a lista de
    folgas NAO e montada dentro do innerHTML dele: o HTML sai com um
@@ -60,11 +64,10 @@
         return bruto.includes(':') ? bruto.slice(0, 5) : '';
     }
 
-    function opcoesColaborador(selecionado, { excluir = null } = {}) {
+    function opcoesColaborador(selecionado) {
         return [
             '<option value="">Selecione...</option>',
             ...(window.colaboradores || [])
-                .filter((c) => !excluir || Number(c.Id) !== Number(excluir))
                 .map((c) => `<option value="${c.Id}" ${Number(selecionado) === Number(c.Id) ? 'selected' : ''}>${esc(c.Nome)}</option>`)
         ].join('');
     }
@@ -79,8 +82,8 @@
             <div class="editor-form-group folga-domingo-bloco" data-folga-domingo-data="${esc(dataISO)}">
                 <label><i class="fas fa-scale-balanced"></i> Folga de domingo</label>
                 <p class="helper-text">
-                    Registra quem folgou este domingo, em que dia repoe e quem cobriu o posto.
-                    A escala do mes passa a mostrar os tres dias ligados.
+                    Registra quem folgou este domingo e em que dia repoe, com horario e almoco.
+                    Quem esta lancado no plantao deste dia aparece na escala como cobertura.
                 </p>
 
                 <div id="folgaDomingoLista" class="folga-domingo-lista">
@@ -93,10 +96,6 @@
                         <select id="folgaDomingoColaborador" class="form-control">${opcoesColaborador('')}</select>
                     </div>
                     <div class="folga-domingo-campo">
-                        <small>Quem cobriu (opcional)</small>
-                        <select id="folgaDomingoCobertoPor" class="form-control">${opcoesColaborador('')}</select>
-                    </div>
-                    <div class="folga-domingo-campo">
                         <small>Repoe em (opcional)</small>
                         <input type="date" id="folgaDomingoDataReposicao" class="form-control">
                     </div>
@@ -106,6 +105,14 @@
                             <input type="time" id="folgaDomingoHoraInicio" class="form-control">
                             <span>ate</span>
                             <input type="time" id="folgaDomingoHoraFim" class="form-control">
+                        </div>
+                    </div>
+                    <div class="folga-domingo-campo">
+                        <small>Almoco da reposicao</small>
+                        <div class="folga-domingo-par">
+                            <input type="time" id="folgaDomingoAlmocoInicio" class="form-control">
+                            <span>ate</span>
+                            <input type="time" id="folgaDomingoAlmocoFim" class="form-control">
                         </div>
                     </div>
                     <div class="folga-domingo-campo folga-domingo-campo--largo">
@@ -133,18 +140,18 @@
         }
 
         alvo.innerHTML = folgas.map((folga) => {
+            const almoco = folga.reposicaoAlmocoInicio && folga.reposicaoAlmocoFim
+                ? ` · almoco ${hora(folga.reposicaoAlmocoInicio)}–${hora(folga.reposicaoAlmocoFim)}`
+                : '';
             const reposicao = folga.dataReposicao
-                ? `repoe ${rotuloData(folga.dataReposicao)} ${hora(folga.reposicaoHoraInicio)}–${hora(folga.reposicaoHoraFim)}`
+                ? `repoe ${rotuloData(folga.dataReposicao)} ${hora(folga.reposicaoHoraInicio)}–${hora(folga.reposicaoHoraFim)}${almoco}`
                 : '<span class="folga-domingo-pendente">reposicao nao marcada</span>';
-            const cobertura = folga.cobertoPorNome
-                ? `coberta por ${esc(folga.cobertoPorNome)}`
-                : '<span class="folga-domingo-pendente">sem cobertura</span>';
 
             return `
                 <div class="folga-domingo-item">
                     <div>
                         <strong>${esc(folga.colaboradorNome)}</strong>
-                        <p>${reposicao} · ${cobertura}</p>
+                        <p>${reposicao}</p>
                         ${folga.observacao ? `<p class="folga-domingo-obs">${esc(folga.observacao)}</p>` : ''}
                     </div>
                     <button type="button" class="btn-danger-ghost" data-remover-folga="${folga.id}" title="Remover registro">
@@ -203,10 +210,11 @@
         const payload = {
             colaboradorId,
             dataDomingo: dataISO,
-            cobertoPorColaboradorId: document.getElementById('folgaDomingoCobertoPor')?.value || null,
             dataReposicao: document.getElementById('folgaDomingoDataReposicao')?.value || null,
             reposicaoHoraInicio: document.getElementById('folgaDomingoHoraInicio')?.value || null,
             reposicaoHoraFim: document.getElementById('folgaDomingoHoraFim')?.value || null,
+            reposicaoAlmocoInicio: document.getElementById('folgaDomingoAlmocoInicio')?.value || null,
+            reposicaoAlmocoFim: document.getElementById('folgaDomingoAlmocoFim')?.value || null,
             observacao: document.getElementById('folgaDomingoObservacao')?.value.trim() || null
         };
 
@@ -229,8 +237,9 @@
     }
 
     function limparFormulario() {
-        ['folgaDomingoColaborador', 'folgaDomingoCobertoPor', 'folgaDomingoDataReposicao',
-            'folgaDomingoHoraInicio', 'folgaDomingoHoraFim', 'folgaDomingoObservacao']
+        ['folgaDomingoColaborador', 'folgaDomingoDataReposicao', 'folgaDomingoHoraInicio',
+            'folgaDomingoHoraFim', 'folgaDomingoAlmocoInicio', 'folgaDomingoAlmocoFim',
+            'folgaDomingoObservacao']
             .forEach((id) => {
                 const campo = document.getElementById(id);
 
@@ -261,16 +270,6 @@
         if (!bloco || !ehDomingo(dataISO)) {
             return;
         }
-
-        // Quem folgou nao pode ser quem cobre: o backend barra, mas tirar a
-        // pessoa do outro select evita o erro antes de acontecer.
-        const selColaborador = document.getElementById('folgaDomingoColaborador');
-        const selCobertura = document.getElementById('folgaDomingoCobertoPor');
-
-        selColaborador?.addEventListener('change', () => {
-            const atual = selCobertura?.value;
-            selCobertura.innerHTML = opcoesColaborador(atual, { excluir: selColaborador.value });
-        });
 
         document.getElementById('btnRegistrarFolgaDomingo')?.addEventListener('click', () => registrar(dataISO));
 

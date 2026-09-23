@@ -125,6 +125,11 @@ const TABLE_INSERT_SPECS = Object.freeze({
             ['DataReposicao', sql.Date],
             ['ReposicaoHoraInicio', sql.Time],
             ['ReposicaoHoraFim', sql.Time],
+            ['ReposicaoAlmocoInicio', sql.Time],
+            ['ReposicaoAlmocoFim', sql.Time],
+            // A tela nao preenche mais CobertoPorColaboradorId (quem cobriu sao
+            // os lancados no plantao do domingo), mas a coluna segue existindo
+            // e pode ter dado antigo — continua no backup para nao se perder.
             ['CobertoPorColaboradorId', sql.Int],
             ['PlantaoId', sql.Int],
             ['Observacao', sql.NVarChar(500)],
