@@ -1,8 +1,9 @@
 // FolgasDomingo: o registro do evento de folga de domingo do plantonista.
 //
-// Uma linha guarda o evento inteiro — quem folgou, em que domingo, em que dia
-// repos e quem cobriu o posto —, em vez de registros soltos que alguem teria
-// que correlacionar depois.
+// Uma linha guarda o evento inteiro — quem folgou, em que domingo e em que dia
+// repos (com horario e almoco) —, em vez de registros soltos que alguem teria
+// que correlacionar depois. Quem COBRIU nao e campo: sao os colaboradores
+// lancados no plantao daquele domingo, entao guardar de novo duplicaria.
 //
 // Este servico so grava e le. Quem transforma isso em linhas de escala e a
 // hidratacao em escala.js (hydrateFolgasDomingoIntoEscala), e quem confere se
@@ -50,8 +51,8 @@ function serializeFolgaDomingo(row) {
         dataReposicao: extractDateString(row.DataReposicao ?? row.dataReposicao),
         reposicaoHoraInicio: extractTimeString(row.ReposicaoHoraInicio ?? row.reposicaoHoraInicio),
         reposicaoHoraFim: extractTimeString(row.ReposicaoHoraFim ?? row.reposicaoHoraFim),
-        cobertoPorColaboradorId: row.CobertoPorColaboradorId ?? row.cobertoPorColaboradorId ?? null,
-        cobertoPorNome: row.CobertoPorNome ?? row.cobertoPorNome ?? null,
+        reposicaoAlmocoInicio: extractTimeString(row.ReposicaoAlmocoInicio ?? row.reposicaoAlmocoInicio),
+        reposicaoAlmocoFim: extractTimeString(row.ReposicaoAlmocoFim ?? row.reposicaoAlmocoFim),
         plantaoId: row.PlantaoId ?? row.plantaoId ?? null,
         observacao: row.Observacao ?? row.observacao ?? null,
         criadoEm: row.CriadoEm ?? row.criadoEm ?? null,
@@ -113,21 +114,45 @@ function normalizeFolgaDomingoPayload(body = {}, fallback = {}) {
         }
     }
 
-    const cobertoPorColaboradorId = body.cobertoPorColaboradorId !== undefined
-        ? normalizeNullableId(body.cobertoPorColaboradorId, 'Colaborador que cobriu')
-        : normalizeNullableId(fallback.cobertoPorColaboradorId, 'Colaborador que cobriu');
+    const reposicaoAlmocoInicio = normalizeNullableTime(
+        body.reposicaoAlmocoInicio !== undefined ? body.reposicaoAlmocoInicio : fallback.reposicaoAlmocoInicio,
+        'Inicio do almoco da reposicao'
+    );
+    const reposicaoAlmocoFim = normalizeNullableTime(
+        body.reposicaoAlmocoFim !== undefined ? body.reposicaoAlmocoFim : fallback.reposicaoAlmocoFim,
+        'Fim do almoco da reposicao'
+    );
 
-    if (cobertoPorColaboradorId && cobertoPorColaboradorId === colaboradorId) {
-        throw new AppError(400, 'O colaborador nao pode cobrir a propria folga.');
+    // Mesma regra do resto do sistema (validateWorkSchedule e o CHECK da
+    // jornada semanal): almoco vem aos pares e cabe dentro da jornada.
+    if (Boolean(reposicaoAlmocoInicio) !== Boolean(reposicaoAlmocoFim)) {
+        throw new AppError(400, 'Informe o inicio e o fim do almoco da reposicao.');
     }
+
+    if (reposicaoAlmocoInicio && reposicaoAlmocoFim) {
+        if (!dataReposicao) {
+            throw new AppError(400, 'Marque a data da reposicao antes de lancar o almoco dela.');
+        }
+
+        if (reposicaoAlmocoInicio >= reposicaoAlmocoFim) {
+            throw new AppError(400, 'O inicio do almoco da reposicao deve ser menor que o fim.');
+        }
+
+        if (reposicaoAlmocoInicio <= reposicaoHoraInicio || reposicaoAlmocoFim >= reposicaoHoraFim) {
+            throw new AppError(400, 'O almoco da reposicao precisa ficar dentro do horario de trabalho.');
+        }
+    }
+
+    const temReposicao = Boolean(dataReposicao);
 
     return {
         colaboradorId,
         dataDomingo,
         dataReposicao,
-        reposicaoHoraInicio: dataReposicao ? reposicaoHoraInicio : null,
-        reposicaoHoraFim: dataReposicao ? reposicaoHoraFim : null,
-        cobertoPorColaboradorId,
+        reposicaoHoraInicio: temReposicao ? reposicaoHoraInicio : null,
+        reposicaoHoraFim: temReposicao ? reposicaoHoraFim : null,
+        reposicaoAlmocoInicio: temReposicao ? reposicaoAlmocoInicio : null,
+        reposicaoAlmocoFim: temReposicao ? reposicaoAlmocoFim : null,
         plantaoId: body.plantaoId !== undefined
             ? normalizeNullableId(body.plantaoId, 'Plantao')
             : normalizeNullableId(fallback.plantaoId, 'Plantao'),
@@ -149,15 +174,14 @@ function buildSelect() {
             f.DataReposicao,
             f.ReposicaoHoraInicio,
             f.ReposicaoHoraFim,
-            f.CobertoPorColaboradorId,
-            cob.Nome AS CobertoPorNome,
+            f.ReposicaoAlmocoInicio,
+            f.ReposicaoAlmocoFim,
             f.PlantaoId,
             f.Observacao,
             f.CriadoEm,
             f.AtualizadoEm
         FROM FolgasDomingo f
         INNER JOIN Colaboradores c ON c.Id = f.ColaboradorId
-        LEFT JOIN Colaboradores cob ON cob.Id = f.CobertoPorColaboradorId
     `;
 }
 
@@ -224,7 +248,8 @@ function aplicarInputs(request, payload) {
         .input('dataReposicao', sql.Date, payload.dataReposicao)
         .input('reposicaoHoraInicio', sql.Time, payload.reposicaoHoraInicio)
         .input('reposicaoHoraFim', sql.Time, payload.reposicaoHoraFim)
-        .input('cobertoPorColaboradorId', sql.Int, payload.cobertoPorColaboradorId)
+        .input('reposicaoAlmocoInicio', sql.Time, payload.reposicaoAlmocoInicio)
+        .input('reposicaoAlmocoFim', sql.Time, payload.reposicaoAlmocoFim)
         .input('plantaoId', sql.Int, payload.plantaoId)
         .input('observacao', sql.NVarChar(500), payload.observacao);
 }
@@ -246,20 +271,16 @@ async function createFolgaDomingo(poolOrTx, schema, body) {
     const payload = normalizeFolgaDomingoPayload(body);
     await ensureColaboradorExiste(poolOrTx, payload.colaboradorId, 'Colaborador');
 
-    if (payload.cobertoPorColaboradorId) {
-        await ensureColaboradorExiste(poolOrTx, payload.cobertoPorColaboradorId, 'Colaborador que cobriu');
-    }
-
     try {
         const inserido = await aplicarInputs(poolOrTx.request(), payload).query(`
             INSERT INTO FolgasDomingo (
                 ColaboradorId, DataDomingo, DataReposicao, ReposicaoHoraInicio, ReposicaoHoraFim,
-                CobertoPorColaboradorId, PlantaoId, Observacao
+                ReposicaoAlmocoInicio, ReposicaoAlmocoFim, PlantaoId, Observacao
             )
             OUTPUT INSERTED.Id
             VALUES (
                 @colaboradorId, @dataDomingo, @dataReposicao, @reposicaoHoraInicio, @reposicaoHoraFim,
-                @cobertoPorColaboradorId, @plantaoId, @observacao
+                @reposicaoAlmocoInicio, @reposicaoAlmocoFim, @plantaoId, @observacao
             )
         `);
 
@@ -275,10 +296,6 @@ async function updateFolgaDomingo(poolOrTx, schema, id, body) {
 
     await ensureColaboradorExiste(poolOrTx, payload.colaboradorId, 'Colaborador');
 
-    if (payload.cobertoPorColaboradorId) {
-        await ensureColaboradorExiste(poolOrTx, payload.cobertoPorColaboradorId, 'Colaborador que cobriu');
-    }
-
     try {
         await aplicarInputs(poolOrTx.request(), payload)
             .input('id', sql.Int, atual.id)
@@ -290,7 +307,8 @@ async function updateFolgaDomingo(poolOrTx, schema, id, body) {
                     DataReposicao = @dataReposicao,
                     ReposicaoHoraInicio = @reposicaoHoraInicio,
                     ReposicaoHoraFim = @reposicaoHoraFim,
-                    CobertoPorColaboradorId = @cobertoPorColaboradorId,
+                    ReposicaoAlmocoInicio = @reposicaoAlmocoInicio,
+                    ReposicaoAlmocoFim = @reposicaoAlmocoFim,
                     PlantaoId = @plantaoId,
                     Observacao = @observacao,
                     AtualizadoEm = GETDATE()

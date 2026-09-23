@@ -61,6 +61,28 @@ BEGIN
 END;
 GO
 
+-- Almoco do dia reposto. Fica aqui pelo MESMO motivo do horario de trabalho:
+-- o dia reposto e, por definicao, um dia que a jornada semanal marca como
+-- folga, entao nao ha almoco de cadastro de onde puxar.
+--
+-- Nao usa AlmocosPersonalizados (o mecanismo de ajuste manual por dia) porque
+-- upsertLunchOverride APAGA a linha quando o almoco coincide com o do cadastro
+-- do colaborador — e ai o almoco sumiria da reposicao em silencio, ja que
+-- aquele dia nao tem linha base que o segure. O valor daqui vai para
+-- escala_dia.almoco_inicio/almoco_fim, os mesmos campos de todo almoco do
+-- sistema, entao listagens, relatorios e calculos leem sem caminho paralelo.
+IF COL_LENGTH('dbo.FolgasDomingo', 'ReposicaoAlmocoInicio') IS NULL
+BEGIN
+    ALTER TABLE dbo.FolgasDomingo ADD ReposicaoAlmocoInicio TIME NULL;
+END;
+GO
+
+IF COL_LENGTH('dbo.FolgasDomingo', 'ReposicaoAlmocoFim') IS NULL
+BEGIN
+    ALTER TABLE dbo.FolgasDomingo ADD ReposicaoAlmocoFim TIME NULL;
+END;
+GO
+
 IF COL_LENGTH('dbo.FolgasDomingo', 'CobertoPorColaboradorId') IS NULL
 BEGIN
     ALTER TABLE dbo.FolgasDomingo ADD CobertoPorColaboradorId INT NULL;
@@ -146,7 +168,35 @@ BEGIN
 END;
 GO
 
+-- Almoco so existe junto de uma jornada, e dentro dela. Mesma regra que
+-- CK_ColaboradorJornadaSemanal_AlmocoDentroJornada aplica na jornada semanal.
+IF NOT EXISTS (
+    SELECT 1 FROM sys.check_constraints
+    WHERE parent_object_id = OBJECT_ID('dbo.FolgasDomingo')
+      AND name = 'CK_FolgasDomingo_ReposicaoAlmoco'
+)
+BEGIN
+    ALTER TABLE dbo.FolgasDomingo
+    ADD CONSTRAINT CK_FolgasDomingo_ReposicaoAlmoco
+        CHECK (
+            (ReposicaoAlmocoInicio IS NULL AND ReposicaoAlmocoFim IS NULL)
+            OR (
+                ReposicaoAlmocoInicio IS NOT NULL
+                AND ReposicaoAlmocoFim IS NOT NULL
+                AND ReposicaoAlmocoInicio < ReposicaoAlmocoFim
+                AND ReposicaoHoraInicio IS NOT NULL
+                AND ReposicaoHoraFim IS NOT NULL
+                AND ReposicaoAlmocoInicio > ReposicaoHoraInicio
+                AND ReposicaoAlmocoFim < ReposicaoHoraFim
+            )
+        );
+END;
+GO
+
 -- Ninguem cobre a propria folga.
+-- MANTIDA por ora: a tela nao envia mais CobertoPorColaboradorId (os lancados
+-- no domingo ja SAO quem cobriu, entao o campo duplicava a informacao), mas a
+-- coluna e a restricao ficam de pe para nao mexer em dado existente.
 IF NOT EXISTS (
     SELECT 1 FROM sys.check_constraints
     WHERE parent_object_id = OBJECT_ID('dbo.FolgasDomingo')

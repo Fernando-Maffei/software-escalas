@@ -151,8 +151,8 @@ window.DemoDados = (function () {
             dataReposicao: '2026-10-01',
             reposicaoHoraInicio: '13:00:00',
             reposicaoHoraFim: '22:00:00',
-            cobertoPorColaboradorId: 2,
-            cobertoPorNome: 'Bruno Tavares',
+            reposicaoAlmocoInicio: '17:00:00',
+            reposicaoAlmocoFim: '18:00:00',
             plantaoId: null,
             observacao: 'Folga de domingo do mes'
         }

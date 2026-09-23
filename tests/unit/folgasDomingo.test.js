@@ -14,7 +14,8 @@ const BASE = {
     dataReposicao: '2026-10-29',
     reposicaoHoraInicio: '08:00',
     reposicaoHoraFim: '17:00',
-    cobertoPorColaboradorId: 7
+    reposicaoAlmocoInicio: '12:00',
+    reposicaoAlmocoFim: '13:00'
 };
 
 const MARIA = { Id: 3, Nome: 'Maria', SetorId: 2, SetorNome: 'Suporte N1' };
@@ -28,7 +29,8 @@ module.exports = [
             assert.equal(payload.dataDomingo, '2026-10-25');
             assert.equal(payload.dataReposicao, '2026-10-29');
             assert.equal(payload.reposicaoHoraInicio, '08:00:00');
-            assert.equal(payload.cobertoPorColaboradorId, 7);
+            assert.equal(payload.reposicaoAlmocoInicio, '12:00:00');
+            assert.equal(payload.reposicaoAlmocoFim, '13:00:00');
         }
     },
     {
@@ -77,20 +79,15 @@ module.exports = [
             assert.equal(payload.dataReposicao, null);
             // Horario so faz sentido junto da data; sem ela nao fica dado solto.
             assert.equal(payload.reposicaoHoraInicio, null);
-            assert.equal(payload.cobertoPorColaboradorId, null);
+            assert.equal(payload.reposicaoAlmocoInicio, null);
         }
     },
     {
-        name: 'normalizeFolgaDomingoPayload recusa repor no proprio domingo e cobrir a si mesmo',
+        name: 'normalizeFolgaDomingoPayload recusa repor no proprio domingo folgado',
         run() {
             assert.throws(
                 () => normalizeFolgaDomingoPayload({ ...BASE, dataReposicao: '2026-10-25' }),
                 /nao pode cair no proprio domingo/i
-            );
-
-            assert.throws(
-                () => normalizeFolgaDomingoPayload({ ...BASE, cobertoPorColaboradorId: 3 }),
-                /nao pode cobrir a propria folga/i
             );
         }
     },
@@ -116,7 +113,32 @@ module.exports = [
     {
         // A linha da reposicao guarda no texto de qual domingo ela veio: e o
         // vinculo visivel para quem so olha a escala do dia.
-        name: 'createReposicaoEscalaRecord usa o horario gravado e cita o domingo reposto',
+        name: 'createReposicaoEscalaRecord leva horario e almoco para os campos normais da escala',
+        run() {
+            const registro = createReposicaoEscalaRecord(MARIA, {
+                id: 12,
+                dataDomingo: '2026-10-25',
+                dataReposicao: '2026-10-29',
+                reposicaoHoraInicio: '08:00',
+                reposicaoHoraFim: '17:00',
+                reposicaoAlmocoInicio: '12:00',
+                reposicaoAlmocoFim: '13:00'
+            });
+
+            assert.equal(registro.tipo, 'reposicao');
+            assert.equal(registro.dataISO, '2026-10-29');
+            assert.equal(registro.horaInicio, '08:00:00');
+            assert.equal(registro.horaFim, '17:00:00');
+            // almocoInicio/almocoFim sao os MESMOS campos de todo almoco do
+            // sistema: e por isso que listagens e relatorios pegam sozinhos.
+            assert.equal(registro.almocoInicio, '12:00:00');
+            assert.equal(registro.almocoFim, '13:00:00');
+            assert.equal(registro.origemTipo, 'folga_domingo');
+            assert.match(registro.observacao, /Reposicao do domingo 2026-10-25/);
+        }
+    },
+    {
+        name: 'createReposicaoEscalaRecord deixa o almoco nulo quando nao foi lancado',
         run() {
             const registro = createReposicaoEscalaRecord(MARIA, {
                 id: 12,
@@ -126,13 +148,49 @@ module.exports = [
                 reposicaoHoraFim: '17:00'
             });
 
-            assert.equal(registro.tipo, 'reposicao');
-            assert.equal(registro.dataISO, '2026-10-29');
-            assert.equal(registro.horaInicio, '08:00:00');
-            assert.equal(registro.horaFim, '17:00:00');
             assert.equal(registro.almocoInicio, null);
-            assert.equal(registro.origemTipo, 'folga_domingo');
-            assert.match(registro.observacao, /Reposicao do domingo 2026-10-25/);
+            assert.equal(registro.almocoFim, null);
+        }
+    },
+    {
+        // Mesma regra do resto do sistema: almoco vem aos pares e cabe dentro
+        // da jornada (validateWorkSchedule / CK da jornada semanal).
+        name: 'normalizeFolgaDomingoPayload valida o almoco da reposicao',
+        run() {
+            assert.throws(
+                () => normalizeFolgaDomingoPayload({ ...BASE, reposicaoAlmocoFim: null }),
+                /inicio e o fim do almoco/i
+            );
+
+            assert.throws(
+                () => normalizeFolgaDomingoPayload({
+                    ...BASE,
+                    reposicaoAlmocoInicio: '13:00',
+                    reposicaoAlmocoFim: '12:00'
+                }),
+                /inicio do almoco da reposicao deve ser menor/i
+            );
+
+            // 07:00 comeca antes da jornada (08:00-17:00).
+            assert.throws(
+                () => normalizeFolgaDomingoPayload({
+                    ...BASE,
+                    reposicaoAlmocoInicio: '07:00',
+                    reposicaoAlmocoFim: '08:30'
+                }),
+                /dentro do horario de trabalho/i
+            );
+
+            // Almoco sem data de reposicao seria dado solto.
+            assert.throws(
+                () => normalizeFolgaDomingoPayload({
+                    colaboradorId: 3,
+                    dataDomingo: '2026-10-25',
+                    reposicaoAlmocoInicio: '12:00',
+                    reposicaoAlmocoFim: '13:00'
+                }),
+                /data da reposicao antes de lancar o almoco/i
+            );
         }
     },
     {
@@ -152,7 +210,7 @@ module.exports = [
                 origemId: 42
             };
 
-            const registro = createCoberturaEscalaRecord(linhaDoPlantao, 'Maria');
+            const registro = createCoberturaEscalaRecord(linhaDoPlantao, ['Maria']);
 
             assert.equal(registro.tipo, 'cobertura');
             assert.equal(registro.horaInicio, '13:00:00');
@@ -161,6 +219,26 @@ module.exports = [
             assert.equal(registro.origemId, 42);
             assert.match(registro.observacao, /Cobrindo Maria/);
             assert.match(registro.observacao, /Turno da tarde/);
+        }
+    },
+    {
+        // Nao ha mais campo "quem cobriu": quem esta lancado no domingo cobre
+        // o posto de TODOS os que folgaram, entao a observacao lista todos.
+        name: 'createCoberturaEscalaRecord lista todos os folguistas do domingo',
+        run() {
+            const linha = { dataISO: '2026-10-25', tipo: 'plantao', observacao: null };
+
+            assert.match(
+                createCoberturaEscalaRecord(linha, ['Maria', 'Joao']).observacao,
+                /Cobrindo Maria, Joao/
+            );
+
+            // Domingo sem nome resolvido (colaborador desligado, por exemplo)
+            // ainda marca cobertura, so sem citar ninguem.
+            assert.equal(
+                createCoberturaEscalaRecord(linha, []).observacao,
+                'Cobertura de domingo'
+            );
         }
     }
 ];

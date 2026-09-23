@@ -378,10 +378,12 @@ function createReposicaoEscalaRecord(colaborador, folga) {
         tipo: 'reposicao',
         horaInicio: extractTimeString(folga.reposicaoHoraInicio),
         horaFim: extractTimeString(folga.reposicaoHoraFim),
-        // Sem almoco: o dia reposto nao tem jornada de onde herdar um, e
-        // inventar um intervalo seria dado que ninguem informou.
-        almocoInicio: null,
-        almocoFim: null,
+        // O almoco vem do proprio registro da folga, pelo mesmo motivo do
+        // horario de trabalho: o dia reposto e folga na jornada, entao nao ha
+        // almoco de cadastro de onde herdar. Cai nos campos almoco_inicio /
+        // almoco_fim de escala_dia, os mesmos de todo almoco do sistema.
+        almocoInicio: extractTimeString(folga.reposicaoAlmocoInicio),
+        almocoFim: extractTimeString(folga.reposicaoAlmocoFim),
         observacao: `Reposicao do domingo ${folga.dataDomingo}`,
         origemTipo: 'folga_domingo',
         origemId: folga.id
@@ -391,12 +393,20 @@ function createReposicaoEscalaRecord(colaborador, folga) {
 // A cobertura NAO troca a origem: aquela linha pertence ao plantao e continua
 // apontando para ele. Apagar a folga faz a proxima geracao nao reclassificar,
 // e a linha volta a ser plantao sozinha.
-function createCoberturaEscalaRecord(registroDoPlantao, nomeDeQuemFolgou) {
+//
+// Recebe a LISTA de quem folgou no domingo, nao uma pessoa: quem esta escalado
+// naquele dia cobre o posto de todos os que folgaram, e nao ha como (nem por
+// que) dizer quem cobriu quem individualmente.
+function createCoberturaEscalaRecord(registroDoPlantao, nomesDeQuemFolgou) {
+    const nomes = (Array.isArray(nomesDeQuemFolgou) ? nomesDeQuemFolgou : [nomesDeQuemFolgou])
+        .map((nome) => trimToNull(nome))
+        .filter(Boolean);
+
     return {
         ...registroDoPlantao,
         tipo: 'cobertura',
         observacao: buildEscalaObservationParts(
-            `Cobrindo ${nomeDeQuemFolgou}`,
+            nomes.length ? `Cobrindo ${nomes.join(', ')}` : 'Cobertura de domingo',
             trimToNull(registroDoPlantao.observacao)
         )
     };
@@ -1303,7 +1313,8 @@ async function hydrateFolgasDomingoIntoEscala(poolOrTx, schema, existingMap, col
                 CONVERT(VARCHAR(10), DataReposicao, 23) AS DataReposicao,
                 ReposicaoHoraInicio,
                 ReposicaoHoraFim,
-                CobertoPorColaboradorId,
+                ReposicaoAlmocoInicio,
+                ReposicaoAlmocoFim,
                 Observacao
             FROM FolgasDomingo
             WHERE (DataDomingo BETWEEN @dataInicio AND @dataFim)
@@ -1311,6 +1322,9 @@ async function hydrateFolgasDomingoIntoEscala(poolOrTx, schema, existingMap, col
         `);
 
     const conta = (acao) => { counters[acao] = (counters[acao] || 0) + 1; };
+    // Domingo -> nomes de quem folgou nele. Alimenta a passada de cobertura
+    // mais abaixo, que e por DIA e nao por pessoa.
+    const folguistasPorDomingo = new Map();
 
     for (const folga of result.recordset) {
         const colaborador = colaboradoresMap.get(Number(folga.ColaboradorId));
@@ -1329,10 +1343,18 @@ async function hydrateFolgasDomingoIntoEscala(poolOrTx, schema, existingMap, col
             dataReposicao,
             reposicaoHoraInicio: folga.ReposicaoHoraInicio,
             reposicaoHoraFim: folga.ReposicaoHoraFim,
+            reposicaoAlmocoInicio: folga.ReposicaoAlmocoInicio,
+            reposicaoAlmocoFim: folga.ReposicaoAlmocoFim,
             observacao: folga.Observacao
         };
 
         if (noPeriodo(dataDomingo)) {
+            if (!folguistasPorDomingo.has(dataDomingo)) {
+                folguistasPorDomingo.set(dataDomingo, []);
+            }
+
+            folguistasPorDomingo.get(dataDomingo).push(colaborador.Nome);
+
             const aplicado = await applyAutomaticEscalaRecord(
                 poolOrTx,
                 existingMap,
@@ -1358,25 +1380,28 @@ async function hydrateFolgasDomingoIntoEscala(poolOrTx, schema, existingMap, col
             conta(aplicado.action);
         }
 
-        if (folga.CobertoPorColaboradorId && noPeriodo(dataDomingo)) {
-            const cobridor = colaboradoresMap.get(Number(folga.CobertoPorColaboradorId));
-            const existente = cobridor
-                ? existingMap.get(buildEscalaKey(cobridor.Id, dataDomingo))
-                : null;
+    }
 
-            // So reclassifica quem ja esta escalado naquele domingo. Sem linha,
-            // a cobertura nao foi lancada como plantao — o vinculo diz quem
-            // cobriria, mas quem gera a escala do dia e o plantao.
-            if (existente) {
-                const aplicado = await applyAutomaticEscalaRecord(
-                    poolOrTx,
-                    existingMap,
-                    createCoberturaEscalaRecord(existente, colaborador.Nome),
-                    { force: false }
-                );
-
-                conta(aplicado.action);
+    // Cobertura: num domingo que tem folga registrada, TODO mundo escalado
+    // naquele dia esta, por definicao, cobrindo. Nao ha campo "quem cobriu" —
+    // ele duplicaria a lista de quem foi lancado no plantao do dia.
+    //
+    // So pega quem ja tem linha de plantao: sem lancamento, ninguem trabalhou,
+    // e o vinculo da folga por si so nao escala ninguem.
+    for (const [dataDomingo, folguistas] of folguistasPorDomingo) {
+        for (const registro of [...existingMap.values()]) {
+            if (registro.dataISO !== dataDomingo || registro.tipo !== 'plantao') {
+                continue;
             }
+
+            const aplicado = await applyAutomaticEscalaRecord(
+                poolOrTx,
+                existingMap,
+                createCoberturaEscalaRecord(registro, folguistas),
+                { force: false }
+            );
+
+            conta(aplicado.action);
         }
     }
 }
