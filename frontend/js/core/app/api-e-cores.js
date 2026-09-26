@@ -11,31 +11,6 @@ function getApiBaseUrl() {
     return `${origin.replace(/\/$/, '')}/api`;
 }
 
-function apiUrl(path = '') {
-    const normalizedPath = String(path || '');
-
-    if (!normalizedPath || normalizedPath === '/') {
-        return getApiBaseUrl();
-    }
-
-    return normalizedPath.startsWith('/')
-        ? `${getApiBaseUrl()}${normalizedPath}`
-        : `${getApiBaseUrl()}/${normalizedPath}`;
-}
-
-function normalizeLegacyApiUrl(url) {
-    if (typeof url !== 'string') {
-        return url;
-    }
-
-    if (!url.startsWith('http://localhost:3000/api')) {
-        return url;
-    }
-
-    const suffix = url.slice('http://localhost:3000/api'.length);
-    return suffix ? `${getApiBaseUrl()}${suffix}` : getApiBaseUrl();
-}
-
 function normalizarCorHex(value, fallback = '#3f74be') {
     const raw = String(value || '').trim();
 
@@ -48,21 +23,6 @@ function normalizarCorHex(value, fallback = '#3f74be') {
     }
 
     return fallback;
-}
-
-function ajustarCorHex(hex, percent = -18) {
-    const normalized = normalizarCorHex(hex);
-    const value = normalized.replace('#', '');
-    const channels = [0, 2, 4].map((index) => parseInt(value.slice(index, index + 2), 16));
-    const adjusted = channels.map((channel) => {
-        const next = percent < 0
-            ? channel + ((channel * percent) / 100)
-            : channel + (((255 - channel) * percent) / 100);
-
-        return Math.max(0, Math.min(255, Math.round(next)));
-    });
-
-    return `#${adjusted.map((channel) => channel.toString(16).padStart(2, '0')).join('')}`;
 }
 
 function getCoresEscalaPadrao() {

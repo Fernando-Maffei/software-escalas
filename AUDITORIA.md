@@ -143,12 +143,18 @@ essas duas: some plantao, feriado, setor, banco de horas, escala. Ha backup de
 seguranca automatico antes, mas o fluxo e uma armadilha. Correcao proposta: o
 export passa a baixar o backup completo do servidor — ver pergunta P2.
 
-**A6 — `fetch` global remendado para reescrever `http://localhost:3000`** · `ABERTO`
+**A6 — `fetch` global remendado para reescrever `http://localhost:3000`** · `RESOLVIDO`
 `frontend/js/core/app.js:113-126`, `core/app/api-e-cores.js:26-36`
 Varios arquivos chamam `fetch('http://localhost:3000/api/...')` (porta errada,
 host fixo) e um monkey-patch no `window.fetch` reescreve a URL em tempo de
 execucao (`ausencias-e-timeline.js:7`, `colaboradores.js:438`, `feriados.js:7,246`,
 `colaboradores-e-jornada.js:560`). Correcao: usar `apiUrl()` direto e remover o patch.
+**Feito:** as chamadas usam `window.API` (o cliente que ja existia); os dois
+remendos de `window.fetch` perderam a reescrita de URL. O de `api.js` ficou so com
+o que tinha de legitimo — avisar a tela quando a sessao expira (401) — e foi
+renomeado para `installSessionExpiryWatcher`. Verificado no navegador: criar
+colaborador pelo editor, erro 404 chegando com a mensagem do servidor e o aviso
+de sessao expirada.
 
 **A7 — Troca de senha sem confirmar a senha atual** · `ABERTO`
 `backend/routes/auth.js:109`
@@ -175,12 +181,23 @@ integracao cria a folga com reposicao e almoco e confere a escala dos dois dias.
 /api/folgas-domingo/:id` chamava `undefined(...)`. **Feito:** exportada; teste de
 integracao edita a data de reposicao e confere que a escala acompanha.
 
-**A11 — Funcoes chamadas que nao existem em lugar nenhum** · `ABERTO`
+**A11 — Funcoes chamadas que nao existem em lugar nenhum** · `RESOLVIDO`
 `frontend/js/core/app/calendario-e-legenda.js:332,335` chama
 `carregarAusenciasDoDia` e `configurarCamposHora`, que nenhum arquivo define,
 dentro de `abrirModalAusencia` — que por sua vez usa um `#modal` que nao existe
 mais no HTML. So nao explode porque `telas/calendar.js:309` so cai nesse caminho
 se o modal novo nao existir. Codigo morto com bomba-relogio (achado pelo ESLint).
+**Feito:** removidos `abrirModalAusencia` e o ramo impossivel de `calendar.js`;
+junto sairam as referencias as duas funcoes inexistentes. O ESLint (que calcula
+os globais a partir do codigo) nao acusa mais nenhum `no-undef` no frontend.
+
+**A12 — Falha ao carregar dados vira tela vazia, sem aviso** · `ABERTO`
+`frontend/js/core/runtime/dados-e-modais.js:133-240` (achado na Fase 3)
+Os carregadores de colaboradores, setores, ausencias, feriados e tipos de escala
+fazem `catch { lista = [] }`: se a API cair ou der erro, a tela mostra "nenhum
+colaborador/ausencia" como se fosse verdade, e o usuario pode tomar decisao de
+escala em cima disso. Ha tambem `try { colaboradores = lista } catch { // ignore }`
+em volta de atribuicoes que nunca lancam.
 
 ### MEDIO
 
@@ -278,10 +295,34 @@ ligacao `PlantaoColaborador`. Mudanca de banco → pergunta P5.
 
 ### BAIXO
 
-**B1 — Codigo morto** · `ABERTO`
+**B1 — Codigo morto** · `RESOLVIDO`
 `testarConexaoBackend` (`conexao-backend.js`, URLs fixas na porta 3000),
 `debugTiposAusencias` (`calendario-e-legenda.js:206`), rota `GET /api/test`
 (`server.js:507`).
+**Feito:** `scripts/analisar-codigo-morto.js` (`npm run analisar:codigo-morto`)
+monta o grafo de chamadas das funcoes globais do front a partir do que executa
+(codigo de topo, os dois index.html, a demo) e acusa o que nada alcanca e o que
+esta declarado em dois arquivos. Removidas **66 funcoes, ~2.100 linhas**, e dois
+arquivos que ficaram vazios (`core/app/conexao-backend.js`,
+`core/app/ausencias-e-timeline.js`, tirados tambem dos dois index.html). A rota
+`GET /api/test` continua (ver B1b). Prova de que nada ficou chamando o que saiu:
+zero `no-undef` no ESLint + as 9 telas renderizando o mesmo HTML de antes, sem
+erro de JS. **O que saiu** (todas sem nenhum chamador):
+- timeline antiga: `gerarTimelineVisualComAusencias`, `gerarHeaderTimeline`,
+  `adicionarLinhaTotalizador`, `mostrarDetalhesHora`, `gerarResumoHorarios`,
+  `abrirSeletorMes`, `calcularHorasTrabalhadas`;
+- modais antigos de ausencia e de horario: `abrirModalAusencia`,
+  `abrirModalHorario`, `carregarColaboradoresNoSelect`, `cancelarEdicaoAusencia`,
+  `toggleCamposHora`, `corrigirDataISO`;
+- exportacao antiga de relatorio: `mostrarOpcoesExportacao`, `exportarRelatorio*`,
+  `exportarComo*`;
+- editor antigo de saldo no cadastro: `buildBancoHorasEditorMarkup` e 8 auxiliares;
+- arrasto antigo de almoco da escala: `bindLunchCellDragEscala` e 7 auxiliares
+  (o atual e `bindFluidLunchDragEscala`);
+- carregadores antigos que o `runtime/` ja substituia: `carregarAusencias`,
+  `carregarFeriadosLocais`, `salvarFeriado`, `editarFeriado`;
+- ajudantes de console: `debugDados`, `debugTiposAusencias`, `debugAusencias` e
+  `testarConexaoBackend` (este apontava para a porta 3000).
 
 **B2 — 65 `console.log` de depuracao no frontend** · `ABERTO`
 Ex.: `ausencias-e-timeline.js:6-52` loga cada ausencia recebida (dados pessoais no console).
@@ -300,6 +341,10 @@ Login (`auth.js:21,26`) e rotas de `/sistema` (`background-service.js:15`).
 
 **B7 — Enumeracao de usuario por tempo de resposta no login** · `ABERTO`
 Usuario inexistente responde sem rodar o scrypt (mais rapido).
+
+**B9 — Telas pedem dados antes do login** · `ABERTO`
+Ao abrir o sistema deslogado, ~15 requisicoes de dados saem antes da tela de login
+e voltam 401 (ruido no console e no log). Achado na verificacao no navegador.
 
 **B8 — Filtros `LOWER(coluna) = @x` impedem uso de indice** · `ACEITO`
 Tabelas pequenas; o collation padrao ja e case-insensitive. Nao vale o risco agora.

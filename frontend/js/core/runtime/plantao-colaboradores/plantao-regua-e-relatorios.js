@@ -229,21 +229,6 @@
         await window.abrirEditorPlantao(normalized, formatarDataPlantaoCard(normalized));
     }
 
-    function resolvePlantaoWeekdayEscala(dataISO) {
-        const normalized = obterDataISO(dataISO);
-
-        if (!normalized) {
-            return new Date().getDay();
-        }
-
-        const [year, month, day] = normalized.split('-').map(Number);
-        return new Date(year, month - 1, day, 12, 0, 0).getDay();
-    }
-
-    function isPlantaoSabadoEscala(dataISO) {
-        return Boolean(obterDataISO(dataISO)) && resolvePlantaoWeekdayEscala(dataISO) === 6;
-    }
-
     window.abrirPlantaoPorData = abrirPlantaoPorData = function abrirPlantaoPorDataAtualizado(dataISO) {
         return openPlantaoEditorFromGrid(dataISO);
     };

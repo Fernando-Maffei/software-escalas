@@ -202,25 +202,6 @@ function gerarLegendaMensal() {
 
 }
 
-
-function debugTiposAusencias() {
-    console.log("=== DEBUG TIPOS DE AUSÊNCIAS ===");
-    if (ausencias && ausencias.length > 0) {
-        ausencias.forEach((a, index) => {
-            console.log(`Ausência ${index + 1}:`, {
-                id: a.id || a.Id,
-                tipo: a.tipo || a.Tipo,
-                tipoLower: (a.tipo || a.Tipo || '').toLowerCase(),
-                colaboradorId: a.colaboradorId || a.ColaboradorId,
-                dataInicio: a.DataInicio,
-                dataFim: a.DataFim
-            });
-        });
-    } else {
-        console.log("Nenhuma ausência encontrada");
-    }
-}
-
 function renderCalendario() {
     console.log('Renderizando calendário...');
     
@@ -288,65 +269,6 @@ function renderCalendario() {
             console.error('Função inicializarCalendario não encontrada!');
         }
     }, 200); // Pequeno delay para garantir que o DOM foi atualizado
-}
-// Modificar a função abrirModalAusencia para resetar os campos de hora
-function abrirModalAusencia(dataISO = null) {
-    console.log("Abrindo modal de ausência...", dataISO);
-    
-    const modal = document.getElementById("modal");
-    if (!modal) {
-        console.error("Modal não encontrado!");
-        return;
-    }
-    
-    dataSelecionada = dataISO;
-    
-    document.getElementById("loadingAusencias").classList.remove("hidden");
-    document.getElementById("emptyAusencias").classList.add("hidden");
-    document.getElementById("listaAusencias").classList.add("hidden");
-    
-    document.getElementById("colaboradorSelect").value = "";
-    document.getElementById("tipoSelect").value = "folga";
-    document.getElementById("periodoTipo").value = "dia_inteiro";
-    document.getElementById("camposHora").classList.add("hidden");
-    document.getElementById("horaInicio").value = "";
-    document.getElementById("horaFim").value = "";
-    
-    if (dataISO) {
-        let dataFormatada = dataISO;
-        if (dataISO.includes('T')) {
-            dataFormatada = dataISO.split('T')[0];
-        }
-        document.getElementById("dataInicio").value = dataFormatada;
-        document.getElementById("dataFim").value = dataFormatada;
-    } else {
-        document.getElementById("dataInicio").value = "";
-        document.getElementById("dataFim").value = "";
-    }
-    
-    editandoAusenciaId = null;
-    document.getElementById("salvarAusenciaBtn").innerHTML = '<i class="fas fa-save"></i> Salvar';
-    document.getElementById("cancelarEdicaoLancamentoBtn").classList.add("hidden");
-    
-    carregarColaboradoresNoSelect();
-    carregarAusenciasDoDia(dataISO);
-    
-    // 🔥 CHAMAR A CONFIGURAÇÃO DOS CAMPOS DE HORA
-    configurarCamposHora();
-    
-    modal.classList.remove("hidden");
-    modal.classList.add("active");
-}
-function debugDados() {
-    console.log("=== DEBUG DO SISTEMA ===");
-    console.log("Colaboradores:", colaboradores.length);
-    console.log("Ausências:", ausencias.length);
-    console.log("Feriados API:", feriados?.length || 0);
-    console.log("Feriados Locais:", feriadosLocais?.length || 0);
-    
-    if (ausencias.length > 0) {
-        console.log("Primeira ausência:", ausencias[0]);
-    }
 }
 
 function getPaginaFromURL() {

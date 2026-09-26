@@ -301,14 +301,7 @@ function gerarCalendario(mes, ano) {
         cell.addEventListener('click', (event) => {
             event.stopPropagation();
 
-            if (typeof window.abrirModalLancamento === 'function') {
-                window.abrirModalLancamento(cell.classList.contains('holiday') ? 'feriados' : 'pessoal', dataISO, true);
-                return;
-            }
-
-            if (typeof window.abrirModalAusencia === 'function') {
-                window.abrirModalAusencia(dataISO);
-            }
+            window.abrirModalLancamento(cell.classList.contains('holiday') ? 'feriados' : 'pessoal', dataISO, true);
         });
 
         calendar.appendChild(cell);

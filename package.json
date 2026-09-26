@@ -27,7 +27,8 @@
     "teste:derrubar": "docker compose -f docker-compose.teste.yml down -v",
     "limpar-feriados-nacionais": "node scripts/limpar-feriados-nacionais.js",
     "smoke": "node tests/smoke.js",
-    "integracao:servidor": "node tests/integracao/servidor-local.js"
+    "integracao:servidor": "node tests/integracao/servidor-local.js",
+    "analisar:codigo-morto": "node scripts/analisar-codigo-morto.js"
   },
   "keywords": [],
   "author": "Fernando Maffei",

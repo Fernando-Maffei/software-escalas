@@ -188,7 +188,7 @@
         });
     };
 
-    window.carregarAusencias = carregarAusencias = function carregarAusenciasComCache() {
+    window.carregarAusencias = function carregarAusenciasComCache() {
         return withInFlight('ausencias', async () => {
             let lista = [];
 
@@ -210,7 +210,7 @@
         });
     };
 
-    window.carregarFeriadosLocais = carregarFeriadosLocais = function carregarFeriadosLocaisComCache() {
+    window.carregarFeriadosLocais = function carregarFeriadosLocaisComCache() {
         return withInFlight('feriadosLocais', async () => {
             let lista = [];
 

@@ -1,26 +1,4 @@
-    function compactEscalaExportLabel(value) {
-        return String(value || '--')
-            .replace(/\s+às\s+/gi, '-')
-            .replace(/\s+-\s+/g, '-')
-            .replace(/\s+/g, ' ')
-            .trim() || '--';
-    }
 
-    function compactEscalaExportName(value) {
-        const name = String(value || '--').replace(/\s+/g, ' ').trim();
-
-        if (name.length <= 12) {
-            return name;
-        }
-
-        const parts = name.split(' ').filter(Boolean);
-
-        if (parts.length >= 2) {
-            return `${parts[0]} ${parts[1].charAt(0)}.`;
-        }
-
-        return `${name.slice(0, 13)}...`;
-    }
 
     function getEscalaExportDayRowCount(day) {
         return Array.isArray(day?.rows) ? day.rows.length : 0;

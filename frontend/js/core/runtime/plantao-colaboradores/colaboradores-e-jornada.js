@@ -555,10 +555,6 @@
         }
 
         try {
-            const metodo = id ? 'PUT' : 'POST';
-            const url = id
-                ? `http://localhost:3000/api/colaboradores/${id}`
-                : 'http://localhost:3000/api/colaboradores';
             const jornadaMeta = getJornadaSemanalEditorMeta();
             const jornadaSemanal = collectJornadaSemanalPayloadFromEditor();
             const shouldSendJornadaSemanal = Boolean(
@@ -596,15 +592,12 @@
                 body.jornadaSemanal = jornadaSemanal;
             }
 
-            const response = await fetch(url, {
-                method: metodo,
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(body)
-            });
-            const data = await response.json().catch(() => null);
-
-            if (!response.ok) {
-                throw new Error(data?.error || data?.message || 'Erro ao salvar');
+            // window.API.request ja transforma resposta de erro em Error com a
+            // mensagem do servidor.
+            if (id) {
+                await window.API.put(`/colaboradores/${id}`, body);
+            } else {
+                await window.API.post('/colaboradores', body);
             }
 
             await Promise.allSettled([

@@ -9,23 +9,14 @@ let editandoFeriadoId = null;
 let exclusaoPendenteId = null;
 let exclusaoTipo = 'ausencia';
 
-
 // EXPOR FUNÇÕES GLOBAIS (já está correto)
 window.carregarPagina = carregarPagina;
-window.abrirModalHorario = abrirModalHorario;
-window.debugTiposAusencias = debugTiposAusencias;
-window.debugDados = debugDados;
-window.testarAtualizacao = testarAtualizacao;
 window.ausencias = ausencias;
 window.colaboradores = colaboradores;
 window.setores = setores;
 window.feriadosLocais = feriadosLocais;
-window.editarFeriado = editarFeriado;
 window.excluirFeriado = excluirFeriado;
 window.gerarRelatorioCompleto = gerarRelatorioCompleto;
-window.toggleCamposHora = toggleCamposHora;
-window.mostrarDetalhesHora = mostrarDetalhesHora;
-window.corrigirDataISO = corrigirDataISO;
 window.carregarSetores = carregarSetores;
 
 const ESCALA_CORES_STORAGE_KEY = 'escalaCoresPersonalizadas';
@@ -98,12 +89,9 @@ const ESCALA_CORES_PADRAO = [
 window.ESCALA_CORES_PADRAO = ESCALA_CORES_PADRAO;
 window.aplicarCoresEscala = aplicarCoresEscala;
 
-
-
 window.abrirModalFeriado = function(dataISO) {
     window.abrirModalLancamento('feriados', dataISO);
 };
-
 
 // Elemento principal onde o conteúdo será renderizado
 const appContent = document.getElementById("appContent");
@@ -111,26 +99,11 @@ window.__appBootstrapPromise = window.__appBootstrapPromise || null;
 aplicarCoresEscala();
 window.testarComunicacaoRede = testarComunicacaoRede;
 
-if (!window.__API_FETCH_NORMALIZER_INSTALLED__ && typeof window.fetch === 'function') {
-    const nativeFetch = window.fetch.bind(window);
-
-    window.fetch = function fetchWithDynamicApiHost(input, init) {
-        if (typeof input === 'string') {
-            return nativeFetch(normalizeLegacyApiUrl(input), init);
-        }
-
-        return nativeFetch(input, init);
-    };
-
-    window.__API_FETCH_NORMALIZER_INSTALLED__ = true;
-    window.normalizeLegacyApiUrl = normalizeLegacyApiUrl;
-}
 document.addEventListener("DOMContentLoaded", async () => {
     inicializarAplicacaoUmaVez();
 });
-window.testarConexaoBackend = testarConexaoBackend;
 window.adicionarSetorRapido = adicionarSetorRapido;
-importarDados = function importarDadosAtualizado() {
+window.importarDados = function importarDados() {
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = '.json';

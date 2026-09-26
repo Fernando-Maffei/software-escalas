@@ -1,5 +1,3 @@
-const LEGACY_API_URL_PATTERN = /^http:\/\/(?:localhost|127\.0\.0\.1):3000\/api(?=\/|$|\?)/i;
-
 function getRuntimeApiBaseUrl() {
     if (window.__API_BASE_URL) {
         const explicitBase = String(window.__API_BASE_URL).replace(/\/$/, '');
@@ -11,32 +9,6 @@ function getRuntimeApiBaseUrl() {
         : 'http://localhost:4450';
 
     return `${origin.replace(/\/$/, '')}/api`;
-}
-
-function normalizeApiUrl(input) {
-    if (typeof input !== 'string') {
-        return input;
-    }
-
-    return input.replace(LEGACY_API_URL_PATTERN, getRuntimeApiBaseUrl());
-}
-
-function normalizeFetchInput(input) {
-    if (typeof input === 'string') {
-        return normalizeApiUrl(input);
-    }
-
-    if (typeof URL !== 'undefined' && input instanceof URL) {
-        const normalized = normalizeApiUrl(input.href);
-        return normalized === input.href ? input : new URL(normalized);
-    }
-
-    if (typeof Request !== 'undefined' && input instanceof Request) {
-        const normalized = normalizeApiUrl(input.url);
-        return normalized === input.url ? input : new Request(normalized, input);
-    }
-
-    return input;
 }
 
 function getRequestUrl(input) {
@@ -63,34 +35,33 @@ function notifyIfSessionExpired(response, requestUrl) {
     window.dispatchEvent(new CustomEvent('auth:expired'));
 }
 
-function installApiFetchNormalizer() {
-    if (window.__API_FETCH_NORMALIZER_INSTALLED__ || typeof window.fetch !== 'function') {
+// Qualquer 401 de rota de dados (inclusive de fetch feito direto pelas telas,
+// fora de window.API) avisa o login para reabrir a tela de entrada. O fetch
+// nativo e embrulhado so para isso — ele nao reescreve URL nenhuma.
+function installSessionExpiryWatcher() {
+    if (window.__SESSION_EXPIRY_WATCHER_INSTALLED__ || typeof window.fetch !== 'function') {
         return;
     }
 
     const nativeFetch = window.fetch.bind(window);
 
-    window.fetch = function fetchWithDynamicApiHost(input, init) {
-        const normalizedInput = normalizeFetchInput(input);
-
-        return nativeFetch(normalizedInput, init).then((response) => {
-            notifyIfSessionExpired(response, getRequestUrl(normalizedInput));
+    window.fetch = function fetchComAvisoDeSessao(input, init) {
+        return nativeFetch(input, init).then((response) => {
+            notifyIfSessionExpired(response, getRequestUrl(input));
             return response;
         });
     };
 
-    window.__API_FETCH_NORMALIZER_INSTALLED__ = true;
-    window.normalizeLegacyApiUrl = normalizeApiUrl;
+    window.__SESSION_EXPIRY_WATCHER_INSTALLED__ = true;
 }
 
-installApiFetchNormalizer();
+installSessionExpiryWatcher();
 
 const API = {
     get baseURL() {
         return getRuntimeApiBaseUrl();
     },
 
-    normalizeUrl: normalizeApiUrl,
 
     toQuery(params = {}) {
         const searchParams = new URLSearchParams();
