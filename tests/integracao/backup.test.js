@@ -3,6 +3,7 @@ const fs = require('fs');
 const path = require('path');
 
 const { PASTA_DADOS, consultar, criarCliente, esperarSucesso } = require('./apoio');
+const { TABELAS_BACKUP } = require('../../backend/services/backup/especificacao');
 const {
     DATAS,
     anotarSemana,
@@ -80,11 +81,43 @@ async function montarCenarioCompleto(cliente) {
     await lancarSaldoSemanal(cliente, colega.Id, '-01:15');
     await anotarSemana(cliente);
 
+    esperarSucesso(
+        await cliente.put('/api/escala/almoco-periodo', {
+            colaboradorId: colega.Id,
+            dataInicio: DATAS.segunda,
+            dataFim: DATAS.terca,
+            almocoInicio: '12:30',
+            almocoFim: '13:30'
+        }),
+        'almoco personalizado'
+    );
+
     // Garante linhas de escala_dia materializadas para o periodo.
     esperarSucesso(await cliente.get(`/api/escala/dia/${DATAS.segunda}`), 'gerar escala');
 }
 
 module.exports = [
+    {
+        // Rede contra a classe de bug do C2: tabela ou coluna nova no banco que
+        // ninguem lembrou de por no backup. Contas e sessoes ficam de fora de
+        // proposito (ver backup/especificacao.js).
+        name: 'especificacao do backup cobre todas as tabelas e colunas do banco',
+        async run() {
+            const colunasDoBanco = await consultar(`
+                SELECT c.TABLE_NAME AS tabela, c.COLUMN_NAME AS coluna
+                FROM INFORMATION_SCHEMA.COLUMNS c
+                JOIN INFORMATION_SCHEMA.TABLES t
+                  ON t.TABLE_NAME = c.TABLE_NAME AND t.TABLE_TYPE = 'BASE TABLE'
+                WHERE c.TABLE_NAME NOT IN ('Usuarios', 'Sessoes')
+            `);
+            const noBanco = colunasDoBanco.map((linha) => `${linha.tabela}.${linha.coluna}`).sort();
+            const naEspecificacao = TABELAS_BACKUP.flatMap((item) =>
+                item.colunas.map((coluna) => `${item.tabela}.${coluna.nome}`)
+            ).sort();
+
+            assert.deepEqual(naEspecificacao, noBanco);
+        }
+    },
     {
         // C2 da auditoria: a restauracao zerava tipos de escala e folgas de
         // domingo, perdia TipoEscalaId e o desligamento, transformava todo

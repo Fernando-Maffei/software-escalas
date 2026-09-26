@@ -97,4 +97,57 @@ module.exports = [
             assert.equal(payload.preferences.tema, 'dark');
         }
     }
+,
+    {
+        // Backup antigo nao tinha tipo_plantao; o DEFAULT do banco ('sabado')
+        // transformava todo domingo e feriado em sabado na restauracao.
+        name: 'coerceBackupPayload deriva o tipo do plantao pela data quando o backup nao traz',
+        run() {
+            const payload = coerceBackupPayload({
+                data: {
+                    plantoes: [
+                        { id: 1, data_plantao: '2027-01-02', colaboradores_ids: '[1]' },
+                        { id: 2, data_plantao: '2027-01-03', colaboradores_ids: '[1]' },
+                        { id: 3, data_plantao: '2027-09-07', colaboradores_ids: '[1]' },
+                        { id: 4, data_plantao: '2027-03-19', colaboradores_ids: '[1]' }
+                    ]
+                }
+            });
+
+            assert.deepEqual(
+                payload.data.plantoes.map((linha) => linha.tipo_plantao),
+                ['sabado', 'domingo', 'feriado', 'feriado']
+            );
+        }
+    },
+    {
+        name: 'coerceBackupPayload preserva tipo de credito, vinculo de escala e desligamento',
+        run() {
+            const payload = coerceBackupPayload({
+                data: {
+                    Colaboradores: [
+                        { Id: 1, Nome: 'Ana', TipoEscalaId: 4, Ativo: false, DataDesligamento: '2026-08-31T00:00:00.000Z' }
+                    ],
+                    plantoes: [
+                        { id: 9, data_plantao: '2027-01-03', colaboradores_ids: '[1]', tipo_plantao: 'domingo', tipo_credito: 'extra' }
+                    ]
+                }
+            });
+
+            const [colaborador] = payload.data.Colaboradores;
+            assert.equal(colaborador.TipoEscalaId, 4);
+            assert.equal(colaborador.Ativo, false);
+            assert.equal(colaborador.DataDesligamento, '2026-08-31');
+            assert.equal(payload.data.plantoes[0].tipo_credito, 'extra');
+        }
+    },
+    {
+        name: 'coerceBackupPayload recusa registro sem campo obrigatorio',
+        run() {
+            assert.throws(
+                () => coerceBackupPayload({ data: { Feriados: [{ Id: 1, Data: '2027-03-19' }] } }),
+                /Feriados.Nome e obrigatorio/
+            );
+        }
+    }
 ];

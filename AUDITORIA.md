@@ -57,7 +57,7 @@ Tamanho: ~62 mil linhas. Os maiores focos sao `backend/services/escala.js`
   do JSON da equipe virou `parseEquipePlantao` (antes duplicada). Testes de
   integracao: exclusao completa sem sobrar vinculo, e falha no meio sem apagar nada.
 
-**C2 — Restaurar backup corrompe dados em silencio** · `ABERTO`
+**C2 — Restaurar backup corrompe dados em silencio** · `RESOLVIDO`
 `backend/services/backup-service.js`
 - `coerceBackupPayload` (≈linha 823) **nunca** preenche `TiposEscala`,
   `TipoEscalaDia` nem `FolgasDomingo`, mas `BACKUP_DELETE_ORDER` apaga essas
@@ -74,6 +74,18 @@ Tamanho: ~62 mil linhas. Os maiores focos sao `backend/services/escala.js`
 - Correcao: uma unica tabela de especificacao por tabela (colunas + normalizador +
   ordem), derivada de forma que tabela nova sem spec **quebre um teste**; teste de
   ida-e-volta backup→restore no banco de teste.
+- **Feito:** `backend/services/backup/especificacao.js` e a fonte unica (ordem das
+  tabelas = ordem de insercao; exclusao = ordem inversa; colunas com tipo e
+  apelidos do formato legado). `backup/normalizacao.js` normaliza qualquer
+  tabela a partir da especificacao e guarda as regras de negocio que ja existiam
+  (padroes de ausencia, validacao de jornada, tipos da escala). Backup antigo sem
+  `tipo_plantao` tem o tipo derivado da data. Coluna ausente no arquivo deixa o
+  DEFAULT do banco agir. `backup-service.js` caiu de 1055 para ~190 linhas.
+- **Provas:** teste de ida-e-volta com as 14 tabelas preenchidas compara linha a
+  linha antes/depois (passa; contra o codigo antigo falha com a FK de
+  BancoHorasSemanal); teste que compara a especificacao com o
+  `INFORMATION_SCHEMA` (coluna nova sem backup quebra o CI); 3 testes unitarios
+  de compatibilidade.
 
 ### ALTO
 
@@ -93,13 +105,17 @@ aleatoria, porem `generated = !envPassword` = `false`: o log diz "senha definida
 via ADMIN_PASSWORD", a senha real nunca e exibida e ninguem consegue entrar.
 **Reproduzido** no banco de teste.
 
-**A3 — Backup grava hashes de senha e tokens de sessao validos** · `ABERTO`
+**A3 — Backup grava hashes de senha e tokens de sessao validos** · `RESOLVIDO`
 `backend/services/backup-service.js:423-437`
 O export itera `REQUIRED_TABLES`, que inclui `Usuarios` e `Sessoes`. Qualquer
 pessoa com leitura na pasta de backup obtem tokens de sessao em texto puro
 (sequestro de sessao de admin) e hashes scrypt. Sessao nao e dado de negocio.
 Correcao: excluir `Sessoes` do backup; manter `Usuarios` fora tambem (a
 restauracao nunca os reinsere), ou tratar explicitamente — ver pergunta P3.
+**Feito:** o backup exporta so as tabelas da especificacao; `Usuarios` e
+`Sessoes` ficaram de fora. Nenhuma funcionalidade se perdeu: a restauracao nunca
+reinseriu contas. (Se um dia quiser restaurar contas, e a P3.) Teste de
+integracao confere que o arquivo nao tem token de sessao nem hash de senha.
 
 **A4 — XSS armazenado em varias telas** · `ABERTO`
 Nome de colaborador/feriado/setor e descricao de alerta vao para `innerHTML` sem
@@ -257,7 +273,7 @@ ligacao `PlantaoColaborador`. Mudanca de banco → pergunta P5.
 **B2 — 65 `console.log` de depuracao no frontend** · `ABERTO`
 Ex.: `ausencias-e-timeline.js:6-52` loga cada ausencia recebida (dados pessoais no console).
 
-**B3 — Versao fixa `'1.2.0'` nos metadados do backup/export** · `ABERTO`
+**B3 — Versao fixa `'1.2.0'` nos metadados do backup/export** · `ABERTO` (backup do servidor resolvido: usa a versao do package.json; falta o export do front, ver A5)
 `backup-service.js:441`, `configuracoes-tela.js:636` (o sistema esta na 1.6.3).
 
 **B4 — Nome de variavel herdado de outra ferramenta** · `ABERTO`
