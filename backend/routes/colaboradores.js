@@ -11,6 +11,7 @@ const {
     replaceColaboradorJornadaSemanal
 } = require('../services/jornada-semanal');
 const { getBancoHorasCapabilities, getSchemaInfo, hasColumn, hasTable } = require('../db/schema');
+const { excluirColaboradorDefinitivamente } = require('../services/exclusao-colaborador');
 const { ensureSetorExists, normalizeNullableSetorId } = require('../services/setores');
 const { withTransaction } = require('../db/transactions');
 const {
@@ -489,103 +490,13 @@ router.put('/:id/reativar', async (req, res) => {
 });
 
 // Exclusao DEFINITIVA (limpeza). So permitida para quem ja esta desligado E cuja
-// data de desligamento ja passou (fim do periodo de retencao). Agora sim cascata
-// completa, inclusive Ausencias e banco de horas semanal.
+// data de desligamento ja passou (fim do periodo de retencao). A cascata inteira
+// esta em services/exclusao-colaborador.js e roda numa transacao so.
 router.delete('/:id', async (req, res) => {
     const id = ensurePositiveInt(req.params.id, 'Colaborador');
     const pool = await conectar();
-    const schema = await getSchemaInfo(pool);
-    const colaborador = await findColaboradorById(pool, id);
 
-    if (!colaborador) {
-        throw new AppError(404, 'Colaborador nao encontrado.');
-    }
-
-    if (hasColumn(schema, 'Colaboradores', 'Ativo')) {
-        const ativo = colaborador.Ativo === true || colaborador.Ativo === 1;
-
-        if (ativo) {
-            throw new AppError(400, 'Desligue o colaborador antes de excluir definitivamente.');
-        }
-
-        const dataDesligamento = extractDateString(colaborador.DataDesligamento);
-        const hojeISO = extractDateString(new Date());
-
-        if (!dataDesligamento || dataDesligamento > hojeISO) {
-            throw new AppError(400, 'A exclusao definitiva so e permitida apos a data de desligamento (periodo de retencao ainda vigente).');
-        }
-    }
-
-    const plantoes = await pool.request()
-        .query('SELECT id, colaboradores_ids FROM plantoes');
-
-    for (const plantao of plantoes.recordset) {
-        let colaboradoresIds = [];
-
-        try {
-            colaboradoresIds = JSON.parse(plantao.colaboradores_ids || '[]');
-        } catch (error) {
-            colaboradoresIds = [];
-        }
-
-        if (!Array.isArray(colaboradoresIds) || !colaboradoresIds.includes(id)) {
-            continue;
-        }
-
-        const atualizados = colaboradoresIds.filter((colaboradorId) => colaboradorId !== id);
-
-        await pool.request()
-            .input('id', sql.Int, plantao.id)
-            .input('colaboradores_ids', sql.NVarChar(sql.MAX), JSON.stringify(atualizados))
-            .query(`
-                UPDATE plantoes
-                SET colaboradores_ids = @colaboradores_ids, atualizado_em = GETDATE()
-                WHERE id = @id
-            `);
-    }
-
-    if (getBancoHorasCapabilities(schema).hasMovimentosTable) {
-        await pool.request()
-            .input('colaboradorId', sql.Int, id)
-            .query('DELETE FROM BancoHorasMovimentos WHERE ColaboradorId = @colaboradorId');
-    }
-
-    if (hasTable(schema, 'escala_dia')) {
-        await pool.request()
-            .input('colaboradorId', sql.Int, id)
-            .query('DELETE FROM escala_dia WHERE colaborador_id = @colaboradorId');
-    }
-
-    if (hasTable(schema, 'ColaboradorJornadaSemanal')) {
-        await pool.request()
-            .input('colaboradorId', sql.Int, id)
-            .query('DELETE FROM ColaboradorJornadaSemanal WHERE ColaboradorId = @colaboradorId');
-    }
-
-    // Almocos personalizados (o ajuste de almoco por dia/periodo) ficavam
-    // para tras quando o colaborador era excluido, virando linhas orfas
-    // apontando para um Id que nao existe mais.
-    if (hasTable(schema, 'AlmocosPersonalizados')) {
-        await pool.request()
-            .input('colaboradorId', sql.Int, id)
-            .query('DELETE FROM AlmocosPersonalizados WHERE ColaboradorId = @colaboradorId');
-    }
-
-    if (hasTable(schema, 'BancoHorasSemanal')) {
-        await pool.request()
-            .input('colaboradorId', sql.Int, id)
-            .query('DELETE FROM BancoHorasSemanal WHERE ColaboradorId = @colaboradorId');
-    }
-
-    // Na limpeza pos-retencao, as ausencias tambem sao removidas (o historico
-    // ja passou do periodo de guarda). Antes, elas BLOQUEAVAM a exclusao.
-    await pool.request()
-        .input('colaboradorId', sql.Int, id)
-        .query('DELETE FROM Ausencias WHERE ColaboradorId = @colaboradorId');
-
-    await pool.request()
-        .input('id', sql.Int, id)
-        .query('DELETE FROM Colaboradores WHERE Id = @id');
+    await withTransaction(sql, pool, (tx) => excluirColaboradorDefinitivamente(tx, id));
 
     res.json({
         message: 'Colaborador e historico excluidos definitivamente.',

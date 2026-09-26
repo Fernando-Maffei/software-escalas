@@ -1,5 +1,4 @@
 const { AppError } = require('../lib/errors');
-const { minutesToDurationLabel } = require('./bancoHoras');
 const { isFeriadoNacional } = require('./feriados-nacionais');
 const {
     ensurePositiveInt,
@@ -11,7 +10,7 @@ const {
     normalizeNumericArray,
     normalizeOptionalText
 } = require('../lib/validation');
-const { calculateIntervalMinutes } = require('./bancoHoras');
+const { calculateIntervalMinutes, minutesToDurationLabel } = require('./bancoHoras');
 
 function formatDateToISO(date) {
     return normalizeIsoDate(extractDateString(date), 'Data');
@@ -23,6 +22,23 @@ function normalizeColaboradores(values) {
     }
 
     return normalizeNumericArray(values, 'Colaborador');
+}
+
+// A equipe do plantao fica em plantoes.colaboradores_ids como texto JSON
+// ("[3,7]"). Texto que nao e JSON valido vira equipe vazia: e dado legado, e
+// derrubar a leitura do dia inteiro por causa dele seria pior.
+function parseEquipePlantao(raw) {
+    let valor = raw ?? [];
+
+    if (typeof valor === 'string') {
+        try {
+            valor = JSON.parse(valor);
+        } catch (error) {
+            valor = [];
+        }
+    }
+
+    return normalizeColaboradores(valor);
 }
 
 const PLANTAO_TIPOS = ['sabado', 'domingo', 'feriado'];
@@ -141,21 +157,15 @@ function serializePlantaoRecord(row) {
         dataISO = normalizeIsoDate(rawDate.split('T')[0], 'Data do plantão');
     }
 
-    let colaboradores = row.colaboradores ?? row.Colaboradores ?? row.colaboradores_ids ?? row.ColaboradoresIds ?? [];
-
-    if (typeof colaboradores === 'string') {
-        try {
-            colaboradores = JSON.parse(colaboradores);
-        } catch (error) {
-            colaboradores = [];
-        }
-    }
+    const colaboradores = parseEquipePlantao(
+        row.colaboradores ?? row.Colaboradores ?? row.colaboradores_ids ?? row.ColaboradoresIds
+    );
 
     return {
         id: row.id ?? row.Id ?? null,
         data_plantao: rawDate,
         dataISO,
-        colaboradores: normalizeColaboradores(colaboradores),
+        colaboradores,
         tipoPlantao: resolveLegacyPlantaoType(row, dataISO),
         tipoCredito: resolveLegacyTipoCredito(row),
         horaInicio: extractTimeString(row.hora_inicio ?? row.HoraInicio ?? row.horaInicio),
@@ -428,6 +438,7 @@ module.exports = {
     normalizeColaboradores,
     normalizePlantaoType,
     normalizeTipoCredito,
+    parseEquipePlantao,
     resolvePlantaoTypeByDate,
     serializePlantaoRecord
 };

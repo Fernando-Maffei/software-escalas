@@ -35,7 +35,7 @@ Tamanho: ~62 mil linhas. Os maiores focos sao `backend/services/escala.js`
 
 ### CRITICO
 
-**C1 — Exclusao definitiva de colaborador apaga metade do historico e depois falha** · `ABERTO`
+**C1 — Exclusao definitiva de colaborador apaga metade do historico e depois falha** · `RESOLVIDO`
 `backend/routes/colaboradores.js:494-610`
 - A cascata (plantoes, BancoHorasMovimentos, escala_dia, jornada, almocos,
   Ausencias, Colaboradores) roda **fora de transacao**, em `pool.request()` soltos.
@@ -49,6 +49,13 @@ Tamanho: ~62 mil linhas. Os maiores focos sao `backend/services/escala.js`
 - Tambem le **todos** os plantoes do banco e faz um UPDATE por linha (performance).
 - Correcao: uma transacao; cobrir todas as tabelas filhas; limpar
   `CobertoPorColaboradorId` de folgas de terceiros; teste de integracao.
+- **Feito:** a cascata foi para `backend/services/exclusao-colaborador.js`, numa
+  transacao so (`withTransaction`), com a lista explicita `TABELAS_FILHAS` (todas
+  as FKs para Colaboradores, inclusive BancoHorasSemanal e FolgasDomingo). A
+  referencia legada `CobertoPorColaboradorId` de folgas de terceiros vira NULL.
+  O plantao e pre-filtrado por `LIKE` em vez de ler a tabela inteira, e a leitura
+  do JSON da equipe virou `parseEquipePlantao` (antes duplicada). Testes de
+  integracao: exclusao completa sem sobrar vinculo, e falha no meio sem apagar nada.
 
 **C2 — Restaurar backup corrompe dados em silencio** · `ABERTO`
 `backend/services/backup-service.js`
@@ -130,6 +137,27 @@ Muda o contrato da rota → ver pergunta P4.
 **A8 — Sem linter, formatter, checagem de tipos ou testes de rota** · `ABERTO`
 Nenhum erro de rota, SQL ou transacao e pego antes de produção — C1 e C2 existem
 exatamente por isso. Fase 2.
+
+**A9 — Folga de domingo com reposicao sempre dava erro 500** · `RESOLVIDO`
+`backend/services/folgas-domingo.js:249-252` (achado pelos testes de integracao)
+Os horarios da reposicao iam como texto (`"08:00:00"`) para parametros
+`sql.Time`; o driver tedious 19 so aceita `Date` e respondia "Invalid time".
+Toda folga COM reposicao — o caso principal do plantonista — falhava.
+**Feito:** `toSqlTime` nos quatro parametros, como no resto do backend. Teste de
+integracao cria a folga com reposicao e almoco e confere a escala dos dois dias.
+
+**A10 — Editar folga de domingo sempre dava erro 500** · `RESOLVIDO`
+`backend/services/folgas-domingo.js` (achado pelo ESLint e pelo `tsc`)
+`updateFolgaDomingo` existia mas nao era exportada; a rota `PUT
+/api/folgas-domingo/:id` chamava `undefined(...)`. **Feito:** exportada; teste de
+integracao edita a data de reposicao e confere que a escala acompanha.
+
+**A11 — Funcoes chamadas que nao existem em lugar nenhum** · `ABERTO`
+`frontend/js/core/app/calendario-e-legenda.js:332,335` chama
+`carregarAusenciasDoDia` e `configurarCamposHora`, que nenhum arquivo define,
+dentro de `abrirModalAusencia` — que por sua vez usa um `#modal` que nao existe
+mais no HTML. So nao explode porque `telas/calendar.js:309` so cai nesse caminho
+se o modal novo nao existir. Codigo morto com bomba-relogio (achado pelo ESLint).
 
 ### MEDIO
 

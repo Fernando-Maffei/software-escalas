@@ -21,7 +21,8 @@ const {
     extractTimeString,
     normalizeIsoDate,
     normalizeNullableTime,
-    normalizeOptionalText
+    normalizeOptionalText,
+    toSqlTime
 } = require('../lib/validation');
 
 function ensureFolgasDomingoTable(schema, options = {}) {
@@ -241,15 +242,17 @@ async function ensureColaboradorExiste(poolOrTx, colaboradorId, rotulo) {
     }
 }
 
+// Os horarios chegam normalizados como texto "HH:mm:ss"; o driver (tedious)
+// so aceita Date num parametro TIME e recusava o texto com "Invalid time".
 function aplicarInputs(request, payload) {
     return request
         .input('colaboradorId', sql.Int, payload.colaboradorId)
         .input('dataDomingo', sql.Date, payload.dataDomingo)
         .input('dataReposicao', sql.Date, payload.dataReposicao)
-        .input('reposicaoHoraInicio', sql.Time, payload.reposicaoHoraInicio)
-        .input('reposicaoHoraFim', sql.Time, payload.reposicaoHoraFim)
-        .input('reposicaoAlmocoInicio', sql.Time, payload.reposicaoAlmocoInicio)
-        .input('reposicaoAlmocoFim', sql.Time, payload.reposicaoAlmocoFim)
+        .input('reposicaoHoraInicio', sql.Time, toSqlTime(payload.reposicaoHoraInicio))
+        .input('reposicaoHoraFim', sql.Time, toSqlTime(payload.reposicaoHoraFim))
+        .input('reposicaoAlmocoInicio', sql.Time, toSqlTime(payload.reposicaoAlmocoInicio))
+        .input('reposicaoAlmocoFim', sql.Time, toSqlTime(payload.reposicaoAlmocoFim))
         .input('plantaoId', sql.Int, payload.plantaoId)
         .input('observacao', sql.NVarChar(500), payload.observacao);
 }
@@ -338,5 +341,6 @@ module.exports = {
     findFolgaDomingoById,
     listFolgasDomingo,
     normalizeFolgaDomingoPayload,
-    serializeFolgaDomingo
+    serializeFolgaDomingo,
+    updateFolgaDomingo
 };
