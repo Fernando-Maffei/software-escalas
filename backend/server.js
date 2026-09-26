@@ -674,7 +674,7 @@ function start(options = {}) {
                         clearTimeout(timeoutId);
                     }
 
-                    await fecharConexao().catch(() => {});
+                    await fecharConexao();
                     activeController = null;
 
                     if (shutdownOptions.exitProcess) {
@@ -702,7 +702,7 @@ function start(options = {}) {
                     timeoutId.unref();
                 }
             })().catch(async (error) => {
-                await fecharConexao().catch(() => {});
+                await fecharConexao();
                 activeController = null;
 
                 if (shutdownOptions.exitProcess) {

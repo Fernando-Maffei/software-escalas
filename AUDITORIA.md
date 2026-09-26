@@ -459,9 +459,15 @@ Usuario inexistente responde sem rodar o scrypt (mais rapido).
 **Feito:** `credenciaisValidas` roda o scrypt contra um hash ficticio quando o
 usuario nao existe; login e verify-password usam essa funcao. Teste unitario.
 
-**B9 — Telas pedem dados antes do login** · `ABERTO`
+**B9 — Telas pedem dados antes do login** · `RESOLVIDO`
 Ao abrir o sistema deslogado, ~15 requisicoes de dados saem antes da tela de login
 e voltam 401 (ruido no console e no log). Achado na verificacao no navegador.
+**Feito:** o bootstrap do app e a carga do resumo de banco de horas esperam
+`aguardarUsuarioAutenticado()` antes de buscar dados. Medido no navegador:
+deslogado saiam 6 cargas de dados (todas 401); agora so `setup/status` e
+`auth/me`. Logado, os dados carregam e as 9 telas renderizam igual. De quebra
+saiu mais um `.catch(() => {})` redundante, e o fechamento do pool de conexoes
+no backend passou a registrar a falha em vez de engoli-la.
 
 **B10 — Desligar o servidor sem pasta de backup registrava erro** · `RESOLVIDO`
 `backend/services/backup-scheduler.js`: a falta de pasta era checada antes de ver
@@ -494,12 +500,16 @@ Tabelas pequenas; o collation padrao ja e case-insensitive. Nao vale o risco ago
 
 _(preenchido na Fase 3)_
 
-**B11 — Rajada repetida de requisicoes com sessao ativa** · `ABERTO` (achado no fim)
+**B11 — Rajada repetida de requisicoes com sessao ativa** · `ACEITO`
 No servidor de teste, com sessao ativa, o navegador registrou mais de 1.900
 requisicoes repetindo as mesmas 7 rotas (feriados, plantoes, colaboradores,
 jornada, setores, ausencias). Deslogado nao sai nenhuma. Falta confirmar se foi
 efeito das passadas automaticas pelas telas ou uma atualizacao periodica
 (`dashboardInterval` / `atualizarTudo`) disparando em excesso.
+**Investigado:** com a sessao ativa e a tela parada, zero requisicoes em 30 s (nao
+ha polling); cada troca de tela faz uma carga de cada lista, sem duplicatas. A
+rajada vista veio das dezenas de passadas automaticas que fiz pelas telas, cada
+uma com recarga da pagina — nao e bug.
 
 ---
 

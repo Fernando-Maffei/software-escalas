@@ -1037,14 +1037,15 @@
         }
     };
 
-    document.addEventListener('DOMContentLoaded', () => {
-        carregarBancoHorasResumo()
-            .then(() => {
-                if (isColaboradoresScreenVisible() && typeof renderListaColaboradores === 'function') {
-                    renderListaColaboradores();
-                }
-            })
-            .catch(() => {});
+    // carregarBancoHorasResumo trata a propria falha; so espera o login para
+    // nao disparar a carga (e um 401) atras da tela de entrada.
+    document.addEventListener('DOMContentLoaded', async () => {
+        await window.aguardarUsuarioAutenticado();
+        await carregarBancoHorasResumo();
+
+        if (isColaboradoresScreenVisible() && typeof renderListaColaboradores === 'function') {
+            renderListaColaboradores();
+        }
     });
 
     setTimeout(() => {

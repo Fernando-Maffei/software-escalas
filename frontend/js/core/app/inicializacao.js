@@ -9,6 +9,12 @@ function inicializarAplicacaoUmaVez() {
         const temaSalvo = localStorage.getItem('tema') || 'light';
         document.documentElement.setAttribute('data-theme', temaSalvo);
 
+        // Dados so depois do login: antes, com a tela de login aberta, o app ja
+        // disparava as cargas e todas voltavam 401.
+        if (typeof window.aguardarUsuarioAutenticado === 'function') {
+            await window.aguardarUsuarioAutenticado();
+        }
+
         try {
             await carregarColaboradores();
 
