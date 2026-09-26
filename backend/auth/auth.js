@@ -142,6 +142,25 @@ function normalizeSetoresVisiveis(value) {
     return Array.from(vistos);
 }
 
+// Setores PERMITIDOS sao um teto de acesso: se o JSON gravado estiver
+// ilegivel, a conta nao pode passar a ver tudo (lista vazia = sem restricao).
+// Um id que nao casa com nenhum setor faz as rotas nao mostrarem ninguem —
+// falha fechada — e o problema fica no log.
+const SETOR_PERMITIDO_INVALIDO = 'invalido';
+
+function lerSetoresPermitidos(json, userId) {
+    if (typeof json === 'string' && json.trim()) {
+        try {
+            JSON.parse(json);
+        } catch (error) {
+            console.error(`[auth] SetoresPermitidosJson ilegivel no usuario ${userId}; acesso bloqueado ate corrigir.`);
+            return [SETOR_PERMITIDO_INVALIDO];
+        }
+    }
+
+    return normalizeSetoresVisiveis(json);
+}
+
 function mapUserRow(row) {
     if (!row) {
         return null;
@@ -156,7 +175,7 @@ function mapUserRow(row) {
         ativo: Boolean(row.Ativo),
         isAdmin: Boolean(row.IsAdmin),
         setoresVisiveis: normalizeSetoresVisiveis(row.SetoresVisiveisJson),
-        setoresPermitidos: normalizeSetoresVisiveis(row.SetoresPermitidosJson),
+        setoresPermitidos: lerSetoresPermitidos(row.SetoresPermitidosJson, row.Id),
         criadoEm: row.CreatedAt || null,
         ultimoLoginAt: row.UltimoLoginAt || null
     };

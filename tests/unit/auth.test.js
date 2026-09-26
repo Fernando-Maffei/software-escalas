@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const {
     credenciaisValidas,
     ensureDefaultAdmin,
+    findUserById,
     getSessionTokenFromRequest,
     verifyPassword
 } = require('../../backend/auth/auth');
@@ -158,6 +159,28 @@ module.exports = [
             assert.equal(await credenciaisValidas(usuario, 'errada-123'), false);
             assert.equal(await credenciaisValidas({ ...usuario, ativo: false }, 'Senha!Valida1'), false);
             assert.equal(await credenciaisValidas(null, 'qualquer-coisa'), false);
+        }
+    }
+,
+    {
+        // Teto de setores ilegivel nao pode virar "sem restricao".
+        name: 'setores permitidos com JSON ilegivel bloqueiam em vez de liberar tudo',
+        async run() {
+            const linha = (json) => ({
+                request() {
+                    return { input() { return this; }, query: async () => ({ recordset: [{ Id: 9, Username: 'x', SetoresPermitidosJson: json }] }) };
+                }
+            });
+            const erroOriginal = console.error;
+            console.error = () => {};
+
+            try {
+                assert.deepEqual((await findUserById(linha('[3,4]'), 9)).setoresPermitidos, ['3', '4']);
+                assert.deepEqual((await findUserById(linha(null), 9)).setoresPermitidos, []);
+                assert.deepEqual((await findUserById(linha('{quebrado'), 9)).setoresPermitidos, ['invalido']);
+            } finally {
+                console.error = erroOriginal;
+            }
         }
     }
 ];

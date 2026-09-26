@@ -130,7 +130,8 @@ Visão de alto nível (ignorando `node_modules`, `.git` e afins):
 ```
 App de escalas/
 ├── backend/                    ← todo o servidor (Node/Express)
-│   ├── server.js               ← ponto de entrada: middlewares, rotas, erro, boot
+│   ├── server.js               ← ponto de entrada: sobe e derruba o servidor HTTP
+│   ├── app.js                  ← aplicação Express: middlewares, portões, rotas, erro
 │   ├── config/                 ← config local (database.local.json) — NÃO versionado
 │   ├── routes/                 ← a API REST, um arquivo por domínio
 │   │   ├── colaboradores.js, escala.js, ausencias.js, feriados.js,
@@ -138,13 +139,17 @@ App de escalas/
 │   │   └── auth.js, usuarios.js, configuracao-banco.js, sistema.js
 │   ├── db/                     ← acesso ao SQL Server
 │   │   ├── index.js            ← conexão (pool)
-│   │   └── database-config.js, database-schema.js, schema.js, transactions.js, ...
+│   │   └── database-config.js, database-schema.js, transactions.js, ...
 │   ├── auth/                   ← segurança: sessão/login, permissões, rate limit, acesso por setor
 │   ├── services/               ← regras de negócio (sem HTTP)
 │   │   ├── escala.js, bancoHoras.js, plantoes.js, jornada-semanal.js, setores.js
-│   │   └── backup-config.js, backup-service.js, backup-scheduler.js
+│   │   ├── horas-em-carteira.js, exclusao-colaborador.js, folgas-domingo.js, tipos-escala.js
+│   │   ├── backup-config.js, backup-service.js, backup-scheduler.js
+│   │   └── backup/             ← especificacao.js (o que o backup guarda) e normalizacao.js
 │   └── lib/                    ← utilitários gerais
-│       ├── errors.js, validation.js, app-paths.js, app-state.js
+│       ├── errors.js, validation.js, dominio.js, app-paths.js, app-state.js
+│       ├── cors.js, rede.js, ip-cliente.js, cabecalhos-seguranca.js, tratador-erros.js
+│       ├── bootstrap-banco.js  ← conectar + schema + retentativa + limpeza de sessões
 │       └── background-service.js, folder-picker.js     (integração Windows)
 │
 ├── frontend/                   ← tudo que roda no navegador
@@ -168,7 +173,7 @@ App de escalas/
 │       │   ├── banco-horas.js, lancamentos.js, calendar.js
 │       │   └── configuracoes-backup.js / configuracoes-usuarios.js
 │       └── lib/                ← utilitários sem tela
-│           └── pdf-utils.js, escala-report-utils.js
+│           └── pdf-utils.js, escala-report-utils.js, html-seguro.js (escapeHtml único)
 │
 ├── database/
 │   ├── migrations/             ← evolução do esquema (arquivos SQL datados)
@@ -178,6 +183,7 @@ App de escalas/
 │                                  plano do instalador) + esta apostila
 ├── tests/
 │   ├── unit/                   ← testes de lógica (Node puro, npm test)
+│   ├── integracao/             ← rotas contra SQL Server descartável + golden master
 │   ├── e2e/                    ← robô de testes no navegador (Playwright)
 │   └── smoke.js                ← checagem de sintaxe (npm run smoke)
 │
@@ -202,7 +208,19 @@ App de escalas/
 
 ### 4.1 Backend — ponto de entrada e infraestrutura
 
-#### `backend/server.js` — o coração do servidor
+#### `backend/server.js` e `backend/app.js` — o coração do servidor
+
+> **Atualização (auditoria de 2026-09):** o antigo `server.js` foi dividido por
+> responsabilidade. O que esta seção descreve continua valendo, mas mora agora em:
+> `app.js` (middlewares, portões e rotas), `lib/cors.js` (CORS),
+> `lib/rede.js` (endereços de acesso e porta), `lib/bootstrap-banco.js` (conexão,
+> schema e retentativa) e `server.js` (subir e derrubar o servidor). Os números de
+> linha abaixo se referem ao arquivo antigo. Mudaram também: o corpo JSON é
+> limitado a 1 MB (25 MB só na restauração de backup), toda resposta leva
+> cabeçalhos de segurança (`lib/cabecalhos-seguranca.js`), o IP do cliente só vem
+> de `X-Forwarded-For` com `TRUST_PROXY` configurado, erro inesperado não expõe
+> mensagem interna (`lib/tratador-erros.js`) e conta com senha provisória só
+> acessa `/api/auth/*` até trocar a senha.
 
 Este arquivo faz o "sanduíche" de uma requisição: ela entra, passa por várias camadas de segurança (os *middlewares*), chega na rota certa, e a resposta volta. A ordem em que as camadas são declaradas **importa** — é a ordem em que a requisição passa por elas.
 
@@ -372,7 +390,7 @@ Três princípios se repetem:
 
 - **`buildColaboradorPayload(body, fallback)` (linhas 24+):** monta o objeto do colaborador validando cada campo — `nome` (obrigatório, até 300 caracteres), horários de trabalho/almoço (`normalizeNullableTime`), `setorId` (existe?), e por fim `validateWorkSchedule` (o fim é depois do início? o almoço cabe no expediente?). O parâmetro `fallback` permite atualizações parciais: se o `body` não trouxe um campo, usa o valor atual do registro.
 - Ao criar/editar, além de gravar o colaborador, a rota chama `syncColaboradorDefaultsToEscalaDia` (de `escala.js`) — para que mudar o horário padrão do colaborador **reflita** na escala do dia. Operações que mexem em várias tabelas usam `withTransaction` (tudo ou nada).
-- Repare nos imports: a rota puxa regras de `services/` (`escala`, `jornada-semanal`, `setores`), do banco (`db/schema`) e de `lib/validation`. Isso mostra o desenho: **a rota coordena; os serviços fazem**.
+- Repare nos imports: a rota puxa regras de `services/` (`escala`, `jornada-semanal`, `setores`, `exclusao-colaborador`), o controle de setores de `auth/acesso-setores` e `lib/validation`. (Até a auditoria de 2026-09 as rotas também consultavam `db/schema` para descobrir, a cada requisição, se colunas existiam; isso saiu — o servidor só libera as rotas depois de aplicar todas as migrations.) Isso mostra o desenho: **a rota coordena; os serviços fazem**.
 
 #### Papel de cada arquivo de rota
 
@@ -450,7 +468,7 @@ Uma **única página** (`index.html`) que carrega vários **módulos JavaScript*
 Todo acesso à API passa por aqui. Isso concentra num só lugar coisas como URL base, tratamento de sessão expirada e formato de erro.
 
 - **URL base dinâmica (`getRuntimeApiBaseUrl`, linhas 3–14):** a base da API é derivada de `window.location.origin`. Ou seja: se você abre o app por `http://192.168.0.10:4450`, a API é chamada nesse mesmo endereço — **sem configuração**. É isso que faz o mesmo código funcionar em localhost, no IP da rede ou no Docker.
-- **Normalizador de `fetch` (linhas 66–86):** o código "envelopa" o `window.fetch` nativo. Dois motivos: (1) reescrever URLs antigas com `:3000` hardcoded para a base atual (compatibilidade com código legado); (2) observar as respostas para detectar sessão expirada.
+- **Vigia de sessão no `fetch` (`installSessionExpiryWatcher`):** o código "envelopa" o `window.fetch` nativo só para observar as respostas e detectar sessão expirada. (Até 2026-09 ele também reescrevia URLs antigas com `:3000` fixo; as chamadas passaram a usar `window.API` e a reescrita saiu.)
 - **Sessão expirada (`notifyIfSessionExpired`, linhas 54–64):** se qualquer chamada de API (fora as de `/auth`) responder **401**, dispara o evento `auth:expired`. A aplicação escuta esse evento e volta para a tela de login — assim o usuário não fica "preso" numa tela quebrada quando a sessão de 12h vence.
 - **O objeto `API` (linhas 88+):**
   - `request(endpoint, options)`: o coração. Garante `Content-Type: application/json` quando há corpo, envia o cookie de sessão, lê a resposta (JSON ou texto), e — se `!response.ok` — lança um `Error` com `.status` e `.payload`. Assim, quem chama a API só precisa de um `try/catch`.
@@ -574,6 +592,9 @@ Pré-requisitos: **Node.js** (LTS) e **SQL Server** (Express serve) instalados; 
 | `npm start` | Sobe o servidor (`node backend/server.js`). |
 | `npm test` | Roda os testes de lógica (banco de horas, escala, permissões, validação...). |
 | `npm run smoke` | Checagem rápida de sintaxe (`node --check`) em todos os arquivos-chave. |
+| `npm run verificar` | Sintaxe, lint, tipos, formatação e testes unitários (o mesmo que o CI roda). |
+| `npm run test:integracao` | Testes das rotas contra um SQL Server descartável (`npm run integracao:banco:subir` antes). |
+| `npm run analisar:codigo-morto` | Acusa funções globais do frontend que nada chama. |
 
 ### Acesso pelo time (rede)
 

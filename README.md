@@ -13,10 +13,13 @@ Uma máquina roda o servidor; qualquer dispositivo da rede acessa pelo navegador
 - [Funcionalidades](#funcionalidades)
 - [Tecnologias](#tecnologias)
 - [Início rápido](#início-rápido-desenvolvimento)
+- [Testes e qualidade](#testes-e-qualidade)
+- [Estrutura do código](#estrutura-do-código)
 - [Implantação](#implantação)
 - [Login e primeiro acesso](#login-e-primeiro-acesso)
 - [Configuração inicial do banco](#configuração-inicial-do-banco)
 - [Usuários do sistema](#usuários-do-sistema)
+- [Backup](#backup)
 - [Atualização](#atualização)
 - [Versionamento](#versionamento)
 - [Documentação](#documentação)
@@ -78,12 +81,103 @@ npm start
 Acesse `http://localhost:4450`. Configure a conexão com o SQL Server pela própria
 tela de configuração inicial (veja [Configuração inicial do banco](#configuração-inicial-do-banco)).
 
-Testes:
+## Testes e qualidade
+
+Uma verificação completa antes de abrir um Pull Request (o CI roda o mesmo):
 
 ```bash
-npm test         # suíte de testes
-npm run smoke    # checagem rápida de sintaxe de todos os módulos
+npm run verificar
 ```
+
+Ela executa, em ordem:
+
+| Comando | O que faz |
+|---|---|
+| `npm run smoke` | Checagem de sintaxe de todos os `.js` |
+| `npm run lint` | ESLint. No frontend (sem bundler) os globais são calculados do próprio código, então chamar uma função que não existe é erro |
+| `npm run typecheck` | TypeScript em modo `checkJs` sobre backend, scripts e testes |
+| `npm run format:check` | Prettier (por enquanto só nos arquivos novos — ver `.prettierignore`) |
+| `npm test` | Testes unitários das regras de negócio, sem banco |
+
+### Testes de integração (SQL Server de verdade)
+
+Sobem o servidor em processo contra um SQL Server descartável em Docker e
+exercitam as rotas por HTTP: login e permissões, colaboradores, lançamentos,
+folgas de domingo, limite de setores e backup/restauração.
+
+```bash
+npm run integracao:banco:subir
+```
+```bash
+npm run test:integracao
+```
+
+O banco de teste fica em `127.0.0.1:14339` (container `escalas-integracao-db`) e
+é apagado e recriado a cada execução. Por segurança, os testes só aceitam banco
+com "Integracao" no nome — nunca tocam a produção (porta 4450/1433).
+`npm run integracao:banco:derrubar` remove o container.
+
+Para conferir telas no navegador com dados de exemplo, sem tocar na produção:
+
+```bash
+npm run integracao:servidor
+```
+
+Abra `http://127.0.0.1:4480` (login `admin` / `Admin!Integracao1`).
+
+### Prova de equivalência em refatorações grandes
+
+`tests/integracao/golden-master.js` executa um roteiro fixo por todas as rotas de
+dados e fotografa todas as tabelas. Gere antes da mudança e compare depois
+(no mesmo dia):
+
+```bash
+node tests/integracao/golden-master.js gerar antes.json
+```
+```bash
+node tests/integracao/golden-master.js comparar antes.json
+```
+
+### Robô de testes de tela (Playwright)
+
+```bash
+npm run e2e:demo
+```
+
+Clica aleatoriamente pelas telas da demo (sem backend). Para rodar contra uma
+instância com banco, use `npm run teste:subir` e `npm run e2e:teste` (detalhes em
+[`docs/ROBO-DE-TESTES.md`](docs/ROBO-DE-TESTES.md)).
+
+### Código morto no frontend
+
+```bash
+npm run analisar:codigo-morto
+```
+
+Monta o grafo de chamadas das funções globais do frontend a partir do que
+executa e acusa as que nada alcança ou que estão declaradas em dois arquivos.
+
+## Estrutura do código
+
+```
+backend/
+  server.js            sobe e derruba o servidor HTTP
+  app.js               aplicação Express: portões (banco pronto, login,
+                       permissão), rotas, tratamento de erro
+  routes/              uma rota por recurso; coordena, não calcula
+  services/            regras de negócio (escala, banco de horas, plantões,
+                       backup/, horas-em-carteira, exclusão de colaborador...)
+  auth/                sessões, permissões, limite de setores, rate limit
+  db/                  conexão, transação, bootstrap do schema
+  lib/                 validação, domínio, erros, CORS, IP, cabeçalhos
+database/migrations/   scripts SQL idempotentes, aplicados a cada boot
+frontend/              HTML/CSS/JS sem bundler (scripts clássicos, escopo global)
+demo/                  modo demonstração (mock da API) usado pelo robô
+tests/unit|integracao|e2e
+```
+
+A auditoria técnica completa, com o que foi corrigido e o que está pendente,
+está em [`AUDITORIA.md`](AUDITORIA.md).
 
 ## Implantação
 
@@ -105,9 +199,17 @@ A partir da versão 1.3.0 o sistema exige login. Na primeira execução com um b
 novo, se a tabela `Usuarios` estiver vazia, um administrador é criado automaticamente:
 
 - **Usuário:** valor de `ADMIN_USERNAME` (padrão `admin`)
-- **Senha:** valor de `ADMIN_PASSWORD` se definido no `.env`; caso contrário, uma
-  senha aleatória é gerada e exibida **uma única vez** (na tela de configuração
-  inicial ou no console do servidor), com troca obrigatória no primeiro login.
+- **Senha:** valor de `ADMIN_PASSWORD` se definido no `.env` (mínimo de 8
+  caracteres); caso contrário — ou se for curta demais — uma senha aleatória é
+  gerada e exibida **uma única vez** (na tela de configuração inicial ou no console
+  do servidor), com troca obrigatória no primeiro login.
+
+Enquanto a senha provisória não for trocada, o servidor recusa as rotas de dados.
+Para trocar a senha é preciso informar a senha atual; a troca encerra as outras
+sessões abertas da conta.
+
+Com um proxy reverso na frente do app (nginx, IIS), configure `TRUST_PROXY` para o
+limite de tentativas de login enxergar o IP real do cliente (ver `.env.example`).
 
 Veja [`.env.example`](.env.example) para `ADMIN_USERNAME`, `ADMIN_PASSWORD` e a lista
 de origens liberadas em `CORS_ORIGINS`.
@@ -126,6 +228,18 @@ Administradores gerenciam contas em **Configurações → Usuários**: criar usu
 senha temporária e troca obrigatória no primeiro acesso), ativar/desativar,
 promover/remover administrador e resetar senha. Usuários comuns não veem essa tela. O
 sistema impede desativar ou rebaixar a própria conta e o último administrador ativo.
+
+Uma conta pode ter **setores permitidos**: nesse caso ela só vê colaboradores
+desses setores — e as ausências, plantões, banco de horas, jornadas e folgas
+deles — em todas as telas e na API.
+
+## Backup
+
+Em **Configurações → Banco de dados** é possível gerar backups na pasta do servidor,
+agendar backups automáticos e restaurar um arquivo. **Exportar Dados** baixa o
+mesmo backup completo; **Importar Dados** restaura o sistema a partir dele. Antes
+de restaurar, um backup de segurança do estado atual é salvo automaticamente. O
+arquivo de backup não contém contas nem sessões.
 
 ## Atualização
 

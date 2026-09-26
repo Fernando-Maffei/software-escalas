@@ -52,13 +52,20 @@ apenas o `frontend/`.
 ## Testes
 
 ```bash
-npm test         # suite de testes
-npm run smoke    # checagem rapida de sintaxe de todos os modulos
+npm run verificar          # sintaxe, lint, tipos, formatacao e testes unitarios
 ```
 
-Rode ambos antes de abrir um Pull Request. Os dois tambem rodam
-automaticamente no GitHub Actions a cada push e PR (ver
+```bash
+npm run integracao:banco:subir
+npm run test:integracao    # rotas contra um SQL Server descartavel
+```
+
+Rode os dois antes de abrir um Pull Request. O GitHub Actions roda os mesmos
+passos (e o robo de telas na demo) a cada push e PR (ver
 `.github/workflows/ci.yml`), entao um PR com teste quebrado aparece marcado.
+
+Refatoracao grande no backend: gere o golden master antes e compare depois
+(`tests/integracao/golden-master.js`, explicado no README).
 
 ## Estilo de codigo
 
