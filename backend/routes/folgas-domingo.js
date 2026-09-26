@@ -2,6 +2,7 @@ const express = require('express');
 
 const { sql, conectar } = require('../db');
 const { withTransaction } = require('../db/transactions');
+const { colaboradoresVisiveis, exigirColaboradorVisivel } = require('../auth/acesso-setores');
 const {
     createFolgaDomingo,
     deleteFolgaDomingo,
@@ -51,13 +52,19 @@ router.get('/', async (req, res) => {
         colaboradorId: req.query.colaboradorId
     });
 
-    res.json({ total: items.length, items });
+    const visiveis = await colaboradoresVisiveis(pool, req);
+    const filtrados = visiveis ? items.filter((item) => visiveis.has(Number(item.colaboradorId))) : items;
+
+    res.json({ total: filtrados.length, items: filtrados });
 });
 
 router.get('/:id', async (req, res) => {
     const pool = await conectar();
 
-    res.json(await findFolgaDomingoById(pool, req.params.id));
+    const folga = await findFolgaDomingoById(pool, req.params.id);
+    exigirColaboradorVisivel(await colaboradoresVisiveis(pool, req), folga.colaboradorId);
+
+    res.json(folga);
 });
 
 router.post('/', async (req, res) => {

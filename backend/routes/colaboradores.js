@@ -3,7 +3,12 @@ const router = express.Router();
 
 const { sql, conectar } = require('../db');
 const { AppError } = require('../lib/errors');
-const { getSetoresPermitidosRequest, idsPermitidosNumericos } = require('../auth/acesso-setores');
+const {
+    colaboradoresVisiveis,
+    exigirColaboradorVisivel,
+    getSetoresPermitidosRequest,
+    idsPermitidosNumericos
+} = require('../auth/acesso-setores');
 const { syncColaboradorDefaultsToEscalaDia } = require('../services/escala');
 const {
     listJornadaSemanal,
@@ -196,6 +201,8 @@ router.get('/:id/jornada-semanal', async (req, res) => {
     if (!colaborador) {
         throw new AppError(404, 'Colaborador nao encontrado.');
     }
+
+    exigirColaboradorVisivel(await colaboradoresVisiveis(pool, req), colaboradorId);
 
     const items = await listJornadaSemanal(pool, {
         colaboradorId,

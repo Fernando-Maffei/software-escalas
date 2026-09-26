@@ -9,6 +9,7 @@ const suites = [
     ...require('./colaboradores.test.js'),
     ...require('./lancamentos.test.js'),
     ...require('./folgas-domingo.test.js'),
+    ...require('./acesso-setores.test.js'),
     ...require('./backup.test.js')
 ];
 

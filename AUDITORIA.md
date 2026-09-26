@@ -318,12 +318,19 @@ resposta; corpo JSON limitado a 1 MB, com 25 MB so em
 fora:** CSP de script — as telas usam `onclick` inline em muitos pontos; exigiria
 `'unsafe-inline'`, que anula a protecao (ver M15).
 
-**M7 — Controle de acesso por setor so no cadastro de colaboradores** · `PROPOSTA`
+**M7 — Controle de acesso por setor so no cadastro de colaboradores** · `RESOLVIDO`
 `getSetoresPermitidosRequest` e aplicado em colaboradores, escala e banco semanal,
 mas `/api/ausencias`, `/api/plantoes`, `/api/banco-horas` e
 `/api/colaboradores/:id/jornada-semanal` devolvem dados de todos os setores. O
 comentario do codigo diz que filtrar a lista de colaboradores "ja limita as
 telas" — verdade na interface, falso na API. Ver pergunta P1.
+**Decisao (P1):** estender o filtro. **Feito:** `colaboradoresVisiveis` e
+`exigirColaboradorVisivel` em `backend/auth/acesso-setores.js`, aplicados nas
+leituras de ausencias, plantoes (lista, dia e disponibilidade — cada lancamento
+mostra so a parte visivel da equipe), banco de horas (resumo e extrato), jornada
+semanal e folgas de domingo. Colaborador de outro setor responde 404 (nao
+confirma que existe). Teste de integracao com conta limitada a um setor; golden
+master (conta sem restricao) identico.
 
 **M8 — Codigo duplicado** · `RESOLVIDO`
 - `escapeHtml` em 9 copias (`helpers.js:17`, `relatorio-mensal.js:13`,

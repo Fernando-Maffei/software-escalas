@@ -16,6 +16,7 @@ const {
     syncPlantaoDiaToEscalaDia
 } = require('../services/escala');
 const { withTransaction } = require('../db/transactions');
+const { colaboradoresVisiveis } = require('../auth/acesso-setores');
 const {
     extractDateString,
     normalizeIsoDate,
@@ -116,6 +117,21 @@ async function listDisponibilidade(poolOrTx, plantao) {
         ausenciasPorColaborador.get(colaborador.Id) || [],
         plantao
     ));
+}
+
+// Cada lancamento mostra so a parte da equipe que a conta pode ver; lancamento
+// sem ninguem visivel sai da resposta.
+function filtrarEquipesVisiveis(lancamentos, visiveis) {
+    if (!visiveis) {
+        return lancamentos;
+    }
+
+    return lancamentos
+        .map((lancamento) => ({
+            ...lancamento,
+            colaboradores: lancamento.colaboradores.filter((id) => visiveis.has(Number(id)))
+        }))
+        .filter((lancamento) => lancamento.colaboradores.length > 0);
 }
 
 async function assertColaboradoresDisponiveis(poolOrTx, payload) {
@@ -238,7 +254,7 @@ router.get('/', async (req, res) => {
         .map((row) => hydratePlantaoDuration(serializePlantaoRecord(row)))
         .filter((plantao) => PLANTAO_TIPOS.includes(plantao.tipoPlantao));
 
-    res.json(records);
+    res.json(filtrarEquipesVisiveis(records, await colaboradoresVisiveis(pool, req)));
 });
 
 router.get('/proximos/:quantidade', async (req, res) => {
@@ -263,11 +279,13 @@ router.get('/disponibilidade/:dataISO', async (req, res) => {
         horaFim
     });
 
+    const visiveis = await colaboradoresVisiveis(pool, req);
+
     res.json({
         dataISO,
         horaInicio,
         horaFim,
-        colaboradores: disponibilidade
+        colaboradores: visiveis ? disponibilidade.filter((item) => visiveis.has(Number(item.id))) : disponibilidade
     });
 });
 
@@ -281,7 +299,14 @@ router.get('/:dataISO', async (req, res) => {
         throw new AppError(404, 'Plantao nao encontrado.');
     }
 
-    const lancamentos = rows.map((row) => hydratePlantaoDuration(serializePlantaoRecord(row)));
+    const lancamentos = filtrarEquipesVisiveis(
+        rows.map((row) => hydratePlantaoDuration(serializePlantaoRecord(row))),
+        await colaboradoresVisiveis(pool, req)
+    );
+
+    if (lancamentos.length === 0) {
+        throw new AppError(404, 'Plantao nao encontrado.');
+    }
 
     res.json({
         dataISO,

@@ -15,6 +15,7 @@ const {
     syncAusenciaToEscalaDia
 } = require('../services/escala');
 const { withTransaction } = require('../db/transactions');
+const { colaboradoresVisiveis, exigirColaboradorVisivel } = require('../auth/acesso-setores');
 const {
     buildDateRange,
     ensurePositiveInt,
@@ -272,8 +273,9 @@ router.get('/', async (req, res) => {
         ${clauses.length > 0 ? `WHERE ${clauses.join(' AND ')}` : ''}
         ORDER BY DataInicio DESC, Id DESC
     `);
+    const visiveis = await colaboradoresVisiveis(pool, req);
 
-    res.json(result.recordset);
+    res.json(visiveis ? result.recordset.filter((linha) => visiveis.has(Number(linha.ColaboradorId))) : result.recordset);
 });
 
 router.post('/', async (req, res) => {
@@ -428,6 +430,7 @@ router.get('/colaborador/:colaboradorId', async (req, res) => {
     const colaboradorId = ensurePositiveInt(req.params.colaboradorId, 'Colaborador');
     const pool = await conectar();
     await getColaboradorById(pool, colaboradorId);
+    exigirColaboradorVisivel(await colaboradoresVisiveis(pool, req), colaboradorId);
 
     const result = await pool.request()
         .input('colaboradorId', sql.Int, colaboradorId)

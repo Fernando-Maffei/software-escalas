@@ -13,6 +13,7 @@ const {
     parseBalanceInputToMinutes
 } = require('../services/bancoHoras');
 const { withTransaction } = require('../db/transactions');
+const { colaboradoresVisiveis, exigirColaboradorVisivel } = require('../auth/acesso-setores');
 const { ensurePositiveInt, extractDateString, normalizeOptionalText } = require('../lib/validation');
 const { serializePlantaoRecord } = require('../services/plantoes');
 
@@ -168,9 +169,12 @@ router.get('/resumo', async (req, res) => {
         ORDER BY c.Nome
     `);
 
+    const visiveis = await colaboradoresVisiveis(pool, req);
+    const linhas = visiveis ? result.recordset.filter((linha) => visiveis.has(Number(linha.Id))) : result.recordset;
+
     res.json({
         enabled: true,
-        items: result.recordset.map(mapResumoRow)
+        items: linhas.map(mapResumoRow)
     });
 });
 
@@ -212,6 +216,7 @@ router.get('/colaborador/:id', async (req, res) => {
     const pool = await conectar();
 
     const limit = req.query.limit ? Math.min(ensurePositiveInt(req.query.limit, 'Limite'), 200) : 100;
+    exigirColaboradorVisivel(await colaboradoresVisiveis(pool, req), colaboradorId);
 
     const colaboradorResult = await pool.request()
         .input('id', sql.Int, colaboradorId)
