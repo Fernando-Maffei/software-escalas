@@ -133,24 +133,15 @@
         // toda ausencia cujo colaborador nao esteja nelas. Se o carregamento
         // inicial tiver falhado (por exemplo sessao expirada), o relatorio saia
         // completo na aparencia, porem sem nenhum colaborador.
-        try {
-            if (!Array.isArray(window.colaboradores) || window.colaboradores.length === 0) {
-                if (typeof carregarColaboradores === 'function') {
-                    await carregarColaboradores();
-                }
-            }
-        } catch (error) {
-            // Segue adiante: a checagem abaixo avisa se ainda faltar dado.
+        // Os carregadores nao lancam: em falha avisam o usuario e devolvem os
+        // ultimos dados (core/runtime/dados-e-modais.js); a checagem abaixo
+        // avisa se mesmo assim faltar dado.
+        if (!Array.isArray(window.colaboradores) || window.colaboradores.length === 0) {
+            await carregarColaboradores();
         }
 
-        try {
-            if (!Array.isArray(window.ausencias) || window.ausencias.length === 0) {
-                if (typeof carregarAusencias === 'function') {
-                    await carregarAusencias();
-                }
-            }
-        } catch (error) {
-            // idem
+        if (!Array.isArray(window.ausencias) || window.ausencias.length === 0) {
+            await carregarAusencias();
         }
 
         // Se mesmo apos a tentativa de recarga nao houver colaboradores, avisa

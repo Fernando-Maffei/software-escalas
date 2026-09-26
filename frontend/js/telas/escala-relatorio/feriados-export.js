@@ -40,12 +40,9 @@
                 return [];
             }
 
-            try {
-                const result = await carregarFeriadosAPI(year);
-                return Array.isArray(result) ? result : [];
-            } catch (error) {
-                return [];
-            }
+            // carregarFeriadosAPI trata a propria falha (loga e devolve []).
+            const result = await carregarFeriadosAPI(year);
+            return Array.isArray(result) ? result : [];
         }));
 
         nationalHolidayResults.flat().forEach((item) => {

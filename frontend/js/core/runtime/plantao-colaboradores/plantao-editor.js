@@ -414,6 +414,11 @@
 
             state.disponibilidade = Array.isArray(response?.colaboradores) ? response.colaboradores : [];
         } catch (error) {
+            // Sem a checagem, a lista segue aberta para o lancamento nao travar,
+            // mas o usuario precisa saber: quem estiver de folga ou ausente so
+            // sera barrado pelo servidor na hora de salvar.
+            console.error('[plantao] falha ao verificar disponibilidade:', error);
+            mostrarToast('Nao foi possivel verificar a disponibilidade agora. O servidor confere ao salvar.', 'warning');
             state.disponibilidade = (window.colaboradores || []).map((item) => ({
                 id: item.Id,
                 nome: item.Nome,

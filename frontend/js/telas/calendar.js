@@ -375,6 +375,11 @@ async function inicializarCalendario() {
 
     await Promise.allSettled([carregarFeriados(anoAtual), diretorio]);
 
+    // O usuario pode ter trocado de tela enquanto os dados chegavam.
+    if (!document.getElementById('calendar')) {
+        return;
+    }
+
     gerarDiasSemana();
     gerarCalendario(mesAtual, anoAtual);
     configurarNavegacaoCalendario();

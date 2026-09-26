@@ -255,21 +255,10 @@ function renderCalendario() {
         </div>
     `;
 
-    setTimeout(() => {
-        const calendar = document.getElementById('calendar');
-
-        if (!calendar) {
-            console.error("Elemento calendar não foi criado!");
-            return;
-        }
-        
-        // Inicializar o calendário
-        if (typeof window.inicializarCalendario === 'function') {
-            window.inicializarCalendario();
-        } else {
-            console.error('Função inicializarCalendario não encontrada!');
-        }
-    }, 200); // Pequeno delay para garantir que o DOM foi atualizado
+    // innerHTML e sincrono: o #calendar ja existe aqui. O antigo atraso de
+    // 200 ms "para o DOM atualizar" so abria uma corrida — trocar de tela
+    // nesse intervalo registrava "Elemento calendar nao foi criado!".
+    window.inicializarCalendario();
 }
 
 function getPaginaFromURL() {

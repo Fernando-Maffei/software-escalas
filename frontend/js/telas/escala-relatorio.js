@@ -39,6 +39,19 @@
         return { folhas: folhas.length, folhasEstouradas, densidade: nivelComum || 'normal' };
     };
 
+    // Mensagem para filtro invalido no modo atual do relatorio, ou null. Filtro
+    // errado e entrada do usuario: vira aviso na tela, nao erro no console.
+    function mensagemFiltroInvalidoRelatorioEscala() {
+        if (getEscalaReportMode() === RELATORIO_ESCALA_MODOS.QUADRO_MENSAL) {
+            return getEscalaMonthlyFilters() ? null : 'Informe um mes e ano validos para o quadro mensal.';
+        }
+
+        const dataInicio = document.getElementById('relatorioEscalaDataInicio')?.value;
+        const dataFim = document.getElementById('relatorioEscalaDataFim')?.value;
+
+        return dataInicio && dataFim ? null : 'Informe a data inicial e final do relatorio.';
+    }
+
     window.gerarRelatorioEscala = gerarRelatorioEscala = async function gerarRelatorioEscalaAtualizado() {
         const modo = getEscalaReportMode();
 
@@ -106,6 +119,15 @@
         if (typeof html2canvas !== 'function' || !window.jspdf || typeof window.jspdf.jsPDF !== 'function') {
             if (typeof mostrarToast === 'function') {
                 mostrarToast('Bibliotecas de exportacao nao estao disponiveis.', 'error');
+            }
+            return;
+        }
+
+        const filtroInvalido = mensagemFiltroInvalidoRelatorioEscala();
+
+        if (filtroInvalido) {
+            if (typeof mostrarToast === 'function') {
+                mostrarToast(filtroInvalido, 'error');
             }
             return;
         }

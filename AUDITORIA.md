@@ -513,6 +513,50 @@ Tabelas pequenas; o collation padrao ja e case-insensitive. Nao vale o risco ago
 
 ---
 
+## 3b. Achados da segunda passada (Fase 5)
+
+Revarredura por `catch` que engole erro, atrasos arbitrarios, interpolacao em
+HTML e testes do robo (demo e backend real, sementes fixa e aleatorias). Tudo o
+que apareceu foi corrigido:
+
+**S1 — Mensagens de aviso (toast) iam cruas para o innerHTML** · `RESOLVIDO`
+`frontend/js/core/app/horas-e-resumo.js` (`mostrarToast`). Varias mensagens levam
+nome digitado (ex.: `Padrao de "${tipo.nome}" aplicado`) ou texto de erro do
+servidor. **Feito:** a mensagem e escapada; nenhum chamador passava HTML de
+proposito. Verificado no navegador com um nome `<img onerror>`.
+
+**S2 — Teto de setores ilegivel liberava tudo** · `RESOLVIDO`
+`backend/auth/auth.js`: JSON corrompido em `SetoresPermitidosJson` virava lista
+vazia, que significa "sem restricao". **Feito:** falha fechada (a conta nao ve
+ninguem) com erro no log. Teste unitario.
+
+**S3 — Atraso de 200 ms "para o DOM atualizar" no calendario** · `RESOLVIDO`
+`frontend/js/core/app/calendario-e-legenda.js`: `innerHTML` e sincrono; o atraso so
+abria uma corrida, e trocar de tela nesse intervalo registrava "Elemento calendar
+nao foi criado!" (achado pelo robo, semente 711). **Feito:** chamada direta; e
+`inicializarCalendario` nao desenha se o usuario saiu da tela durante a carga.
+
+**S4 — Exportar relatorio com filtro invalido registrava erro de sistema** · `RESOLVIDO`
+`frontend/js/telas/escala-relatorio.js` (achado pelo robo na demo, pre-existente):
+ano invalido ia ate a montagem do PDF e caia no `console.error`. **Feito:** uma
+validacao unica dos filtros, usada antes de exportar; vira aviso na tela.
+
+**S5 — Falha na checagem de disponibilidade do plantao era silenciosa** · `RESOLVIDO`
+`plantao-editor.js`: com a API fora, a tela marcava todos como disponiveis sem
+avisar. **Feito:** avisa o usuario (o servidor continua barrando indisponivel ao
+salvar) e loga.
+
+**S6 — `try/catch` redundantes em volta de carregadores que ja tratam o erro** · `RESOLVIDO`
+`relatorio-mensal.js`, `feriados-export.js`, `plantao-regua-e-relatorios.js`;
+e o fechamento do pool no backend passou a logar a falha.
+
+Quedas deliberadas que **ficaram** (documentadas no codigo): JSON invalido de
+cache/`localStorage`, `setPointerCapture` em navegador antigo, corpo de erro que
+nao e JSON (mensagem de reserva), pool que nem conectou, previa opcional da
+escala e a fonte do PDF.
+
+---
+
 ## 4. Registro das correcoes
 
 _(preenchido na Fase 3)_

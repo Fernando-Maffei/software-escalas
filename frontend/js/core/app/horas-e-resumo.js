@@ -61,7 +61,8 @@ function mostrarToast(mensagem, tipo = "success") {
         icone = "fa-exclamation-triangle";
     }
     
-    toast.innerHTML = `<i class="fas ${icone}"></i> ${mensagem}`;
+    // A mensagem traz texto do usuario e do servidor (nome, erro): vai escapada.
+    toast.innerHTML = `<i class="fas ${icone}"></i> ${escapeHtml(mensagem)}`;
     
     container.appendChild(toast);
     
