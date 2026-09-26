@@ -150,5 +150,38 @@ module.exports = [
             const resposta = await cliente.post('/api/setores', { nome: 'x'.repeat(1024 * 1024 + 10) });
             assert.equal(resposta.status, 413);
         }
+    },
+    {
+        // A7 da auditoria: a troca de senha nao pedia a senha atual nem
+        // derrubava as outras sessoes da conta.
+        name: 'trocar a propria senha exige a senha atual e encerra as outras sessoes',
+        async run() {
+            const admin = criarCliente();
+            await admin.entrar();
+            const username = nomeUnico('chefe').replace(/s+/g, '-');
+            const senha = 'Chefe!Integracao1';
+            esperarSucesso(await admin.post('/api/usuarios', { username, senha, isAdmin: true }), 'criar admin');
+
+            const aba1 = criarCliente();
+            const aba2 = criarCliente();
+            await aba1.entrar(username, senha);
+            await aba2.entrar(username, senha);
+
+            assert.equal((await aba1.post('/api/auth/trocar-senha', { novaSenha: 'Nova!Senha2026' })).status, 400);
+            assert.equal(
+                (await aba1.post('/api/auth/trocar-senha', { senhaAtual: 'errada-123', novaSenha: 'Nova!Senha2026' }))
+                    .status,
+                403
+            );
+
+            esperarSucesso(
+                await aba1.post('/api/auth/trocar-senha', { senhaAtual: senha, novaSenha: 'Nova!Senha2026' }),
+                'trocar senha'
+            );
+
+            assert.equal((await aba1.get('/api/auth/me')).status, 200, 'a sessao de quem trocou continua');
+            assert.equal((await aba2.get('/api/auth/me')).status, 401, 'as outras sessoes caem');
+            await criarCliente().entrar(username, 'Nova!Senha2026');
+        }
     }
 ];

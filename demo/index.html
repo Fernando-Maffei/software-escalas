@@ -111,6 +111,10 @@
     </div>
     <form id="trocarSenhaForm" class="login-form">
       <div class="form-group">
+        <label for="senhaAtualInput">Senha temporaria (a que voce acabou de usar)</label>
+        <input type="password" id="senhaAtualInput" class="form-control" autocomplete="current-password" required>
+      </div>
+      <div class="form-group">
         <label for="novaSenhaInput">Nova senha</label>
         <input type="password" id="novaSenhaInput" class="form-control" minlength="8" autocomplete="new-password" required>
       </div>
@@ -513,6 +517,10 @@
 
         <div class="modal-body">
             <form id="modalTrocarSenhaForm">
+                <div class="form-group">
+                    <label>Senha atual</label>
+                    <input type="password" id="modalSenhaAtualInput" class="form-control" autocomplete="current-password" required>
+                </div>
                 <div class="form-group">
                     <label>Nova senha</label>
                     <input type="password" id="modalNovaSenhaInput" class="form-control" minlength="8" autocomplete="new-password" required>

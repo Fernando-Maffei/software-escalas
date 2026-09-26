@@ -343,6 +343,7 @@
             event.preventDefault();
             hideError(trocarSenhaError);
 
+            const senhaAtual = document.getElementById('senhaAtualInput').value;
             const novaSenha = document.getElementById('novaSenhaInput').value;
             const confirmarSenha = document.getElementById('confirmarSenhaInput').value;
 
@@ -355,7 +356,7 @@
                 const response = await fetch(AUTH_TROCAR_SENHA_URL, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ novaSenha })
+                    body: JSON.stringify({ senhaAtual, novaSenha })
                 });
                 const data = await response.json().catch(() => ({}));
 
@@ -441,6 +442,7 @@
             event.preventDefault();
             hideError(modalTrocarSenhaError);
 
+            const senhaAtual = document.getElementById('modalSenhaAtualInput').value;
             const novaSenha = document.getElementById('modalNovaSenhaInput').value;
             const confirmarSenha = document.getElementById('modalConfirmarSenhaInput').value;
 
@@ -453,7 +455,7 @@
                 const response = await fetch(AUTH_TROCAR_SENHA_URL, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ novaSenha })
+                    body: JSON.stringify({ senhaAtual, novaSenha })
                 });
                 const data = await response.json().catch(() => ({}));
 

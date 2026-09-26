@@ -13,6 +13,7 @@ const {
     normalizePassword,
     normalizeUsername,
     requireAuth,
+    revokeOtherUserSessions,
     setSessionCookie,
     touchLastLogin,
     updateUserPassword,
@@ -111,9 +112,35 @@ router.post('/trocar-senha', requireAuth, async (req, res, next) => {
         }
 
         const novaSenha = normalizePassword(req.body?.novaSenha, 'Nova senha');
-        const pool = await conectar();
+        const senhaAtual = String(req.body?.senhaAtual || '');
 
+        if (!senhaAtual) {
+            throw new AppError(400, 'Informe a senha atual.');
+        }
+
+        // A senha atual e exigida: uma sessao aberta num computador destravado
+        // (ou sequestrada) nao pode trocar a senha e trancar o dono do lado de
+        // fora. Mesmo limitador de forca bruta do login, com chave propria.
+        const rateKey = `trocar-senha|${getClientIp(req)}|${req.user.id}`;
+        const limite = loginRateLimiter.check(rateKey);
+
+        if (limite.blocked) {
+            const minutos = Math.ceil(limite.retryAfterMs / 60000);
+            throw new AppError(429, `Muitas tentativas. Tente novamente em ${minutos} minuto(s).`);
+        }
+
+        const pool = await conectar();
+        const user = await findUserById(pool, req.user.id);
+
+        if (!(await credenciaisValidas(user, senhaAtual))) {
+            loginRateLimiter.registerFailure(rateKey);
+            throw new AppError(403, 'Senha atual incorreta.');
+        }
+
+        loginRateLimiter.reset(rateKey);
         await updateUserPassword(pool, req.user.id, novaSenha, { deveTrocarSenha: false });
+        // As outras sessoes da conta caem; a atual continua valendo.
+        await revokeOtherUserSessions(pool, req.user.id, getSessionTokenFromRequest(req));
 
         res.json({ success: true });
     } catch (error) {

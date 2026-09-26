@@ -379,6 +379,17 @@ async function revokeUserSessions(pool, userId) {
     return result.rowsAffected?.[0] || 0;
 }
 
+// Encerra todas as sessoes da conta menos a informada (a de quem acabou de
+// trocar a propria senha). Retorna quantas foram apagadas.
+async function revokeOtherUserSessions(pool, userId, tokenAtual) {
+    const result = await pool.request()
+        .input('userId', sql.Int, userId)
+        .input('token', sql.Char(64), tokenAtual || '')
+        .query('DELETE FROM Sessoes WHERE UserId = @userId AND Token <> @token');
+
+    return result.rowsAffected?.[0] || 0;
+}
+
 // Valida a sessao e, na mesma ida ao banco, renova o ExpiresAt (validade
 // deslizante) e devolve os dados. Uma sessao expirada nao casa no WHERE e
 // retorna null — a linha vencida sera varrida por purgeExpiredSessions.
@@ -532,6 +543,7 @@ module.exports = {
     normalizeUsername,
     requireAdmin,
     requireAuth,
+    revokeOtherUserSessions,
     revokeUserSessions,
     setSessionCookie,
     touchLastLogin,

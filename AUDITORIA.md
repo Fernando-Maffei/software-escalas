@@ -172,12 +172,19 @@ renomeado para `installSessionExpiryWatcher`. Verificado no navegador: criar
 colaborador pelo editor, erro 404 chegando com a mensagem do servidor e o aviso
 de sessao expirada.
 
-**A7 — Troca de senha sem confirmar a senha atual** · `ABERTO`
+**A7 — Troca de senha sem confirmar a senha atual** · `RESOLVIDO`
 `backend/routes/auth.js:109`
 Uma sessao de admin sequestrada (ou um computador destravado) troca a senha e
 tranca o dono fora. A troca tambem nao derruba as outras sessoes da conta.
 Correcao: exigir `senhaAtual` (a tela precisa mandar) e revogar as demais sessoes.
 Muda o contrato da rota → ver pergunta P4.
+**Decisao (P4):** exigir a senha atual e derrubar as outras sessoes. **Feito:**
+`POST /api/auth/trocar-senha` exige `senhaAtual` (400 sem ela, 403 errada, com o
+mesmo limitador de forca bruta do login) e, ao trocar, encerra as outras sessoes
+da conta (`revokeOtherUserSessions`), mantendo a atual. As duas telas (troca
+obrigatoria do primeiro acesso e o modal "Alterar senha") ganharam o campo, nos
+dois index.html. Teste de integracao cobre os quatro casos; modal verificado no
+navegador.
 
 **A8 — Sem linter, formatter, checagem de tipos ou testes de rota** · `RESOLVIDO`
 Nenhum erro de rota, SQL ou transacao e pego antes de produção — C1 e C2 existem
