@@ -12,7 +12,6 @@
 // classificado.
 const { sql } = require('../db');
 const { AppError } = require('../lib/errors');
-const { hasTable } = require('../db/schema');
 const { isSunday } = require('./escala');
 const {
     buildDateRange,
@@ -24,24 +23,6 @@ const {
     normalizeOptionalText,
     toSqlTime
 } = require('../lib/validation');
-
-function ensureFolgasDomingoTable(schema, options = {}) {
-    const { allowMissing = false } = options;
-
-    if (hasTable(schema, 'FolgasDomingo')) {
-        return true;
-    }
-
-    if (allowMissing) {
-        return false;
-    }
-
-    throw new AppError(
-        409,
-        'O registro de folgas de domingo ainda nao esta habilitado no banco. Aplique o script de migracao antes de usar esse recurso.',
-        { missing: ['tabela FolgasDomingo'] }
-    );
-}
 
 function serializeFolgaDomingo(row) {
     return {
@@ -186,11 +167,7 @@ function buildSelect() {
     `;
 }
 
-async function listFolgasDomingo(poolOrTx, schema, filtros = {}) {
-    if (!ensureFolgasDomingoTable(schema, { allowMissing: filtros.allowMissingTable })) {
-        return [];
-    }
-
+async function listFolgasDomingo(poolOrTx, filtros = {}) {
     const request = poolOrTx.request();
     const clauses = [];
 
@@ -217,9 +194,7 @@ async function listFolgasDomingo(poolOrTx, schema, filtros = {}) {
     return result.recordset.map(serializeFolgaDomingo);
 }
 
-async function findFolgaDomingoById(poolOrTx, schema, id) {
-    ensureFolgasDomingoTable(schema);
-
+async function findFolgaDomingoById(poolOrTx, id) {
     const folgaId = ensurePositiveInt(id, 'Folga de domingo');
     const result = await poolOrTx.request()
         .input('id', sql.Int, folgaId)
@@ -268,9 +243,7 @@ function traduzirErroDeDuplicidade(erro) {
     return erro;
 }
 
-async function createFolgaDomingo(poolOrTx, schema, body) {
-    ensureFolgasDomingoTable(schema);
-
+async function createFolgaDomingo(poolOrTx, body) {
     const payload = normalizeFolgaDomingoPayload(body);
     await ensureColaboradorExiste(poolOrTx, payload.colaboradorId, 'Colaborador');
 
@@ -287,14 +260,14 @@ async function createFolgaDomingo(poolOrTx, schema, body) {
             )
         `);
 
-        return findFolgaDomingoById(poolOrTx, schema, inserido.recordset[0].Id);
+        return findFolgaDomingoById(poolOrTx, inserido.recordset[0].Id);
     } catch (erro) {
         throw traduzirErroDeDuplicidade(erro);
     }
 }
 
-async function updateFolgaDomingo(poolOrTx, schema, id, body) {
-    const atual = await findFolgaDomingoById(poolOrTx, schema, id);
+async function updateFolgaDomingo(poolOrTx, id, body) {
+    const atual = await findFolgaDomingoById(poolOrTx, id);
     const payload = normalizeFolgaDomingoPayload(body, atual);
 
     await ensureColaboradorExiste(poolOrTx, payload.colaboradorId, 'Colaborador');
@@ -321,11 +294,11 @@ async function updateFolgaDomingo(poolOrTx, schema, id, body) {
         throw traduzirErroDeDuplicidade(erro);
     }
 
-    return findFolgaDomingoById(poolOrTx, schema, atual.id);
+    return findFolgaDomingoById(poolOrTx, atual.id);
 }
 
-async function deleteFolgaDomingo(poolOrTx, schema, id) {
-    const atual = await findFolgaDomingoById(poolOrTx, schema, id);
+async function deleteFolgaDomingo(poolOrTx, id) {
+    const atual = await findFolgaDomingoById(poolOrTx, id);
 
     await poolOrTx.request()
         .input('id', sql.Int, atual.id)
@@ -337,7 +310,6 @@ async function deleteFolgaDomingo(poolOrTx, schema, id) {
 module.exports = {
     createFolgaDomingo,
     deleteFolgaDomingo,
-    ensureFolgasDomingoTable,
     findFolgaDomingoById,
     listFolgasDomingo,
     normalizeFolgaDomingoPayload,

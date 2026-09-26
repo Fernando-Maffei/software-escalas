@@ -1,6 +1,5 @@
 const { sql } = require('../db');
 const { AppError } = require('../lib/errors');
-const { getSchemaInfo, hasTable } = require('../db/schema');
 const { ensurePositiveInt, normalizeOptionalText } = require('../lib/validation');
 
 function serializeSetor(row) {
@@ -33,12 +32,6 @@ function normalizeNullableSetorId(value, fieldName = 'Setor') {
 }
 
 async function listSetores(poolOrTx, options = {}) {
-    const schema = await getSchemaInfo(poolOrTx);
-
-    if (!hasTable(schema, 'Setores')) {
-        return [];
-    }
-
     const { onlyActive = true } = options;
     const request = poolOrTx.request();
     const clauses = [];
@@ -64,12 +57,6 @@ async function listSetores(poolOrTx, options = {}) {
 }
 
 async function findSetorById(poolOrTx, setorId) {
-    const schema = await getSchemaInfo(poolOrTx);
-
-    if (!hasTable(schema, 'Setores')) {
-        return null;
-    }
-
     const id = ensurePositiveInt(setorId, 'Setor');
     const result = await poolOrTx.request()
         .input('id', sql.Int, id)
@@ -91,12 +78,6 @@ async function findSetorById(poolOrTx, setorId) {
 async function ensureSetorExists(poolOrTx, setorId) {
     if (!setorId) {
         return null;
-    }
-
-    const schema = await getSchemaInfo(poolOrTx);
-
-    if (!hasTable(schema, 'Setores')) {
-        throw new AppError(409, 'A tabela de setores ainda nao foi criada. Use a opcao de verificar/gerar tabelas antes de vincular um setor.');
     }
 
     const setor = await findSetorById(poolOrTx, setorId);

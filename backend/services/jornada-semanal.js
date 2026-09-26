@@ -1,6 +1,5 @@
 const { sql } = require('../db');
 const { AppError } = require('../lib/errors');
-const { hasTable } = require('../db/schema');
 const {
     ensurePositiveInt,
     extractTimeString,
@@ -24,24 +23,6 @@ function normalizeDiaSemana(value, fieldName = 'Dia da semana') {
 
 function coerceBoolean(value) {
     return value === true || value === 1;
-}
-
-function ensureJornadaSemanalTable(schema, options = {}) {
-    const { allowMissing = false } = options;
-
-    if (hasTable(schema, 'ColaboradorJornadaSemanal')) {
-        return true;
-    }
-
-    if (allowMissing) {
-        return false;
-    }
-
-    throw new AppError(
-        409,
-        'A tabela ColaboradorJornadaSemanal ainda nao esta habilitada no banco. Aplique o script SQL de migracao antes de usar esse recurso.',
-        { missing: ['tabela ColaboradorJornadaSemanal'] }
-    );
 }
 
 function serializeJornadaSemanalRow(row) {
@@ -153,12 +134,8 @@ async function ensureColaboradorExists(poolOrTx, colaboradorId) {
     return id;
 }
 
-async function listJornadaSemanal(poolOrTx, schema, options = {}) {
-    const { colaboradorId = null, onlyActive = true, allowMissingTable = false } = options;
-
-    if (!ensureJornadaSemanalTable(schema, { allowMissing: allowMissingTable })) {
-        return [];
-    }
+async function listJornadaSemanal(poolOrTx, options = {}) {
+    const { colaboradorId = null, onlyActive = true } = options;
 
     const request = poolOrTx.request();
     const clauses = [];
@@ -192,9 +169,7 @@ async function listJornadaSemanal(poolOrTx, schema, options = {}) {
     return result.recordset.map(serializeJornadaSemanalRow);
 }
 
-async function replaceColaboradorJornadaSemanal(poolOrTx, schema, colaboradorId, jornadaSemanal) {
-    ensureJornadaSemanalTable(schema);
-
+async function replaceColaboradorJornadaSemanal(poolOrTx, colaboradorId, jornadaSemanal) {
     const normalizedColaboradorId = await ensureColaboradorExists(poolOrTx, colaboradorId);
     const normalizedRows = normalizeJornadaSemanalPayload(jornadaSemanal, {
         fieldName: 'Jornada semanal'
@@ -308,14 +283,13 @@ async function replaceColaboradorJornadaSemanal(poolOrTx, schema, colaboradorId,
             `);
     }
 
-    return listJornadaSemanal(poolOrTx, schema, {
+    return listJornadaSemanal(poolOrTx, {
         colaboradorId: normalizedColaboradorId,
         onlyActive: true
     });
 }
 
 module.exports = {
-    ensureJornadaSemanalTable,
     listJornadaSemanal,
     normalizeDiaSemana,
     normalizeJornadaSemanalPayload,

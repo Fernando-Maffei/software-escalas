@@ -2,7 +2,6 @@ const fs = require('fs');
 const path = require('path');
 
 const { AppError } = require('../lib/errors');
-const { clearSchemaCache } = require('./schema');
 const { ensureDefaultAdmin } = require('../auth/auth');
 
 const REQUIRED_TABLES = Object.freeze([
@@ -130,8 +129,6 @@ async function ensureApplicationSchema(pool) {
     for (const filePath of SCHEMA_SCRIPT_PATHS) {
         await executeSqlScriptFile(pool, filePath);
     }
-
-    clearSchemaCache();
 
     const after = await listExistingRequiredTables(pool);
     const schemaAfter = await getSchemaSnapshot(pool);

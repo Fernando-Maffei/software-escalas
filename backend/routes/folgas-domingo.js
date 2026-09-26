@@ -1,7 +1,6 @@
 const express = require('express');
 
 const { sql, conectar } = require('../db');
-const { getSchemaInfo } = require('../db/schema');
 const { withTransaction } = require('../db/transactions');
 const {
     createFolgaDomingo,
@@ -35,23 +34,21 @@ function janelaAfetada(...folgas) {
 // Limpa as linhas de escala que esta folga gerou e manda regerar a janela.
 // Sempre nesta ordem: a hidratacao so recria o que a folga ainda diz, entao
 // uma data que saiu do registro some da escala em vez de ficar orfa.
-async function ressincronizarEscala(tx, schema, folgaId, janela) {
+async function ressincronizarEscala(tx, folgaId, janela) {
     await deleteEscalaDiaByOrigin(tx, 'folga_domingo', folgaId);
 
     if (janela) {
-        await ensureEscalaDiaForPeriod(tx, schema, janela.inicio, janela.fim);
+        await ensureEscalaDiaForPeriod(tx, janela.inicio, janela.fim);
     }
 }
 
 router.get('/', async (req, res) => {
     const pool = await conectar();
-    const schema = await getSchemaInfo(pool);
 
-    const items = await listFolgasDomingo(pool, schema, {
+    const items = await listFolgasDomingo(pool, {
         dataInicio: req.query.dataInicio,
         dataFim: req.query.dataFim,
-        colaboradorId: req.query.colaboradorId,
-        allowMissingTable: true
+        colaboradorId: req.query.colaboradorId
     });
 
     res.json({ total: items.length, items });
@@ -59,18 +56,16 @@ router.get('/', async (req, res) => {
 
 router.get('/:id', async (req, res) => {
     const pool = await conectar();
-    const schema = await getSchemaInfo(pool);
 
-    res.json(await findFolgaDomingoById(pool, schema, req.params.id));
+    res.json(await findFolgaDomingoById(pool, req.params.id));
 });
 
 router.post('/', async (req, res) => {
     const pool = await conectar();
-    const schema = await getSchemaInfo(pool);
 
     const folga = await withTransaction(sql, pool, async (tx) => {
-        const criada = await createFolgaDomingo(tx, schema, req.body || {});
-        await ressincronizarEscala(tx, schema, criada.id, janelaAfetada(criada));
+        const criada = await createFolgaDomingo(tx, req.body || {});
+        await ressincronizarEscala(tx, criada.id, janelaAfetada(criada));
         return criada;
     });
 
@@ -83,13 +78,12 @@ router.post('/', async (req, res) => {
 
 router.put('/:id', async (req, res) => {
     const pool = await conectar();
-    const schema = await getSchemaInfo(pool);
     const id = ensurePositiveInt(req.params.id, 'Folga de domingo');
 
     const folga = await withTransaction(sql, pool, async (tx) => {
-        const anterior = await findFolgaDomingoById(tx, schema, id);
-        const atualizada = await updateFolgaDomingo(tx, schema, id, req.body || {});
-        await ressincronizarEscala(tx, schema, id, janelaAfetada(anterior, atualizada));
+        const anterior = await findFolgaDomingoById(tx, id);
+        const atualizada = await updateFolgaDomingo(tx, id, req.body || {});
+        await ressincronizarEscala(tx, id, janelaAfetada(anterior, atualizada));
         return atualizada;
     });
 
@@ -102,15 +96,14 @@ router.put('/:id', async (req, res) => {
 
 router.delete('/:id', async (req, res) => {
     const pool = await conectar();
-    const schema = await getSchemaInfo(pool);
     const id = ensurePositiveInt(req.params.id, 'Folga de domingo');
 
     const removida = await withTransaction(sql, pool, async (tx) => {
-        const folga = await deleteFolgaDomingo(tx, schema, id);
+        const folga = await deleteFolgaDomingo(tx, id);
         // A cobertura nao e apagada aqui: aquela linha pertence ao plantao e
         // volta sozinha a ser 'plantao' na regeracao, porque nao ha mais folga
         // dizendo que era cobertura.
-        await ressincronizarEscala(tx, schema, id, janelaAfetada(folga));
+        await ressincronizarEscala(tx, id, janelaAfetada(folga));
         return folga;
     });
 

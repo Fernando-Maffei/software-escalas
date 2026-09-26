@@ -21,8 +21,8 @@
     }
 
     function buildTipoEscalaEditorMarkup(selectedId = '') {
-        // Banco sem a migration devolve lista vazia: nesse caso o bloco inteiro
-        // some, em vez de mostrar um select que nao tem o que oferecer.
+        // Sem nenhum tipo de escala cadastrado o bloco inteiro some, em vez de
+        // mostrar um select que nao tem o que oferecer.
         if (!(window.tiposEscala || []).length) {
             return '';
         }

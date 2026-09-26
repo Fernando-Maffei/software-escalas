@@ -10,7 +10,6 @@ const {
     normalizeJornadaSemanalPayload,
     replaceColaboradorJornadaSemanal
 } = require('../services/jornada-semanal');
-const { getSchemaInfo } = require('../db/schema');
 const { excluirColaboradorDefinitivamente } = require('../services/exclusao-colaborador');
 const { ensureSetorExists, normalizeNullableSetorId } = require('../services/setores');
 const { withTransaction } = require('../db/transactions');
@@ -192,17 +191,15 @@ router.get('/:id', async (req, res) => {
 router.get('/:id/jornada-semanal', async (req, res) => {
     const colaboradorId = ensurePositiveInt(req.params.id, 'Colaborador');
     const pool = await conectar();
-    const schema = await getSchemaInfo(pool);
     const colaborador = await findColaboradorById(pool, colaboradorId);
 
     if (!colaborador) {
         throw new AppError(404, 'Colaborador nao encontrado.');
     }
 
-    const items = await listJornadaSemanal(pool, schema, {
+    const items = await listJornadaSemanal(pool, {
         colaboradorId,
-        onlyActive: true,
-        allowMissingTable: true
+        onlyActive: true
     });
 
     res.json({
@@ -223,11 +220,9 @@ function salvarJornadaSemanal(mensagem) {
             fieldName: 'Jornada semanal'
         }) || [];
         const pool = await conectar();
-        const schema = await getSchemaInfo(pool);
 
         const items = await withTransaction(sql, pool, async (tx) => replaceColaboradorJornadaSemanal(
             tx,
-            schema,
             colaboradorId,
             jornadaSemanal
         ));
@@ -248,7 +243,6 @@ router.put('/:id/jornada-semanal', salvarJornadaSemanal('Jornada semanal atualiz
 
 router.post('/', async (req, res) => {
     const pool = await conectar();
-    const schema = await getSchemaInfo(pool);
     const payload = buildColaboradorPayload(req.body);
     const jornadaSemanal = normalizeJornadaSemanalPayload(req.body?.jornadaSemanal, {
         fieldName: 'jornadaSemanal'
@@ -273,7 +267,7 @@ router.post('/', async (req, res) => {
         const colaboradorSalvo = result.recordset[0];
 
         if (jornadaSemanal !== undefined) {
-            await replaceColaboradorJornadaSemanal(tx, schema, colaboradorSalvo.Id, jornadaSemanal);
+            await replaceColaboradorJornadaSemanal(tx, colaboradorSalvo.Id, jornadaSemanal);
         }
 
         return colaboradorSalvo;
@@ -290,7 +284,6 @@ router.put('/:id', async (req, res) => {
     const id = ensurePositiveInt(req.params.id, 'Colaborador');
     const pool = await conectar();
     const existing = await findColaboradorById(pool, id);
-    const schema = await getSchemaInfo(pool);
     const jornadaSemanal = normalizeJornadaSemanalPayload(req.body?.jornadaSemanal, {
         fieldName: 'jornadaSemanal'
     });
@@ -327,10 +320,10 @@ router.put('/:id', async (req, res) => {
         const colaboradorSalvo = result.recordset[0];
 
         if (jornadaSemanal !== undefined) {
-            await replaceColaboradorJornadaSemanal(tx, schema, colaboradorSalvo.Id, jornadaSemanal);
+            await replaceColaboradorJornadaSemanal(tx, colaboradorSalvo.Id, jornadaSemanal);
         }
 
-        await syncColaboradorDefaultsToEscalaDia(tx, schema, colaboradorSalvo);
+        await syncColaboradorDefaultsToEscalaDia(tx, colaboradorSalvo);
 
         return colaboradorSalvo;
     });

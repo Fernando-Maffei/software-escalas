@@ -1,7 +1,6 @@
 const express = require('express');
 
 const { sql, conectar } = require('../db');
-const { getSchemaInfo } = require('../db/schema');
 const { withTransaction } = require('../db/transactions');
 const {
     aplicarTipoEscalaNoColaborador,
@@ -19,12 +18,10 @@ const router = express.Router();
 // simplesmente nao aparece).
 router.get('/', async (req, res) => {
     const pool = await conectar();
-    const schema = await getSchemaInfo(pool);
     const incluirInativos = String(req.query.includeInactive || '').trim().toLowerCase() === 'true';
 
-    const items = await listTiposEscala(pool, schema, {
-        onlyActive: !incluirInativos,
-        allowMissingTable: true
+    const items = await listTiposEscala(pool, {
+        onlyActive: !incluirInativos
     });
 
     res.json({ total: items.length, items });
@@ -32,17 +29,15 @@ router.get('/', async (req, res) => {
 
 router.get('/:id', async (req, res) => {
     const pool = await conectar();
-    const schema = await getSchemaInfo(pool);
-    const tipoEscala = await findTipoEscalaById(pool, schema, req.params.id);
+    const tipoEscala = await findTipoEscalaById(pool, req.params.id);
 
     res.json(tipoEscala);
 });
 
 router.post('/', async (req, res) => {
     const pool = await conectar();
-    const schema = await getSchemaInfo(pool);
 
-    const tipoEscala = await withTransaction(sql, pool, async (tx) => createTipoEscala(tx, schema, req.body || {}));
+    const tipoEscala = await withTransaction(sql, pool, async (tx) => createTipoEscala(tx, req.body || {}));
 
     res.status(201).json({
         success: true,
@@ -53,11 +48,9 @@ router.post('/', async (req, res) => {
 
 router.put('/:id', async (req, res) => {
     const pool = await conectar();
-    const schema = await getSchemaInfo(pool);
 
     const tipoEscala = await withTransaction(sql, pool, async (tx) => updateTipoEscala(
         tx,
-        schema,
         req.params.id,
         req.body || {}
     ));
@@ -74,12 +67,10 @@ router.put('/:id', async (req, res) => {
 // do tipo sem que nada seja desfeito.
 router.post('/:id/aplicar/:colaboradorId', async (req, res) => {
     const pool = await conectar();
-    const schema = await getSchemaInfo(pool);
     const colaboradorId = ensurePositiveInt(req.params.colaboradorId, 'Colaborador');
 
     const resultado = await withTransaction(sql, pool, async (tx) => aplicarTipoEscalaNoColaborador(
         tx,
-        schema,
         req.params.id,
         colaboradorId
     ));

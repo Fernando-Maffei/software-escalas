@@ -9,7 +9,6 @@ const {
     normalizeSubtipo,
     resolveDefaultDescontaBancoHoras
 } = require('../services/bancoHoras');
-const { getSchemaInfo } = require('../db/schema');
 const {
     restoreEscalaDefaultsForPeriod,
     syncAusenciaToEscalaDia
@@ -280,7 +279,6 @@ router.get('/', async (req, res) => {
 
 router.post('/', async (req, res) => {
     const pool = await conectar();
-    const schema = await getSchemaInfo(pool);
     const payload = buildAusenciaPayload(req.body, {});
 
     const result = await withTransaction(sql, pool, async (tx) => {
@@ -312,7 +310,7 @@ router.post('/', async (req, res) => {
         const saved = insertResult.recordset[0];
 
         await syncAusenciaMovement(tx, saved, colaborador);
-        await syncAusenciaToEscalaDia(tx, schema, saved, colaborador);
+        await syncAusenciaToEscalaDia(tx, saved, colaborador);
 
         return saved;
     });
@@ -327,7 +325,6 @@ router.post('/', async (req, res) => {
 router.put('/:id', async (req, res) => {
     const id = ensurePositiveInt(req.params.id, 'Lancamento');
     const pool = await conectar();
-    const schema = await getSchemaInfo(pool);
 
     const result = await withTransaction(sql, pool, async (tx) => {
         const existing = await findAusenciaById(tx, id);
@@ -372,12 +369,11 @@ router.put('/:id', async (req, res) => {
         await syncAusenciaMovement(tx, saved, colaborador);
         await restoreEscalaDefaultsForPeriod(
             tx,
-            schema,
             extractDateString(existing.DataInicio),
             extractDateString(existing.DataFim),
             { colaboradorId: existing.ColaboradorId }
         );
-        await syncAusenciaToEscalaDia(tx, schema, saved, colaborador);
+        await syncAusenciaToEscalaDia(tx, saved, colaborador);
 
         return saved;
     });
@@ -392,7 +388,6 @@ router.put('/:id', async (req, res) => {
 router.delete('/:id', async (req, res) => {
     const id = ensurePositiveInt(req.params.id, 'Lancamento');
     const pool = await conectar();
-    const schema = await getSchemaInfo(pool);
 
     await withTransaction(sql, pool, async (tx) => {
         const existing = await findAusenciaById(tx, id);
@@ -414,7 +409,6 @@ router.delete('/:id', async (req, res) => {
 
         await restoreEscalaDefaultsForPeriod(
             tx,
-            schema,
             extractDateString(existing.DataInicio),
             extractDateString(existing.DataFim),
             { colaboradorId: existing.ColaboradorId }

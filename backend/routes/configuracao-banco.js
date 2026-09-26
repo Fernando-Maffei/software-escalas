@@ -22,7 +22,6 @@ const {
     saveDatabaseSettings
 } = require('../db/database-config');
 const { ensureApplicationSchema, applyExampleSeed, REQUIRED_TABLES } = require('../db/database-schema');
-const { clearSchemaCache } = require('../db/schema');
 const { setSchemaReady } = require('../lib/app-state');
 
 const router = express.Router();
@@ -64,7 +63,6 @@ router.post('/salvar', async (req, res, next) => {
         const connection = await testarConexao(payload);
         const saved = saveDatabaseSettings(payload);
 
-        clearSchemaCache();
         await fecharConexao();
 
         // Garante tabelas (e o admin inicial, se o banco for novo) ja na

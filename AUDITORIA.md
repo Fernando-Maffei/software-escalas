@@ -249,13 +249,22 @@ Testes unitario e de integracao (lanca 08:00–10:30 no passado, debita 150 min)
 
 ### MEDIO
 
-**M1 — Deteccao de schema em tempo de execucao ja nao serve para nada** · `ABERTO`
+**M1 — Deteccao de schema em tempo de execucao ja nao serve para nada** · `RESOLVIDO`
 `backend/db/schema.js` + ~130 usos (`hasColumn`, `hasTable`, `getBancoHorasCapabilities`)
 O servidor so libera as rotas de dados (`schemaReady`) depois de aplicar
 **todas** as migrations, entao toda coluna "opcional" sempre existe. Os ramos
 `if (capabilities.hasX)` e os `saved.x === undefined` sao codigo morto que
 triplica o tamanho das rotas — e causaram C1 (lista incompleta). Correcao
 gradual: remover rota por rota com teste de integracao cobrindo.
+**Feito:** `backend/db/schema.js` (getSchemaInfo, hasTable, hasColumn,
+getBancoHorasCapabilities, ensureXTable) foi removido. Rotas e servicos usam
+listas fixas de colunas e INSERT/UPDATE diretos; o parametro `schema`, que so era
+repassado de mao em mao, saiu de 35 funcoes (por AST, com o `tsc` conferindo a
+aridade de cada chamada). `GET /banco-horas/status` devolve o mesmo JSON por
+contrato. Backend ficou ~420 linhas menor. **Prova de equivalencia:** roteiro
+golden master (`tests/integracao/golden-master.js`: 87 passos por todas as rotas
+de dados + foto das 14 tabelas) identico antes e depois, conferido a cada arquivo
+alterado; integracao, unitarios, lint e tipos verdes.
 
 **M2 — Mensagens de erro 500 vazam detalhe interno** · `RESOLVIDO`
 `backend/server.js:539-551`: qualquer erro nao tratado devolve `error.message`

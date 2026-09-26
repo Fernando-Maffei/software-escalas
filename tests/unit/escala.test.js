@@ -61,25 +61,6 @@ module.exports = [
         }
     },
     {
-        name: 'getSchemaInfo rastreia a tabela Feriados (senao o feriado cadastrado nao suprime a escala)',
-        async run() {
-            const { getSchemaInfo, hasTable } = require('../../backend/db/schema');
-            let consulta = '';
-            const fakePool = {
-                request: () => ({
-                    query: async (sqlText) => {
-                        consulta = sqlText;
-                        return { recordset: [{ TABLE_NAME: 'Feriados', COLUMN_NAME: 'Data' }] };
-                    }
-                })
-            };
-
-            const schema = await getSchemaInfo(fakePool, { forceRefresh: true });
-            assert.ok(consulta.includes("'Feriados'"), 'a consulta de schema precisa incluir Feriados');
-            assert.equal(hasTable(schema, 'Feriados'), true);
-        }
-    },
-    {
         name: 'loadFeriadosDoPeriodo junta feriados nacionais e os cadastrados no banco',
         async run() {
             const fakePool = {
@@ -91,16 +72,13 @@ module.exports = [
                     return request;
                 }
             };
-            const schema = { tables: { feriados: true } };
-            const semTabela = { tables: {} };
-
-            const datas = await loadFeriadosDoPeriodo(fakePool, schema, '2026-09-01', '2026-09-30');
+            // O caso "tabela Feriados ausente" nao existe mais: o servidor so
+            // libera as rotas depois de aplicar todas as migrations (M1 da
+            // auditoria).
+            const datas = await loadFeriadosDoPeriodo(fakePool, '2026-09-01', '2026-09-30');
             assert.ok(datas.has('2026-09-07'), 'Independencia (nacional) deve estar na lista');
             assert.ok(datas.has('2026-09-20'), 'feriado cadastrado deve estar na lista');
             assert.equal(datas.has('2026-09-08'), false);
-
-            const soNacionais = await loadFeriadosDoPeriodo(fakePool, semTabela, '2026-09-01', '2026-09-30');
-            assert.deepEqual([...soNacionais], ['2026-09-07']);
         }
     },
     {

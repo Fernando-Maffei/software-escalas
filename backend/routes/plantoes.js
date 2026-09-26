@@ -9,7 +9,6 @@ const {
     describePlantaoMovement,
     minutesToDurationLabel
 } = require('../services/bancoHoras');
-const { getSchemaInfo } = require('../db/schema');
 const {
     deleteEscalaDiaByOrigin,
     restoreEscalaDefaultsForPeriod,
@@ -294,7 +293,6 @@ router.get('/:dataISO', async (req, res) => {
 
 router.post('/', async (req, res) => {
     const pool = await conectar();
-    const schema = await getSchemaInfo(pool);
     const feriados = await loadFeriadosSet(pool);
     const payload = buildPlantaoDiaPayload(req.body, feriados);
     const grupos = agruparLancamentosPorHorario(payload.lancamentos);
@@ -357,7 +355,7 @@ router.post('/', async (req, res) => {
         }
 
         const colaboradoresResult = await tx.request().query('SELECT * FROM Colaboradores');
-        await syncPlantaoDiaToEscalaDia(tx, schema, payload.dataISO, salvos, colaboradoresResult.recordset);
+        await syncPlantaoDiaToEscalaDia(tx, payload.dataISO, salvos, colaboradoresResult.recordset);
 
         return {
             action,
@@ -382,7 +380,6 @@ router.post('/', async (req, res) => {
 
 router.delete('/:dataISO', async (req, res) => {
     const pool = await conectar();
-    const schema = await getSchemaInfo(pool);
     const dataISO = normalizeIsoDate(req.params.dataISO, 'Data do plantao');
 
     await withTransaction(sql, pool, async (tx) => {
@@ -402,7 +399,7 @@ router.delete('/:dataISO', async (req, res) => {
             .input('data_plantao', sql.Date, dataISO)
             .query('DELETE FROM plantoes WHERE data_plantao = @data_plantao');
 
-        await restoreEscalaDefaultsForPeriod(tx, schema, dataISO, dataISO);
+        await restoreEscalaDefaultsForPeriod(tx, dataISO, dataISO);
     });
 
     res.json({

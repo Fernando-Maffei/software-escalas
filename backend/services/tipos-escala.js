@@ -9,7 +9,6 @@
 // amarra.
 const { sql } = require('../db');
 const { AppError } = require('../lib/errors');
-const { hasTable } = require('../db/schema');
 const { replaceColaboradorJornadaSemanal } = require('./jornada-semanal');
 const {
     ensurePositiveInt,
@@ -31,24 +30,6 @@ const CICLOS_SUPORTADOS = Object.freeze(['semanal']);
 
 function coerceBoolean(value) {
     return value === true || value === 1;
-}
-
-function ensureTiposEscalaTable(schema, options = {}) {
-    const { allowMissing = false } = options;
-
-    if (hasTable(schema, 'TiposEscala') && hasTable(schema, 'TipoEscalaDia')) {
-        return true;
-    }
-
-    if (allowMissing) {
-        return false;
-    }
-
-    throw new AppError(
-        409,
-        'Os tipos de escala ainda nao estao habilitados no banco. Aplique o script de migracao antes de usar esse recurso.',
-        { missing: ['tabela TiposEscala', 'tabela TipoEscalaDia'] }
-    );
 }
 
 function serializeTipoEscalaDia(row) {
@@ -219,12 +200,8 @@ async function listTipoEscalaDias(poolOrTx, tipoEscalaId = null) {
     return result.recordset;
 }
 
-async function listTiposEscala(poolOrTx, schema, options = {}) {
-    const { onlyActive = true, allowMissingTable = false } = options;
-
-    if (!ensureTiposEscalaTable(schema, { allowMissing: allowMissingTable })) {
-        return [];
-    }
+async function listTiposEscala(poolOrTx, options = {}) {
+    const { onlyActive = true } = options;
 
     const result = await poolOrTx.request().query(`
         SELECT Id, Nome, CicloTipo, DomingosFolgaCada, ExigeReposicao, Ativo, Ordem, Observacao, CriadoEm, AtualizadoEm
@@ -248,9 +225,7 @@ async function listTiposEscala(poolOrTx, schema, options = {}) {
     return result.recordset.map((row) => serializeTipoEscala(row, diasPorTipo.get(Number(row.Id)) || []));
 }
 
-async function findTipoEscalaById(poolOrTx, schema, tipoEscalaId) {
-    ensureTiposEscalaTable(schema);
-
+async function findTipoEscalaById(poolOrTx, tipoEscalaId) {
     const id = ensurePositiveInt(tipoEscalaId, 'Tipo de escala');
     const result = await poolOrTx.request()
         .input('id', sql.Int, id)
@@ -297,9 +272,7 @@ async function replaceTipoEscalaDias(poolOrTx, tipoEscalaId, dias) {
     }
 }
 
-async function createTipoEscala(poolOrTx, schema, body) {
-    ensureTiposEscalaTable(schema);
-
+async function createTipoEscala(poolOrTx, body) {
     const payload = normalizeTipoEscalaPayload(body);
     const ordemResult = await poolOrTx.request().query('SELECT COALESCE(MAX(Ordem), 0) AS maxOrdem FROM TiposEscala');
     const ordem = Number(ordemResult.recordset[0]?.maxOrdem || 0) + 1;
@@ -321,11 +294,11 @@ async function createTipoEscala(poolOrTx, schema, body) {
     const id = Number(inserido.recordset[0].Id);
     await replaceTipoEscalaDias(poolOrTx, id, payload.dias);
 
-    return findTipoEscalaById(poolOrTx, schema, id);
+    return findTipoEscalaById(poolOrTx, id);
 }
 
-async function updateTipoEscala(poolOrTx, schema, tipoEscalaId, body) {
-    const atual = await findTipoEscalaById(poolOrTx, schema, tipoEscalaId);
+async function updateTipoEscala(poolOrTx, tipoEscalaId, body) {
+    const atual = await findTipoEscalaById(poolOrTx, tipoEscalaId);
     const payload = normalizeTipoEscalaPayload(body, atual);
 
     await poolOrTx.request()
@@ -351,7 +324,7 @@ async function updateTipoEscala(poolOrTx, schema, tipoEscalaId, body) {
 
     await replaceTipoEscalaDias(poolOrTx, atual.id, payload.dias);
 
-    return findTipoEscalaById(poolOrTx, schema, atual.id);
+    return findTipoEscalaById(poolOrTx, atual.id);
 }
 
 // O molde no formato que ColaboradorJornadaSemanal entende. Dia de folga vira
@@ -370,8 +343,8 @@ function construirJornadaSemanalDoTipo(tipoEscala) {
         }));
 }
 
-async function aplicarTipoEscalaNoColaborador(poolOrTx, schema, tipoEscalaId, colaboradorId) {
-    const tipoEscala = await findTipoEscalaById(poolOrTx, schema, tipoEscalaId);
+async function aplicarTipoEscalaNoColaborador(poolOrTx, tipoEscalaId, colaboradorId) {
+    const tipoEscala = await findTipoEscalaById(poolOrTx, tipoEscalaId);
 
     if (tipoEscala.cicloTipo !== 'semanal') {
         throw new AppError(400, `Ciclo "${tipoEscala.cicloTipo}" ainda nao e suportado. Apenas o ciclo semanal pode ser aplicado.`);
@@ -380,7 +353,6 @@ async function aplicarTipoEscalaNoColaborador(poolOrTx, schema, tipoEscalaId, co
     const id = ensurePositiveInt(colaboradorId, 'Colaborador');
     const jornadaSemanal = await replaceColaboradorJornadaSemanal(
         poolOrTx,
-        schema,
         id,
         construirJornadaSemanalDoTipo(tipoEscala)
     );
@@ -397,7 +369,6 @@ module.exports = {
     aplicarTipoEscalaNoColaborador,
     construirJornadaSemanalDoTipo,
     createTipoEscala,
-    ensureTiposEscalaTable,
     findTipoEscalaById,
     listTiposEscala,
     normalizeDiasPayload,

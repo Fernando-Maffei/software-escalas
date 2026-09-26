@@ -3,7 +3,6 @@ const { AppError } = require('../lib/errors');
 const { isFeriadoNacional } = require('./feriados-nacionais');
 const { listJornadaSemanal } = require('./jornada-semanal');
 const { serializePlantaoRecord } = require('./plantoes');
-const { getBancoHorasCapabilities, hasTable } = require('../db/schema');
 const {
     buildDateRange,
     compareTimes,
@@ -113,12 +112,8 @@ function shouldCreateWeekdayBase(dataISO) {
 // Datas de feriado do periodo: nacionais (calculados) e os cadastrados na
 // tabela Feriados (municipal/estadual). Em feriado a escala padrao nao e
 // gerada — so aparece quem tem lancamento de plantao no dia.
-async function loadFeriadosDoPeriodo(poolOrTx, schema, startISO, endISO) {
+async function loadFeriadosDoPeriodo(poolOrTx, startISO, endISO) {
     const datas = new Set(iterateIsoDates(startISO, endISO).filter((dataISO) => isFeriadoNacional(dataISO)));
-
-    if (!hasTable(schema, 'Feriados')) {
-        return datas;
-    }
 
     const result = await poolOrTx.request()
         .input('dataInicio', sql.Date, normalizeIsoDate(startISO, 'Data inicial'))
@@ -559,18 +554,6 @@ function buildEscalaSelect(alias = 'e') {
     ].join(',\n                ');
 }
 
-function ensureEscalaDiaTable(schema) {
-    if (hasTable(schema, 'escala_dia')) {
-        return;
-    }
-
-    throw new AppError(
-        409,
-        'A tabela escala_dia ainda nao esta habilitada no banco. Aplique o script SQL da migracao antes de usar a escala diaria.',
-        { missing: ['tabela escala_dia'] }
-    );
-}
-
 async function findColaboradorById(poolOrTx, colaboradorId) {
     const id = ensurePositiveInt(colaboradorId, 'Colaborador');
     const result = await poolOrTx.request()
@@ -786,21 +769,17 @@ async function applyAutomaticEscalaRecord(poolOrTx, existingMap, incomingRecord,
     };
 }
 
-async function ensureEscalaBaseForPeriod(poolOrTx, schema, startISO, endISO, options = {}) {
-    ensureEscalaDiaTable(schema);
-
+async function ensureEscalaBaseForPeriod(poolOrTx, startISO, endISO, options = {}) {
     const { colaboradorId = null, includeSaturday = false } = options;
     const colaboradores = await listColaboradores(poolOrTx, { colaboradorId });
-    const jornadaSemanalRows = await listJornadaSemanal(poolOrTx, schema, {
+    const jornadaSemanalRows = await listJornadaSemanal(poolOrTx, {
         colaboradorId,
-        onlyActive: false,
-        allowMissingTable: true
+        onlyActive: false
     });
     const jornadaSemanalIndex = buildJornadaSemanalIndex(jornadaSemanalRows);
-    const hasJornadaSemanalSupport = hasTable(schema, 'ColaboradorJornadaSemanal');
     const existingRows = await listEscalaDiaRows(poolOrTx, startISO, endISO, { colaboradorId });
     const existingMap = new Map(existingRows.map((row) => [buildEscalaKey(row.colaboradorId, row.dataISO), row]));
-    const feriados = await loadFeriadosDoPeriodo(poolOrTx, schema, startISO, endISO);
+    const feriados = await loadFeriadosDoPeriodo(poolOrTx, startISO, endISO);
     const counters = {
         created: 0,
         updated: 0,
@@ -824,7 +803,7 @@ async function ensureEscalaBaseForPeriod(poolOrTx, schema, startISO, endISO, opt
             if (isFeriado) {
                 // Feriado: sem escala padrao. A linha automatica que ja existia
                 // e removida abaixo; o plantao do feriado entra na hidratacao.
-            } else if (hasJornadaSemanalSupport && jornadaInfo.hasRows) {
+            } else if (jornadaInfo.hasRows) {
                 const jornadaDia = jornadaInfo.activeByDay.get(weekday);
 
                 if (jornadaDia) {
@@ -898,25 +877,20 @@ async function ensureEscalaBaseForPeriod(poolOrTx, schema, startISO, endISO, opt
     };
 }
 
-async function syncColaboradorDefaultsToEscalaDia(poolOrTx, schema, colaborador) {
-    ensureEscalaDiaTable(schema);
-
+async function syncColaboradorDefaultsToEscalaDia(poolOrTx, colaborador) {
     const colaboradorId = ensurePositiveInt(colaborador.Id || colaborador.id, 'Colaborador');
 
-    if (hasTable(schema, 'ColaboradorJornadaSemanal')) {
-        const jornadaRows = await listJornadaSemanal(poolOrTx, schema, {
-            colaboradorId,
-            onlyActive: false,
-            allowMissingTable: true
-        });
+    const jornadaRows = await listJornadaSemanal(poolOrTx, {
+        colaboradorId,
+        onlyActive: false
+    });
 
-        if (jornadaRows.length > 0) {
-            return {
-                updated: 0,
-                skipped: 0,
-                ignoredByWeeklySchedule: true
-            };
-        }
+    if (jornadaRows.length > 0) {
+        return {
+            updated: 0,
+            skipped: 0,
+            ignoredByWeeklySchedule: true
+        };
     }
 
     const result = await poolOrTx.request()
@@ -960,12 +934,6 @@ async function syncColaboradorDefaultsToEscalaDia(poolOrTx, schema, colaborador)
 }
 
 async function listLunchOverrideRows(poolOrTx, startISO, endISO, options = {}) {
-    const capabilities = getBancoHorasCapabilities(options.schema || {});
-
-    if (!capabilities.hasAlmocosPersonalizadosTable) {
-        return [];
-    }
-
     const request = poolOrTx.request()
         .input('dataInicio', sql.Date, normalizeIsoDate(startISO, 'Data inicial'))
         .input('dataFim', sql.Date, normalizeIsoDate(endISO, 'Data final'));
@@ -1001,13 +969,7 @@ async function listLunchOverrideRows(poolOrTx, startISO, endISO, options = {}) {
     }));
 }
 
-async function upsertLunchOverride(poolOrTx, schema, colaborador, dataISO, almocoInicio, almocoFim) {
-    const capabilities = getBancoHorasCapabilities(schema);
-
-    if (!capabilities.hasAlmocosPersonalizadosTable) {
-        return { action: 'skipped', reason: 'almocos_table_missing' };
-    }
-
+async function upsertLunchOverride(poolOrTx, colaborador, dataISO, almocoInicio, almocoFim) {
     const defaults = getColaboradorDefaultLunchTimes(colaborador);
     const useDefault = areSameLunchTimes(defaults.almocoInicio, defaults.almocoFim, almocoInicio, almocoFim);
 
@@ -1058,9 +1020,8 @@ async function upsertLunchOverride(poolOrTx, schema, colaborador, dataISO, almoc
     return { action: 'upserted' };
 }
 
-async function hydrateLunchOverridesIntoEscala(poolOrTx, schema, existingMap, colaboradores, startISO, endISO, options = {}) {
+async function hydrateLunchOverridesIntoEscala(poolOrTx, existingMap, colaboradores, startISO, endISO, options = {}) {
     const overrides = await listLunchOverrideRows(poolOrTx, startISO, endISO, {
-        schema,
         colaboradorId: options.colaboradorId || null
     });
     const colaboradoresMap = new Map((colaboradores || []).map((item) => [Number(item.Id), item]));
@@ -1108,54 +1069,27 @@ async function hydrateLunchOverridesIntoEscala(poolOrTx, schema, existingMap, co
     }
 }
 
-function buildHistoricAusenciaSelect(schema) {
-    const capabilities = getBancoHorasCapabilities(schema);
-    const columns = [
-        'Id',
-        'ColaboradorId',
-        'Tipo',
-        'DataInicio',
-        'DataFim',
-        'PeriodoTipo',
-        'HoraInicio',
-        'HoraFim'
-    ];
+const HISTORICO_AUSENCIA_COLUNAS = `
+                Id,
+                ColaboradorId,
+                Tipo,
+                DataInicio,
+                DataFim,
+                PeriodoTipo,
+                HoraInicio,
+                HoraFim,
+                Subtipo,
+                Observacao`;
 
-    if (capabilities.hasAusenciaSubtipo) {
-        columns.push('Subtipo');
-    }
+const HISTORICO_PLANTAO_COLUNAS = `
+                id,
+                data_plantao,
+                colaboradores_ids,
+                hora_inicio,
+                hora_fim,
+                observacao`;
 
-    if (capabilities.hasAusenciaObservacao) {
-        columns.push('Observacao');
-    }
-
-    return columns.join(',\n                ');
-}
-
-function buildHistoricPlantaoSelect(schema) {
-    const capabilities = getBancoHorasCapabilities(schema);
-    const columns = [
-        'id',
-        'data_plantao',
-        'colaboradores_ids'
-    ];
-
-    if (capabilities.hasPlantaoHoraInicio) {
-        columns.push('hora_inicio');
-    }
-
-    if (capabilities.hasPlantaoHoraFim) {
-        columns.push('hora_fim');
-    }
-
-    if (capabilities.hasPlantaoObservacao) {
-        columns.push('observacao');
-    }
-
-    return columns.join(',\n                ');
-}
-
-async function hydrateHistoricSourcesIntoEscala(poolOrTx, schema, existingMap, colaboradores, startISO, endISO, options = {}) {
+async function hydrateHistoricSourcesIntoEscala(poolOrTx, existingMap, colaboradores, startISO, endISO, options = {}) {
     const { colaboradorId = null } = options;
     const counters = {
         created: 0,
@@ -1177,8 +1111,7 @@ async function hydrateHistoricSourcesIntoEscala(poolOrTx, schema, existingMap, c
     }
 
     const ausenciasResult = await requestAusencias.query(`
-        SELECT
-            ${buildHistoricAusenciaSelect(schema)}
+        SELECT ${HISTORICO_AUSENCIA_COLUNAS}
         FROM Ausencias
         WHERE ${ausenciaClauses.join(' AND ')}
     `);
@@ -1224,8 +1157,7 @@ async function hydrateHistoricSourcesIntoEscala(poolOrTx, schema, existingMap, c
     ];
 
     const plantoesResult = await requestPlantoes.query(`
-        SELECT
-            ${buildHistoricPlantaoSelect(schema)}
+        SELECT ${HISTORICO_PLANTAO_COLUNAS}
         FROM plantoes
         WHERE ${plantaoClauses.join(' AND ')}
     `);
@@ -1281,7 +1213,7 @@ async function hydrateHistoricSourcesIntoEscala(poolOrTx, schema, existingMap, c
 
     // DEPOIS dos plantoes, de proposito: a cobertura reclassifica a linha que a
     // passada de plantao acabou de criar para quem cobriu o posto.
-    await hydrateFolgasDomingoIntoEscala(poolOrTx, schema, existingMap, colaboradoresMap, startISO, endISO, counters);
+    await hydrateFolgasDomingoIntoEscala(poolOrTx, existingMap, colaboradoresMap, startISO, endISO, counters);
 
     return counters;
 }
@@ -1295,11 +1227,7 @@ async function hydrateHistoricSourcesIntoEscala(poolOrTx, schema, existingMap, c
 // pertence ao plantao e continua apontando para ele. Se a folga for apagada, a
 // proxima geracao simplesmente nao reclassifica e a linha volta a ser plantao,
 // sem precisar de limpeza.
-async function hydrateFolgasDomingoIntoEscala(poolOrTx, schema, existingMap, colaboradoresMap, startISO, endISO, counters) {
-    if (!hasTable(schema, 'FolgasDomingo')) {
-        return;
-    }
-
+async function hydrateFolgasDomingoIntoEscala(poolOrTx, existingMap, colaboradoresMap, startISO, endISO, counters) {
     const result = await poolOrTx.request()
         .input('dataInicio', sql.Date, normalizeIsoDate(startISO, 'Data inicial'))
         .input('dataFim', sql.Date, normalizeIsoDate(endISO, 'Data final'))
@@ -1404,9 +1332,9 @@ async function hydrateFolgasDomingoIntoEscala(poolOrTx, schema, existingMap, col
     }
 }
 
-async function ensureEscalaDiaForPeriod(poolOrTx, schema, startISO, endISO, options = {}) {
+async function ensureEscalaDiaForPeriod(poolOrTx, startISO, endISO, options = {}) {
     const { hydrateSources = true, colaboradorId = null, includeSaturday = false } = options;
-    const baseResult = await ensureEscalaBaseForPeriod(poolOrTx, schema, startISO, endISO, {
+    const baseResult = await ensureEscalaBaseForPeriod(poolOrTx, startISO, endISO, {
         colaboradorId,
         includeSaturday
     });
@@ -1417,7 +1345,6 @@ async function ensureEscalaDiaForPeriod(poolOrTx, schema, startISO, endISO, opti
     if (hydrateSources) {
         const hydratedCounters = await hydrateHistoricSourcesIntoEscala(
             poolOrTx,
-            schema,
             baseResult.existingMap,
             baseResult.colaboradores,
             startISO,
@@ -1432,7 +1359,6 @@ async function ensureEscalaDiaForPeriod(poolOrTx, schema, startISO, endISO, opti
 
     await hydrateLunchOverridesIntoEscala(
         poolOrTx,
-        schema,
         baseResult.existingMap,
         baseResult.colaboradores,
         startISO,
@@ -1447,14 +1373,12 @@ async function ensureEscalaDiaForPeriod(poolOrTx, schema, startISO, endISO, opti
     };
 }
 
-async function syncAusenciaToEscalaDia(poolOrTx, schema, ausencia, colaborador) {
-    ensureEscalaDiaTable(schema);
-
+async function syncAusenciaToEscalaDia(poolOrTx, ausencia, colaborador) {
     const dataInicio = extractDateString(ausencia.DataInicio || ausencia.dataInicio);
     const dataFim = extractDateString(ausencia.DataFim || ausencia.dataFim);
 
     await deleteEscalaDiaByOrigin(poolOrTx, 'ausencia', ausencia.Id || ausencia.id);
-    await ensureEscalaDiaForPeriod(poolOrTx, schema, dataInicio, dataFim, {
+    await ensureEscalaDiaForPeriod(poolOrTx, dataInicio, dataFim, {
         colaboradorId: colaborador.Id,
         hydrateSources: false
     });
@@ -1526,9 +1450,7 @@ function aggregatePlantoesPorColaborador(plantoes) {
 
 // Sincroniza TODOS os turnos de um dia de uma vez. Recebe as linhas cruas da
 // tabela plantoes daquela data (o dia inteiro, nao um turno solto).
-async function syncPlantaoDiaToEscalaDia(poolOrTx, schema, dataISO, plantaoRows, colaboradores) {
-    ensureEscalaDiaTable(schema);
-
+async function syncPlantaoDiaToEscalaDia(poolOrTx, dataISO, plantaoRows, colaboradores) {
     const plantoes = (plantaoRows || [])
         .map((row) => serializePlantaoRecord(row))
         .filter((plantao) => ESCALA_PLANTAO_TIPOS.includes(plantao.tipoPlantao));
@@ -1546,7 +1468,7 @@ async function syncPlantaoDiaToEscalaDia(poolOrTx, schema, dataISO, plantaoRows,
 
     const colaboradoresMap = new Map((colaboradores || []).map((item) => [Number(item.Id), item]));
 
-    await ensureEscalaDiaForPeriod(poolOrTx, schema, dataISO, dataISO, {
+    await ensureEscalaDiaForPeriod(poolOrTx, dataISO, dataISO, {
         hydrateSources: false
     });
 
@@ -1575,25 +1497,23 @@ async function syncPlantaoDiaToEscalaDia(poolOrTx, schema, dataISO, plantaoRows,
     }
 }
 
-async function syncPlantaoToEscalaDia(poolOrTx, schema, plantaoRow, colaboradores) {
+async function syncPlantaoToEscalaDia(poolOrTx, plantaoRow, colaboradores) {
     const dataISO = serializePlantaoRecord(plantaoRow).dataISO;
-    return syncPlantaoDiaToEscalaDia(poolOrTx, schema, dataISO, [plantaoRow], colaboradores);
+    return syncPlantaoDiaToEscalaDia(poolOrTx, dataISO, [plantaoRow], colaboradores);
 }
 
-async function restoreEscalaDefaultsForPeriod(poolOrTx, schema, startISO, endISO, options = {}) {
-    return ensureEscalaDiaForPeriod(poolOrTx, schema, startISO, endISO, {
+async function restoreEscalaDefaultsForPeriod(poolOrTx, startISO, endISO, options = {}) {
+    return ensureEscalaDiaForPeriod(poolOrTx, startISO, endISO, {
         ...options,
         hydrateSources: false
     });
 }
 
-async function upsertManualEscalaDia(poolOrTx, schema, payload) {
-    ensureEscalaDiaTable(schema);
-
+async function upsertManualEscalaDia(poolOrTx, payload) {
     const colaborador = await findColaboradorById(poolOrTx, payload.colaboradorId);
     const dataISO = normalizeIsoDate(payload.dataISO, 'Data');
 
-    await ensureEscalaDiaForPeriod(poolOrTx, schema, dataISO, dataISO, {
+    await ensureEscalaDiaForPeriod(poolOrTx, dataISO, dataISO, {
         colaboradorId: colaborador.Id
     });
 
@@ -1635,7 +1555,7 @@ async function upsertManualEscalaDia(poolOrTx, schema, payload) {
     });
 
     const persisted = await persistEscalaDiaRecord(poolOrTx, nextRecord);
-    await upsertLunchOverride(poolOrTx, schema, colaborador, dataISO, nextRecord.almocoInicio, nextRecord.almocoFim);
+    await upsertLunchOverride(poolOrTx, colaborador, dataISO, nextRecord.almocoInicio, nextRecord.almocoFim);
 
     return serializeEscalaDiaRecord({
         ...persisted,
@@ -1646,9 +1566,7 @@ async function upsertManualEscalaDia(poolOrTx, schema, payload) {
     });
 }
 
-async function applyLunchPeriod(poolOrTx, schema, payload) {
-    ensureEscalaDiaTable(schema);
-
+async function applyLunchPeriod(poolOrTx, payload) {
     const colaborador = await findColaboradorById(poolOrTx, payload.colaboradorId);
     const { dataInicio, dataFim } = buildDateRange(payload.dataInicio, payload.dataFim);
     const almocoInicio = normalizeNullableTime(payload.almocoInicio, 'Inicio do almoco');
@@ -1662,7 +1580,7 @@ async function applyLunchPeriod(poolOrTx, schema, payload) {
         throw new AppError(400, 'O horario de inicio do almoco deve ser menor que o horario de fim.');
     }
 
-    await ensureEscalaDiaForPeriod(poolOrTx, schema, dataInicio, dataFim, {
+    await ensureEscalaDiaForPeriod(poolOrTx, dataInicio, dataFim, {
         colaboradorId: colaborador.Id
     });
 
@@ -1705,7 +1623,7 @@ async function applyLunchPeriod(poolOrTx, schema, payload) {
         });
 
         const persisted = await persistEscalaDiaRecord(poolOrTx, nextRecord);
-        await upsertLunchOverride(poolOrTx, schema, colaborador, dataISO, nextRecord.almocoInicio, nextRecord.almocoFim);
+        await upsertLunchOverride(poolOrTx, colaborador, dataISO, nextRecord.almocoInicio, nextRecord.almocoFim);
         existingMap.set(key, serializeEscalaDiaRecord({
             ...persisted,
             colaboradorNome: colaborador.Nome,
@@ -1726,11 +1644,9 @@ async function applyLunchPeriod(poolOrTx, schema, payload) {
     };
 }
 
-async function resetEscalaLunchesToCadastro(poolOrTx, schema, dataISO, options = {}) {
-    ensureEscalaDiaTable(schema);
-
+async function resetEscalaLunchesToCadastro(poolOrTx, dataISO, options = {}) {
     const normalized = normalizeIsoDate(dataISO, 'Data');
-    await ensureEscalaDiaForPeriod(poolOrTx, schema, normalized, normalized);
+    await ensureEscalaDiaForPeriod(poolOrTx, normalized, normalized);
 
     const rows = await listEscalaDiaRows(poolOrTx, normalized, normalized, {
         setorId: options.setorId || null
@@ -1780,7 +1696,7 @@ async function resetEscalaLunchesToCadastro(poolOrTx, schema, dataISO, options =
 
         const sameLunch = areSameLunchTimes(row.almocoInicio, row.almocoFim, defaultStart, defaultEnd);
 
-        await upsertLunchOverride(poolOrTx, schema, colaborador, normalized, defaultStart, defaultEnd);
+        await upsertLunchOverride(poolOrTx, colaborador, normalized, defaultStart, defaultEnd);
 
         if (sameLunch && !row.almocoAjustado) {
             result.skipped += 1;
@@ -1800,11 +1716,9 @@ async function resetEscalaLunchesToCadastro(poolOrTx, schema, dataISO, options =
     return result;
 }
 
-async function listEscalaDiaByDate(poolOrTx, schema, dataISO, options = {}) {
-    ensureEscalaDiaTable(schema);
-
+async function listEscalaDiaByDate(poolOrTx, dataISO, options = {}) {
     const normalized = normalizeIsoDate(dataISO, 'Data');
-    await ensureEscalaDiaForPeriod(poolOrTx, schema, normalized, normalized, {
+    await ensureEscalaDiaForPeriod(poolOrTx, normalized, normalized, {
         setorId: options.setorId || null
     });
     const rows = await listEscalaDiaRows(poolOrTx, normalized, normalized, {
@@ -1819,11 +1733,9 @@ async function listEscalaDiaByDate(poolOrTx, schema, dataISO, options = {}) {
     }));
 }
 
-async function listEscalaReport(poolOrTx, schema, filters) {
-    ensureEscalaDiaTable(schema);
-
+async function listEscalaReport(poolOrTx, filters) {
     const { dataInicio, dataFim } = buildDateRange(filters.dataInicio, filters.dataFim);
-    await ensureEscalaDiaForPeriod(poolOrTx, schema, dataInicio, dataFim, {
+    await ensureEscalaDiaForPeriod(poolOrTx, dataInicio, dataFim, {
         colaboradorId: filters.colaboradorId || null
     });
 
@@ -1838,13 +1750,10 @@ async function listEscalaReport(poolOrTx, schema, filters) {
     const colaboradoresMap = new Map(colaboradores.map((item) => [Number(item.Id), item]));
     // Mesma fonte que a escala padrao usa (ensureEscalaBaseForPeriod): quem
     // tem jornada semanal tem o almoco do dia definido la, nao na ficha.
-    const jornadaSemanalIndex = hasTable(schema, 'ColaboradorJornadaSemanal')
-        ? buildJornadaSemanalIndex(await listJornadaSemanal(poolOrTx, schema, {
-            colaboradorId: filters.colaboradorId || null,
-            onlyActive: false,
-            allowMissingTable: true
-        }))
-        : new Map();
+    const jornadaSemanalIndex = buildJornadaSemanalIndex(await listJornadaSemanal(poolOrTx, {
+        colaboradorId: filters.colaboradorId || null,
+        onlyActive: false
+    }));
 
     return rows.map((row) => ({
         id: row.id,
@@ -1918,7 +1827,6 @@ module.exports = {
     createReposicaoEscalaRecord,
     deleteEscalaDiaByOrigin,
     ensureEscalaDiaForPeriod,
-    ensureEscalaDiaTable,
     findColaboradorById,
     findEscalaDiaByColaboradorAndDate,
     formatTimeToDisplay,
