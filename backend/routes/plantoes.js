@@ -9,7 +9,7 @@ const {
     describePlantaoMovement,
     minutesToDurationLabel
 } = require('../services/bancoHoras');
-const { getBancoHorasCapabilities, getSchemaInfo, hasColumn, hasTable } = require('../db/schema');
+const { getSchemaInfo } = require('../db/schema');
 const {
     deleteEscalaDiaByOrigin,
     restoreEscalaDefaultsForPeriod,
@@ -31,51 +31,28 @@ const {
     serializePlantaoRecord
 } = require('../services/plantoes');
 
-function buildPlantaoSelect(schema) {
-    const capabilities = getBancoHorasCapabilities(schema);
-    const columns = [
-        'id',
-        'data_plantao',
-        'colaboradores_ids',
-        'criado_em',
-        'atualizado_em'
-    ];
-
-    if (capabilities.hasPlantaoHoraInicio) {
-        columns.push('hora_inicio');
-    }
-
-    if (capabilities.hasPlantaoHoraFim) {
-        columns.push('hora_fim');
-    }
-
-    if (capabilities.hasPlantaoObservacao) {
-        columns.push('observacao');
-    }
-
-    if (capabilities.hasPlantaoTipo) {
-        columns.push('tipo_plantao');
-    }
-
-    if (capabilities.hasPlantaoTipoCredito) {
-        columns.push('tipo_credito');
-    }
-
-    return columns.join(',\n            ');
-}
+const PLANTAO_COLUNAS = `
+            id,
+            data_plantao,
+            colaboradores_ids,
+            criado_em,
+            atualizado_em,
+            hora_inicio,
+            hora_fim,
+            observacao,
+            tipo_plantao,
+            tipo_credito`;
 
 // O dia pode ter MAIS DE UM lancamento (turnos com horarios, pessoas e destinos
 // diferentes), entao a busca por data devolve lista.
-async function findPlantoesByDate(poolOrTx, dataISO, schema) {
-    const capabilities = getBancoHorasCapabilities(schema);
+async function findPlantoesByDate(poolOrTx, dataISO) {
     const result = await poolOrTx.request()
         .input('data_plantao', sql.Date, dataISO)
         .query(`
-            SELECT
-                ${buildPlantaoSelect(schema)}
+            SELECT ${PLANTAO_COLUNAS}
             FROM plantoes
             WHERE data_plantao = @data_plantao
-            ORDER BY ${capabilities.hasPlantaoHoraInicio ? 'hora_inicio, ' : ''}id
+            ORDER BY hora_inicio, id
         `);
 
     return result.recordset;
@@ -111,35 +88,13 @@ async function ensureColaboradoresExist(poolOrTx, colaboradoresIds) {
     }
 }
 
-function buildDisponibilidadeSelect(schema) {
-    const capabilities = getBancoHorasCapabilities(schema);
-    const columns = [
-        'Id',
-        'ColaboradorId',
-        'Tipo',
-        'DataInicio',
-        'DataFim',
-        'PeriodoTipo',
-        'HoraInicio',
-        'HoraFim'
-    ];
-
-    if (capabilities.hasAusenciaSubtipo) {
-        columns.push('Subtipo');
-    }
-
-    return columns.join(',\n                ');
-}
-
-async function listDisponibilidade(poolOrTx, schema, plantao) {
+async function listDisponibilidade(poolOrTx, plantao) {
     // Colaborador desligado (Ativo = 0) nao aparece como disponivel para plantao.
-    const filtroAtivo = hasColumn(schema, 'Colaboradores', 'Ativo') ? 'WHERE Ativo = 1' : '';
-    const colaboradoresResult = await poolOrTx.request().query(`SELECT * FROM Colaboradores ${filtroAtivo} ORDER BY Nome`);
+    const colaboradoresResult = await poolOrTx.request().query('SELECT * FROM Colaboradores WHERE Ativo = 1 ORDER BY Nome');
     const ausenciasResult = await poolOrTx.request()
         .input('dataPlantao', sql.Date, plantao.dataISO)
         .query(`
-            SELECT
-                ${buildDisponibilidadeSelect(schema)}
+            SELECT Id, ColaboradorId, Tipo, DataInicio, DataFim, PeriodoTipo, HoraInicio, HoraFim, Subtipo
             FROM Ausencias
             WHERE @dataPlantao BETWEEN DataInicio AND DataFim
         `);
@@ -163,8 +118,8 @@ async function listDisponibilidade(poolOrTx, schema, plantao) {
     ));
 }
 
-async function assertColaboradoresDisponiveis(poolOrTx, schema, payload) {
-    const disponibilidade = await listDisponibilidade(poolOrTx, schema, payload);
+async function assertColaboradoresDisponiveis(poolOrTx, payload) {
+    const disponibilidade = await listDisponibilidade(poolOrTx, payload);
     const indisponiveis = disponibilidade.filter((item) => payload.colaboradores.includes(item.id) && !item.disponivel);
 
     if (indisponiveis.length === 0) {
@@ -195,13 +150,7 @@ async function deletePlantaoMovements(poolOrTx, plantaoId) {
         `);
 }
 
-async function syncPlantaoMovements(poolOrTx, schema, row) {
-    const capabilities = getBancoHorasCapabilities(schema);
-
-    if (!capabilities.hasMovimentosTable) {
-        return { synced: false, skippedReason: 'movimentos_table_missing' };
-    }
-
+async function syncPlantaoMovements(poolOrTx, row) {
     const plantao = serializePlantaoRecord(row);
     await deletePlantaoMovements(poolOrTx, plantao.id);
 
@@ -260,8 +209,6 @@ async function syncPlantaoMovements(poolOrTx, schema, row) {
 
 router.get('/', async (req, res) => {
     const pool = await conectar();
-    const schema = await getSchemaInfo(pool);
-    const capabilities = getBancoHorasCapabilities(schema);
     const request = pool.request();
     const clauses = [];
 
@@ -276,20 +223,15 @@ router.get('/', async (req, res) => {
     }
 
     if (req.query.tipoPlantao) {
-        const tipoPlantao = normalizePlantaoType(req.query.tipoPlantao);
-
-        if (capabilities.hasPlantaoTipo) {
-            request.input('tipoPlantao', sql.NVarChar(30), tipoPlantao);
-            clauses.push('LOWER(tipo_plantao) = @tipoPlantao');
-        }
+        request.input('tipoPlantao', sql.NVarChar(30), normalizePlantaoType(req.query.tipoPlantao));
+        clauses.push('LOWER(tipo_plantao) = @tipoPlantao');
     }
 
     const result = await request.query(`
-        SELECT
-            ${buildPlantaoSelect(schema)}
+        SELECT ${PLANTAO_COLUNAS}
         FROM plantoes
         ${clauses.length > 0 ? `WHERE ${clauses.join(' AND ')}` : ''}
-        ORDER BY data_plantao DESC, ${capabilities.hasPlantaoHoraInicio ? 'hora_inicio, ' : ''}id
+        ORDER BY data_plantao DESC, hora_inicio, id
     `);
 
     const records = result.recordset
@@ -306,7 +248,6 @@ router.get('/proximos/:quantidade', async (req, res) => {
 
 router.get('/disponibilidade/:dataISO', async (req, res) => {
     const pool = await conectar();
-    const schema = await getSchemaInfo(pool);
     const dataISO = normalizeIsoDate(req.params.dataISO, 'Data do plantao');
     resolvePlantaoTypeByDate(dataISO, await loadFeriadosSet(pool));
     const horaInicio = req.query.horaInicio ? normalizeNullableTime(req.query.horaInicio, 'Hora inicial do plantao') : null;
@@ -316,7 +257,7 @@ router.get('/disponibilidade/:dataISO', async (req, res) => {
         throw new AppError(400, 'Informe hora inicial e hora final para validar disponibilidade por horario.');
     }
 
-    const disponibilidade = await listDisponibilidade(pool, schema, {
+    const disponibilidade = await listDisponibilidade(pool, {
         dataISO,
         horaInicio,
         horaFim
@@ -332,10 +273,9 @@ router.get('/disponibilidade/:dataISO', async (req, res) => {
 
 router.get('/:dataISO', async (req, res) => {
     const pool = await conectar();
-    const schema = await getSchemaInfo(pool);
     const dataISO = normalizeIsoDate(req.params.dataISO, 'Data do plantao');
     const tipoPlantao = resolvePlantaoTypeByDate(dataISO, await loadFeriadosSet(pool));
-    const rows = await findPlantoesByDate(pool, dataISO, schema);
+    const rows = await findPlantoesByDate(pool, dataISO);
 
     if (rows.length === 0) {
         throw new AppError(404, 'Plantao nao encontrado.');
@@ -355,36 +295,16 @@ router.get('/:dataISO', async (req, res) => {
 router.post('/', async (req, res) => {
     const pool = await conectar();
     const schema = await getSchemaInfo(pool);
-    const capabilities = getBancoHorasCapabilities(schema);
     const feriados = await loadFeriadosSet(pool);
     const payload = buildPlantaoDiaPayload(req.body, feriados);
     const grupos = agruparLancamentosPorHorario(payload.lancamentos);
     const colaboradoresDoDia = [...new Set(grupos.flatMap((grupo) => grupo.colaboradores))];
 
-    // A coluna tipo_credito chega junto com o indice que libera varias linhas
-    // por dia (migration 2026-09-04). Sem ela, os dois recursos ficariam
-    // gravando errado em silencio, entao a recusa e explicita.
-    if (!capabilities.hasPlantaoTipoCredito) {
-        if (grupos.some((grupo) => grupo.tipoCredito === 'extra')) {
-            throw new AppError(
-                503,
-                'Hora extra ainda nao esta disponivel: aplique a migration 2026-09-04-plantao-lancamentos.sql.'
-            );
-        }
-
-        if (grupos.length > 1) {
-            throw new AppError(
-                503,
-                'Mais de um turno no mesmo dia ainda nao esta disponivel: aplique a migration 2026-09-04-plantao-lancamentos.sql.'
-            );
-        }
-    }
-
     const result = await withTransaction(sql, pool, async (tx) => {
         await ensureColaboradoresExist(tx, colaboradoresDoDia);
 
         for (const grupo of grupos) {
-            await assertColaboradoresDisponiveis(tx, schema, {
+            await assertColaboradoresDisponiveis(tx, {
                 dataISO: payload.dataISO,
                 horaInicio: grupo.horaInicio,
                 horaFim: grupo.horaFim,
@@ -392,20 +312,15 @@ router.post('/', async (req, res) => {
             });
         }
 
-        const anteriores = await findPlantoesByDate(tx, payload.dataISO, schema);
+        const anteriores = await findPlantoesByDate(tx, payload.dataISO);
         const action = anteriores.length > 0 ? 'updated' : 'created';
 
         // O dia e reescrito inteiro a cada gravacao: casar linha por linha com o
         // que ja existia daria o mesmo resultado por muito mais codigo, e a tela
         // sempre manda o dia completo.
         for (const anterior of anteriores) {
-            if (capabilities.hasMovimentosTable) {
-                await deletePlantaoMovements(tx, anterior.id);
-            }
-
-            if (hasTable(schema, 'escala_dia')) {
-                await deleteEscalaDiaByOrigin(tx, 'plantao', anterior.id);
-            }
+            await deletePlantaoMovements(tx, anterior.id);
+            await deleteEscalaDiaByOrigin(tx, 'plantao', anterior.id);
         }
 
         await tx.request()
@@ -415,34 +330,6 @@ router.post('/', async (req, res) => {
         const salvos = [];
 
         for (const grupo of grupos) {
-            const fields = ['data_plantao', 'colaboradores_ids'];
-            const values = ['@data_plantao', '@colaboradores_ids'];
-
-            if (capabilities.hasPlantaoHoraInicio) {
-                fields.push('hora_inicio');
-                values.push('@horaInicio');
-            }
-
-            if (capabilities.hasPlantaoHoraFim) {
-                fields.push('hora_fim');
-                values.push('@horaFim');
-            }
-
-            if (capabilities.hasPlantaoObservacao) {
-                fields.push('observacao');
-                values.push('@observacao');
-            }
-
-            if (capabilities.hasPlantaoTipo) {
-                fields.push('tipo_plantao');
-                values.push('@tipoPlantao');
-            }
-
-            if (capabilities.hasPlantaoTipoCredito) {
-                fields.push('tipo_credito');
-                values.push('@tipoCredito');
-            }
-
             const insertResult = await tx.request()
                 .input('data_plantao', sql.Date, payload.dataISO)
                 .input('colaboradores_ids', sql.NVarChar(sql.MAX), JSON.stringify(grupo.colaboradores))
@@ -452,47 +339,25 @@ router.post('/', async (req, res) => {
                 .input('horaFim', sql.Time, toSqlTime(grupo.horaFim, 'Hora final do plantao'))
                 .input('observacao', sql.NVarChar(500), payload.observacao)
                 .query(`
-                    INSERT INTO plantoes (${fields.join(', ')})
+                    INSERT INTO plantoes (
+                        data_plantao, colaboradores_ids, hora_inicio, hora_fim, observacao, tipo_plantao, tipo_credito
+                    )
                     OUTPUT INSERTED.*
-                    VALUES (${values.join(', ')})
+                    VALUES (@data_plantao, @colaboradores_ids, @horaInicio, @horaFim, @observacao, @tipoPlantao, @tipoCredito)
                 `);
 
             const saved = insertResult.recordset[0];
-
-            // OUTPUT INSERTED.* nao devolve o que a tabela ainda nao tem; o
-            // fallback mantem a serializacao completa mesmo sem a coluna.
-            if (saved.hora_inicio === undefined && capabilities.hasPlantaoHoraInicio) {
-                saved.hora_inicio = toSqlTime(grupo.horaInicio, 'Hora inicial do plantao');
-            }
-
-            if (saved.hora_fim === undefined && capabilities.hasPlantaoHoraFim) {
-                saved.hora_fim = toSqlTime(grupo.horaFim, 'Hora final do plantao');
-            }
-
-            if (saved.observacao === undefined && capabilities.hasPlantaoObservacao) {
-                saved.observacao = payload.observacao;
-            }
-
-            if (saved.tipo_plantao === undefined && capabilities.hasPlantaoTipo) {
-                saved.tipo_plantao = payload.tipoPlantao;
-            }
-
-            if (saved.tipo_credito === undefined && capabilities.hasPlantaoTipoCredito) {
-                saved.tipo_credito = grupo.tipoCredito;
-            }
 
             saved.duracaoMinutos = grupo.duracaoMinutos;
             salvos.push(saved);
         }
 
         for (const saved of salvos) {
-            await syncPlantaoMovements(tx, schema, saved);
+            await syncPlantaoMovements(tx, saved);
         }
 
-        if (hasTable(schema, 'escala_dia')) {
-            const colaboradoresResult = await tx.request().query('SELECT * FROM Colaboradores');
-            await syncPlantaoDiaToEscalaDia(tx, schema, payload.dataISO, salvos, colaboradoresResult.recordset);
-        }
+        const colaboradoresResult = await tx.request().query('SELECT * FROM Colaboradores');
+        await syncPlantaoDiaToEscalaDia(tx, schema, payload.dataISO, salvos, colaboradoresResult.recordset);
 
         return {
             action,
@@ -521,7 +386,7 @@ router.delete('/:dataISO', async (req, res) => {
     const dataISO = normalizeIsoDate(req.params.dataISO, 'Data do plantao');
 
     await withTransaction(sql, pool, async (tx) => {
-        const existentes = await findPlantoesByDate(tx, dataISO, schema);
+        const existentes = await findPlantoesByDate(tx, dataISO);
 
         if (existentes.length === 0) {
             throw new AppError(404, 'Plantao nao encontrado.');
@@ -529,22 +394,15 @@ router.delete('/:dataISO', async (req, res) => {
 
         // Excluir o dia derruba TODOS os turnos daquela data.
         for (const existente of existentes) {
-            if (getBancoHorasCapabilities(schema).hasMovimentosTable) {
-                await deletePlantaoMovements(tx, existente.id);
-            }
-
-            if (hasTable(schema, 'escala_dia')) {
-                await deleteEscalaDiaByOrigin(tx, 'plantao', existente.id);
-            }
+            await deletePlantaoMovements(tx, existente.id);
+            await deleteEscalaDiaByOrigin(tx, 'plantao', existente.id);
         }
 
         await tx.request()
             .input('data_plantao', sql.Date, dataISO)
             .query('DELETE FROM plantoes WHERE data_plantao = @data_plantao');
 
-        if (hasTable(schema, 'escala_dia')) {
-            await restoreEscalaDefaultsForPeriod(tx, schema, dataISO, dataISO);
-        }
+        await restoreEscalaDefaultsForPeriod(tx, schema, dataISO, dataISO);
     });
 
     res.json({

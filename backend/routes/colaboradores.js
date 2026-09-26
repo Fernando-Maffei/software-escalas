@@ -10,7 +10,7 @@ const {
     normalizeJornadaSemanalPayload,
     replaceColaboradorJornadaSemanal
 } = require('../services/jornada-semanal');
-const { getBancoHorasCapabilities, getSchemaInfo, hasColumn, hasTable } = require('../db/schema');
+const { getSchemaInfo } = require('../db/schema');
 const { excluirColaboradorDefinitivamente } = require('../services/exclusao-colaborador');
 const { ensureSetorExists, normalizeNullableSetorId } = require('../services/setores');
 const { withTransaction } = require('../db/transactions');
@@ -89,31 +89,16 @@ function normalizeNullableId(value, fieldName) {
     return ensurePositiveInt(value, fieldName);
 }
 
-function hasSetorSupport(schema) {
-    const capabilities = getBancoHorasCapabilities(schema);
-    return capabilities.hasSetoresTable && capabilities.hasColaboradorSetorId;
-}
-
-function hasTipoEscalaSupport(schema) {
-    return hasTable(schema, 'TiposEscala') && hasColumn(schema, 'Colaboradores', 'TipoEscalaId');
-}
-
-function buildColaboradorSelectQuery(schema, options = {}) {
+function buildColaboradorSelectQuery(options = {}) {
     const { whereClause = '', single = false } = options;
-    const selectSetor = hasSetorSupport(schema)
-        ? 's.Nome AS SetorNome'
-        : 'CAST(NULL AS NVARCHAR(120)) AS SetorNome';
-    const joinSetor = hasSetorSupport(schema)
-        ? 'LEFT JOIN Setores s ON s.Id = c.SetorId'
-        : '';
     const topClause = single ? 'TOP 1' : '';
 
     return `
         SELECT ${topClause}
             c.*,
-            ${selectSetor}
+            s.Nome AS SetorNome
         FROM Colaboradores c
-        ${joinSetor}
+        LEFT JOIN Setores s ON s.Id = c.SetorId
         ${whereClause}
         ORDER BY c.Nome
     `;
@@ -129,7 +114,6 @@ async function findColaboradorById(pool, id) {
 
 router.get('/', async (req, res) => {
     const pool = await conectar();
-    const schema = await getSchemaInfo(pool);
     const request = pool.request();
     const clauses = [];
     const search = String(req.query.search || '').trim();
@@ -139,7 +123,7 @@ router.get('/', async (req, res) => {
         clauses.push('c.Nome LIKE @search');
     }
 
-    if (req.query.setorId && hasSetorSupport(schema)) {
+    if (req.query.setorId) {
         request.input('setorId', sql.Int, ensurePositiveInt(req.query.setorId, 'Setor'));
         clauses.push('c.SetorId = @setorId');
     }
@@ -147,21 +131,19 @@ router.get('/', async (req, res) => {
     // Controle de acesso por setor: a conta so ve colaboradores dos setores que
     // tem permissao. Como as telas (Escala, Dashboard, Plantao) derivam desta
     // lista, filtrar aqui ja as limita. Vazio = sem restricao (ve todos).
-    if (hasSetorSupport(schema)) {
-        const permitidos = await getSetoresPermitidosRequest(pool, req);
+    const permitidos = await getSetoresPermitidosRequest(pool, req);
 
-        if (permitidos.length) {
-            const ids = idsPermitidosNumericos(permitidos);
+    if (permitidos.length) {
+        const ids = idsPermitidosNumericos(permitidos);
 
-            if (ids.length) {
-                const params = ids.map((id, index) => {
-                    request.input(`perm${index}`, sql.Int, id);
-                    return `@perm${index}`;
-                });
-                clauses.push(`c.SetorId IN (${params.join(', ')})`);
-            } else {
-                clauses.push('1 = 0'); // permitidos invalidos: nao vaza ninguem
-            }
+        if (ids.length) {
+            const params = ids.map((id, index) => {
+                request.input(`perm${index}`, sql.Int, id);
+                return `@perm${index}`;
+            });
+            clauses.push(`c.SetorId IN (${params.join(', ')})`);
+        } else {
+            clauses.push('1 = 0'); // permitidos invalidos: nao vaza ninguem
         }
     }
 
@@ -169,13 +151,11 @@ router.get('/', async (req, res) => {
     // telas ativas (Escala, Calendario, Plantao, Dashboard) derivam desta lista,
     // entao o desligado some delas de uma vez. `?incluirInativos=1` traz todos
     // (usado pela tela de limpeza/gestao).
-    const incluirInativos = String(req.query.incluirInativos || '') === '1';
-
-    if (!incluirInativos && hasColumn(schema, 'Colaboradores', 'Ativo')) {
+    if (String(req.query.incluirInativos || '') !== '1') {
         clauses.push('c.Ativo = 1');
     }
 
-    const query = buildColaboradorSelectQuery(schema, {
+    const query = buildColaboradorSelectQuery({
         whereClause: clauses.length > 0 ? `WHERE ${clauses.join(' AND ')}` : ''
     });
     const result = await request.query(query);
@@ -186,10 +166,9 @@ router.get('/', async (req, res) => {
 router.get('/:id', async (req, res) => {
     const id = ensurePositiveInt(req.params.id, 'Colaborador');
     const pool = await conectar();
-    const schema = await getSchemaInfo(pool);
     const result = await pool.request()
         .input('id', sql.Int, id)
-        .query(buildColaboradorSelectQuery(schema, {
+        .query(buildColaboradorSelectQuery({
             single: true,
             whereClause: 'WHERE c.Id = @id'
         }));
@@ -201,16 +180,10 @@ router.get('/:id', async (req, res) => {
 
     // Controle de acesso por setor: nao revela colaborador de setor sem
     // permissao (404, para nao confirmar sequer a existencia).
-    if (hasSetorSupport(schema)) {
-        const permitidos = await getSetoresPermitidosRequest(pool, req);
+    const permitidos = await getSetoresPermitidosRequest(pool, req);
 
-        if (permitidos.length) {
-            const ids = idsPermitidosNumericos(permitidos);
-
-            if (!ids.includes(Number(colaborador.SetorId))) {
-                throw new AppError(404, 'Colaborador nao encontrado.');
-            }
-        }
+    if (permitidos.length && !idsPermitidosNumericos(permitidos).includes(Number(colaborador.SetorId))) {
+        throw new AppError(404, 'Colaborador nao encontrado.');
     }
 
     res.json(colaborador);
@@ -238,111 +211,68 @@ router.get('/:id/jornada-semanal', async (req, res) => {
     });
 });
 
-router.post('/:id/jornada-semanal', async (req, res) => {
-    const colaboradorId = ensurePositiveInt(req.params.id, 'Colaborador');
-    const payloadSource = req.body?.jornadaSemanal !== undefined
-        ? req.body.jornadaSemanal
-        : req.body;
-    const jornadaSemanal = normalizeJornadaSemanalPayload(payloadSource, {
-        fieldName: 'Jornada semanal'
-    }) || [];
-    const pool = await conectar();
-    const schema = await getSchemaInfo(pool);
+// POST e PUT fazem a mesma coisa (substituem a jornada inteira); as duas rotas
+// existem porque telas diferentes usam uma ou outra.
+function salvarJornadaSemanal(mensagem) {
+    return async (req, res) => {
+        const colaboradorId = ensurePositiveInt(req.params.id, 'Colaborador');
+        const payloadSource = req.body?.jornadaSemanal !== undefined
+            ? req.body.jornadaSemanal
+            : req.body;
+        const jornadaSemanal = normalizeJornadaSemanalPayload(payloadSource, {
+            fieldName: 'Jornada semanal'
+        }) || [];
+        const pool = await conectar();
+        const schema = await getSchemaInfo(pool);
 
-    const items = await withTransaction(sql, pool, async (tx) => replaceColaboradorJornadaSemanal(
-        tx,
-        schema,
-        colaboradorId,
-        jornadaSemanal
-    ));
-
-    res.json({
-        message: 'Jornada semanal salva com sucesso!',
-        success: true,
-        data: {
+        const items = await withTransaction(sql, pool, async (tx) => replaceColaboradorJornadaSemanal(
+            tx,
+            schema,
             colaboradorId,
-            items
-        }
-    });
-});
+            jornadaSemanal
+        ));
 
-router.put('/:id/jornada-semanal', async (req, res) => {
-    const colaboradorId = ensurePositiveInt(req.params.id, 'Colaborador');
-    const payloadSource = req.body?.jornadaSemanal !== undefined
-        ? req.body.jornadaSemanal
-        : req.body;
-    const jornadaSemanal = normalizeJornadaSemanalPayload(payloadSource, {
-        fieldName: 'Jornada semanal'
-    }) || [];
-    const pool = await conectar();
-    const schema = await getSchemaInfo(pool);
+        res.json({
+            message: mensagem,
+            success: true,
+            data: {
+                colaboradorId,
+                items
+            }
+        });
+    };
+}
 
-    const items = await withTransaction(sql, pool, async (tx) => replaceColaboradorJornadaSemanal(
-        tx,
-        schema,
-        colaboradorId,
-        jornadaSemanal
-    ));
-
-    res.json({
-        message: 'Jornada semanal atualizada com sucesso!',
-        success: true,
-        data: {
-            colaboradorId,
-            items
-        }
-    });
-});
+router.post('/:id/jornada-semanal', salvarJornadaSemanal('Jornada semanal salva com sucesso!'));
+router.put('/:id/jornada-semanal', salvarJornadaSemanal('Jornada semanal atualizada com sucesso!'));
 
 router.post('/', async (req, res) => {
     const pool = await conectar();
     const schema = await getSchemaInfo(pool);
-    const supportsSetor = hasSetorSupport(schema);
     const payload = buildColaboradorPayload(req.body);
     const jornadaSemanal = normalizeJornadaSemanalPayload(req.body?.jornadaSemanal, {
         fieldName: 'jornadaSemanal'
     });
 
-    if (jornadaSemanal !== undefined && !hasTable(schema, 'ColaboradorJornadaSemanal')) {
-        throw new AppError(409, 'O banco atual ainda nao possui a tabela de jornada semanal. Verifique/atualize as tabelas antes de salvar a jornada.');
-    }
-
     const created = await withTransaction(sql, pool, async (tx) => {
-        if (!supportsSetor && payload.setorId) {
-            throw new AppError(409, 'O banco atual ainda nao possui o campo de setor. Use a opcao de verificar/gerar tabelas antes de salvar com setor.');
-        }
+        await ensureSetorExists(tx, payload.setorId);
 
-        await ensureSetorExists(tx, supportsSetor ? payload.setorId : null);
-
-        const fields = ['Nome', 'TrabalhoInicio', 'TrabalhoFim', 'AlmocoInicio', 'AlmocoFim'];
-        const values = ['@nome', '@trabalhoInicio', '@trabalhoFim', '@almocoInicio', '@almocoFim'];
-        const request = tx.request()
+        const result = await tx.request()
             .input('nome', sql.NVarChar(300), payload.nome)
+            .input('setorId', sql.Int, payload.setorId)
             .input('trabalhoInicio', sql.Time, toSqlTime(payload.trabalhoInicio, 'Inicio do trabalho'))
             .input('trabalhoFim', sql.Time, toSqlTime(payload.trabalhoFim, 'Fim do trabalho'))
             .input('almocoInicio', sql.Time, toSqlTime(payload.almocoInicio, 'Inicio do almoco'))
-            .input('almocoFim', sql.Time, toSqlTime(payload.almocoFim, 'Fim do almoco'));
-
-        if (supportsSetor) {
-            fields.splice(1, 0, 'SetorId');
-            values.splice(1, 0, '@setorId');
-            request.input('setorId', sql.Int, payload.setorId);
-        }
-
-        if (hasTipoEscalaSupport(schema)) {
-            fields.push('TipoEscalaId');
-            values.push('@tipoEscalaId');
-            request.input('tipoEscalaId', sql.Int, payload.tipoEscalaId);
-        }
-
-        const result = await request.query(`
-            INSERT INTO Colaboradores (${fields.join(', ')})
-            OUTPUT INSERTED.*
-            VALUES (${values.join(', ')})
-        `);
+            .input('almocoFim', sql.Time, toSqlTime(payload.almocoFim, 'Fim do almoco'))
+            .input('tipoEscalaId', sql.Int, payload.tipoEscalaId)
+            .query(`
+                INSERT INTO Colaboradores (Nome, SetorId, TrabalhoInicio, TrabalhoFim, AlmocoInicio, AlmocoFim, TipoEscalaId)
+                OUTPUT INSERTED.*
+                VALUES (@nome, @setorId, @trabalhoInicio, @trabalhoFim, @almocoInicio, @almocoFim, @tipoEscalaId)
+            `);
         const colaboradorSalvo = result.recordset[0];
 
-        if (jornadaSemanal !== undefined && hasTable(schema, 'ColaboradorJornadaSemanal')) {
+        if (jornadaSemanal !== undefined) {
             await replaceColaboradorJornadaSemanal(tx, schema, colaboradorSalvo.Id, jornadaSemanal);
         }
 
@@ -361,14 +291,9 @@ router.put('/:id', async (req, res) => {
     const pool = await conectar();
     const existing = await findColaboradorById(pool, id);
     const schema = await getSchemaInfo(pool);
-    const supportsSetor = hasSetorSupport(schema);
     const jornadaSemanal = normalizeJornadaSemanalPayload(req.body?.jornadaSemanal, {
         fieldName: 'jornadaSemanal'
     });
-
-    if (jornadaSemanal !== undefined && !hasTable(schema, 'ColaboradorJornadaSemanal')) {
-        throw new AppError(409, 'O banco atual ainda nao possui a tabela de jornada semanal. Verifique/atualize as tabelas antes de salvar a jornada.');
-    }
 
     if (!existing) {
         throw new AppError(404, 'Colaborador nao encontrado.');
@@ -376,52 +301,36 @@ router.put('/:id', async (req, res) => {
 
     const payload = buildColaboradorPayload(req.body, existing);
     const saved = await withTransaction(sql, pool, async (tx) => {
-        if (!supportsSetor && payload.setorId) {
-            throw new AppError(409, 'O banco atual ainda nao possui o campo de setor. Use a opcao de verificar/gerar tabelas antes de salvar com setor.');
-        }
+        await ensureSetorExists(tx, payload.setorId);
 
-        await ensureSetorExists(tx, supportsSetor ? payload.setorId : null);
-
-        const setParts = [
-            'Nome = @nome',
-            'TrabalhoInicio = @trabalhoInicio',
-            'TrabalhoFim = @trabalhoFim',
-            'AlmocoInicio = @almocoInicio',
-            'AlmocoFim = @almocoFim'
-        ];
-        const request = tx.request()
+        const result = await tx.request()
             .input('id', sql.Int, id)
             .input('nome', sql.NVarChar(300), payload.nome)
+            .input('setorId', sql.Int, payload.setorId)
             .input('trabalhoInicio', sql.Time, toSqlTime(payload.trabalhoInicio, 'Inicio do trabalho'))
             .input('trabalhoFim', sql.Time, toSqlTime(payload.trabalhoFim, 'Fim do trabalho'))
             .input('almocoInicio', sql.Time, toSqlTime(payload.almocoInicio, 'Inicio do almoco'))
-            .input('almocoFim', sql.Time, toSqlTime(payload.almocoFim, 'Fim do almoco'));
-
-        if (supportsSetor) {
-            setParts.splice(1, 0, 'SetorId = @setorId');
-            request.input('setorId', sql.Int, payload.setorId);
-        }
-
-        if (hasTipoEscalaSupport(schema)) {
-            setParts.push('TipoEscalaId = @tipoEscalaId');
-            request.input('tipoEscalaId', sql.Int, payload.tipoEscalaId);
-        }
-
-        const result = await request.query(`
-            UPDATE Colaboradores
-            SET ${setParts.join(', ')}
-            OUTPUT INSERTED.*
-            WHERE Id = @id
-        `);
+            .input('almocoFim', sql.Time, toSqlTime(payload.almocoFim, 'Fim do almoco'))
+            .input('tipoEscalaId', sql.Int, payload.tipoEscalaId)
+            .query(`
+                UPDATE Colaboradores
+                SET Nome = @nome,
+                    SetorId = @setorId,
+                    TrabalhoInicio = @trabalhoInicio,
+                    TrabalhoFim = @trabalhoFim,
+                    AlmocoInicio = @almocoInicio,
+                    AlmocoFim = @almocoFim,
+                    TipoEscalaId = @tipoEscalaId
+                OUTPUT INSERTED.*
+                WHERE Id = @id
+            `);
         const colaboradorSalvo = result.recordset[0];
 
-        if (jornadaSemanal !== undefined && hasTable(schema, 'ColaboradorJornadaSemanal')) {
+        if (jornadaSemanal !== undefined) {
             await replaceColaboradorJornadaSemanal(tx, schema, colaboradorSalvo.Id, jornadaSemanal);
         }
 
-        if (hasTable(schema, 'escala_dia')) {
-            await syncColaboradorDefaultsToEscalaDia(tx, schema, colaboradorSalvo);
-        }
+        await syncColaboradorDefaultsToEscalaDia(tx, schema, colaboradorSalvo);
 
         return colaboradorSalvo;
     });
@@ -438,12 +347,6 @@ router.put('/:id', async (req, res) => {
 router.put('/:id/desligar', async (req, res) => {
     const id = ensurePositiveInt(req.params.id, 'Colaborador');
     const pool = await conectar();
-    const schema = await getSchemaInfo(pool);
-
-    if (!hasColumn(schema, 'Colaboradores', 'Ativo') || !hasColumn(schema, 'Colaboradores', 'DataDesligamento')) {
-        throw new AppError(400, 'Atualize o banco: faltam as colunas de desligamento.');
-    }
-
     const colaborador = await findColaboradorById(pool, id);
 
     if (!colaborador) {
@@ -470,12 +373,6 @@ router.put('/:id/desligar', async (req, res) => {
 router.put('/:id/reativar', async (req, res) => {
     const id = ensurePositiveInt(req.params.id, 'Colaborador');
     const pool = await conectar();
-    const schema = await getSchemaInfo(pool);
-
-    if (!hasColumn(schema, 'Colaboradores', 'Ativo')) {
-        throw new AppError(400, 'Atualize o banco: falta a coluna Ativo.');
-    }
-
     const colaborador = await findColaboradorById(pool, id);
 
     if (!colaborador) {

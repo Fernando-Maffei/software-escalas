@@ -18,22 +18,11 @@ const {
     normalizeOptionalText
 } = require('../lib/validation');
 const { montarRelatorioHorasExtras, serializePlantaoRecord } = require('../services/plantoes');
-const { getBancoHorasCapabilities, getSchemaInfo } = require('../db/schema');
 
 const SEMANAS_PADRAO = 8;
 
-// Colunas de plantao usadas nos calculos de credito. tipo_credito so entra
-// quando a coluna existe: num banco anterior a migration 2026-09-04 a leitura
-// nao pode quebrar — la todo plantao era credito de banco de horas.
-function buildPlantaoCreditoColumns(capabilities) {
-    const columns = ['id', 'data_plantao', 'colaboradores_ids', 'hora_inicio', 'hora_fim'];
-
-    if (capabilities.hasPlantaoTipoCredito) {
-        columns.push('tipo_credito');
-    }
-
-    return columns.join(', ');
-}
+// Colunas de plantao usadas nos calculos de credito.
+const PLANTAO_COLUNAS_CREDITO = 'id, data_plantao, colaboradores_ids, hora_inicio, hora_fim, tipo_credito';
 
 // Custo de uma folga em minutos (8h). Usado na coluna "Sugestao" do Verificar:
 // quantos dias de folga cabem nas horas em carteira.
@@ -489,12 +478,11 @@ router.get('/verificar', async (req, res) => {
     let plantoesJanela = [];
 
     if (bases.length > 0) {
-        const colunasPlantao = buildPlantaoCreditoColumns(getBancoHorasCapabilities(await getSchemaInfo(pool)));
         const plantoesResult = await pool.request()
             .input('piso', sql.Date, pisoGlobal)
             .input('data', sql.Date, dataISO)
             .query(`
-                SELECT ${colunasPlantao}
+                SELECT ${PLANTAO_COLUNAS_CREDITO}
                 FROM plantoes
                 WHERE data_plantao <= @data AND data_plantao >= @piso
             `);
@@ -709,12 +697,11 @@ router.post('/gerar-semana', async (req, res) => {
             ausenciasPorColaborador.get(cid).push(ausencia);
         }
 
-        const colunasPlantao = buildPlantaoCreditoColumns(getBancoHorasCapabilities(await getSchemaInfo(pool)));
         const plantoesResult = await pool.request()
             .input('piso', sql.Date, pisoGlobal)
             .input('alvo', sql.Date, alvoISO)
             .query(`
-                SELECT ${colunasPlantao}
+                SELECT ${PLANTAO_COLUNAS_CREDITO}
                 FROM plantoes
                 WHERE data_plantao <= @alvo AND data_plantao >= @piso
             `);
@@ -857,8 +844,6 @@ router.delete('/semana/:semana', async (req, res) => {
 // nenhum lugar que somasse quanto cada um fez de hora extra no mes.
 router.get('/horas-extras', async (req, res) => {
     const pool = await conectar();
-    const schema = await getSchemaInfo(pool);
-    const capabilities = getBancoHorasCapabilities(schema);
 
     const hoje = new Date().toISOString().slice(0, 10);
     const inicioISO = req.query.inicio
@@ -876,24 +861,6 @@ router.get('/horas-extras', async (req, res) => {
         ? ensurePositiveInt(req.query.colaboradorId, 'Colaborador')
         : null;
 
-    // Banco sem a coluna tipo_credito: nao ha como saber o que e extra, e
-    // chutar 'banco' para tudo devolveria um relatorio vazio que parece certo.
-    if (!capabilities.hasPlantaoTipoCredito) {
-        res.json({
-            disponivel: false,
-            mensagem: 'Hora extra ainda nao esta disponivel: aplique a migration 2026-09-04-plantao-lancamentos.sql.',
-            inicio: inicioISO,
-            fim: fimISO,
-            itens: [],
-            totalMinutos: 0,
-            totalFormatado: minutosParaRelogio(0),
-            totalColaboradores: 0,
-            totalDias: 0,
-            avisos: []
-        });
-        return;
-    }
-
     const permitidos = await getSetoresPermitidosRequest(pool, req);
     const idsPermitidos = new Set(idsPermitidosNumericos(permitidos));
 
@@ -910,7 +877,7 @@ router.get('/horas-extras', async (req, res) => {
         .input('inicio', sql.Date, inicioISO)
         .input('fim', sql.Date, fimISO)
         .query(`
-            SELECT ${buildPlantaoCreditoColumns(capabilities)}, tipo_plantao, observacao
+            SELECT ${PLANTAO_COLUNAS_CREDITO}, tipo_plantao, observacao
             FROM plantoes
             WHERE LOWER(tipo_credito) = 'extra'
               AND data_plantao >= @inicio
