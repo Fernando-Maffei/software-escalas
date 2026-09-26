@@ -238,6 +238,15 @@ caminho: `core/app/colaboradores.js` e `carregarSetores` originais nunca rodavam
 (sobrescritos no `window` por `telas/lancamentos.js` e pelo `runtime/`) —
 removidos. Verificado no navegador simulando erro 500 e 401.
 
+**A13 — Ausencia por horas no passado nao podia ser lancada** · `RESOLVIDO`
+`backend/services/bancoHoras.js:18` (achado pelo roteiro golden master da Fase 3)
+Colunas TIME voltam do banco como `Date` (01/01/1970), e `timeToMinutes` so
+aceitava texto. Lancar uma ausencia por horas numa data passada (com desconto,
+o padrao de "ausencia comum") dava 400 "Hora inicial invalido"; o mesmo calculo
+roda no `/verificar` e no "gerar semana" do banco de horas semanal.
+**Feito:** `timeToMinutes` converte o `Date` de coluna TIME antes de validar.
+Testes unitario e de integracao (lanca 08:00–10:30 no passado, debita 150 min).
+
 ### MEDIO
 
 **M1 — Deteccao de schema em tempo de execucao ja nao serve para nada** · `ABERTO`
@@ -413,6 +422,12 @@ usuario nao existe; login e verify-password usam essa funcao. Teste unitario.
 **B9 — Telas pedem dados antes do login** · `ABERTO`
 Ao abrir o sistema deslogado, ~15 requisicoes de dados saem antes da tela de login
 e voltam 401 (ruido no console e no log). Achado na verificacao no navegador.
+
+**B10 — Desligar o servidor sem pasta de backup registrava erro** · `RESOLVIDO`
+`backend/services/backup-scheduler.js`: a falta de pasta era checada antes de ver
+se o backup de desligamento estava ligado, entao todo encerramento sem pasta
+configurada logava "Falha ao gerar backup automatico". **Feito:** gatilho
+desligado e checado primeiro.
 
 **B8 — Filtros `LOWER(coluna) = @x` impedem uso de indice** · `ACEITO`
 Tabelas pequenas; o collation padrao ja e case-insensitive. Nao vale o risco agora.

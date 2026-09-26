@@ -111,5 +111,25 @@ module.exports = [
                 `colaborador ${colaborador.Id} nao apareceu na escala: ${JSON.stringify(escala).slice(0, 300)}`
             );
         }
+    },
+    {
+        // A13 da auditoria: horario lido do banco chega como Date e o calculo
+        // do debito recusava; lancar ausencia por horas no passado dava 400.
+        name: 'ausencia por horas no passado e lancada e debita so as horas',
+        async run() {
+            const cliente = criarCliente();
+            await cliente.entrar();
+
+            const colaborador = await criarColaborador(cliente);
+            await lancarAusencia(cliente, colaborador.Id, {
+                periodoTipo: 'horas',
+                dataInicio: '2026-08-31',
+                dataFim: '2026-08-31',
+                horaInicio: '08:00',
+                horaFim: '10:30'
+            });
+
+            assert.deepEqual(await movimentos(colaborador.Id), [{ OrigemTipo: 'ausencia', Minutos: -150 }]);
+        }
     }
 ];

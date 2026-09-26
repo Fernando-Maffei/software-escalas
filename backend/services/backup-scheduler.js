@@ -29,10 +29,9 @@ async function executeAutomaticBackup(trigger = 'auto-schedule', options = {}) {
 
     const settings = getBackupSettings();
 
-    if (!settings.directory) {
-        throw new AppError(400, 'Configure uma pasta de backup antes de usar o backup automatico.');
-    }
-
+    // Gatilho desligado e checado ANTES de exigir a pasta: sem isso todo
+    // desligamento do servidor sem pasta configurada registrava um erro, mesmo
+    // com o backup de desligamento desativado.
     if (trigger === 'auto-schedule' && !settings.autoBackupEnabled && !options.force) {
         return {
             success: false,
@@ -47,6 +46,10 @@ async function executeAutomaticBackup(trigger = 'auto-schedule', options = {}) {
             skipped: true,
             reason: 'shutdown_backup_disabled'
         };
+    }
+
+    if (!settings.directory) {
+        throw new AppError(400, 'Configure uma pasta de backup antes de usar o backup automatico.');
     }
 
     autoBackupRunning = true;

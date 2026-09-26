@@ -15,8 +15,12 @@ function formatDateLabel(dateISO) {
     return `${day}/${month}/${year}`;
 }
 
+// Aceita "HH:mm", "HH:mm:ss" e o Date que o driver devolve para colunas TIME
+// (01/01/1970 em UTC). So aceitar texto quebrava todo calculo feito com
+// horario lido do banco (ex.: ausencia por horas ja gravada).
 function timeToMinutes(value, fieldName = 'Horario') {
-    const normalized = normalizeTime(value, fieldName);
+    const texto = value instanceof Date ? extractTimeString(value) : value;
+    const normalized = normalizeTime(texto, fieldName);
     const [hours, minutes] = normalized.split(':').map(Number);
     return (hours * 60) + minutes;
 }

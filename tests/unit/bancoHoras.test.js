@@ -17,6 +17,28 @@ const colaboradorBase = {
 
 module.exports = [
     {
+        // A13 da auditoria: colunas TIME voltam do banco como Date (1970-01-01);
+        // o calculo so aceitava texto e a ausencia por horas no passado dava 400.
+        name: 'calculateAusenciaDebitMinutes aceita horarios vindos do banco como Date',
+        run() {
+            const minutos = calculateAusenciaDebitMinutes(
+                {
+                    Tipo: 'ausencia',
+                    PeriodoTipo: 'horas',
+                    DataInicio: '2026-08-31',
+                    DataFim: '2026-08-31',
+                    HoraInicio: new Date(Date.UTC(1970, 0, 1, 8, 0, 0)),
+                    HoraFim: new Date(Date.UTC(1970, 0, 1, 10, 30, 0)),
+                    DescontaBancoHoras: true
+                },
+                colaboradorBase,
+                { referenceDateISO: '2026-09-26' }
+            );
+
+            assert.equal(minutos, 150);
+        }
+    },
+    {
         name: 'resolveDefaultDescontaBancoHoras skips ferias and medico',
         run() {
             assert.equal(resolveDefaultDescontaBancoHoras('ferias'), false);
