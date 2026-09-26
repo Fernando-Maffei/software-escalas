@@ -1293,24 +1293,15 @@
         await recarregarLista();
     }
 
+    // Erro de rede/servidor propaga: o wrapper de core/runtime/dados-e-modais.js
+    // (que embrulha esta funcao) avisa o usuario e mantem os ultimos dados.
     async function carregarColaboradores() {
-        let lista = [];
-
-        try {
-            const dados = await window.API.getColaboradores();
-            lista = Array.isArray(dados) ? dados : [];
-        } catch (error) {
-            console.error('[lancamentos] erro ao carregar colaboradores:', error);
-        }
+        const dados = await window.API.getColaboradores();
+        const lista = Array.isArray(dados) ? dados : [];
 
         window.colaboradores = lista;
-
-        try {
-            // Binding compartilhado declarado em app.js.
-            colaboradores = lista;  
-        } catch (error) {
-            // ignore
-        }
+        // Binding compartilhado declarado em app.js.
+        colaboradores = lista;
 
         // O diretorio completo (com desligados) acompanha, respeitando o TTL.
         await carregarDiretorioColaboradores();

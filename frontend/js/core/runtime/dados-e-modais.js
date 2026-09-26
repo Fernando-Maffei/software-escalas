@@ -33,13 +33,43 @@
     function limparExclusaoPendente() {
         window.exclusaoPendenteId = null;
         window.exclusaoTipo = 'ausencia';
+        exclusaoPendenteId = null;
+        exclusaoTipo = 'ausencia';
+    }
 
-        try {
-            exclusaoPendenteId = null;
-            exclusaoTipo = 'ausencia';
-        } catch (error) {
-            // ignore
+    // Falha ao carregar uma lista NAO pode virar lista vazia em silencio: a
+    // tela mostraria "nenhum colaborador/ausencia" como se fosse verdade. O
+    // usuario e avisado (uma vez a cada 30s por recurso, para nao inundar de
+    // avisos com o servidor fora) e a tela segue com os ultimos dados que
+    // chegaram. 401 fica de fora: a sessao expirada ja leva para o login.
+    const INTERVALO_AVISO_FALHA_MS = 30 * 1000;
+    const ultimoAvisoFalha = new Map();
+
+    function falhaAoCarregar(recurso, erro, ultimosDados) {
+        console.error(`[dados] falha ao carregar ${recurso}:`, erro);
+
+        const anterior = Array.isArray(ultimosDados) ? ultimosDados : [];
+
+        if (erro?.status === 401) {
+            return anterior;
         }
+
+        const agora = Date.now();
+
+        if (agora - (ultimoAvisoFalha.get(recurso) || 0) >= INTERVALO_AVISO_FALHA_MS) {
+            ultimoAvisoFalha.set(recurso, agora);
+
+            if (typeof mostrarToast === 'function') {
+                mostrarToast(
+                    anterior.length
+                        ? `Nao foi possivel atualizar ${recurso}. Mostrando os ultimos dados carregados.`
+                        : `Nao foi possivel carregar ${recurso}. Tente novamente.`,
+                    'error'
+                );
+            }
+        }
+
+        return anterior;
     }
 
     function obterDataISO(valor) {
@@ -127,60 +157,57 @@
         };
     }
 
-    if (typeof carregarColaboradores === 'function') {
-        const originalCarregarColaboradores = carregarColaboradores;
+    // Embrulha o carregador publicado por telas/lancamentos.js (que carrega
+    // antes deste arquivo e tambem mantem o diretorio com os desligados).
+    if (typeof window.carregarColaboradores === 'function') {
+        const originalCarregarColaboradores = window.carregarColaboradores;
 
-        window.carregarColaboradores = carregarColaboradores = function carregarColaboradoresComCache() {
+        window.carregarColaboradores = function carregarColaboradoresComCache() {
             return withInFlight('colaboradores', async () => {
-                const data = await originalCarregarColaboradores();
-                const lista = Array.isArray(data) ? data : [];
+                let lista;
 
                 try {
-                    colaboradores = lista;
+                    const data = await originalCarregarColaboradores();
+                    lista = Array.isArray(data) ? data : [];
                 } catch (error) {
-                    // ignore
+                    lista = falhaAoCarregar('os colaboradores', error, window.colaboradores);
                 }
 
+                colaboradores = lista;
                 window.colaboradores = lista;
                 return lista;
             });
         };
     }
 
-    window.carregarSetores = carregarSetores = function carregarSetoresComCache() {
+    window.carregarSetores = function carregarSetoresComCache() {
         return withInFlight('setores', async () => {
-            let lista = [];
+            let lista;
 
             try {
                 const data = await window.API.getSetores();
                 lista = Array.isArray(data) ? data : [];
             } catch (error) {
-                lista = [];
+                lista = falhaAoCarregar('os setores', error, window.setores);
             }
 
-            try {
-                setores = lista;
-            } catch (error) {
-                // ignore
-            }
-
+            setores = lista;
             window.setores = lista;
             return lista;
         });
     };
 
-    // Tipos de escala: o molde do padrao semanal. Banco ainda sem a migration
-    // devolve 409/404 — nesse caso a lista fica vazia e o select de tipo
-    // simplesmente nao aparece no editor, em vez de derrubar a tela.
+    // Tipos de escala: o molde do padrao semanal. Sem tipos cadastrados a lista
+    // fica vazia e o select de tipo simplesmente nao aparece no editor.
     window.carregarTiposEscala = function carregarTiposEscalaComCache() {
         return withInFlight('tiposEscala', async () => {
-            let lista = [];
+            let lista;
 
             try {
                 const data = await window.API.getTiposEscala();
                 lista = Array.isArray(data?.items) ? data.items : (Array.isArray(data) ? data : []);
             } catch (error) {
-                lista = [];
+                lista = falhaAoCarregar('os tipos de escala', error, window.tiposEscala);
             }
 
             window.tiposEscala = lista;
@@ -190,48 +217,45 @@
 
     window.carregarAusencias = function carregarAusenciasComCache() {
         return withInFlight('ausencias', async () => {
-            let lista = [];
+            let lista;
 
             try {
                 const data = await window.API.getAusencias();
                 lista = Array.isArray(data) ? data.map(mapAusencia) : [];
             } catch (error) {
-                lista = [];
+                lista = falhaAoCarregar('as ausencias', error, window.ausencias);
             }
 
-            try {
-                ausencias = lista;
-            } catch (error) {
-                // ignore
-            }
-
+            ausencias = lista;
             window.ausencias = lista;
             return lista;
         });
     };
 
+    function lerFeriadosSalvos() {
+        try {
+            const salvos = JSON.parse(localStorage.getItem('feriadosLocais') || '[]');
+            return Array.isArray(salvos) ? salvos : [];
+        } catch (erro) {
+            // Conteudo corrompido no localStorage: e so um cache, descarta.
+            return [];
+        }
+    }
+
     window.carregarFeriadosLocais = function carregarFeriadosLocaisComCache() {
         return withInFlight('feriadosLocais', async () => {
-            let lista = [];
+            let lista;
 
             try {
                 const data = await window.API.getFeriados();
                 lista = Array.isArray(data) ? data : [];
                 localStorage.setItem('feriadosLocais', JSON.stringify(lista));
             } catch (error) {
-                try {
-                    lista = JSON.parse(localStorage.getItem('feriadosLocais') || '[]');
-                } catch (storageError) {
-                    lista = [];
-                }
+                // Sem servidor, a ultima lista salva neste navegador ainda vale.
+                lista = falhaAoCarregar('os feriados', error, lerFeriadosSalvos());
             }
 
-            try {
-                feriadosLocais = lista;
-            } catch (error) {
-                // ignore
-            }
-
+            feriadosLocais = lista;
             window.feriadosLocais = lista;
             return lista;
         });
@@ -239,21 +263,16 @@
 
     window.carregarPlantoes = carregarPlantoes = function carregarPlantoesComCache() {
         return withInFlight('plantoes', async () => {
-            let lista = [];
+            let lista;
 
             try {
                 const data = await window.API.getPlantoes();
                 lista = Array.isArray(data) ? data.map(mapPlantao) : [];
             } catch (error) {
-                lista = [];
+                lista = falhaAoCarregar('os plantoes', error, window.plantoesLancados);
             }
 
-            try {
-                plantoesLancados = lista;
-            } catch (error) {
-                // ignore
-            }
-
+            plantoesLancados = lista;
             window.plantoesLancados = lista;
             return lista;
         });

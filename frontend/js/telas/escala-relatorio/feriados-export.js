@@ -13,12 +13,10 @@
     async function collectEscalaHolidayItems(startISO, endISO) {
         const merged = new Map();
 
+        // carregarFeriadosLocais nao lanca: em falha avisa o usuario e devolve
+        // a ultima lista conhecida (core/runtime/dados-e-modais.js).
         if (typeof carregarFeriadosLocais === 'function') {
-            try {
-                await carregarFeriadosLocais();
-            } catch (error) {
-                // ignore
-            }
+            await carregarFeriadosLocais();
         }
 
         (Array.isArray(window.feriadosLocais) ? window.feriadosLocais : []).forEach((item) => {

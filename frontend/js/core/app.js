@@ -17,7 +17,6 @@ window.setores = setores;
 window.feriadosLocais = feriadosLocais;
 window.excluirFeriado = excluirFeriado;
 window.gerarRelatorioCompleto = gerarRelatorioCompleto;
-window.carregarSetores = carregarSetores;
 
 const ESCALA_CORES_STORAGE_KEY = 'escalaCoresPersonalizadas';
 const ESCALA_CORES_PADRAO = [

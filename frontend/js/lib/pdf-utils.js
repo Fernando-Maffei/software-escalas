@@ -38,7 +38,9 @@
             try {
                 await document.fonts.ready;
             } catch (error) {
-                // ignore
+                // Fonte que nao carregou nao impede o PDF: ele sai com a fonte
+                // substituta do navegador.
+                console.warn('[pdf] fontes nao carregaram; seguindo com a fonte padrao.', error);
             }
         }
     }

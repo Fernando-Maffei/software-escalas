@@ -248,42 +248,6 @@ function solicitarSenhaModal(options = {}) {
 /* ===========================
    CARREGAR DADOS
 =========================== */
-async function carregarColaboradores() {
-    try {
-        const data = await window.API.getColaboradores();
-        colaboradores = Array.isArray(data) ? data : [];
-        
-        // 🔥 ATUALIZAR WINDOW
-        window.colaboradores = colaboradores;
-        
-        console.log(`Colaboradores carregados: ${colaboradores.length}`);
-        return colaboradores;
-    } catch (error) {
-        console.error("Erro ao carregar colaboradores:", error);
-        colaboradores = [];
-        window.colaboradores = [];
-        return [];
-    }
-}
-
-async function carregarSetores() {
-    try {
-        const res = await fetch(`${getApiBaseUrl()}/setores`);
-        if (!res.ok) {
-            throw new Error(`Erro ${res.status}: ${res.statusText}`);
-        }
-        const data = await res.json();
-        setores = Array.isArray(data) ? data : [];
-        window.setores = setores;
-        return setores;
-    } catch (error) {
-        console.error("Erro ao carregar setores:", error);
-        setores = [];
-        window.setores = [];
-        return [];
-    }
-}
-
 function buildSetorOptionsHtml(selectedId = null) {
     const currentSetores = Array.isArray(window.setores) ? window.setores : [];
 

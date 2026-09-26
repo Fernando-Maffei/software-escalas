@@ -219,13 +219,24 @@ se o modal novo nao existir. Codigo morto com bomba-relogio (achado pelo ESLint)
 junto sairam as referencias as duas funcoes inexistentes. O ESLint (que calcula
 os globais a partir do codigo) nao acusa mais nenhum `no-undef` no frontend.
 
-**A12 — Falha ao carregar dados vira tela vazia, sem aviso** · `ABERTO`
+**A12 — Falha ao carregar dados vira tela vazia, sem aviso** · `RESOLVIDO`
 `frontend/js/core/runtime/dados-e-modais.js:133-240` (achado na Fase 3)
 Os carregadores de colaboradores, setores, ausencias, feriados e tipos de escala
 fazem `catch { lista = [] }`: se a API cair ou der erro, a tela mostra "nenhum
 colaborador/ausencia" como se fosse verdade, e o usuario pode tomar decisao de
 escala em cima disso. Ha tambem `try { colaboradores = lista } catch { // ignore }`
 em volta de atribuicoes que nunca lancam.
+**Feito:** um tratador so, `falhaAoCarregar` em `dados-e-modais.js`, para os seis
+carregadores (colaboradores, setores, tipos de escala, ausencias, feriados,
+plantoes): registra no console, avisa o usuario por toast (no maximo uma vez a
+cada 30 s por recurso; nunca em 401, que ja leva ao login) e **mantem os ultimos
+dados carregados** em vez de esvaziar a tela. Os carregadores "originais"
+passaram a propagar o erro para esse tratador. Sairam todos os
+`catch { // ignore }` do frontend (7): os que envolviam atribuicoes que nao lancam
+e os redundantes; o unico que ficou (fonte do PDF) diz por que e loga. Achado no
+caminho: `core/app/colaboradores.js` e `carregarSetores` originais nunca rodavam
+(sobrescritos no `window` por `telas/lancamentos.js` e pelo `runtime/`) —
+removidos. Verificado no navegador simulando erro 500 e 401.
 
 ### MEDIO
 

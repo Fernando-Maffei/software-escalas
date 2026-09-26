@@ -123,12 +123,9 @@
             });
         }
 
-        try {
-            if ((!window.feriadosAPI || !Array.isArray(window.feriadosAPI) || window.feriadosAPI.length === 0) && typeof carregarFeriadosAPI === 'function') {
-                await carregarFeriadosAPI(ano);
-            }
-        } catch (error) {
-            // ignore
+        // carregarFeriadosAPI trata a propria falha (devolve lista vazia e loga).
+        if ((!window.feriadosAPI || !Array.isArray(window.feriadosAPI) || window.feriadosAPI.length === 0) && typeof carregarFeriadosAPI === 'function') {
+            await carregarFeriadosAPI(ano);
         }
 
         // Mesmo cuidado que ja existia para feriados, agora para colaboradores
