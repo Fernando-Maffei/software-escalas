@@ -9,15 +9,25 @@
 const DEFAULT_MAX_ATTEMPTS = 5;
 const DEFAULT_WINDOW_MS = 15 * 60 * 1000;   // 15 min para acumular tentativas
 const DEFAULT_BLOCK_MS = 15 * 60 * 1000;    // 15 min de bloqueio ao estourar
+// Acima deste numero de chaves, cada falha nova varre as expiradas. Sem isso,
+// chaves que nunca mais voltam (IPs e usuarios aleatorios) ficavam no Map para
+// sempre.
+const DEFAULT_SWEEP_THRESHOLD = 1000;
 
 function createRateLimiter(options = {}) {
     const maxAttempts = options.maxAttempts ?? DEFAULT_MAX_ATTEMPTS;
     const windowMs = options.windowMs ?? DEFAULT_WINDOW_MS;
     const blockMs = options.blockMs ?? DEFAULT_BLOCK_MS;
+    const sweepThreshold = options.sweepThreshold ?? DEFAULT_SWEEP_THRESHOLD;
     // Injetavel para os testes controlarem o tempo sem esperar de verdade.
     const now = typeof options.now === 'function' ? options.now : () => Date.now();
 
     const entries = new Map();
+
+    // Expirado por completo: fora da janela e sem bloqueio ativo.
+    function isExpired(entry, instant) {
+        return entry.blockedUntil <= instant && entry.firstAttempt + windowMs <= instant;
+    }
 
     function getEntry(key) {
         const entry = entries.get(key);
@@ -26,14 +36,22 @@ function createRateLimiter(options = {}) {
             return null;
         }
 
-        // Descarta um registro que ja expirou por completo (fora da janela e
-        // sem bloqueio ativo), para o Map nao crescer indefinidamente.
-        if (entry.blockedUntil <= now() && entry.firstAttempt + windowMs <= now()) {
+        if (isExpired(entry, now())) {
             entries.delete(key);
             return null;
         }
 
         return entry;
+    }
+
+    function sweepExpired() {
+        const instant = now();
+
+        for (const [key, entry] of entries) {
+            if (isExpired(entry, instant)) {
+                entries.delete(key);
+            }
+        }
     }
 
     // Chamado ANTES de validar a senha. Retorna { blocked, retryAfterMs }.
@@ -51,6 +69,11 @@ function createRateLimiter(options = {}) {
     // arma o bloqueio. Retorna o estado resultante.
     function registerFailure(key) {
         const instant = now();
+
+        if (entries.size >= sweepThreshold) {
+            sweepExpired();
+        }
+
         let entry = getEntry(key);
 
         if (!entry) {
@@ -83,7 +106,15 @@ function createRateLimiter(options = {}) {
         entries.delete(key);
     }
 
-    return { check, registerFailure, reset, maxAttempts, windowMs, blockMs };
+    return {
+        check,
+        registerFailure,
+        reset,
+        size: () => entries.size,
+        maxAttempts,
+        windowMs,
+        blockMs
+    };
 }
 
 module.exports = { createRateLimiter };

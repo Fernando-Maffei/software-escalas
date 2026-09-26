@@ -2,6 +2,7 @@ const assert = require('node:assert/strict');
 
 const {
     buildDateRange,
+    ensurePositiveInt,
     extractDateString,
     extractTimeString,
     normalizeEnum,
@@ -11,6 +12,17 @@ const {
 } = require('../../backend/lib/validation');
 
 module.exports = [
+    {
+        // Acima do INT do SQL Server o driver recusava o parametro e virava 500.
+        name: 'ensurePositiveInt recusa zero, negativo, texto e valor acima do INT do banco',
+        run() {
+            assert.equal(ensurePositiveInt('42', 'Id'), 42);
+            assert.equal(ensurePositiveInt(2147483647, 'Id'), 2147483647);
+            ['0', '-1', 'abc', '2147483648', '99999999999'].forEach((valor) => {
+                assert.throws(() => ensurePositiveInt(valor, 'Id'), /Id invalido/);
+            });
+        }
+    },
     {
         name: 'normalizeIsoDate accepts valid ISO dates',
         run() {

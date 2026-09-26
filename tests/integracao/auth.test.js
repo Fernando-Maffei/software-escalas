@@ -98,21 +98,17 @@ module.exports = [
         }
     },
     {
-        name: 'erro interno nao vaza a mensagem crua do banco para o cliente',
+        // Antes o id passava na validacao, estourava o INT no driver e o 500
+        // devolvia a mensagem crua do tedious.
+        name: 'id acima do limite do banco e entrada invalida (400), sem mensagem do driver',
         async run() {
             const cliente = criarCliente();
             await cliente.entrar();
 
-            // Um id que passa na validacao da rota mas estoura o INT do SQL
-            // Server provoca um erro real do driver (EPARAM), sem precisar
-            // quebrar nada de proposito.
             const resposta = await cliente.get('/api/colaboradores/99999999999');
 
-            assert.ok(resposta.status >= 400);
-
-            if (resposta.status >= 500) {
-                assert.doesNotMatch(String(resposta.body?.error), /Validation failed|out of range|mssql|tedious/i);
-            }
+            assert.equal(resposta.status, 400);
+            assert.doesNotMatch(String(resposta.body?.error), /Validation failed|mssql|tedious/i);
         }
     }
 ];

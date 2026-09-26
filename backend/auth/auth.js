@@ -273,19 +273,28 @@ async function ensureDefaultAdmin(pool) {
     }
 
     const username = normalizeOptionalText(process.env.ADMIN_USERNAME, 'Usuario') || 'admin';
-    const envPassword = process.env.ADMIN_PASSWORD;
-    const password = envPassword && envPassword.length >= MIN_PASSWORD_LENGTH
-        ? envPassword
-        : generateRandomPassword();
+    const envPassword = process.env.ADMIN_PASSWORD || '';
+    const envPasswordValida = envPassword.length >= MIN_PASSWORD_LENGTH;
+
+    // Senha do .env curta demais e ignorada — e isso precisa ficar visivel.
+    // Antes ela era trocada por uma aleatoria marcada como "nao gerada": a
+    // senha nunca aparecia e ninguem conseguia entrar.
+    if (envPassword && !envPasswordValida) {
+        console.warn(
+            `[auth] ADMIN_PASSWORD ignorada: tem menos de ${MIN_PASSWORD_LENGTH} caracteres. Uma senha aleatoria sera gerada.`
+        );
+    }
+
+    const password = envPasswordValida ? envPassword : generateRandomPassword();
 
     await createUser(pool, {
         username,
         password,
-        deveTrocarSenha: !envPassword,
+        deveTrocarSenha: !envPasswordValida,
         isAdmin: true
     });
 
-    return { username, password, generated: !envPassword };
+    return { username, password, generated: !envPasswordValida };
 }
 
 async function createSession(pool, user) {
@@ -389,8 +398,19 @@ function parseCookies(req) {
         const key = pair.slice(0, separatorIndex).trim();
         const value = pair.slice(separatorIndex + 1).trim();
 
-        if (key) {
+        if (!key) {
+            return;
+        }
+
+        // Cookie com escape invalido (ex.: "%" solto) e entrada malformada do
+        // cliente, nao erro do servidor: ele e ignorado, e a requisicao segue
+        // como sem sessao (401) em vez de estourar URIError (500).
+        try {
             cookies[key] = decodeURIComponent(value);
+        } catch (error) {
+            if (!(error instanceof URIError)) {
+                throw error;
+            }
         }
     });
 

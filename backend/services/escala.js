@@ -10,10 +10,8 @@ const {
     ensurePositiveInt,
     extractDateString,
     extractTimeString,
-    normalizeEnum,
     normalizeIsoDate,
     normalizeNullableTime,
-    normalizeOptionalText,
     toSqlTime,
     validateWorkSchedule
 } = require('../lib/validation');
@@ -1673,7 +1671,6 @@ async function applyLunchPeriod(poolOrTx, schema, payload) {
     });
     const existingMap = new Map(existingRows.map((row) => [buildEscalaKey(row.colaboradorId, row.dataISO), row]));
     let updated = 0;
-    let created = 0;
     let skipped = 0;
 
     for (const dataISO of iterateIsoDates(dataInicio, dataFim)) {
@@ -1717,13 +1714,13 @@ async function applyLunchPeriod(poolOrTx, schema, payload) {
             almocoPersonalizado: Boolean(nextRecord.almocoAjustado)
         }));
 
-        if (existing) {
-            updated += 1;
-        }
+        updated += 1;
     }
 
     return {
-        created,
+        // As linhas do periodo ja foram criadas por ensureEscalaDiaForPeriod
+        // acima; aqui so se atualiza. A chave fica na resposta por contrato.
+        created: 0,
         updated,
         skipped
     };

@@ -7,7 +7,6 @@ const { getSetoresPermitidosRequest, idsPermitidosNumericos } = require('../auth
 const {
     calculateDailyWorkMinutes,
     calculateIntervalMinutes,
-    enumerateBusinessDates,
     normalizeSubtipo,
     parseBalanceInputToMinutes,
     resolveDefaultDescontaBancoHoras

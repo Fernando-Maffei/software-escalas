@@ -3,10 +3,14 @@ const { AppError } = require('./errors');
 const ISO_DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 const TIME_REGEX = /^([01]\d|2[0-3]):([0-5]\d)(?::([0-5]\d))?$/;
 
+// Maior valor da coluna INT do SQL Server. Acima disso o driver recusava o
+// parametro e a requisicao virava erro 500 em vez de "invalido".
+const SQL_INT_MAX = 2147483647;
+
 function ensurePositiveInt(value, fieldName) {
     const parsed = Number.parseInt(value, 10);
 
-    if (!Number.isInteger(parsed) || parsed <= 0) {
+    if (!Number.isInteger(parsed) || parsed <= 0 || parsed > SQL_INT_MAX) {
         throw new AppError(400, `${fieldName} invalido.`);
     }
 

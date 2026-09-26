@@ -20,6 +20,7 @@ const {
 } = require('../auth/auth');
 
 const { createRateLimiter } = require('../auth/rate-limit');
+const { getClientIp } = require('../lib/ip-cliente');
 
 const router = express.Router();
 
@@ -27,12 +28,6 @@ const router = express.Router();
 // repetida nao vazar para outras contas nem para a tentativa de outra pessoa
 // na mesma rede.
 const loginRateLimiter = createRateLimiter();
-
-function getClientIpFromRequest(req) {
-    const forwardedFor = String(req.headers['x-forwarded-for'] || '').split(',')[0].trim();
-    const rawIp = forwardedFor || req.socket?.remoteAddress || req.ip || '';
-    return String(rawIp).replace(/^::ffff:/, '');
-}
 
 function toPublicUser(user) {
     return {
@@ -50,7 +45,7 @@ router.post('/login', async (req, res, next) => {
         const username = normalizeUsername(req.body?.username);
         const password = normalizePassword(req.body?.password, 'Senha');
 
-        const rateKey = `${getClientIpFromRequest(req)}|${username.toLowerCase()}`;
+        const rateKey = `${getClientIp(req)}|${username.toLowerCase()}`;
         const limite = loginRateLimiter.check(rateKey);
 
         if (limite.blocked) {
@@ -153,7 +148,7 @@ router.post('/verify-password', requireAuth, async (req, res, next) => {
             throw new AppError(400, 'Informe a senha.');
         }
 
-        const rateKey = `verify|${getClientIpFromRequest(req)}|${req.user.id}`;
+        const rateKey = `verify|${getClientIp(req)}|${req.user.id}`;
         const limite = loginRateLimiter.check(rateKey);
 
         if (limite.blocked) {

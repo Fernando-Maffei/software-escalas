@@ -10,6 +10,8 @@ const {
     initializeAutoBackupScheduler
 } = require('./services/backup-scheduler');
 const { AppError } = require('./lib/errors');
+const { getClientIp, parseTrustProxy } = require('./lib/ip-cliente');
+const { tratadorDeErros } = require('./lib/tratador-erros');
 const { requireAuth, purgeExpiredSessions } = require('./auth/auth');
 const { checkAccess } = require('./auth/permissoes');
 const { ensureApplicationSchema } = require('./db/database-schema');
@@ -317,12 +319,6 @@ function getControllerUrl(controller) {
     return `http://localhost:${port}`;
 }
 
-function getClientIp(req) {
-    const forwardedFor = String(req.headers['x-forwarded-for'] || '').split(',')[0].trim();
-    const rawIp = forwardedFor || req.socket?.remoteAddress || req.ip || '';
-    return String(rawIp).replace(/^::ffff:/, '');
-}
-
 async function getDatabaseHealth() {
     try {
         const pool = await conectar();
@@ -368,6 +364,8 @@ function getNetworkStatusPayload(req) {
 }
 
 app.disable('x-powered-by');
+// Sem TRUST_PROXY, X-Forwarded-For e ignorado (ver lib/ip-cliente.js).
+app.set('trust proxy', parseTrustProxy(process.env.TRUST_PROXY));
 app.use(cors(corsOptionsDelegate));
 app.use(express.json({ limit: '25mb' }));
 // Sem cache nos arquivos do front-end: garante que o time sempre recebe a
@@ -536,19 +534,7 @@ app.use((req, res, next) => {
     next(new AppError(404, 'Rota nao encontrada.'));
 });
 
-app.use((error, req, res, next) => {
-    const statusCode = error.statusCode || 500;
-    const message = error.message || 'Erro interno no servidor.';
-
-    if (statusCode >= 500) {
-        console.error(`[${req.method}] ${req.originalUrl}`, error);
-    }
-
-    res.status(statusCode).json({
-        error: message,
-        details: error.details || null
-    });
-});
+app.use(tratadorDeErros());
 
 function start(options = {}) {
     if (activeController) {
