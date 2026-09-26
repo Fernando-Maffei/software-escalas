@@ -124,7 +124,7 @@ restauracao nunca os reinsere), ou tratar explicitamente — ver pergunta P3.
 reinseriu contas. (Se um dia quiser restaurar contas, e a P3.) Teste de
 integracao confere que o arquivo nao tem token de sessao nem hash de senha.
 
-**A4 — XSS armazenado em varias telas** · `ABERTO`
+**A4 — XSS armazenado em varias telas** · `RESOLVIDO`
 Nome de colaborador/feriado/setor e descricao de alerta vao para `innerHTML` sem
 escape, p.ex.: `frontend/js/core/app/ausencias-e-timeline.js:269`,
 `core/app/modais-e-navegacao.js:91`, `core/app/feriados.js:184`,
@@ -133,6 +133,15 @@ escape, p.ex.: `frontend/js/core/app/ausencias-e-timeline.js:269`,
 `<img src=x onerror=...>` executa no navegador de todo usuario (inclusive via
 arquivo de backup restaurado). Correcao: escapar na interpolacao, com **um**
 helper compartilhado (hoje ha 9 copias — ver M8).
+**Feito:** um unico `escapeHtml` (`frontend/js/lib/html-seguro.js`, ver M8) e escape
+nos pontos que sobraram depois da limpeza de codigo morto: alerta e eventos do
+dashboard, opcao de setor no cadastro e lista de feriados (os demais pontos da
+lista original estavam em funcoes mortas, removidas no B1). **Prova no navegador**
+(servidor de integracao com colaboradora chamada `<img src=x onerror=...>Maria` e
+ferias daqui a 3 dias): com a correcao revertida o codigo executa no dashboard
+(`window.__xss = 1`, 2 imagens injetadas); com a correcao, 0 execucoes nas 9
+telas e o nome aparece como texto. `npm run integracao:servidor` sobe esse
+cenario para conferir de novo.
 
 **A5 — "Exportar Dados" + "Importar Dados" apagam quase tudo** · `ABERTO`
 `frontend/js/core/app/configuracoes-tela.js:623` e `frontend/js/core/app.js:133`

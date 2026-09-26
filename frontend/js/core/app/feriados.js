@@ -134,10 +134,10 @@ async function carregarListaFeriados() {
                     <div class="lancamento-header">
                         <div class="lancamento-titulo">
                             <i class="fas ${isManual ? 'fa-city' : 'fa-globe'}" style="color: ${cor};"></i>
-                            <span><strong>${f.nome}</strong></span>
+                            <span><strong>${escapeHtml(f.nome)}</strong></span>
                         </div>
                         <span class="lancamento-badge" style="background: ${bgCor}; color: ${cor};">
-                            ${f.icone} ${isManual ? f.tipo : 'Federal'}
+                            ${f.icone} ${isManual ? escapeHtml(f.tipo) : 'Federal'}
                         </span>
                     </div>
                     

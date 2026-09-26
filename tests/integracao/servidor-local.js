@@ -34,7 +34,20 @@ const NOME_COM_HTML = '<img src=x onerror="window.__xss=1">Maria';
     const joao = await criarColaborador(cliente, { nome: 'Joao Silva', setorId: setor.Id });
 
     await cadastrarFeriado(cliente);
-    await lancarAusencia(cliente, joao.Id, { dataInicio: DATAS.terca, dataFim: DATAS.terca, observacao: '<script>x</script>' });
+    await cliente.post('/api/feriados', { nome: '<img src=x onerror="window.__xss=1">Feriado', data: '2027-04-20' });
+
+    // Ferias comecando daqui a 3 dias: aciona o alerta e a lista de eventos
+    // do dashboard, que mostram o nome do colaborador.
+    const inicioFerias = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000);
+    const fimFerias = new Date(inicioFerias.getTime() + 6 * 24 * 60 * 60 * 1000);
+    const iso = (data) =>
+        `${data.getFullYear()}-${String(data.getMonth() + 1).padStart(2, '0')}-${String(data.getDate()).padStart(2, '0')}`;
+    await lancarAusencia(cliente, maria.Id, { tipo: 'ferias', dataInicio: iso(inicioFerias), dataFim: iso(fimFerias) });
+    await lancarAusencia(cliente, joao.Id, {
+        dataInicio: DATAS.terca,
+        dataFim: DATAS.terca,
+        observacao: '<script>x</script>'
+    });
     await lancarPlantao(cliente, DATAS.sabado, [
         { horaInicio: '08:00', horaFim: '12:00', colaboradores: [maria.Id, joao.Id], tipoCredito: 'banco' }
     ]);

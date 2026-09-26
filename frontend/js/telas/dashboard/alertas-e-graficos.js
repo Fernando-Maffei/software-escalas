@@ -96,8 +96,8 @@ function gerarAlertItem(alerta) {
         <div class="alert-item ${alerta.tipo}">
             <i class="fas fa-${alerta.icone}"></i>
             <div class="alert-content">
-                <span class="alert-title">${alerta.titulo}</span>
-                <span class="alert-description">${alerta.descricao}</span>
+                <span class="alert-title">${escapeHtml(alerta.titulo)}</span>
+                <span class="alert-description">${escapeHtml(alerta.descricao)}</span>
             </div>
         </div>
     `;

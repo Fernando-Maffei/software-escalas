@@ -99,8 +99,8 @@ function gerarEventItem(evento) {
                 ${evento.isPeriodo ? '<div class="event-period-icon"><i class="fas fa-calendar-alt"></i></div>' : ''}
             </div>
             <div class="event-info">
-                <div class="event-title">${evento.titulo}</div>
-                <div class="event-subtitle">${evento.subtitulo}</div>
+                <div class="event-title">${escapeHtml(evento.titulo)}</div>
+                <div class="event-subtitle">${escapeHtml(evento.subtitulo)}</div>
             </div>
             <span class="event-badge ${badgeClass}">${badgeText}</span>
         </div>

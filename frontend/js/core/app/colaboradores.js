@@ -276,7 +276,7 @@ function buildSetorOptionsHtml(selectedId = null) {
     return [
         '<option value="">Selecione...</option>',
         ...currentSetores.map((setor) => `
-            <option value="${setor.id}" ${Number(selectedId) === Number(setor.id) ? 'selected' : ''}>${setor.nome}</option>
+            <option value="${setor.id}" ${Number(selectedId) === Number(setor.id) ? 'selected' : ''}>${escapeHtml(setor.nome)}</option>
         `)
     ].join('');
 }
