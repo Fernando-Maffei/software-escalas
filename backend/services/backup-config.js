@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 
 const { AppError } = require('../lib/errors');
+const { normalizeBoolean } = require('../lib/validation');
 const { ensureDataDirectory, resolveDataPath } = require('../lib/app-paths');
 
 const CONFIG_PATH = resolveDataPath('backup.local.json');
@@ -52,38 +53,6 @@ function normalizeTableCounts(value) {
             return [String(key), Number.isFinite(parsed) && parsed >= 0 ? parsed : 0];
         })
     );
-}
-
-function normalizeBackupBoolean(value, defaultValue = false) {
-    if (value === undefined || value === null || value === '') {
-        return defaultValue;
-    }
-
-    if (typeof value === 'boolean') {
-        return value;
-    }
-
-    if (typeof value === 'number') {
-        if (value === 1) {
-            return true;
-        }
-
-        if (value === 0) {
-            return false;
-        }
-    }
-
-    const normalized = String(value).trim().toLowerCase();
-
-    if (['true', '1', 'sim', 'yes'].includes(normalized)) {
-        return true;
-    }
-
-    if (['false', '0', 'nao', 'no'].includes(normalized)) {
-        return false;
-    }
-
-    throw new AppError(400, 'Valor booleano invalido na configuracao de backup.');
 }
 
 function normalizeAutoBackupIntervalMinutes(value, fallback = 180) {
@@ -143,12 +112,16 @@ function coerceBackupSettings(input = {}) {
 
     return {
         directory: normalizeTrimmedString(input.directory) ? path.normalize(stripWrappingQuotes(input.directory)) : defaults.directory,
-        autoBackupEnabled: normalizeBackupBoolean(input.autoBackupEnabled, defaults.autoBackupEnabled),
+        autoBackupEnabled: normalizeBoolean(input.autoBackupEnabled, 'Backup automatico', {
+            defaultValue: defaults.autoBackupEnabled
+        }),
         autoBackupIntervalMinutes: normalizeAutoBackupIntervalMinutes(
             input.autoBackupIntervalMinutes,
             defaults.autoBackupIntervalMinutes
         ),
-        autoBackupOnShutdown: normalizeBackupBoolean(input.autoBackupOnShutdown, defaults.autoBackupOnShutdown),
+        autoBackupOnShutdown: normalizeBoolean(input.autoBackupOnShutdown, 'Backup ao desligar', {
+            defaultValue: defaults.autoBackupOnShutdown
+        }),
         lastBackupAt: normalizeTrimmedString(input.lastBackupAt) || defaults.lastBackupAt,
         lastBackupFile: normalizeTrimmedString(input.lastBackupFile) || defaults.lastBackupFile,
         lastBackupPath: normalizeTrimmedString(input.lastBackupPath) ? path.normalize(stripWrappingQuotes(input.lastBackupPath)) : defaults.lastBackupPath,

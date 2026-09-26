@@ -3,6 +3,7 @@ const router = express.Router();
 
 const { sql, conectar } = require('../db');
 const { AppError } = require('../lib/errors');
+const { PLANTAO_TIPOS } = require('../lib/dominio');
 const {
     buildDisponibilidadeColaborador,
     calculateIntervalMinutes,
@@ -235,7 +236,7 @@ router.get('/', async (req, res) => {
 
     const records = result.recordset
         .map((row) => hydratePlantaoDuration(serializePlantaoRecord(row)))
-        .filter((plantao) => ['sabado', 'domingo', 'feriado'].includes(plantao.tipoPlantao));
+        .filter((plantao) => PLANTAO_TIPOS.includes(plantao.tipoPlantao));
 
     res.json(records);
 });

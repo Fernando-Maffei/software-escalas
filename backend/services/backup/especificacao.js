@@ -41,10 +41,12 @@ function col(nome, tipo, opcoes = {}) {
     });
 }
 
-const AUSENCIA_TIPOS = Object.freeze(['folga', 'ausencia', 'ferias']);
-const AUSENCIA_PERIODOS = Object.freeze(['dia_inteiro', 'horas']);
-const PLANTAO_TIPOS = Object.freeze(['sabado', 'domingo', 'feriado']);
-const PLANTAO_CREDITOS = Object.freeze(['banco', 'extra']);
+const {
+    AUSENCIA_PERIODOS,
+    AUSENCIA_TIPOS,
+    PLANTAO_TIPOS,
+    PLANTAO_TIPOS_CREDITO: PLANTAO_CREDITOS
+} = require('../../lib/dominio');
 const SEMANAL_STATUS = Object.freeze(['auto', 'confirmado']);
 
 const TABELAS_BACKUP = Object.freeze([
@@ -287,7 +289,6 @@ const TABELAS_BACKUP = Object.freeze([
 const NOMES_TABELAS_BACKUP = Object.freeze(TABELAS_BACKUP.map((item) => item.tabela));
 
 module.exports = {
-    AUSENCIA_TIPOS,
     NOMES_TABELAS_BACKUP,
     TABELAS_BACKUP,
     TIPO

@@ -1,4 +1,5 @@
 const { AppError } = require('../lib/errors');
+const { PLANTAO_TIPOS, PLANTAO_TIPOS_CREDITO } = require('../lib/dominio');
 const { isFeriadoNacional } = require('./feriados-nacionais');
 const {
     ensurePositiveInt,
@@ -41,12 +42,7 @@ function parseEquipePlantao(raw) {
     return normalizeColaboradores(valor);
 }
 
-const PLANTAO_TIPOS = ['sabado', 'domingo', 'feriado'];
 
-// Destino das horas do lancamento. 'banco' credita BancoHorasMovimentos como
-// sempre; 'extra' registra o plantao e a escala do dia, mas nao mexe no saldo —
-// a hora sai como extra na folha.
-const PLANTAO_TIPOS_CREDITO = ['banco', 'extra'];
 
 function normalizeTipoCredito(value, fieldName = 'Tipo de credito') {
     if (value === undefined || value === null || String(value).trim() === '') {

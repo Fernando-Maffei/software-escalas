@@ -3,6 +3,7 @@ const router = express.Router();
 
 const { sql, conectar } = require('../db');
 const { AppError } = require('../lib/errors');
+const { AUSENCIA_PERIODOS: PERIODO_TIPOS, AUSENCIA_TIPOS } = require('../lib/dominio');
 const {
     calculateAusenciaDebitMinutes,
     describeAusenciaMovement,
@@ -27,8 +28,6 @@ const {
     toSqlTime
 } = require('../lib/validation');
 
-const AUSENCIA_TIPOS = ['folga', 'ausencia', 'ferias'];
-const PERIODO_TIPOS = ['dia_inteiro', 'horas'];
 
 const AUSENCIA_COLUNAS = `
             Id,

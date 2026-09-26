@@ -32,7 +32,7 @@ const ESCALA_TIPOS = [
 ];
 // Plantoes que viram linha na escala do dia. Antes so o de sabado entrava, e o
 // lancamento de domingo/feriado nao aparecia na escala nem no relatorio.
-const ESCALA_PLANTAO_TIPOS = ['sabado', 'domingo', 'feriado'];
+const { PLANTAO_TIPOS: ESCALA_PLANTAO_TIPOS } = require('../lib/dominio');
 const DIA_SEMANA_LABELS = [
     'Domingo',
     'Segunda-feira',

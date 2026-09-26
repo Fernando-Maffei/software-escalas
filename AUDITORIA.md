@@ -311,13 +311,21 @@ mas `/api/ausencias`, `/api/plantoes`, `/api/banco-horas` e
 comentario do codigo diz que filtrar a lista de colaboradores "ja limita as
 telas" — verdade na interface, falso na API. Ver pergunta P1.
 
-**M8 — Codigo duplicado** · `ABERTO`
+**M8 — Codigo duplicado** · `RESOLVIDO`
 - `escapeHtml` em 9 copias (`helpers.js:17`, `relatorio-mensal.js:13`,
   `banco-horas.js:114`, `configuracoes-usuarios.js:13`, `disponibilidade.js:14`,
   `escala-dia-shared.js:73`, `folgas-domingo.js:32`, `lancamentos.js:157`, `tipos-escala.js:34`).
 - `getClientIp` 2x; `normalizeBoolean` 3x (`validation.js:190`,
   `database-config.js:53`, `backup-config.js:57`); `AUSENCIA_TIPOS` 2x.
 - `POST` e `PUT /colaboradores/:id/jornada-semanal` identicos (`colaboradores.js:240-294`).
+**Feito:** um `escapeHtml` (`frontend/js/lib/html-seguro.js`, no lugar das 9
+copias); um `getClientIp` (`backend/lib/ip-cliente.js`); um `normalizeBoolean`
+(`lib/validation.js`, no lugar das copias de `database-config.js` e
+`backup-config.js`); as listas de dominio (tipos e periodos de ausencia, tipos e
+creditos de plantao) em `backend/lib/dominio.js` no lugar de ate 4 copias; a
+leitura do JSON da equipe do plantao em `parseEquipePlantao`; e os handlers
+identicos de `POST`/`PUT /colaboradores/:id/jornada-semanal` num so (as duas
+rotas continuam). Golden master identico.
 
 **M9 — Migrations rodam todas em todo boot, sem controle de versao** · `PROPOSTA`
 `backend/db/database-schema.js:163`. Funciona porque todas sao idempotentes

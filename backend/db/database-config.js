@@ -1,6 +1,7 @@
 const fs = require('fs');
 
 const { AppError } = require('../lib/errors');
+const { normalizeBoolean } = require('../lib/validation');
 const { ensureDataDirectory, resolveDataPath } = require('../lib/app-paths');
 
 const CONFIG_PATH = resolveDataPath('database.local.json');
@@ -52,32 +53,6 @@ function normalizePort(value) {
     return parsed;
 }
 
-function normalizeBoolean(value, defaultValue) {
-    if (value === undefined || value === null || value === '') {
-        return defaultValue;
-    }
-
-    if (typeof value === 'boolean') {
-        return value;
-    }
-
-    const normalized = String(value).trim().toLowerCase();
-
-    if (['true', '1', 'sim', 'yes'].includes(normalized)) {
-        return true;
-    }
-
-    if (['false', '0', 'nao', 'não', 'no'].includes(normalized)) {
-        return false;
-    }
-
-    throw new AppError(400, 'Valor booleano invalido na configuracao do banco.');
-}
-
-/**
- * @param {unknown} value
- * @param {string} [fallback]
- */
 function normalizeAuthenticationType(value, fallback = AUTHENTICATION_TYPES.SQL) {
     const normalized = normalizeTrimmedString(value).toLowerCase() || fallback;
 
@@ -117,8 +92,8 @@ function getEnvironmentDatabaseSettings() {
         user: normalizeTrimmedString(process.env.DB_USER),
         password: normalizeTrimmedString(process.env.DB_PASSWORD),
         authenticationType: normalizeAuthenticationType(process.env.DB_AUTH_TYPE, AUTHENTICATION_TYPES.SQL),
-        encrypt: normalizeBoolean(process.env.DB_ENCRYPT, true),
-        trustServerCertificate: normalizeBoolean(process.env.DB_TRUST_CERT, true)
+        encrypt: normalizeBoolean(process.env.DB_ENCRYPT, 'DB_ENCRYPT', { defaultValue: true }),
+        trustServerCertificate: normalizeBoolean(process.env.DB_TRUST_CERT, 'DB_TRUST_CERT', { defaultValue: true })
     };
 }
 
@@ -209,13 +184,15 @@ function normalizeDatabaseSettings(input, options = {}) {
         authenticationType: authType,
         encrypt: normalizeBoolean(
             input?.encrypt !== undefined ? input.encrypt : currentSettings.encrypt,
-            true
+            'Criptografia da conexao',
+            { defaultValue: true }
         ),
         trustServerCertificate: normalizeBoolean(
             input?.trustServerCertificate !== undefined
                 ? input.trustServerCertificate
                 : currentSettings.trustServerCertificate,
-            true
+            'Confiar no certificado do servidor',
+            { defaultValue: true }
         )
     };
 
