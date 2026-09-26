@@ -1,5 +1,5 @@
-// Imposicao do controle de acesso por setor (ver [[project_meus_setores]] e a
-// decisao: teto por conta, imposto no backend). Le os setores PERMITIDOS da
+// Imposicao do controle de acesso por setor: cada conta pode ter um teto de
+// setores (SetoresPermitidosJson), imposto no backend. Le os setores PERMITIDOS da
 // conta logada — sempre fresco do banco, para uma mudanca do admin valer no
 // proximo request sem precisar derrubar a sessao.
 //
@@ -18,12 +18,15 @@ async function getSetoresPermitidosRequest(pool, req) {
     return Array.isArray(user?.setoresPermitidos) ? user.setoresPermitidos : [];
 }
 
-// Ids permitidos como inteiros (os setores sao numericos). Vazio = sem
-// restricao.
+// Ids permitidos como inteiros validos para a coluna INT (os setores sao
+// numericos). Valor que nao e id de setor e descartado — e, se nada sobrar, as
+// rotas nao mostram ninguem (falha fechada).
+const SQL_INT_MAX = 2147483647;
+
 function idsPermitidosNumericos(setoresPermitidos) {
     return (setoresPermitidos || [])
         .map((id) => Number(id))
-        .filter((id) => Number.isFinite(id));
+        .filter((id) => Number.isInteger(id) && id > 0 && id <= SQL_INT_MAX);
 }
 
 // Ids dos colaboradores que a conta logada pode ver, ou null quando ela nao

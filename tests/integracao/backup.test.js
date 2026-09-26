@@ -221,5 +221,19 @@ module.exports = [
 
             assert.equal((await leitor.get('/api/configuracao-banco/backup/baixar')).status, 403);
         }
+    },
+    {
+        // O limite de 1 MB vale para a API toda, menos a restauracao de backup.
+        name: 'restauracao aceita arquivo acima de 1 MB (chega a validacao, nao e cortada)',
+        async run() {
+            const cliente = criarCliente();
+            await cliente.entrar();
+
+            const grande = { data: { Feriados: [{ Id: 1, Data: '2027-03-19', Nome: 'x'.repeat(2 * 1024 * 1024) }] } };
+            const resposta = await cliente.post('/api/configuracao-banco/backup/restaurar', { backupData: grande });
+
+            assert.equal(resposta.status, 400);
+            assert.match(resposta.body.error, /Nome deve ter no maximo 200/);
+        }
     }
 ];

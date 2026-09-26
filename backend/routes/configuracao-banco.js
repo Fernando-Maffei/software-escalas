@@ -2,6 +2,7 @@ const express = require('express');
 
 const { conectar, fecharConexao, testarConexao } = require('../db');
 const {
+    coerceBackupPayload,
     createSystemBackup,
     ensureBackupDirectory,
     formatBackupTimestamp,
@@ -271,6 +272,10 @@ router.get('/backup/baixar', async (req, res, next) => {
 router.post('/backup/restaurar', async (req, res, next) => {
     try {
         const backupData = req.body?.backupData ?? req.body;
+        // Valida o arquivo ANTES de tudo: um arquivo invalido nao deve gerar
+        // backup de seguranca nem tocar no banco.
+        coerceBackupPayload(backupData);
+
         const currentSettings = getBackupSettings();
         const pool = await conectar();
 
