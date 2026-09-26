@@ -470,3 +470,33 @@ Tabelas pequenas; o collation padrao ja e case-insensitive. Nao vale o risco ago
 ## 4. Registro das correcoes
 
 _(preenchido na Fase 3)_
+
+**B11 — Rajada repetida de requisicoes com sessao ativa** · `ABERTO` (achado no fim)
+No servidor de teste, com sessao ativa, o navegador registrou mais de 1.900
+requisicoes repetindo as mesmas 7 rotas (feriados, plantoes, colaboradores,
+jornada, setores, ausencias). Deslogado nao sai nenhuma. Falta confirmar se foi
+efeito das passadas automaticas pelas telas ou uma atualizacao periodica
+(`dashboardInterval` / `atualizarTudo`) disparando em excesso.
+
+---
+
+## 5. Resumo final (sessao interrompida pelo limite de uso)
+
+**Resolvido:** C1, C2; A1, A2, A3, A4, A6, A8, A9, A10, A11, A12, A13; M1, M2,
+M3, M4, M5, M6, M8, M12, M16; B1, B2, B4, B5, B6, B7, B10. Rede de seguranca
+criada: 123 testes unitarios, 28 de integracao com SQL Server real, roteiro
+golden master (87 passos), ESLint e checagem de tipos sem nenhum erro, CI
+atualizado. Cerca de 3.000 linhas de codigo morto ou redundante removidas.
+
+**Pendente (depende de decisao — ver secao 3):** A5 (P2, exportar backup
+completo), A7 (P4, senha atual na troca), M7 (P1), M9/M17 (P5), M15 (P6),
+formatacao em massa (P7), M13 (container como root: o volume de producao ja
+pertence ao root; trocar de usuario exige migrar as permissoes do volume).
+
+**Pendente (sem bloqueio):** M10 (retencao de backups), M11, M14 (funcoes
+gigantes do frontend), B3 (versao no export antigo, junto com A5), B9, B11 e a
+atualizacao do README (Fase 5).
+
+**Recomendacoes:** responder P1–P7; rodar `npm run test:integracao` e o golden
+master antes de qualquer refatoracao grande do backend; aplicar as tres
+migrations pendentes em producao so depois de backup.
