@@ -11,6 +11,7 @@ const suites = [
     ...require('./permissoes.test.js'),
     ...require('./auth.test.js'),
     ...require('./servidor.test.js'),
+    ...require('./htmlSeguro.test.js'),
     ...require('./rate-limit.test.js')
 ];
 

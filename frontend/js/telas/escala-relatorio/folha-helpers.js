@@ -157,12 +157,12 @@
         const rows = Array.isArray(day.rows) ? day.rows : [];
         const hasRows = day.hasScale && rows.length > 0;
         const emptyLabel = holidayLabel ? 'FERIADO' : 'Sem escala';
-        const titleAttribute = holidayLabel ? ` title="${escapeHtmlEscala(holidayLabel)}"` : '';
+        const titleAttribute = holidayLabel ? ` title="${escapeHtml(holidayLabel)}"` : '';
         const domingoOuFeriado = isEscalaSheetDomingoOuFeriado(day, holidayLabel);
 
         return `
             <article class="escala-sheet-day${hasRows ? '' : ' is-empty'}${holidayLabel ? ' is-holiday' : ''}">
-                <div class="escala-sheet-day-date"${titleAttribute}>${escapeHtmlEscala(day.dateLabel || '--')}</div>
+                <div class="escala-sheet-day-date"${titleAttribute}>${escapeHtml(day.dateLabel || '--')}</div>
                 <table class="escala-sheet-table">
                     <colgroup>
                         ${includeLunch
@@ -179,13 +179,13 @@
                     <tbody>
                         ${hasRows ? rows.map((row) => `
                             <tr>
-                                ${includeLunch && row.showAlmoco ? `<td rowspan="${row.almocoRowspan || 1}" class="escala-sheet-group${row.almocoForaDoCadastro ? ' is-destaque' : ''}">${escapeHtmlEscala(row.almocoLabel || '--')}</td>` : ''}
-                                <td class="escala-sheet-name${isEscalaSheetNomeDestacado(row, domingoOuFeriado) ? ' is-destaque' : ''}">${escapeHtmlEscala(row.colaboradorNome || '--')}</td>
-                                ${row.showJornada ? `<td rowspan="${row.jornadaRowspan || 1}" class="escala-sheet-group">${escapeHtmlEscala(row.jornadaLabel || '--')}</td>` : ''}
+                                ${includeLunch && row.showAlmoco ? `<td rowspan="${row.almocoRowspan || 1}" class="escala-sheet-group${row.almocoForaDoCadastro ? ' is-destaque' : ''}">${escapeHtml(row.almocoLabel || '--')}</td>` : ''}
+                                <td class="escala-sheet-name${isEscalaSheetNomeDestacado(row, domingoOuFeriado) ? ' is-destaque' : ''}">${escapeHtml(row.colaboradorNome || '--')}</td>
+                                ${row.showJornada ? `<td rowspan="${row.jornadaRowspan || 1}" class="escala-sheet-group">${escapeHtml(row.jornadaLabel || '--')}</td>` : ''}
                             </tr>
                         `).join('') : `
                             <tr>
-                                <td colspan="${columnCount}" class="escala-sheet-empty">${escapeHtmlEscala(emptyLabel)}</td>
+                                <td colspan="${columnCount}" class="escala-sheet-empty">${escapeHtml(emptyLabel)}</td>
                             </tr>
                         `}
                     </tbody>

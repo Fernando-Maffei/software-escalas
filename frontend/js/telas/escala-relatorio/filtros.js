@@ -3,7 +3,7 @@
             <option value="">Todos os colaboradores</option>
             ${(window.colaboradores || []).map((item) => `
                 <option value="${item.Id}" ${String(selectedId) === String(item.Id) ? 'selected' : ''}>
-                    ${escapeHtmlEscala(item.Nome)}
+                    ${escapeHtml(item.Nome)}
                 </option>
             `).join('')}
         `;
@@ -29,8 +29,8 @@
         return `
             <option value="">Todos os setores</option>
             ${setoresOrdenados.map((setor) => `
-                <option value="${escapeHtmlEscala(String(setor.id))}" ${String(selectedId) === String(setor.id) ? 'selected' : ''}>
-                    ${escapeHtmlEscala(setor.nome || 'Sem nome')}
+                <option value="${escapeHtml(String(setor.id))}" ${String(selectedId) === String(setor.id) ? 'selected' : ''}>
+                    ${escapeHtml(setor.nome || 'Sem nome')}
                 </option>
             `).join('')}
         `;
@@ -73,7 +73,7 @@
 
         return `
             <div class="relatorio-filtros-ativos">
-                <span><i class="fas fa-building"></i> Setor: <strong>${escapeHtmlEscala(setorNome)}</strong></span>
+                <span><i class="fas fa-building"></i> Setor: <strong>${escapeHtml(setorNome)}</strong></span>
             </div>
         `;
     }
@@ -92,13 +92,13 @@
     // deixava fácil header e body divergirem (a causa-raiz de "colunas
     // desalinhadas"). Aqui, adicionar/reordenar coluna é editar uma lista só.
     const COLUNAS_ESCALA_DETALHADA = [
-        { titulo: 'Data', html: true, valor: (i) => `<strong>${escapeHtmlEscala(formatDatePtBrEscala(i.dataISO))}</strong>` },
+        { titulo: 'Data', html: true, valor: (i) => `<strong>${escapeHtml(formatDatePtBrEscala(i.dataISO))}</strong>` },
         { titulo: 'Dia', valor: (i) => i.diaSemana || getDayLabelEscala(i.dataISO) },
         { titulo: 'Colaborador', truncar: true, valor: (i) => i.colaboradorNome || '--' },
         { titulo: 'Entrada', valor: (i) => i.horaInicio || '--' },
         { titulo: 'Saida', valor: (i) => i.horaFim || '--' },
         { titulo: 'Almoco', valor: (i) => i.almoco || '--' },
-        { titulo: 'Tipo', html: true, valor: (i) => `<span class="evento-tipo badge-${escapeHtmlEscala(i.tipo)}">${escapeHtmlEscala(TIPO_LABELS[i.tipo] || i.tipo || '--')}</span>` },
+        { titulo: 'Tipo', html: true, valor: (i) => `<span class="evento-tipo badge-${escapeHtml(i.tipo)}">${escapeHtml(TIPO_LABELS[i.tipo] || i.tipo || '--')}</span>` },
         { titulo: 'Observacoes', valor: (i) => i.observacao || '--' }
     ];
 
@@ -111,7 +111,7 @@
         const classeTabela = config && config.classe ? ` ${config.classe}` : '';
 
         const head = colunas
-            .map((col) => `<th scope="col">${escapeHtmlEscala(col.titulo || '')}</th>`)
+            .map((col) => `<th scope="col">${escapeHtml(col.titulo || '')}</th>`)
             .join('');
 
         const body = linhas.map((linha) => {
@@ -119,7 +119,7 @@
                 const bruto = typeof col.valor === 'function' ? col.valor(linha) : (linha ? linha[col.chave] : null);
                 const conteudo = col.html
                     ? (bruto == null ? '' : String(bruto))
-                    : escapeHtmlEscala(bruto == null ? '--' : bruto);
+                    : escapeHtml(bruto == null ? '--' : bruto);
                 const classe = col.truncar ? ' class="is-truncada"' : '';
                 return `<td${classe}>${conteudo}</td>`;
             }).join('');

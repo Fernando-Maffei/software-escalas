@@ -10,15 +10,6 @@
         'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
     ];
 
-    function escapeHtmlRelatorio(value) {
-        return String(value ?? '')
-            .replaceAll('&', '&amp;')
-            .replaceAll('<', '&lt;')
-            .replaceAll('>', '&gt;')
-            .replaceAll('"', '&quot;')
-            .replaceAll("'", '&#39;');
-    }
-
     function obterDataIsoRelatorio(valor) {
         if (!valor) {
             return null;
@@ -336,14 +327,14 @@
             html += `<div class="dia-numero">${dia}</div>`;
 
             if (isFeriado) {
-                html += `<div class="dia-feriado" title="${escapeHtmlRelatorio(eventos.feriado)}">📅 ${escapeHtmlRelatorio(eventos.feriado)}</div>`;
+                html += `<div class="dia-feriado" title="${escapeHtml(eventos.feriado)}">📅 ${escapeHtml(eventos.feriado)}</div>`;
             }
 
             if (folgasDia.length > 0) {
                 html += '<div class="dia-folgas">';
                 folgasDia.slice(0, 3).forEach((nome) => {
                     const nomeCurto = nome.length > 18 ? `${nome.substring(0, 15)}...` : nome;
-                    html += `<span class="folga-tag" title="${escapeHtmlRelatorio(nome)}">🌸 ${escapeHtmlRelatorio(nomeCurto)}</span>`;
+                    html += `<span class="folga-tag" title="${escapeHtml(nome)}">🌸 ${escapeHtml(nomeCurto)}</span>`;
                 });
                 if (folgasDia.length > 3) {
                     html += `<span class="mais-tag">+${folgasDia.length - 3}</span>`;
@@ -355,7 +346,7 @@
                 html += '<div class="dia-ferias">';
                 feriasDia.slice(0, 3).forEach((nome) => {
                     const nomeCurto = nome.length > 18 ? `${nome.substring(0, 15)}...` : nome;
-                    html += `<span class="ferias-tag" title="${escapeHtmlRelatorio(nome)}">🏖️ ${escapeHtmlRelatorio(nomeCurto)}</span>`;
+                    html += `<span class="ferias-tag" title="${escapeHtml(nome)}">🏖️ ${escapeHtml(nomeCurto)}</span>`;
                 });
                 if (feriasDia.length > 3) {
                     html += `<span class="mais-tag">+${feriasDia.length - 3}</span>`;
@@ -367,7 +358,7 @@
                 html += '<div class="dia-ausencias">';
                 ausenciasDia.slice(0, 3).forEach((nome) => {
                     const nomeCurto = nome.length > 18 ? `${nome.substring(0, 15)}...` : nome;
-                    html += `<span class="ausencia-tag" title="${escapeHtmlRelatorio(nome)}">⚠️ ${escapeHtmlRelatorio(nomeCurto)}</span>`;
+                    html += `<span class="ausencia-tag" title="${escapeHtml(nome)}">⚠️ ${escapeHtml(nomeCurto)}</span>`;
                 });
                 if (ausenciasDia.length > 3) {
                     html += `<span class="mais-tag">+${ausenciasDia.length - 3}</span>`;
@@ -402,9 +393,9 @@
                         emptyLabel: 'Nenhum feriado no periodo',
                         rowRenderer: (item) => `
                             <tr>
-                                <td><strong>${escapeHtmlRelatorio(item.nome)}</strong></td>
-                                <td>${escapeHtmlRelatorio(item.dataFormatada)}</td>
-                                <td>${escapeHtmlRelatorio(item.tipo || 'municipal')}</td>
+                                <td><strong>${escapeHtml(item.nome)}</strong></td>
+                                <td>${escapeHtml(item.dataFormatada)}</td>
+                                <td>${escapeHtml(item.tipo || 'municipal')}</td>
                             </tr>
                         `
                     })}
@@ -415,8 +406,8 @@
                         emptyLabel: 'Nenhuma ferias no periodo',
                         rowRenderer: (item) => `
                             <tr>
-                                <td><strong>${escapeHtmlRelatorio(item.colaborador)}</strong></td>
-                                <td>${escapeHtmlRelatorio(item.periodoTexto)}</td>
+                                <td><strong>${escapeHtml(item.colaborador)}</strong></td>
+                                <td>${escapeHtml(item.periodoTexto)}</td>
                             </tr>
                         `
                     })}
@@ -427,8 +418,8 @@
                         emptyLabel: 'Nenhuma folga no periodo',
                         rowRenderer: (item) => `
                             <tr>
-                                <td><strong>${escapeHtmlRelatorio(item.colaborador)}</strong></td>
-                                <td>${escapeHtmlRelatorio(item.dataFormatada)}</td>
+                                <td><strong>${escapeHtml(item.colaborador)}</strong></td>
+                                <td>${escapeHtml(item.dataFormatada)}</td>
                             </tr>
                         `
                     })}
@@ -439,8 +430,8 @@
                         emptyLabel: 'Nenhuma ausencia no periodo',
                         rowRenderer: (item) => `
                             <tr>
-                                <td><strong>${escapeHtmlRelatorio(item.colaborador)}</strong></td>
-                                <td>${escapeHtmlRelatorio(item.dataFormatada)}</td>
+                                <td><strong>${escapeHtml(item.colaborador)}</strong></td>
+                                <td>${escapeHtml(item.dataFormatada)}</td>
                             </tr>
                         `
                     })}
@@ -547,22 +538,22 @@
 
             if (isFeriado) {
                 const nomeFeriado = eventos.feriado.length > 15 ? `${eventos.feriado.substring(0, 12)}...` : eventos.feriado;
-                linhaAtual += `<div class="dia-feriado" title="${escapeHtmlRelatorio(eventos.feriado)}">📅 ${escapeHtmlRelatorio(nomeFeriado)}</div>`;
+                linhaAtual += `<div class="dia-feriado" title="${escapeHtml(eventos.feriado)}">📅 ${escapeHtml(nomeFeriado)}</div>`;
             }
 
             folgasDia.forEach((item) => {
                 const nome = item.nome.length > 10 ? `${item.nome.substring(0, 8)}...` : item.nome;
-                linhaAtual += `<div class="evento-tag folga-tag" title="${escapeHtmlRelatorio(item.nome)}">🌸 ${escapeHtmlRelatorio(nome)}</div>`;
+                linhaAtual += `<div class="evento-tag folga-tag" title="${escapeHtml(item.nome)}">🌸 ${escapeHtml(nome)}</div>`;
             });
 
             feriasDia.forEach((item) => {
                 const nome = item.nome.length > 10 ? `${item.nome.substring(0, 8)}...` : item.nome;
-                linhaAtual += `<div class="evento-tag ferias-tag" title="${escapeHtmlRelatorio(item.nome)}">🏖️ ${escapeHtmlRelatorio(nome)}</div>`;
+                linhaAtual += `<div class="evento-tag ferias-tag" title="${escapeHtml(item.nome)}">🏖️ ${escapeHtml(nome)}</div>`;
             });
 
             ausenciasDia.forEach((item) => {
                 const nome = item.nome.length > 10 ? `${item.nome.substring(0, 8)}...` : item.nome;
-                linhaAtual += `<div class="evento-tag ausencia-tag" title="${escapeHtmlRelatorio(item.nome)}">⚠️ ${escapeHtmlRelatorio(nome)}</div>`;
+                linhaAtual += `<div class="evento-tag ausencia-tag" title="${escapeHtml(item.nome)}">⚠️ ${escapeHtml(nome)}</div>`;
             });
 
             if (colaboradoresDia.length > 2) {
@@ -617,9 +608,9 @@
                                     <tbody>
                                         ${feriados.slice(0, 8).map((item) => `
                                             <tr>
-                                                <td>${escapeHtmlRelatorio(item.nome)}</td>
-                                                <td>${escapeHtmlRelatorio(item.dataFormatada)}</td>
-                                                <td>${escapeHtmlRelatorio(item.tipo || 'municipal')}</td>
+                                                <td>${escapeHtml(item.nome)}</td>
+                                                <td>${escapeHtml(item.dataFormatada)}</td>
+                                                <td>${escapeHtml(item.tipo || 'municipal')}</td>
                                             </tr>
                                         `).join('')}
                                         ${feriados.length > 8 ? `<tr><td colspan="3" style="text-align: center; color: #64748b;">... e mais ${feriados.length - 8}</td></tr>` : ''}
@@ -638,8 +629,8 @@
                                     <tbody>
                                         ${ferias.slice(0, 8).map((item) => `
                                             <tr>
-                                                <td>${escapeHtmlRelatorio(item.colaborador)}</td>
-                                                <td>${escapeHtmlRelatorio(item.periodoTexto)}</td>
+                                                <td>${escapeHtml(item.colaborador)}</td>
+                                                <td>${escapeHtml(item.periodoTexto)}</td>
                                             </tr>
                                         `).join('')}
                                         ${ferias.length > 8 ? `<tr><td colspan="2" style="text-align: center; color: #64748b;">... e mais ${ferias.length - 8}</td></tr>` : ''}
@@ -658,8 +649,8 @@
                                     <tbody>
                                         ${folgas.slice(0, 8).map((item) => `
                                             <tr>
-                                                <td>${escapeHtmlRelatorio(item.colaborador)}</td>
-                                                <td>${escapeHtmlRelatorio(item.dataFormatada)}</td>
+                                                <td>${escapeHtml(item.colaborador)}</td>
+                                                <td>${escapeHtml(item.dataFormatada)}</td>
                                             </tr>
                                         `).join('')}
                                         ${folgas.length > 8 ? `<tr><td colspan="2" style="text-align: center; color: #64748b;">... e mais ${folgas.length - 8}</td></tr>` : ''}
@@ -678,8 +669,8 @@
                                     <tbody>
                                         ${ausencias.slice(0, 8).map((item) => `
                                             <tr>
-                                                <td>${escapeHtmlRelatorio(item.colaborador)}</td>
-                                                <td>${escapeHtmlRelatorio(item.dataFormatada)}</td>
+                                                <td>${escapeHtml(item.colaborador)}</td>
+                                                <td>${escapeHtml(item.dataFormatada)}</td>
                                             </tr>
                                         `).join('')}
                                         ${ausencias.length > 8 ? `<tr><td colspan="2" style="text-align: center; color: #64748b;">... e mais ${ausencias.length - 8}</td></tr>` : ''}
@@ -1010,24 +1001,24 @@
 
             if (isFeriado) {
                 const nomeFeriado = eventos.feriado.length > 26 ? `${eventos.feriado.substring(0, 23)}...` : eventos.feriado;
-                linhaAtual += `<div class="dia-feriado" title="${escapeHtmlRelatorio(eventos.feriado)}">${escapeHtmlRelatorio(nomeFeriado)}</div>`;
+                linhaAtual += `<div class="dia-feriado" title="${escapeHtml(eventos.feriado)}">${escapeHtml(nomeFeriado)}</div>`;
             }
 
             linhaAtual += '<div class="dia-eventos">';
 
             folgasVisiveis.forEach((item) => {
                 const nome = item.nome.length > 20 ? `${item.nome.substring(0, 17)}...` : item.nome;
-                linhaAtual += `<div class="evento-tag folga-tag" title="${escapeHtmlRelatorio(item.nome)}">Folga: ${escapeHtmlRelatorio(nome)}</div>`;
+                linhaAtual += `<div class="evento-tag folga-tag" title="${escapeHtml(item.nome)}">Folga: ${escapeHtml(nome)}</div>`;
             });
 
             feriasVisiveis.forEach((item) => {
                 const nome = item.nome.length > 20 ? `${item.nome.substring(0, 17)}...` : item.nome;
-                linhaAtual += `<div class="evento-tag ferias-tag" title="${escapeHtmlRelatorio(item.nome)}">Ferias: ${escapeHtmlRelatorio(nome)}</div>`;
+                linhaAtual += `<div class="evento-tag ferias-tag" title="${escapeHtml(item.nome)}">Ferias: ${escapeHtml(nome)}</div>`;
             });
 
             ausenciasVisiveis.forEach((item) => {
                 const nome = item.nome.length > 20 ? `${item.nome.substring(0, 17)}...` : item.nome;
-                linhaAtual += `<div class="evento-tag ausencia-tag" title="${escapeHtmlRelatorio(item.nome)}">Ausencia: ${escapeHtmlRelatorio(nome)}</div>`;
+                linhaAtual += `<div class="evento-tag ausencia-tag" title="${escapeHtml(item.nome)}">Ausencia: ${escapeHtml(nome)}</div>`;
             });
 
             if (colaboradoresDia.length > itensExibidos) {
@@ -1087,9 +1078,9 @@
                                     <tbody>
                                         ${feriados.slice(0, 10).map((item) => `
                                             <tr>
-                                                <td>${escapeHtmlRelatorio(item.nome)}</td>
-                                                <td>${escapeHtmlRelatorio(item.dataFormatada)}</td>
-                                                <td>${escapeHtmlRelatorio(item.tipo || 'municipal')}</td>
+                                                <td>${escapeHtml(item.nome)}</td>
+                                                <td>${escapeHtml(item.dataFormatada)}</td>
+                                                <td>${escapeHtml(item.tipo || 'municipal')}</td>
                                             </tr>
                                         `).join('')}
                                         ${feriados.length > 10 ? `<tr><td colspan="3" style="text-align: center; color: #64748b;">... e mais ${feriados.length - 10}</td></tr>` : ''}
@@ -1108,8 +1099,8 @@
                                     <tbody>
                                         ${ferias.slice(0, 10).map((item) => `
                                             <tr>
-                                                <td>${escapeHtmlRelatorio(item.colaborador)}</td>
-                                                <td>${escapeHtmlRelatorio(item.periodoTexto)}</td>
+                                                <td>${escapeHtml(item.colaborador)}</td>
+                                                <td>${escapeHtml(item.periodoTexto)}</td>
                                             </tr>
                                         `).join('')}
                                         ${ferias.length > 10 ? `<tr><td colspan="2" style="text-align: center; color: #64748b;">... e mais ${ferias.length - 10}</td></tr>` : ''}
@@ -1128,8 +1119,8 @@
                                     <tbody>
                                         ${folgas.slice(0, 10).map((item) => `
                                             <tr>
-                                                <td>${escapeHtmlRelatorio(item.colaborador)}</td>
-                                                <td>${escapeHtmlRelatorio(item.dataFormatada)}</td>
+                                                <td>${escapeHtml(item.colaborador)}</td>
+                                                <td>${escapeHtml(item.dataFormatada)}</td>
                                             </tr>
                                         `).join('')}
                                         ${folgas.length > 10 ? `<tr><td colspan="2" style="text-align: center; color: #64748b;">... e mais ${folgas.length - 10}</td></tr>` : ''}
@@ -1148,8 +1139,8 @@
                                     <tbody>
                                         ${ausencias.slice(0, 10).map((item) => `
                                             <tr>
-                                                <td>${escapeHtmlRelatorio(item.colaborador)}</td>
-                                                <td>${escapeHtmlRelatorio(item.dataFormatada)}</td>
+                                                <td>${escapeHtml(item.colaborador)}</td>
+                                                <td>${escapeHtml(item.dataFormatada)}</td>
                                             </tr>
                                         `).join('')}
                                         ${ausencias.length > 10 ? `<tr><td colspan="2" style="text-align: center; color: #64748b;">... e mais ${ausencias.length - 10}</td></tr>` : ''}

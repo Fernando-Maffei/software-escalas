@@ -111,14 +111,6 @@
         return `${sinal}${horas}:${String(resto).padStart(2, '0')}`;
     }
 
-    function escapeHtml(valor) {
-        return String(valor === null || valor === undefined ? '' : valor)
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;');
-    }
-
     // ---- render ----
     function render() {
         const appContent = document.getElementById('appContent');

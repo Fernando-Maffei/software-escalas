@@ -79,7 +79,7 @@
         }
 
         statusEl.className = `escala-daybar-status ${nivel}`;
-        statusEl.innerHTML = `<i class="fas ${icon}"></i> <span>${escapeHtmlEscala(texto)}</span>`;
+        statusEl.innerHTML = `<i class="fas ${icon}"></i> <span>${escapeHtml(texto)}</span>`;
     }
 
     // Camada de barras no estilo do prototipo: desenha, por cima das celulas,
@@ -95,7 +95,7 @@
 
         if (isFullDayOffEscala(record)) {
             const label = TIPO_LABELS[type] || 'Ausencia';
-            const motivo = record.observacao ? escapeHtmlEscala(record.observacao) : '';
+            const motivo = record.observacao ? escapeHtml(record.observacao) : '';
             // So existe CSS para estas tres faixas. Os tipos novos sem
             // trabalho herdam a cor de 'folga', que e o que eles sao na
             // pratica — o rotulo acima ja diz qual deles e.
@@ -104,7 +104,7 @@
                 : (ehTipoSemTrabalho(type) ? 'folga' : 'ausencia');
             return `<div class="escala-overlay">
                 <div class="escala-band escala-band-${bandType}">
-                    <span class="escala-band-label">${escapeHtmlEscala(label)}</span>
+                    <span class="escala-band-label">${escapeHtml(label)}</span>
                     ${motivo ? `<span class="escala-band-motivo">${motivo}</span>` : ''}
                 </div>
             </div>`;
@@ -154,14 +154,14 @@
         if (absenceRange) {
             const absenceLabel = `${formatTimeInputEscala(absenceStartRaw)}–${formatTimeInputEscala(absenceEndRaw)}`;
 
-            absence = `<div class="escala-ausencia-parcial" style="left:${pct(absenceRange.start)}%;width:${pct(absenceRange.end) - pct(absenceRange.start)}%" title="Ausencia parcial ${escapeHtmlEscala(absenceLabel)}">
-                <span class="escala-ausencia-parcial-time">${escapeHtmlEscala(absenceLabel)}</span>
+            absence = `<div class="escala-ausencia-parcial" style="left:${pct(absenceRange.start)}%;width:${pct(absenceRange.end) - pct(absenceRange.start)}%" title="Ausencia parcial ${escapeHtml(absenceLabel)}">
+                <span class="escala-ausencia-parcial-time">${escapeHtml(absenceLabel)}</span>
             </div>`;
         }
 
         return `<div class="escala-overlay">
             <div class="escala-bar${isPlantao ? ' escala-bar-plantao' : ''}" style="left:${left}%;width:${Math.max(0, right - left)}%">
-                <span class="escala-bar-label">${escapeHtmlEscala(barLabel)}</span>
+                <span class="escala-bar-label">${escapeHtml(barLabel)}</span>
             </div>
             ${lunch}
             ${absence}
@@ -338,14 +338,14 @@
             row.innerHTML = `
                 <div class="timeline-name" data-colaborador-id="${record.colaboradorId}"
                      role="button" tabindex="0"
-                     aria-label="Editar escala de ${escapeHtmlEscala(record.colaboradorNome || 'colaborador')}${record.setorNome ? `, setor ${escapeHtmlEscala(record.setorNome)}` : ''}. ${escapeHtmlEscala(buildTimeRangeLabelEscala(record) || 'sem horario definido')}"
-                     title="Editar escala de ${escapeHtmlEscala(record.colaboradorNome || 'colaborador')}">
+                     aria-label="Editar escala de ${escapeHtml(record.colaboradorNome || 'colaborador')}${record.setorNome ? `, setor ${escapeHtml(record.setorNome)}` : ''}. ${escapeHtml(buildTimeRangeLabelEscala(record) || 'sem horario definido')}"
+                     title="Editar escala de ${escapeHtml(record.colaboradorNome || 'colaborador')}">
                     <span class="timeline-name-main">
-                        <strong class="timeline-name-text">${escapeHtmlEscala(record.colaboradorNome || 'Sem nome')}</strong>
+                        <strong class="timeline-name-text">${escapeHtml(record.colaboradorNome || 'Sem nome')}</strong>
                         <span class="timeline-name-meta">
-                            ${record.setorNome ? `<small class="escala-sector-chip">${escapeHtmlEscala(record.setorNome)}</small>` : ''}
+                            ${record.setorNome ? `<small class="escala-sector-chip">${escapeHtml(record.setorNome)}</small>` : ''}
                             ${type === 'plantao' ? '<span class="plantao-badge">Plantao</span>' : ''}
-                            ${type !== 'normal' && type !== 'plantao' ? `<small class="escala-dia-tipo">${escapeHtmlEscala(typeLabel)}</small>` : ''}
+                            ${type !== 'normal' && type !== 'plantao' ? `<small class="escala-dia-tipo">${escapeHtml(typeLabel)}</small>` : ''}
                         </span>
                     </span>
                     <span class="timeline-name-action" aria-hidden="true">
@@ -353,7 +353,7 @@
                     </span>
                 </div>
                 <div class="timeline-cell total-cell">
-                    <span class="total-valor">${escapeHtmlEscala(totalLabel)}</span>
+                    <span class="total-valor">${escapeHtml(totalLabel)}</span>
                 </div>
                 ${Array.from({ length: bounds.columnCount }, (_, index) => {
                     const slot = bounds.startSlot + index;

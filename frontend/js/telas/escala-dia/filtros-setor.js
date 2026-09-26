@@ -119,10 +119,10 @@
             <button
                 type="button"
                 class="escala-sector-tab ${ativo ? 'is-active' : ''}"
-                data-escala-setor="${escapeHtmlEscala(String(setor.id))}"
+                data-escala-setor="${escapeHtml(String(setor.id))}"
                 aria-pressed="${ativo ? 'true' : 'false'}"
             >
-                ${escapeHtmlEscala(setor.nome)}
+                ${escapeHtml(setor.nome)}
             </button>`;
         }).join('');
 

@@ -27,9 +27,9 @@
             <div class="relatorio-tabela-container">
                 ${renderRelatorioEscalaFiltrosAtivos(filters)}
                 <div class="relatorio-total">
-                    Periodo: <strong>${escapeHtmlEscala(formatDatePtBrEscala(filters.dataInicio))}</strong>
+                    Periodo: <strong>${escapeHtml(formatDatePtBrEscala(filters.dataInicio))}</strong>
                     ate
-                    <strong>${escapeHtmlEscala(formatDatePtBrEscala(filters.dataFim))}</strong>
+                    <strong>${escapeHtml(formatDatePtBrEscala(filters.dataFim))}</strong>
                     • Registros: <strong>${items.length}</strong>
                 </div>
                 <div class="resumo-cards" style="margin-bottom: 18px;">
@@ -72,7 +72,7 @@
                 ${setorGroups.map((group) => `
                     <section class="relatorio-setor-section">
                         <div class="relatorio-setor-header">
-                            <span><i class="fas fa-layer-group"></i> ${escapeHtmlEscala(group.setorNome)}</span>
+                            <span><i class="fas fa-layer-group"></i> ${escapeHtml(group.setorNome)}</span>
                             <strong>${group.items.length} registro(s)</strong>
                         </div>
                         ${renderTabelaRelatorio({

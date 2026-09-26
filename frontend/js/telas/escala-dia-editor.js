@@ -192,7 +192,7 @@
                         </button>
                         <label class="escala-date-shell" for="seletorDataEscala">
                             <i class="fas fa-calendar-alt"></i>
-                            <input type="date" id="seletorDataEscala" value="${escapeHtmlEscala(todayISO)}" class="form-control date-input">
+                            <input type="date" id="seletorDataEscala" value="${escapeHtml(todayISO)}" class="form-control date-input">
                             <span class="escala-date-chevron">
                                 <i class="fas fa-chevron-down"></i>
                             </span>

@@ -154,15 +154,6 @@
 
     /* ================= HELPERS DIVERSOS ================= */
 
-    function escapeHtml(valor) {
-        return String(valor ?? '')
-            .replaceAll('&', '&amp;')
-            .replaceAll('<', '&lt;')
-            .replaceAll('>', '&gt;')
-            .replaceAll('"', '&quot;')
-            .replaceAll("'", '&#39;');
-    }
-
     function toast(mensagem, tipo = 'success') {
         if (typeof window.mostrarToast === 'function') {
             window.mostrarToast(mensagem, tipo);

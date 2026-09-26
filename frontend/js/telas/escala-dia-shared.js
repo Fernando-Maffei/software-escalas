@@ -70,15 +70,6 @@
         }).join('');
     }
 
-    function escapeHtmlEscala(value) {
-        return String(value ?? '')
-            .replaceAll('&', '&amp;')
-            .replaceAll('<', '&lt;')
-            .replaceAll('>', '&gt;')
-            .replaceAll('"', '&quot;')
-            .replaceAll("'", '&#39;');
-    }
-
     function toISODateEscala(value) {
         if (!value) {
             return null;

@@ -14,15 +14,6 @@
         return promise;
     }
 
-    function escapeHtml(value) {
-        return String(value ?? '')
-            .replaceAll('&', '&amp;')
-            .replaceAll('<', '&lt;')
-            .replaceAll('>', '&gt;')
-            .replaceAll('"', '&quot;')
-            .replaceAll("'", '&#39;');
-    }
-
     function fecharModalSeguro(modalId) {
         const modal = document.getElementById(modalId);
         if (!modal) {

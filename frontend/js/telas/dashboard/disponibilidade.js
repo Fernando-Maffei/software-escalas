@@ -11,15 +11,6 @@ function obterAusenciaDoColaboradorNaData(colaboradorId, dataISO) {
     return obterAusenciasNaData(dataISO).find((ausencia) => Number(ausencia.colaboradorId || ausencia.ColaboradorId) === Number(colaboradorId)) || null;
 }
 
-function escapeHtmlDashboard(value) {
-    return String(value ?? '')
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#039;');
-}
-
 function getDashboardSetorId(colaborador) {
     const value = colaborador?.SetorId ?? colaborador?.setorId ?? colaborador?.setor_id ?? null;
 

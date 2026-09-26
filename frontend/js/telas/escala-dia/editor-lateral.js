@@ -130,7 +130,7 @@
             shell.innerHTML = `
                 <div class="escala-range-placeholder">
                     <i class="fas fa-up-down-left-right"></i>
-                    <span>${escapeHtmlEscala(config.emptyMessage)}</span>
+                    <span>${escapeHtml(config.emptyMessage)}</span>
                 </div>
             `;
             return;
@@ -146,13 +146,13 @@
 
         shell.innerHTML = `
             <div class="escala-range-head">
-                <span>${escapeHtmlEscala(config.label)}</span>
-                <strong>${escapeHtmlEscala(middleLabel)}</strong>
+                <span>${escapeHtml(config.label)}</span>
+                <strong>${escapeHtml(middleLabel)}</strong>
             </div>
             <div class="escala-range-axis">
-                <span>${escapeHtmlEscala(formatMinutesToTimeEscala(config.minMinutes))}</span>
-                <span>${escapeHtmlEscala(formatMinutesToTimeEscala(config.minMinutes + Math.round(span / 2)))}</span>
-                <span>${escapeHtmlEscala(formatMinutesToTimeEscala(config.maxMinutes))}</span>
+                <span>${escapeHtml(formatMinutesToTimeEscala(config.minMinutes))}</span>
+                <span>${escapeHtml(formatMinutesToTimeEscala(config.minMinutes + Math.round(span / 2)))}</span>
+                <span>${escapeHtml(formatMinutesToTimeEscala(config.maxMinutes))}</span>
             </div>
             <div class="escala-range-track ${config.accentClass}" data-track-role="track">
                 <div class="escala-range-selection ${config.accentClass}" data-track-role="selection" style="left: ${left}%; width: ${width}%;">
@@ -343,8 +343,8 @@
             <div class="editor-colaborador">
                 <div class="editor-header">
                     <div>
-                        <h4>${escapeHtmlEscala(record.colaboradorNome || 'Colaborador')}</h4>
-                        <small>${escapeHtmlEscala(formatDatePtBrEscala(record.dataISO))} • ${escapeHtmlEscala(getDayLabelEscala(record.dataISO))} • ${escapeHtmlEscala(TIPO_LABELS[record.tipo] || 'Escala')}</small>
+                        <h4>${escapeHtml(record.colaboradorNome || 'Colaborador')}</h4>
+                        <small>${escapeHtml(formatDatePtBrEscala(record.dataISO))} • ${escapeHtml(getDayLabelEscala(record.dataISO))} • ${escapeHtml(TIPO_LABELS[record.tipo] || 'Escala')}</small>
                     </div>
                     <button onclick="fecharEditor()" class="btn-close-editor">
                         <i class="fas fa-times"></i>
@@ -354,26 +354,26 @@
                 <div class="editor-form-group">
                     <label><i class="fas fa-briefcase"></i> Jornada do dia</label>
                     <div class="time-inputs">
-                        <input type="time" id="escalaHoraInicio-${record.colaboradorId}" value="${escapeHtmlEscala(formatTimeInputEscala(record.horaInicio))}" class="form-control">
+                        <input type="time" id="escalaHoraInicio-${record.colaboradorId}" value="${escapeHtml(formatTimeInputEscala(record.horaInicio))}" class="form-control">
                         <span>ate</span>
-                        <input type="time" id="escalaHoraFim-${record.colaboradorId}" value="${escapeHtmlEscala(formatTimeInputEscala(record.horaFim))}" class="form-control">
+                        <input type="time" id="escalaHoraFim-${record.colaboradorId}" value="${escapeHtml(formatTimeInputEscala(record.horaFim))}" class="form-control">
                     </div>
                 </div>
 
                 <div class="editor-form-group">
                     <label><i class="fas fa-utensils"></i> Almoco do dia</label>
                     <div class="time-inputs">
-                        <input type="time" id="escalaAlmocoInicio-${record.colaboradorId}" value="${escapeHtmlEscala(formatTimeInputEscala(record.almocoInicio))}" class="form-control">
+                        <input type="time" id="escalaAlmocoInicio-${record.colaboradorId}" value="${escapeHtml(formatTimeInputEscala(record.almocoInicio))}" class="form-control">
                         <span>ate</span>
-                        <input type="time" id="escalaAlmocoFim-${record.colaboradorId}" value="${escapeHtmlEscala(formatTimeInputEscala(record.almocoFim))}" class="form-control">
+                        <input type="time" id="escalaAlmocoFim-${record.colaboradorId}" value="${escapeHtml(formatTimeInputEscala(record.almocoFim))}" class="form-control">
                     </div>
-                    <small class="helper-text">Atual: ${escapeHtmlEscala(lunchRange)}</small>
+                    <small class="helper-text">Atual: ${escapeHtml(lunchRange)}</small>
                     ${avisoAlmocoPersonalizado}
                 </div>
 
                 <div class="editor-form-group">
                     <label><i class="fas fa-align-left"></i> Observacao</label>
-                    <textarea id="escalaObservacao-${record.colaboradorId}" class="form-control" rows="3" placeholder="Detalhes deste dia">${escapeHtmlEscala(record.observacao || '')}</textarea>
+                    <textarea id="escalaObservacao-${record.colaboradorId}" class="form-control" rows="3" placeholder="Detalhes deste dia">${escapeHtml(record.observacao || '')}</textarea>
                 </div>
 
                 <div class="editor-actions editor-actions-main">

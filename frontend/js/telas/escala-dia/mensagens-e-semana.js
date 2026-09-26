@@ -29,13 +29,13 @@
             <div class="timeline-row mensagem-row${variante ? ` ${variante}` : ''}">
                 <div class="timeline-name mensagem-nome">
                     <i class="fas ${icon}"></i>
-                    <span>${escapeHtmlEscala(label)}</span>
+                    <span>${escapeHtml(label)}</span>
                 </div>
                 <div class="timeline-cell mensagem-cell" style="grid-column: span ${bounds.columnCount + 1};">
                     <div class="mensagem-conteudo">
                         <i class="fas ${icon}"></i>
-                        <h3>${escapeHtmlEscala(title)}</h3>
-                        <p>${escapeHtmlEscala(description)}</p>
+                        <h3>${escapeHtml(title)}</h3>
+                        <p>${escapeHtml(description)}</p>
                         ${acaoHtml}
                     </div>
                 </div>
@@ -66,7 +66,7 @@
             description: error?.message || 'Verifique sua conexao e tente novamente.',
             variante: 'mensagem-row--erro',
             acaoHtml: `
-                <button type="button" class="btn-repetir-escala" data-repetir-escala="${escapeHtmlEscala(dataISO)}">
+                <button type="button" class="btn-repetir-escala" data-repetir-escala="${escapeHtml(dataISO)}">
                     <i class="fas fa-rotate-right"></i> Tentar novamente
                 </button>
             `

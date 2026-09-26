@@ -10,15 +10,6 @@
     // Setores disponiveis para atribuir como "permitidos" a cada conta.
     let setoresDisponiveis = [];
 
-    function esc(value) {
-        return String(value ?? '')
-            .replaceAll('&', '&amp;')
-            .replaceAll('<', '&lt;')
-            .replaceAll('>', '&gt;')
-            .replaceAll('"', '&quot;')
-            .replaceAll("'", '&#39;');
-    }
-
     function toast(mensagem, tipo) {
         if (typeof window.mostrarToast === 'function') {
             window.mostrarToast(mensagem, tipo || 'success');
@@ -83,8 +74,8 @@
         aviso.innerHTML = `
             <div class="usuarios-senha-box">
                 <div>
-                    <strong>${rotulo} de ${esc(username)}:</strong>
-                    <code>${esc(senha)}</code>
+                    <strong>${rotulo} de ${escapeHtml(username)}:</strong>
+                    <code>${escapeHtml(senha)}</code>
                 </div>
                 <p>${explicacao}</p>
                 <button type="button" class="btn-secondary" data-fechar-senha>
@@ -112,7 +103,7 @@
             <div class="usuarios-senha-box">
                 <div class="usuarios-definir-form">
                     <label class="usuarios-campo">
-                        <span>Nova senha para ${esc(nome)}</span>
+                        <span>Nova senha para ${escapeHtml(nome)}</span>
                         <input type="password" id="definirSenhaInput" class="form-control" placeholder="minimo 8 caracteres" autocomplete="new-password">
                     </label>
                     <div class="usuarios-definir-acoes">
@@ -187,38 +178,38 @@
         const acoes = [];
 
         acoes.push(`
-            <button type="button" class="btn-secondary btn-usuario-acao" data-acao="definir-senha" data-id="${usuario.id}" data-nome="${esc(usuario.username)}">
+            <button type="button" class="btn-secondary btn-usuario-acao" data-acao="definir-senha" data-id="${usuario.id}" data-nome="${escapeHtml(usuario.username)}">
                 <i class="fas fa-pen"></i> Definir senha
             </button>
         `);
 
         acoes.push(`
-            <button type="button" class="btn-secondary btn-usuario-acao" data-acao="resetar" data-id="${usuario.id}" data-nome="${esc(usuario.username)}">
+            <button type="button" class="btn-secondary btn-usuario-acao" data-acao="resetar" data-id="${usuario.id}" data-nome="${escapeHtml(usuario.username)}">
                 <i class="fas fa-key"></i> Resetar senha
             </button>
         `);
 
         if (!isSelf) {
             acoes.push(usuario.isAdmin
-                ? `<button type="button" class="btn-secondary btn-usuario-acao" data-acao="remover-admin" data-id="${usuario.id}" data-nome="${esc(usuario.username)}">
+                ? `<button type="button" class="btn-secondary btn-usuario-acao" data-acao="remover-admin" data-id="${usuario.id}" data-nome="${escapeHtml(usuario.username)}">
                         <i class="fas fa-user-minus"></i> Remover admin
                    </button>`
-                : `<button type="button" class="btn-secondary btn-usuario-acao" data-acao="promover-admin" data-id="${usuario.id}" data-nome="${esc(usuario.username)}">
+                : `<button type="button" class="btn-secondary btn-usuario-acao" data-acao="promover-admin" data-id="${usuario.id}" data-nome="${escapeHtml(usuario.username)}">
                         <i class="fas fa-user-shield"></i> Tornar admin
                    </button>`);
 
             acoes.push(usuario.ativo
-                ? `<button type="button" class="btn-secondary btn-usuario-acao btn-usuario-danger" data-acao="desativar" data-id="${usuario.id}" data-nome="${esc(usuario.username)}">
+                ? `<button type="button" class="btn-secondary btn-usuario-acao btn-usuario-danger" data-acao="desativar" data-id="${usuario.id}" data-nome="${escapeHtml(usuario.username)}">
                         <i class="fas fa-user-slash"></i> Desativar
                    </button>`
-                : `<button type="button" class="btn-secondary btn-usuario-acao" data-acao="reativar" data-id="${usuario.id}" data-nome="${esc(usuario.username)}">
+                : `<button type="button" class="btn-secondary btn-usuario-acao" data-acao="reativar" data-id="${usuario.id}" data-nome="${escapeHtml(usuario.username)}">
                         <i class="fas fa-user-check"></i> Reativar
                    </button>`);
 
             // Excluir e diferente de desativar: apaga a conta de vez. Fica por
             // ultimo e com estilo de perigo para nao ser confundido com o resto.
             acoes.push(`
-                <button type="button" class="btn-secondary btn-usuario-acao btn-usuario-danger" data-acao="excluir" data-id="${usuario.id}" data-nome="${esc(usuario.username)}">
+                <button type="button" class="btn-secondary btn-usuario-acao btn-usuario-danger" data-acao="excluir" data-id="${usuario.id}" data-nome="${escapeHtml(usuario.username)}">
                     <i class="fas fa-trash-alt"></i> Excluir
                 </button>
             `);
@@ -227,9 +218,9 @@
         return `
             <div class="usuario-linha${usuario.ativo ? '' : ' usuario-linha-inativa'}">
                 <div class="usuario-info">
-                    <strong>${esc(usuario.username)}${isSelf ? ' <small>(voce)</small>' : ''}</strong>
+                    <strong>${escapeHtml(usuario.username)}${isSelf ? ' <small>(voce)</small>' : ''}</strong>
                     <div class="usuario-badges">${badges}</div>
-                    <small class="usuario-ultimo-login">Ultimo acesso: ${esc(formatarDataHora(usuario.ultimoLoginAt))}</small>
+                    <small class="usuario-ultimo-login">Ultimo acesso: ${escapeHtml(formatarDataHora(usuario.ultimoLoginAt))}</small>
                 </div>
                 <div class="usuario-acoes">${acoes.join('')}</div>
                 ${renderSetoresPermitidos(usuario)}
@@ -253,8 +244,8 @@
             const nome = setor.nome ?? setor.Nome ?? id;
             const ativo = permitidos.has(id);
             return `
-                <button type="button" class="usuario-setor-chip ${ativo ? 'is-active' : ''}" data-setor-id="${esc(id)}" data-user-id="${usuario.id}" aria-pressed="${ativo ? 'true' : 'false'}">
-                    ${esc(nome)}
+                <button type="button" class="usuario-setor-chip ${ativo ? 'is-active' : ''}" data-setor-id="${escapeHtml(id)}" data-user-id="${usuario.id}" aria-pressed="${ativo ? 'true' : 'false'}">
+                    ${escapeHtml(nome)}
                 </button>
             `;
         }).join('');
@@ -282,7 +273,7 @@
             const data = await response.json().catch(() => ({}));
 
             if (!response.ok) {
-                lista.innerHTML = `<p class="config-descricao">${esc(data.error || 'Erro ao carregar os usuarios.')}</p>`;
+                lista.innerHTML = `<p class="config-descricao">${escapeHtml(data.error || 'Erro ao carregar os usuarios.')}</p>`;
                 return;
             }
 

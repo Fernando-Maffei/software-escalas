@@ -32,7 +32,7 @@
             <html>
             <head>
                 <meta charset="UTF-8">
-                <title>${escapeHtmlEscala(snapshot.title)}</title>
+                <title>${escapeHtml(snapshot.title)}</title>
                 <style>
                     * { box-sizing: border-box; margin: 0; padding: 0; }
                     body {

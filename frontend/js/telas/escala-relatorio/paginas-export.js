@@ -89,13 +89,13 @@
         // da folha ja montada, em ajustarDensidadeFolhasEscala.
         return pageEntries.map((entry, pageIndex) => `
             <section class="pdf-pagina escala-export-page escala-export-month-page">
-                <div class="escala-sheet-title">${escapeHtmlEscala(pageTitle)}</div>
+                <div class="escala-sheet-title">${escapeHtml(pageTitle)}</div>
                 <div class="escala-sheet-meta">
-                    <strong>Setor: ${escapeHtmlEscala(entry.sector.setorNome || 'Sem setor')}</strong>
-                    <span>${escapeHtmlEscala(entry.label)} - Pagina ${pageIndex + 1} de ${pageEntries.length}</span>
+                    <strong>Setor: ${escapeHtml(entry.sector.setorNome || 'Sem setor')}</strong>
+                    <span>${escapeHtml(entry.label)} - Pagina ${pageIndex + 1} de ${pageEntries.length}</span>
                 </div>
                 <div class="escala-sheet-weekdays" style="--weekday-count:7;">
-                    ${ESCALA_QUADRO_WEEKDAY_HEADERS.map((label) => `<span>${escapeHtmlEscala(label)}</span>`).join('')}
+                    ${ESCALA_QUADRO_WEEKDAY_HEADERS.map((label) => `<span>${escapeHtml(label)}</span>`).join('')}
                 </div>
                 <div class="escala-sheet-grid" style="--weekday-count:7; --week-count:${entry.weeks.length || 1};">
                     ${entry.weeks.flatMap((week) => (
@@ -132,13 +132,13 @@
         return pageEntries.map((entry, pageIndex) => `
             <section class="pdf-pagina escala-export-page escala-export-detailed">
                 <div class="escala-export-header">
-                    <h1>${escapeHtmlEscala(snapshot.title)}</h1>
+                    <h1>${escapeHtml(snapshot.title)}</h1>
                     <p>Pagina ${pageIndex + 1} de ${pageEntries.length}</p>
                 </div>
                 ${pageIndex === 0 ? `
                     <div class="escala-export-summary">
-                        <span>Periodo: <strong>${escapeHtmlEscala(formatDatePtBrEscala(snapshot.filters.dataInicio))}</strong> ate <strong>${escapeHtmlEscala(formatDatePtBrEscala(snapshot.filters.dataFim))}</strong></span>
-                        ${snapshot.filters.setorId ? `<span>Setor: <strong>${escapeHtmlEscala(snapshot.filters.setorNome || getRelatorioEscalaSetorNome(snapshot.filters.setorId))}</strong></span>` : ''}
+                        <span>Periodo: <strong>${escapeHtml(formatDatePtBrEscala(snapshot.filters.dataInicio))}</strong> ate <strong>${escapeHtml(formatDatePtBrEscala(snapshot.filters.dataFim))}</strong></span>
+                        ${snapshot.filters.setorId ? `<span>Setor: <strong>${escapeHtml(snapshot.filters.setorNome || getRelatorioEscalaSetorNome(snapshot.filters.setorId))}</strong></span>` : ''}
                         <span>Registros: <strong>${snapshot.items.length}</strong></span>
                         <span>Setores: <strong>${setorGroups.length}</strong></span>
                     </div>
@@ -146,7 +146,7 @@
                     ${renderEscalaHolidayList(snapshot.feriados)}
                 ` : ''}
                 <div class="relatorio-setor-header escala-export-setor-header">
-                    <span>Setor: ${escapeHtmlEscala(entry.sector.setorNome || 'Sem setor')}</span>
+                    <span>Setor: ${escapeHtml(entry.sector.setorNome || 'Sem setor')}</span>
                     <strong>${entry.sector.items.length} registro(s)</strong>
                 </div>
                 <table class="relatorio-tabela escala-detalhada-tabela escala-export-table">
@@ -165,14 +165,14 @@
                     <tbody>
                         ${entry.group.map((item) => `
                             <tr>
-                                <td><strong>${escapeHtmlEscala(formatDatePtBrEscala(item.dataISO))}</strong></td>
-                                <td>${escapeHtmlEscala(item.diaSemana || getDayLabelEscala(item.dataISO))}</td>
-                                <td>${escapeHtmlEscala(item.colaboradorNome || '--')}</td>
-                                <td>${escapeHtmlEscala(item.horaInicio || '--')}</td>
-                                <td>${escapeHtmlEscala(item.horaFim || '--')}</td>
-                                <td>${escapeHtmlEscala(item.almoco || '--')}</td>
-                                <td>${escapeHtmlEscala(TIPO_LABELS[item.tipo] || item.tipo || '--')}</td>
-                                <td>${escapeHtmlEscala(item.observacao || '--')}</td>
+                                <td><strong>${escapeHtml(formatDatePtBrEscala(item.dataISO))}</strong></td>
+                                <td>${escapeHtml(item.diaSemana || getDayLabelEscala(item.dataISO))}</td>
+                                <td>${escapeHtml(item.colaboradorNome || '--')}</td>
+                                <td>${escapeHtml(item.horaInicio || '--')}</td>
+                                <td>${escapeHtml(item.horaFim || '--')}</td>
+                                <td>${escapeHtml(item.almoco || '--')}</td>
+                                <td>${escapeHtml(TIPO_LABELS[item.tipo] || item.tipo || '--')}</td>
+                                <td>${escapeHtml(item.observacao || '--')}</td>
                             </tr>
                         `).join('')}
                     </tbody>

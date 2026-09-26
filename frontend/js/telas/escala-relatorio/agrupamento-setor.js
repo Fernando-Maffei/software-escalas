@@ -89,7 +89,7 @@
             <div class="escala-quadro-mensal">
                 ${renderRelatorioEscalaFiltrosAtivos(filters)}
                 <div class="relatorio-total" hidden>
-                    Mes: <strong>${escapeHtmlEscala(MESES_LABELS[filters.month - 1] || filters.month)}/${escapeHtmlEscala(filters.year)}</strong>
+                    Mes: <strong>${escapeHtml(MESES_LABELS[filters.month - 1] || filters.month)}/${escapeHtml(filters.year)}</strong>
                     • Setores: <strong>${setorGroups.length}</strong>
                     • Dias com escala: <strong>${daysWithScale}</strong>
                     • Linhas listadas: <strong>${totalRows}</strong>
@@ -97,7 +97,7 @@
                 ${setorGroups.map((group) => `
                     <section class="relatorio-setor-section">
                         <div class="relatorio-setor-header">
-                            <span><i class="fas fa-layer-group"></i> ${escapeHtmlEscala(group.setorNome)}</span>
+                            <span><i class="fas fa-layer-group"></i> ${escapeHtml(group.setorNome)}</span>
                             <strong>${group.totalRows} registro(s)</strong>
                         </div>
                         <div class="escala-quadro-grid escala-quadro-grid-calendario">

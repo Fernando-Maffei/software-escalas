@@ -29,15 +29,6 @@
     // Invalidado na mao depois de gravar ou remover.
     const cachePorData = new Map();
 
-    function esc(valor) {
-        return String(valor ?? '')
-            .replaceAll('&', '&amp;')
-            .replaceAll('<', '&lt;')
-            .replaceAll('>', '&gt;')
-            .replaceAll('"', '&quot;')
-            .replaceAll("'", '&#39;');
-    }
-
     function ehDomingo(dataISO) {
         const partes = String(dataISO || '').split('-').map(Number);
 
@@ -68,7 +59,7 @@
         return [
             '<option value="">Selecione...</option>',
             ...(window.colaboradores || [])
-                .map((c) => `<option value="${c.Id}" ${Number(selecionado) === Number(c.Id) ? 'selected' : ''}>${esc(c.Nome)}</option>`)
+                .map((c) => `<option value="${c.Id}" ${Number(selecionado) === Number(c.Id) ? 'selected' : ''}>${escapeHtml(c.Nome)}</option>`)
         ].join('');
     }
 
@@ -79,7 +70,7 @@
         }
 
         return `
-            <div class="editor-form-group folga-domingo-bloco" data-folga-domingo-data="${esc(dataISO)}">
+            <div class="editor-form-group folga-domingo-bloco" data-folga-domingo-data="${escapeHtml(dataISO)}">
                 <label><i class="fas fa-scale-balanced"></i> Folga de domingo</label>
                 <p class="helper-text">
                     Registra quem folgou este domingo e em que dia repoe, com horario e almoco.
@@ -150,9 +141,9 @@
             return `
                 <div class="folga-domingo-item">
                     <div>
-                        <strong>${esc(folga.colaboradorNome)}</strong>
+                        <strong>${escapeHtml(folga.colaboradorNome)}</strong>
                         <p>${reposicao}</p>
-                        ${folga.observacao ? `<p class="folga-domingo-obs">${esc(folga.observacao)}</p>` : ''}
+                        ${folga.observacao ? `<p class="folga-domingo-obs">${escapeHtml(folga.observacao)}</p>` : ''}
                     </div>
                     <button type="button" class="btn-danger-ghost" data-remover-folga="${folga.id}" title="Remover registro">
                         <i class="fas fa-trash"></i>
@@ -183,7 +174,7 @@
             const alvo = document.getElementById('folgaDomingoLista');
 
             if (alvo) {
-                alvo.innerHTML = `<div class="folga-domingo-vazio">Nao foi possivel carregar: ${esc(erro.message)}</div>`;
+                alvo.innerHTML = `<div class="folga-domingo-vazio">Nao foi possivel carregar: ${escapeHtml(erro.message)}</div>`;
             }
 
             return;

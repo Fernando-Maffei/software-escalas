@@ -93,6 +93,13 @@ const BIBLIOTECAS_CDN = {
     XLSX: 'readonly'
 };
 
+// Globais publicados pelas bibliotecas UMD do proprio projeto (frontend/js/lib),
+// que tambem rodam no Node dos testes e por isso nao usam window.X.
+const BIBLIOTECAS_DO_PROJETO = {
+    escapeHtml: 'readonly',
+    EscalaReportUtils: 'readonly'
+};
+
 const REGRAS_COMUNS = {
     // Prefixo _ marca parametro exigido pela assinatura mas nao usado (ex.: o
     // quarto parametro do middleware de erro do Express).
@@ -135,6 +142,7 @@ module.exports = [
             globals: {
                 ...globals.browser,
                 ...BIBLIOTECAS_CDN,
+                ...BIBLIOTECAS_DO_PROJETO,
                 ...coletarGlobaisDoFront()
             }
         },

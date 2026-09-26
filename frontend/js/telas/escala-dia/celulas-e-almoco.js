@@ -205,7 +205,7 @@
                     title="Arraste o almoco diretamente na tabela"
                 >
                     <button type="button" class="timeline-lunch-handle start" data-role="start" aria-label="Ajustar inicio do almoco"></button>
-                    <span class="timeline-lunch-label">${escapeHtmlEscala(formatTimeRangeEscala(record.almocoInicio, record.almocoFim))}</span>
+                    <span class="timeline-lunch-label">${escapeHtml(formatTimeRangeEscala(record.almocoInicio, record.almocoFim))}</span>
                     <button type="button" class="timeline-lunch-handle end" data-role="end" aria-label="Ajustar fim do almoco"></button>
                 </div>
             </div>

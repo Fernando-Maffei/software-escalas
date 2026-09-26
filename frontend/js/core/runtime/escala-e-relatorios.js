@@ -167,7 +167,7 @@
             <option value="">Todos os colaboradores</option>
             ${(window.colaboradores || []).map((item) => `
                 <option value="${item.Id}" ${String(selectedId) === String(item.Id) ? 'selected' : ''}>
-                    ${escapeHtmlEscala(item.Nome)}
+                    ${escapeHtml(item.Nome)}
                 </option>
             `).join('')}
         `;
@@ -412,9 +412,9 @@
                     <header class="plantao-export-header">
                         <div>
                             <h1>Relatorio de Plantoes de Sabado</h1>
-                            <p>${escapeHtmlEscala(formatDatePtBrEscala(filters.dataInicio))} ate ${escapeHtmlEscala(formatDatePtBrEscala(filters.dataFim))}</p>
+                            <p>${escapeHtml(formatDatePtBrEscala(filters.dataInicio))} ate ${escapeHtml(formatDatePtBrEscala(filters.dataFim))}</p>
                         </div>
-                        <p>Gerado em ${escapeHtmlEscala(new Date().toLocaleDateString('pt-BR'))}</p>
+                        <p>Gerado em ${escapeHtml(new Date().toLocaleDateString('pt-BR'))}</p>
                     </header>
                     ${renderRelatorioPlantoes(items, filters)}
                 </section>
@@ -526,9 +526,9 @@
         return `
             <div class="relatorio-tabela-container">
                 <div class="relatorio-total">
-                    Periodo: <strong>${escapeHtmlEscala(formatDatePtBrEscala(filters.dataInicio || items[items.length - 1]?.dataISO))}</strong>
+                    Periodo: <strong>${escapeHtml(formatDatePtBrEscala(filters.dataInicio || items[items.length - 1]?.dataISO))}</strong>
                     ate
-                    <strong>${escapeHtmlEscala(formatDatePtBrEscala(filters.dataFim || items[0]?.dataISO))}</strong>
+                    <strong>${escapeHtml(formatDatePtBrEscala(filters.dataFim || items[0]?.dataISO))}</strong>
                 </div>
                 <div class="resumo-cards" style="margin-bottom: 18px;">
                     <div class="resumo-card-estatistica">
@@ -548,21 +548,21 @@
                     <div class="resumo-card-estatistica">
                         <i class="fas fa-clock"></i>
                         <div>
-                            <strong>${escapeHtmlEscala(summary.horasProgramadas)}</strong>
+                            <strong>${escapeHtml(summary.horasProgramadas)}</strong>
                             <span>Horas programadas</span>
                         </div>
                     </div>
                     <div class="resumo-card-estatistica">
                         <i class="fas fa-piggy-bank"></i>
                         <div>
-                            <strong>${escapeHtmlEscala(summary.horasBanco)}</strong>
+                            <strong>${escapeHtml(summary.horasBanco)}</strong>
                             <span>Credito em banco de horas</span>
                         </div>
                     </div>
                     <div class="resumo-card-estatistica">
                         <i class="fas fa-money-bill-wave"></i>
                         <div>
-                            <strong>${escapeHtmlEscala(summary.horasExtra)}</strong>
+                            <strong>${escapeHtml(summary.horasExtra)}</strong>
                             <span>Horas extras (fora do banco)</span>
                         </div>
                     </div>
@@ -597,14 +597,14 @@
 
                                 return `
                                     <tr>
-                                        <td><strong>${escapeHtmlEscala(formatDatePtBrEscala(plantao.dataISO))}</strong></td>
-                                        <td>${escapeHtmlEscala((plantao.tipoPlantao || 'sabado').charAt(0).toUpperCase() + (plantao.tipoPlantao || 'sabado').slice(1))}</td>
-                                        <td>${escapeHtmlEscala(formatTimeRangeEscala(plantao.horaInicio, plantao.horaFim))}</td>
+                                        <td><strong>${escapeHtml(formatDatePtBrEscala(plantao.dataISO))}</strong></td>
+                                        <td>${escapeHtml((plantao.tipoPlantao || 'sabado').charAt(0).toUpperCase() + (plantao.tipoPlantao || 'sabado').slice(1))}</td>
+                                        <td>${escapeHtml(formatTimeRangeEscala(plantao.horaInicio, plantao.horaFim))}</td>
                                         <td><span class="evento-tipo ${extra ? 'badge-ausencia' : 'badge-folga'}">${extra ? 'Hora extra' : 'Banco de horas'}</span></td>
-                                        <td><span class="evento-tipo ${statusClass}">${escapeHtmlEscala(statusLabel)}</span></td>
-                                        <td>${escapeHtmlEscala(colaboradores.join(', ') || '--')}</td>
-                                        <td>${escapeHtmlEscala(plantao.observacao || '--')}</td>
-                                        <td>${escapeHtmlEscala(plantao.duracaoFormatada || getPlantaoDurationLabelReport(plantao))}</td>
+                                        <td><span class="evento-tipo ${statusClass}">${escapeHtml(statusLabel)}</span></td>
+                                        <td>${escapeHtml(colaboradores.join(', ') || '--')}</td>
+                                        <td>${escapeHtml(plantao.observacao || '--')}</td>
+                                        <td>${escapeHtml(plantao.duracaoFormatada || getPlantaoDurationLabelReport(plantao))}</td>
                                     </tr>
                                 `;
                             }).join('')}
@@ -726,9 +726,9 @@
                                 <div class="filtro-group">
                                     <label><i class="fas fa-calendar-day"></i> Periodo</label>
                                     <div class="periodo-selector">
-                                        <input type="date" id="relatorioEscalaDataInicio" class="form-control" value="${escapeHtmlEscala(monthBounds.start)}">
+                                        <input type="date" id="relatorioEscalaDataInicio" class="form-control" value="${escapeHtml(monthBounds.start)}">
                                         <span>ate</span>
-                                        <input type="date" id="relatorioEscalaDataFim" class="form-control" value="${escapeHtmlEscala(monthBounds.end)}">
+                                        <input type="date" id="relatorioEscalaDataFim" class="form-control" value="${escapeHtml(monthBounds.end)}">
                                     </div>
                                 </div>
                                 <div class="filtro-group">

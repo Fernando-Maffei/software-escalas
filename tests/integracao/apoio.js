@@ -81,13 +81,13 @@ async function recriarBanco() {
 
 let controlador = null;
 
-async function subirServidor() {
+async function subirServidor({ porta = 0 } = {}) {
     await recriarBanco();
 
     const { start } = require(path.join(RAIZ, 'backend', 'server.js'));
     const { isSchemaReady } = require(path.join(RAIZ, 'backend', 'lib', 'app-state.js'));
 
-    controlador = start({ host: '127.0.0.1', port: 0, installSignalHandlers: false, logNetworkUrls: false });
+    controlador = start({ host: '127.0.0.1', port: porta, installSignalHandlers: false, logNetworkUrls: false });
     await controlador.ready;
 
     if (!isSchemaReady()) {

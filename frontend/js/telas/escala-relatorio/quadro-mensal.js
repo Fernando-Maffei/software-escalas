@@ -76,12 +76,12 @@
         }
 
         const emptyClassName = day.hasScale ? '' : ' is-empty';
-        const titleAttribute = day.dayLabel ? ` title="${escapeHtmlEscala(day.dayLabel)}"` : '';
+        const titleAttribute = day.dayLabel ? ` title="${escapeHtml(day.dayLabel)}"` : '';
 
         return `
             <article class="escala-quadro-dia${emptyClassName}">
                 <div class="escala-quadro-dia-header"${titleAttribute}>
-                    ${escapeHtmlEscala(day.dateLabel)}
+                    ${escapeHtml(day.dateLabel)}
                 </div>
                 <table class="escala-quadro-tabela">
                     <thead>
@@ -94,9 +94,9 @@
                     <tbody>
                         ${day.hasScale ? day.rows.map((row) => `
                             <tr>
-                                ${row.showAlmoco ? `<td rowspan="${row.almocoRowspan}" class="escala-quadro-grupo">${escapeHtmlEscala(row.almocoLabel)}</td>` : ''}
-                                <td>${escapeHtmlEscala(row.colaboradorNome)}</td>
-                                ${row.showJornada ? `<td rowspan="${row.jornadaRowspan}" class="escala-quadro-grupo">${escapeHtmlEscala(row.jornadaLabel)}</td>` : ''}
+                                ${row.showAlmoco ? `<td rowspan="${row.almocoRowspan}" class="escala-quadro-grupo">${escapeHtml(row.almocoLabel)}</td>` : ''}
+                                <td>${escapeHtml(row.colaboradorNome)}</td>
+                                ${row.showJornada ? `<td rowspan="${row.jornadaRowspan}" class="escala-quadro-grupo">${escapeHtml(row.jornadaLabel)}</td>` : ''}
                             </tr>
                         `).join('') : `
                             <tr>
@@ -119,7 +119,7 @@
         const cellClassName = options.cellClassName || 'escala-quadro-calendario-celula';
         const denseClassName = normalizedWeeks.length >= 6 ? ' is-dense' : '';
         const titleHtml = options.heading
-            ? `<div class="${titleClassName}">${escapeHtmlEscala(options.heading)}</div>`
+            ? `<div class="${titleClassName}">${escapeHtml(options.heading)}</div>`
             : '';
 
         return `
@@ -129,7 +129,7 @@
                     <table class="${tableClassName}${denseClassName}">
                         <thead>
                             <tr>
-                                ${ESCALA_QUADRO_WEEKDAY_HEADERS.map((label) => `<th scope="col">${escapeHtmlEscala(label)}</th>`).join('')}
+                                ${ESCALA_QUADRO_WEEKDAY_HEADERS.map((label) => `<th scope="col">${escapeHtml(label)}</th>`).join('')}
                             </tr>
                         </thead>
                         <tbody>

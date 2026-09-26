@@ -31,15 +31,6 @@
 
     let editandoId = null;
 
-    function esc(valor) {
-        return String(valor ?? '')
-            .replaceAll('&', '&amp;')
-            .replaceAll('<', '&lt;')
-            .replaceAll('>', '&gt;')
-            .replaceAll('"', '&quot;')
-            .replaceAll("'", '&#39;');
-    }
-
     // 'HH:MM:SS' do backend -> 'HH:MM' do <input type="time">.
     function paraInputHora(valor) {
         const bruto = String(valor || '').trim();
@@ -119,11 +110,11 @@
                 <div class="tipo-escala-item${Number(editandoId) === Number(tipo.id) ? ' is-editando' : ''}">
                     <div class="tipo-escala-info">
                         <strong>
-                            ${esc(tipo.nome)}
+                            ${escapeHtml(tipo.nome)}
                             ${tipo.ativo ? '' : '<span class="tipo-escala-chip is-inativo">Inativo</span>'}
                         </strong>
-                        <p>${esc(resumoDosDias(tipo))}</p>
-                        ${regra ? `<p class="tipo-escala-regra"><i class="fas fa-scale-balanced"></i> ${esc(regra)}</p>` : ''}
+                        <p>${escapeHtml(resumoDosDias(tipo))}</p>
+                        ${regra ? `<p class="tipo-escala-regra"><i class="fas fa-scale-balanced"></i> ${escapeHtml(regra)}</p>` : ''}
                     </div>
                     <button type="button" class="btn-secondary" data-editar-tipo="${tipo.id}">
                         <i class="fas fa-pen"></i> Editar
@@ -148,17 +139,17 @@
                         <div class="tipo-dia-group">
                             <small>Trabalho</small>
                             <div class="tipo-dia-pair">
-                                <input type="time" data-tipo-dia-entrada="${dia.diaSemana}" value="${esc(paraInputHora(dia.trabalhoInicio))}" class="form-control">
+                                <input type="time" data-tipo-dia-entrada="${dia.diaSemana}" value="${escapeHtml(paraInputHora(dia.trabalhoInicio))}" class="form-control">
                                 <span>ate</span>
-                                <input type="time" data-tipo-dia-saida="${dia.diaSemana}" value="${esc(paraInputHora(dia.trabalhoFim))}" class="form-control">
+                                <input type="time" data-tipo-dia-saida="${dia.diaSemana}" value="${escapeHtml(paraInputHora(dia.trabalhoFim))}" class="form-control">
                             </div>
                         </div>
                         <div class="tipo-dia-group">
                             <small>Almoco</small>
                             <div class="tipo-dia-pair">
-                                <input type="time" data-tipo-dia-almoco-inicio="${dia.diaSemana}" value="${esc(paraInputHora(dia.almocoInicio))}" class="form-control">
+                                <input type="time" data-tipo-dia-almoco-inicio="${dia.diaSemana}" value="${escapeHtml(paraInputHora(dia.almocoInicio))}" class="form-control">
                                 <span>ate</span>
-                                <input type="time" data-tipo-dia-almoco-fim="${dia.diaSemana}" value="${esc(paraInputHora(dia.almocoFim))}" class="form-control">
+                                <input type="time" data-tipo-dia-almoco-fim="${dia.diaSemana}" value="${escapeHtml(paraInputHora(dia.almocoFim))}" class="form-control">
                             </div>
                         </div>
                     </div>
@@ -185,7 +176,7 @@
 
             <div class="editor-form-group">
                 <label><i class="fas fa-tag"></i> Nome</label>
-                <input type="text" id="tipoEscalaNome" class="form-control" value="${esc(tipo?.nome || '')}" placeholder="ex.: Plantonista Sab-Qua">
+                <input type="text" id="tipoEscalaNome" class="form-control" value="${escapeHtml(tipo?.nome || '')}" placeholder="ex.: Plantonista Sab-Qua">
             </div>
 
             <div class="editor-form-group">
@@ -201,7 +192,7 @@
                     <label class="tipo-escala-inline">
                         Folga 1 domingo a cada
                         <input type="number" id="tipoEscalaDomingos" class="form-control" min="1" step="1"
-                               value="${tipo?.domingosFolgaCada ? esc(tipo.domingosFolgaCada) : ''}" placeholder="—">
+                               value="${tipo?.domingosFolgaCada ? escapeHtml(tipo.domingosFolgaCada) : ''}" placeholder="—">
                         domingos
                     </label>
                     <label class="tipo-escala-inline">
@@ -217,7 +208,7 @@
 
             <div class="editor-form-group">
                 <label><i class="fas fa-comment"></i> Observacao</label>
-                <input type="text" id="tipoEscalaObservacao" class="form-control" maxlength="500" value="${esc(tipo?.observacao || '')}">
+                <input type="text" id="tipoEscalaObservacao" class="form-control" maxlength="500" value="${escapeHtml(tipo?.observacao || '')}">
             </div>
 
             <div class="editor-form-group">

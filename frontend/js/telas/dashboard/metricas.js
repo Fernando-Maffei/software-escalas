@@ -136,7 +136,7 @@ function gerarSetoresDashboard(gruposSetor = []) {
                     return `
                         <article class="dashboard-sector-card">
                             <div class="dashboard-sector-card-header">
-                                <span title="${escapeHtmlDashboard(grupo.setorNome)}">${escapeHtmlDashboard(grupo.setorNome)}</span>
+                                <span title="${escapeHtml(grupo.setorNome)}">${escapeHtml(grupo.setorNome)}</span>
                                 <strong>${metricas.totalColaboradores}</strong>
                             </div>
 

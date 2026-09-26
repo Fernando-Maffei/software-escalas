@@ -97,8 +97,8 @@
                 <ul>
                     ${visible.map((item) => `
                         <li>
-                            <span>${escapeHtmlEscala(formatDatePtBrEscala(item.dataISO))}</span>
-                            <span>${escapeHtmlEscala(item.nome)}</span>
+                            <span>${escapeHtml(formatDatePtBrEscala(item.dataISO))}</span>
+                            <span>${escapeHtml(item.nome)}</span>
                         </li>
                     `).join('')}
                     ${feriados.length > visible.length ? `
