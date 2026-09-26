@@ -542,9 +542,9 @@ function renderConfiguracoes() {
                         Importar Dados
                     </button>
                     
-                    <button class="config-btn config-btn-danger" onclick="resetarSistema()">
-                        <i class="fas fa-trash-alt"></i>
-                        Resetar Sistema
+                    <button class="config-btn" onclick="resetarSistema()">
+                        <i class="fas fa-broom"></i>
+                        Limpar preferências deste navegador
                     </button>
                 </div>
             </div>

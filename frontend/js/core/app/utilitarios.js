@@ -7,7 +7,6 @@ async function carregarFeriadosAPI(ano) {
     try {
         feriadosAPI = await window.buscarFeriadosNacionais(ano);
         window.feriadosAPI = feriadosAPI; // Disponibilizar globalmente
-        console.log(`✅ Feriados nacionais carregados: ${feriadosAPI.length}`);
         return feriadosAPI;
     } catch (error) {
         console.error("❌ Erro ao carregar feriados nacionais:", error);

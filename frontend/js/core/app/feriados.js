@@ -2,7 +2,6 @@
 
 // Abrir modal de feriado
 function abrirModalFeriado() {
-    console.log("Abrindo modal de feriado...");
 
     const modal = document.getElementById('modalFeriado');
     if (!modal) {
@@ -34,7 +33,6 @@ function abrirModalFeriado() {
 
 // Carregar listagem de feriados
 async function carregarListaFeriados() {
-    console.log("=== CARREGANDO FERIADOS (API + MANUAIS) ===");
     
     const container = document.getElementById("listaFeriados");
     if (!container) {
@@ -61,7 +59,6 @@ async function carregarListaFeriados() {
         
         // ===== 2. FERIADOS MANUAIS (do banco) =====
         let feriadosManuais = window.feriadosLocais || [];
-        console.log("📝 Feriados manuais (do banco):", feriadosManuais);
         
         // ===== 3. COMBINAR TODOS OS FERIADOS =====
         const todosFeriados = [];
@@ -175,7 +172,6 @@ async function carregarListaFeriados() {
         });
         
         container.innerHTML = html;
-        console.log("✅ Lista de feriados renderizada!");
         
     } catch (error) {
         console.error("❌ Erro:", error);
@@ -199,8 +195,6 @@ async function excluirFeriado(id) {
 
         await carregarFeriadosLocais();
         await carregarListaFeriados();
-
-        console.log("Feriado removido");
 
     } catch (error) {
 

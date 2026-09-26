@@ -1,25 +1,24 @@
-
+// Limpa so o que este navegador guarda (tema, cores da escala, filtros, cache
+// de feriados) e recarrega. Os dados do sistema ficam no servidor e nao sao
+// tocados. Antes o aviso dizia "apagar TODOS os dados do sistema" e pedia para
+// digitar RESET — assustava sem motivo e descrevia outra coisa.
 function resetarSistema() {
-    // Modal de confirmação mais seguro
-    if (confirm('⚠️ ATENÇÃO: Isso irá apagar TODOS os dados do sistema!\n\nTem certeza?')) {
-        
-        const senha = prompt('Digite "RESET" para confirmar:');
-        
-        if (senha === 'RESET') {
-            mostrarToast('Resetando sistema...', 'warning');
-            
-            // Limpa localStorage
-            localStorage.clear();
-            
-            // Recarrega a página
-            setTimeout(() => {
-                location.reload();
-            }, 1500);
-            
-        } else {
-            mostrarToast('Operação cancelada', 'error');
-        }
+    const confirmou = confirm(
+        'Isso limpa as preferencias salvas neste navegador (tema, cores, filtros).\n\n'
+        + 'Os dados do sistema (colaboradores, escalas, lancamentos) NAO sao apagados.\n\n'
+        + 'Continuar?'
+    );
+
+    if (!confirmou) {
+        return;
     }
+
+    localStorage.clear();
+    mostrarToast('Preferencias deste navegador restauradas. Recarregando...', 'success');
+
+    setTimeout(() => {
+        location.reload();
+    }, 1000);
 }
 
 function gerarOptionsMeses(mesSelecionado) {
@@ -42,21 +41,12 @@ async function gerarRelatorioCompleto() {
     const mes = parseInt(document.getElementById('relatorioMesCompleto').value);
     const ano = parseInt(document.getElementById('relatorioAnoCompleto').value);
     
-    console.log("📊 Gerando relatório para:", mes + 1, "/", ano);
-    console.log("Recarregando dados...");
 
     // 🔥 IMPORTANTE: Carregar todos os dados
     await carregarColaboradores();
     await carregarAusencias();
     await carregarFeriadosLocais();
     await carregarFeriadosAPI(ano); // 🔥 Carregar feriados da API
-
-    console.log("Dados carregados:", {
-        colaboradores: colaboradores.length,
-        ausencias: ausencias.length,
-        feriadosLocais: feriadosLocais.length,
-        feriadosAPI: feriadosAPI.length
-    });
 
     // Gerar o relatório calendário
     gerarRelatorioCalendarioCompleto(mes, ano);

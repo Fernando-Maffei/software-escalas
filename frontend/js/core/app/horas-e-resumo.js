@@ -37,7 +37,6 @@ function formatarHora(hora) {
 
 // Função para mostrar toast
 function mostrarToast(mensagem, tipo = "success") {
-    console.log(`Toast: ${mensagem} (${tipo})`);
     
     // Cria o container se não existir
     let container = document.getElementById("toastContainer");

@@ -215,7 +215,6 @@ function gerarLegendaMensal() {
 }
 
 function renderCalendario() {
-    console.log('Renderizando calendário...');
     
     if (!appContent) {
         console.error("appContent não encontrado!");
@@ -256,18 +255,9 @@ function renderCalendario() {
         </div>
     `;
 
-    // 🔥 VERIFICAR SE OS ELEMENTOS FORAM CRIADOS
     setTimeout(() => {
         const calendar = document.getElementById('calendar');
-        const prevMonth = document.getElementById('prevMonth');
-        const nextMonth = document.getElementById('nextMonth');
-        
-        console.log('Verificando elementos do calendário:', {
-            calendar: !!calendar,
-            prevMonth: !!prevMonth,
-            nextMonth: !!nextMonth
-        });
-        
+
         if (!calendar) {
             console.error("Elemento calendar não foi criado!");
             return;
@@ -275,7 +265,6 @@ function renderCalendario() {
         
         // Inicializar o calendário
         if (typeof window.inicializarCalendario === 'function') {
-            console.log('Chamando inicializarCalendario...');
             window.inicializarCalendario();
         } else {
             console.error('Função inicializarCalendario não encontrada!');

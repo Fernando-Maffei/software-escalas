@@ -5,20 +5,16 @@ function inicializarAplicacaoUmaVez() {
     }
 
     window.__appBootstrapPromise = (async () => {
-        console.log("Inicializando aplicaÃ§Ã£o...");
 
         const temaSalvo = localStorage.getItem('tema') || 'light';
         document.documentElement.setAttribute('data-theme', temaSalvo);
 
         try {
             await carregarColaboradores();
-            console.log("Colaboradores carregados:", colaboradores.length);
 
             await carregarAusencias();
-            console.log("AusÃªncias carregadas:", ausencias.length);
 
             await carregarFeriadosLocais();
-            console.log("Feriados locais carregados:", feriadosLocais.length);
 
             if (typeof carregarPlantoes === 'function') {
                 await carregarPlantoes();
@@ -44,7 +40,6 @@ function inicializarAplicacaoUmaVez() {
             await window.aguardarUsuarioAutenticado();
         }
 
-        console.log("Carregando pÃ¡gina inicial:", paginaInicial);
         window.carregarPagina(paginaInicial);
     })();
 

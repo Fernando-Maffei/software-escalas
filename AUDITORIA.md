@@ -316,11 +316,15 @@ retencao: ~8 arquivos/dia para sempre. Proposta: manter os N mais recentes (conf
 **M11 — `/trocar-senha` e `deveTrocarSenha` so no front** · `PROPOSTA`
 O servidor nao impede uma conta com `deveTrocarSenha = 1` de usar a API.
 
-**M12 — Botao "Resetar Sistema" promete o que nao faz** · `ABERTO`
+**M12 — Botao "Resetar Sistema" promete o que nao faz** · `RESOLVIDO`
 `frontend/js/core/app/relatorios-export.js:2`: avisa "Isso ira apagar TODOS os
 dados do sistema", pede para digitar RESET, e so faz `localStorage.clear()`
 (tema e preferencias deste navegador). Correcao: texto honesto ("Restaurar
 preferencias deste navegador"); a funcao continua.
+**Feito:** a funcao continua (limpa o localStorage e recarrega), agora com o nome
+"Limpar preferências deste navegador", sem o estilo de perigo, e com um aviso que
+diz o que acontece de verdade (e que os dados do sistema nao sao apagados). O
+"digite RESET" saiu: a acao nao destroi nada.
 
 **M13 — Container roda como root** · `ABERTO`
 `Dockerfile`: sem `USER node`.
@@ -377,8 +381,12 @@ erro de JS. **O que saiu** (todas sem nenhum chamador):
 - ajudantes de console: `debugDados`, `debugTiposAusencias`, `debugAusencias` e
   `testarConexaoBackend` (este apontava para a porta 3000).
 
-**B2 — 65 `console.log` de depuracao no frontend** · `ABERTO`
+**B2 — 65 `console.log` de depuracao no frontend** · `RESOLVIDO`
 Ex.: `ausencias-e-timeline.js:6-52` loga cada ausencia recebida (dados pessoais no console).
+**Feito:** removidos por AST os 20 `console.log` de depuracao que sobraram depois
+do B1 (incluindo os que imprimiam dados carregados). Ficaram `console.error/warn`
+e um log de reserva quando o sistema de avisos nao existe. De quebra sumiram
+textos com acentuacao corrompida ("aplicaÃ§Ã£o") que so existiam nesses logs.
 
 **B3 — Versao fixa `'1.2.0'` nos metadados do backup/export** · `ABERTO` (backup do servidor resolvido: usa a versao do package.json; falta o export do front, ver A5)
 `backup-service.js:441`, `configuracoes-tela.js:636` (o sistema esta na 1.6.3).

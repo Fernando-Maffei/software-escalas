@@ -6,7 +6,6 @@ let dataSelecionada = null;
    NAVEGAÇÃO
 =========================== */
 function configurarNavegacao() {
-   console.log('Navegação configurada');
 }
 
 // Pagina que esta montada agora. O popstate abaixo usa para ignorar o eco da
@@ -14,7 +13,6 @@ function configurarNavegacao() {
 let paginaCarregadaAtual = null;
 
 function carregarPagina(pagina) {
-    console.log('Carregando página:', pagina);
 
     if (!appContent) {
         return;
@@ -69,7 +67,7 @@ function carregarPagina(pagina) {
             }
             break;
         default:
-            console.log("Página não encontrada:", pagina);
+            console.warn("Página não encontrada:", pagina);
             renderDashboard(); // Fallback para dashboard
     }
 }
