@@ -360,8 +360,13 @@ atualizacao da producao → pergunta P5.
 Backup automatico a cada 180 min (padrao) mais um por desligamento, sem
 retencao: ~8 arquivos/dia para sempre. Proposta: manter os N mais recentes (configuravel).
 
-**M11 — `/trocar-senha` e `deveTrocarSenha` so no front** · `PROPOSTA`
+**M11 — `/trocar-senha` e `deveTrocarSenha` so no front** · `RESOLVIDO`
 O servidor nao impede uma conta com `deveTrocarSenha = 1` de usar a API.
+**Feito:** a validacao da sessao traz `DeveTrocarSenha` na mesma consulta
+(`UPDATE ... OUTPUT ... FROM Sessoes JOIN Usuarios`), e o portao da API responde
+403 "Defina uma nova senha antes de continuar" para qualquer rota de dados ate a
+troca; `/api/auth/*` segue liberado. Teste de integracao; fluxo de primeiro
+acesso verificado no navegador (tela obrigatoria, troca, dashboard).
 
 **M12 — Botao "Resetar Sistema" promete o que nao faz** · `RESOLVIDO`
 `frontend/js/core/app/relatorios-export.js:2`: avisa "Isso ira apagar TODOS os

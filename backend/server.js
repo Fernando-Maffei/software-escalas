@@ -485,6 +485,14 @@ app.use('/api', (req, res, next) => {
         return;
     }
 
+    // Senha provisoria (conta criada ou resetada pelo admin, ou o admin
+    // inicial): so /api/auth/* funciona ate a troca. Antes isso era imposto so
+    // pela tela, e a API respondia normalmente.
+    if (req.user?.deveTrocarSenha) {
+        next(new AppError(403, 'Defina uma nova senha antes de continuar.'));
+        return;
+    }
+
     const denial = checkAccess({
         isAdmin: Boolean(req.user?.isAdmin),
         method: req.method,

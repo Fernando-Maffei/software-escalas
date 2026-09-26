@@ -402,10 +402,12 @@ async function getSession(pool, token) {
         .input('token', sql.Char(64), token)
         .input('ttl', sql.Int, SESSION_TTL_SECONDS)
         .query(`
-            UPDATE Sessoes
+            UPDATE s
             SET ExpiresAt = DATEADD(SECOND, @ttl, SYSUTCDATETIME())
-            OUTPUT inserted.UserId, inserted.Username, inserted.IsAdmin
-            WHERE Token = @token AND ExpiresAt > SYSUTCDATETIME()
+            OUTPUT inserted.UserId, inserted.Username, inserted.IsAdmin, u.DeveTrocarSenha
+            FROM Sessoes s
+            JOIN Usuarios u ON u.Id = s.UserId
+            WHERE s.Token = @token AND s.ExpiresAt > SYSUTCDATETIME()
         `);
 
     const row = result.recordset[0];
@@ -417,7 +419,8 @@ async function getSession(pool, token) {
     return {
         userId: row.UserId,
         username: row.Username,
-        isAdmin: Boolean(row.IsAdmin)
+        isAdmin: Boolean(row.IsAdmin),
+        deveTrocarSenha: Boolean(row.DeveTrocarSenha)
     };
 }
 
@@ -505,7 +508,12 @@ async function requireAuth(req, res, next) {
             return;
         }
 
-        req.user = { id: session.userId, username: session.username, isAdmin: Boolean(session.isAdmin) };
+        req.user = {
+            id: session.userId,
+            username: session.username,
+            isAdmin: Boolean(session.isAdmin),
+            deveTrocarSenha: session.deveTrocarSenha
+        };
         setSessionCookie(res, token);
         next();
     } catch (error) {

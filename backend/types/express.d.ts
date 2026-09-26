@@ -10,6 +10,7 @@ declare module 'express-serve-static-core' {
             id: number;
             username: string;
             isAdmin: boolean;
+            deveTrocarSenha?: boolean;
         };
     }
 }

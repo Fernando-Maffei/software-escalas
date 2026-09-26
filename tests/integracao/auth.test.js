@@ -183,5 +183,29 @@ module.exports = [
             assert.equal((await aba2.get('/api/auth/me')).status, 401, 'as outras sessoes caem');
             await criarCliente().entrar(username, 'Nova!Senha2026');
         }
+    },
+    {
+        // M11 da auditoria: a troca obrigatoria de senha so era imposta pela tela.
+        name: 'conta com senha provisoria so acessa dados depois de trocar a senha',
+        async run() {
+            const admin = criarCliente();
+            await admin.entrar();
+            const username = nomeUnico('novoadmin').replace(/s+/g, '-');
+            const senha = 'Provisoria!2026';
+            esperarSucesso(await admin.post('/api/usuarios', { username, senha, isAdmin: true }), 'criar admin');
+
+            const novo = criarCliente();
+            const login = await novo.entrar(username, senha);
+            assert.equal(login.body.user.deveTrocarSenha, true);
+
+            assert.equal((await novo.get('/api/colaboradores')).status, 403);
+            assert.equal((await novo.get('/api/auth/me')).status, 200);
+
+            esperarSucesso(
+                await novo.post('/api/auth/trocar-senha', { senhaAtual: senha, novaSenha: 'Definitiva!2026' }),
+                'trocar senha'
+            );
+            assert.equal((await novo.get('/api/colaboradores')).status, 200);
+        }
     }
 ];
