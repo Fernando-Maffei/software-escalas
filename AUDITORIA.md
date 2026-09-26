@@ -143,7 +143,7 @@ ferias daqui a 3 dias): com a correcao revertida o codigo executa no dashboard
 telas e o nome aparece como texto. `npm run integracao:servidor` sobe esse
 cenario para conferir de novo.
 
-**A5 — "Exportar Dados" + "Importar Dados" apagam quase tudo** · `ABERTO`
+**A5 — "Exportar Dados" + "Importar Dados" apagam quase tudo** · `RESOLVIDO`
 `frontend/js/core/app/configuracoes-tela.js:623` e `frontend/js/core/app.js:133`
 "Exportar Dados" gera um arquivo `backup-escalas-AAAA-MM-DD.json` (mesmo nome dos
 backups reais) so com colaboradores e ausencias. "Importar Dados" manda esse
@@ -151,6 +151,13 @@ arquivo para `/backup/restaurar`, que apaga **todas** as tabelas e so reinsere
 essas duas: some plantao, feriado, setor, banco de horas, escala. Ha backup de
 seguranca automatico antes, mas o fluxo e uma armadilha. Correcao proposta: o
 export passa a baixar o backup completo do servidor — ver pergunta P2.
+**Decisao (P2):** baixar o backup completo. **Feito:** `montarBackup` separado da
+gravacao em disco; nova rota `GET /api/configuracao-banco/backup/baixar` (area de
+admin) devolve o mesmo conteudo do backup do servidor como anexo; "Exportar
+Dados" baixa esse arquivo e acrescenta as preferencias do navegador, que o
+import ja reaplica. Testes de integracao: o arquivo baixado, importado de volta,
+devolve as 14 tabelas identicas; usuario comum recebe 403. Verificado no
+navegador (14 tabelas, versao 1.6.3, sem sessoes).
 
 **A6 — `fetch` global remendado para reescrever `http://localhost:3000`** · `RESOLVIDO`
 `frontend/js/core/app.js:113-126`, `core/app/api-e-cores.js:26-36`
@@ -414,8 +421,10 @@ do B1 (incluindo os que imprimiam dados carregados). Ficaram `console.error/warn
 e um log de reserva quando o sistema de avisos nao existe. De quebra sumiram
 textos com acentuacao corrompida ("aplicaÃ§Ã£o") que so existiam nesses logs.
 
-**B3 — Versao fixa `'1.2.0'` nos metadados do backup/export** · `ABERTO` (backup do servidor resolvido: usa a versao do package.json; falta o export do front, ver A5)
+**B3 — Versao fixa `'1.2.0'` nos metadados do backup/export** · `RESOLVIDO`
 `backup-service.js:441`, `configuracoes-tela.js:636` (o sistema esta na 1.6.3).
+**Feito:** backup do servidor e export da tela usam a versao do `package.json`
+(o export antigo com `'1.2.0'` fixo saiu com o A5).
 
 **B4 — Nome de variavel herdado de outra ferramenta** · `RESOLVIDO`
 `CODEX_BACKUP_INITIAL_DIRECTORY` em `backend/lib/folder-picker.js:19,38`.

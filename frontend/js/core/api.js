@@ -201,6 +201,7 @@ const API = {
     getBancoHorasExtras: (params = {}) => API.get('/banco-horas-semanal/horas-extras', params),
 
     getConfiguracaoBanco: () => API.get('/configuracao-banco'),
+    baixarBackup: () => API.get('/configuracao-banco/backup/baixar'),
     salvarConfiguracaoBanco: (data) => API.post('/configuracao-banco/salvar', data),
     testarConfiguracaoBanco: (data) => API.post('/configuracao-banco/testar', data),
     verificarTabelasBanco: () => API.post('/configuracao-banco/verificar-tabelas', {}),

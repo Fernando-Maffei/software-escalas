@@ -626,46 +626,35 @@ function salvarPreferencias() {
 }
 
 // Funções de ferramentas (exemplo)
-function exportarDados() {
+// Baixa o backup COMPLETO do servidor (todas as tabelas de dados), mais as
+// preferencias deste navegador. "Importar Dados" com este arquivo devolve o
+// sistema inteiro. Antes o arquivo tinha so colaboradores e ausencias, e
+// importa-lo apagava plantoes, feriados, setores e banco de horas.
+async function exportarDados() {
     try {
-        // Prepara os dados completos do sistema
-        const dados = {
-            colaboradores: colaboradores,
-            ausencias: ausencias,
-            preferencias: {
-                tema: localStorage.getItem('tema') || 'light',
-                primeiroDiaSemana: localStorage.getItem('primeiroDiaSemana') || '1',
-                formatoHora: localStorage.getItem('formatoHora') || '24',
-                notificacoes: localStorage.getItem('notificacoes') === 'true'
-            },
-            metadata: {
-                versao: '1.2.0',
-                dataExportacao: new Date().toISOString(),
-                sistema: 'Software de Escalas'
-            }
+        const backup = await window.API.baixarBackup();
+        backup.preferencias = {
+            tema: localStorage.getItem('tema') || 'light',
+            primeiroDiaSemana: localStorage.getItem('primeiroDiaSemana') || '1',
+            formatoHora: localStorage.getItem('formatoHora') || '24',
+            notificacoes: localStorage.getItem('notificacoes') === 'true'
         };
-        
-        // Converte para JSON bonito
-        const jsonString = JSON.stringify(dados, null, 2);
-        
-        // Cria o arquivo para download
-        const blob = new Blob([jsonString], { type: 'application/json' });
+
+        const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
         a.download = `backup-escalas-${new Date().toISOString().split('T')[0]}.json`;
         a.click();
-        
-        // Limpa a URL criada
         URL.revokeObjectURL(url);
-        
-        mostrarToast('Dados exportados com sucesso!', 'success');
-        
+
+        mostrarToast('Backup completo exportado com sucesso!', 'success');
     } catch (error) {
         console.error('Erro ao exportar:', error);
-        mostrarToast('Erro ao exportar dados', 'error');
+        mostrarToast(error.message || 'Erro ao exportar dados', 'error');
     }
 }
+
 function aplicarPreferenciasImportadas(preferencias = {}) {
     if (!preferencias || typeof preferencias !== 'object') {
         return;

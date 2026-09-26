@@ -174,5 +174,52 @@ module.exports = [
             assert.equal(texto.includes(sessao.Token.trim()), false, 'token de sessao vazou no backup');
             assert.equal(/PasswordHash|PasswordSalt/.test(texto), false, 'hash de senha vazou no backup');
         }
+    },
+    {
+        // A5 da auditoria: "Exportar Dados" baixava so colaboradores e ausencias,
+        // e importar esse arquivo apagava todo o resto.
+        name: 'backup baixado pela tela, importado de volta, devolve os mesmos dados',
+        async run() {
+            const cliente = criarCliente();
+            await cliente.entrar();
+
+            // Reaproveita o cenario do teste anterior (o banco e o mesmo).
+            const antes = await fotografarBanco();
+            TABELAS_DE_NEGOCIO.forEach((tabela) => {
+                assert.ok(antes[tabela].length > 0, `o cenario deveria ter linhas em ${tabela}`);
+            });
+
+            const baixado = await cliente.get('/api/configuracao-banco/backup/baixar');
+
+            assert.equal(baixado.status, 200);
+            assert.match(String(baixado.headers.get('content-disposition')), /attachment; filename="backup-escalas-/);
+
+            esperarSucesso(
+                await cliente.post('/api/configuracao-banco/backup/restaurar', {
+                    backupData: { ...baixado.body, preferencias: { tema: 'dark' } },
+                    fileName: 'baixado.json'
+                }),
+                'restaurar backup baixado'
+            );
+
+            const depois = await fotografarBanco();
+            TABELAS_DE_NEGOCIO.forEach((tabela) => {
+                assert.deepEqual(depois[tabela], antes[tabela], `tabela ${tabela} mudou na ida e volta`);
+            });
+        }
+    },
+    {
+        name: 'usuario comum nao baixa o backup',
+        async run() {
+            const admin = criarCliente();
+            await admin.entrar();
+            const username = `leitor-backup-${Date.now().toString(36)}`;
+            esperarSucesso(await admin.post('/api/usuarios', { username, senha: 'Leitor!Backup1' }), 'criar usuario');
+
+            const leitor = criarCliente();
+            await leitor.entrar(username, 'Leitor!Backup1');
+
+            assert.equal((await leitor.get('/api/configuracao-banco/backup/baixar')).status, 403);
+        }
     }
 ];

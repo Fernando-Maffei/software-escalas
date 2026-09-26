@@ -1,7 +1,13 @@
 const express = require('express');
 
 const { conectar, fecharConexao, testarConexao } = require('../db');
-const { createSystemBackup, ensureBackupDirectory, restoreSystemBackup } = require('../services/backup-service');
+const {
+    createSystemBackup,
+    ensureBackupDirectory,
+    formatBackupTimestamp,
+    montarBackup,
+    restoreSystemBackup
+} = require('../services/backup-service');
 const { initializeAutoBackupScheduler } = require('../services/backup-scheduler');
 const { openNativeFolderPicker } = require('../lib/folder-picker');
 const { AppError } = require('../lib/errors');
@@ -231,6 +237,34 @@ router.post('/backup/gerar', async (req, res, next) => {
         }
 
         next(mapDatabaseConnectionError(error, 'Erro ao gerar o backup do banco de dados.'));
+    }
+});
+
+// Backup completo para baixar pela tela ("Exportar Dados"). E o mesmo conteudo
+// do backup gravado na pasta do servidor, entao "Importar Dados" com este
+// arquivo devolve o sistema inteiro. Antes a tela exportava so colaboradores e
+// ausencias, e importar esse arquivo apagava todo o resto.
+router.get('/backup/baixar', async (req, res, next) => {
+    try {
+        const pool = await conectar();
+        const databaseSettings = getPublicDatabaseSettings();
+        const payload = await montarBackup(pool, {
+            generatedBy: 'download',
+            databaseInfo: {
+                host: databaseSettings.host,
+                instanceName: databaseSettings.instanceName,
+                database: databaseSettings.database,
+                source: databaseSettings.source
+            }
+        });
+
+        res.setHeader(
+            'Content-Disposition',
+            `attachment; filename="backup-escalas-${formatBackupTimestamp(new Date())}.json"`
+        );
+        res.json(payload);
+    } catch (error) {
+        next(error instanceof AppError ? error : mapDatabaseConnectionError(error, 'Erro ao gerar o backup para download.'));
     }
 });
 

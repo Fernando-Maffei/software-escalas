@@ -53,11 +53,10 @@ async function ensureBackupDirectory(directory) {
     return normalizedDirectory;
 }
 
-async function createSystemBackup(pool, options = {}) {
-    const directory = await ensureBackupDirectory(options.directory);
-    const generatedAt = new Date();
-    const fileName = `backup-escalas-${formatBackupTimestamp(generatedAt)}.json`;
-    const filePath = path.join(directory, fileName);
+// Le todas as tabelas da especificacao e monta o conteudo do backup. Usado
+// tanto para gravar na pasta do servidor quanto para o download pela tela.
+async function montarBackup(pool, options = {}) {
+    const generatedAt = options.generatedAt || new Date();
     const data = {};
     const tableCounts = {};
     let totalRows = 0;
@@ -85,6 +84,17 @@ async function createSystemBackup(pool, options = {}) {
         },
         data
     };
+
+    return payload;
+}
+
+async function createSystemBackup(pool, options = {}) {
+    const directory = await ensureBackupDirectory(options.directory);
+    const generatedAt = new Date();
+    const fileName = `backup-escalas-${formatBackupTimestamp(generatedAt)}.json`;
+    const filePath = path.join(directory, fileName);
+    const payload = await montarBackup(pool, { ...options, generatedAt });
+    const { tableCounts, totalRows } = payload.metadata;
 
     try {
         await fs.promises.writeFile(filePath, JSON.stringify(payload, backupJsonReplacer, 2), 'utf8');
@@ -187,5 +197,6 @@ module.exports = {
     createSystemBackup,
     ensureBackupDirectory,
     formatBackupTimestamp,
+    montarBackup,
     restoreSystemBackup
 };
