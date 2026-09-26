@@ -1,8 +1,9 @@
-# Integracao continua: roda a suite de testes e a checagem de sintaxe a cada
+# Integracao continua: roda sintaxe, linter, tipos, formatacao, testes
+# unitarios e testes de integracao (com SQL Server de verdade) a cada
 # push e pull request. O objetivo e simples — nada entra na main sem os testes
 # passando, sem depender de alguem lembrar de rodar na mao.
 #
-# Nao precisa de banco: a suite cobre as regras puras (escala, banco de horas,
+# A suite unitaria nao precisa de banco: cobre as regras puras (escala, banco de horas,
 # plantoes, permissoes, validacao, backup, rate limit) sem tocar no SQL Server.
 # O robo de testes roda aqui so no modo demo; a versao com banco de verdade e
 # mais acoes fica no robo noturno (robo-noturno.yml).
@@ -38,8 +39,53 @@ jobs:
       - name: Checagem de sintaxe (smoke)
         run: npm run smoke
 
+      - name: Linter
+        run: npm run lint
+
+      - name: Checagem de tipos
+        run: npm run typecheck
+
+      - name: Formatacao
+        run: npm run format:check
+
       - name: Suite de testes
         run: npm test
+
+  integracao:
+    name: Testes de integracao (SQL Server)
+    runs-on: ubuntu-latest
+    # SQL Server descartavel so deste job. Os testes apagam e recriam o banco
+    # SoftwareEscalasIntegracao a cada execucao.
+    services:
+      mssql:
+        image: mcr.microsoft.com/mssql/server:2022-latest
+        env:
+          ACCEPT_EULA: 'Y'
+          MSSQL_SA_PASSWORD: 'Integracao!Escalas2026'
+          MSSQL_PID: 'Express'
+        ports:
+          - 14339:1433
+        options: >-
+          --health-cmd "/opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P 'Integracao!Escalas2026' -Q 'SELECT 1'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 12
+
+    steps:
+      - name: Baixar o codigo
+        uses: actions/checkout@v4
+
+      - name: Preparar Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Testes de integracao
+        run: npm run test:integracao
 
   robo-demo:
     name: Robo de testes (demo)

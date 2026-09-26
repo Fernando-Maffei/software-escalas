@@ -9,6 +9,7 @@ const suites = [
     ...require('./escala.test.js'),
     ...require('./backup.test.js'),
     ...require('./permissoes.test.js'),
+    ...require('./auth.test.js'),
     ...require('./rate-limit.test.js')
 ];
 

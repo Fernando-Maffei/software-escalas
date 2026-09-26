@@ -1,0 +1,118 @@
+const assert = require('node:assert/strict');
+
+const { ADMIN, criarCliente, esperarSucesso, nomeUnico } = require('./apoio');
+
+async function criarUsuarioComum() {
+    const admin = criarCliente();
+    await admin.entrar();
+
+    const username = nomeUnico('leitor').replace(/\s+/g, '-');
+    const senha = 'Leitor!Integracao1';
+    esperarSucesso(await admin.post('/api/usuarios', { username, senha }), 'criar usuario comum');
+
+    return { username, senha };
+}
+
+module.exports = [
+    {
+        name: 'login do admin devolve sessao e /me reconhece o usuario',
+        async run() {
+            const cliente = criarCliente();
+            const login = await cliente.entrar();
+
+            assert.equal(login.body.user.username, ADMIN.username);
+            assert.equal(login.body.user.isAdmin, true);
+            assert.match(login.headers.get('set-cookie'), /HttpOnly/);
+
+            const me = esperarSucesso(await cliente.get('/api/auth/me'), '/me');
+            assert.equal(me.user.username, ADMIN.username);
+        }
+    },
+    {
+        name: 'senha errada devolve 401 sem revelar se o usuario existe',
+        async run() {
+            const cliente = criarCliente();
+            const existente = await cliente.post('/api/auth/login', {
+                username: ADMIN.username,
+                password: 'errada-123'
+            });
+            const inexistente = await cliente.post('/api/auth/login', {
+                username: 'ninguem-aqui',
+                password: 'errada-123'
+            });
+
+            assert.equal(existente.status, 401);
+            assert.equal(inexistente.status, 401);
+            assert.equal(existente.body.error, inexistente.body.error);
+        }
+    },
+    {
+        name: 'rota de dados sem sessao devolve 401',
+        async run() {
+            const resposta = await criarCliente().get('/api/colaboradores');
+            assert.equal(resposta.status, 401);
+        }
+    },
+    {
+        // decodeURIComponent('%') lanca URIError; antes virava 500.
+        name: 'cookie de sessao malformado e tratado como sessao invalida (401), nao erro interno',
+        async run() {
+            const cliente = criarCliente();
+            cliente.definirCookie('escalas_sid=%E0%A4%A');
+
+            const resposta = await cliente.get('/api/colaboradores');
+            assert.equal(resposta.status, 401);
+        }
+    },
+    {
+        // O X-Forwarded-For vem do cliente: se entrasse na chave do limite,
+        // bastaria trocar o header a cada tentativa para nunca ser bloqueado.
+        name: 'limite de tentativas de login nao e contornado trocando X-Forwarded-For',
+        async run() {
+            const { username } = await criarUsuarioComum();
+            const cliente = criarCliente();
+            let ultima = null;
+
+            for (let tentativa = 1; tentativa <= 6; tentativa += 1) {
+                ultima = await cliente.post(
+                    '/api/auth/login',
+                    { username, password: 'senha-errada' },
+                    { 'X-Forwarded-For': `10.0.0.${tentativa}` }
+                );
+            }
+
+            assert.equal(ultima.status, 429);
+        }
+    },
+    {
+        name: 'usuario comum le dados mas nao grava nem entra na area administrativa',
+        async run() {
+            const { username, senha } = await criarUsuarioComum();
+            const leitor = criarCliente();
+            await leitor.entrar(username, senha);
+
+            assert.equal((await leitor.get('/api/colaboradores')).status, 200);
+            assert.equal((await leitor.post('/api/setores', { nome: 'Nao pode' })).status, 403);
+            assert.equal((await leitor.get('/api/usuarios')).status, 403);
+            assert.equal((await leitor.get('/api/configuracao-banco')).status, 403);
+        }
+    },
+    {
+        name: 'erro interno nao vaza a mensagem crua do banco para o cliente',
+        async run() {
+            const cliente = criarCliente();
+            await cliente.entrar();
+
+            // Um id que passa na validacao da rota mas estoura o INT do SQL
+            // Server provoca um erro real do driver (EPARAM), sem precisar
+            // quebrar nada de proposito.
+            const resposta = await cliente.get('/api/colaboradores/99999999999');
+
+            assert.ok(resposta.status >= 400);
+
+            if (resposta.status >= 500) {
+                assert.doesNotMatch(String(resposta.body?.error), /Validation failed|out of range|mssql|tedious/i);
+            }
+        }
+    }
+];

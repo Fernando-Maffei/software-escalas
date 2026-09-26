@@ -1,0 +1,30 @@
+# Prettier (npm run format / format:check).
+#
+# Os arquivos abaixo ainda NAO foram reformatados: rodar o Prettier neles hoje
+# muda 122 de 126 arquivos JS e geraria conflito em todas as branches abertas
+# nos outros worktrees. A decisao esta registrada como P7 no AUDITORIA.md;
+# quando ela for tomada, basta apagar estas linhas e rodar `npm run format`
+# num commit so de formatacao (registrado em .git-blame-ignore-revs).
+backend/
+frontend/
+demo/
+docs/
+database/
+tests/unit/
+tests/e2e/
+tests/smoke.js
+scripts/limpar-feriados-nacionais.js
+playwright.config.js
+*.md
+*.html
+*.css
+*.sql
+*.yml
+*.yaml
+
+# Gerados / de terceiros
+node_modules/
+package-lock.json
+tests/e2e/relatorio/
+tests/e2e/resultados/
+vercel.json
