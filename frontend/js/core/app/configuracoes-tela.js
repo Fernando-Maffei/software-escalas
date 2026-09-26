@@ -606,9 +606,15 @@ function carregarPreferencias() {
     const formatoHora = localStorage.getItem('formatoHora');
     const notificacoes = localStorage.getItem('notificacoes');
     
-    if (primeiroDia) document.getElementById('primeiroDiaSemana').value = primeiroDia;
-    if (formatoHora) document.getElementById('formatoHora').value = formatoHora;
-    if (notificacoes) document.getElementById('notificacoes').checked = notificacoes === 'true';
+    if (primeiroDia) {
+        document.getElementById('primeiroDiaSemana').value = primeiroDia;
+    }
+    if (formatoHora) {
+        document.getElementById('formatoHora').value = formatoHora;
+    }
+    if (notificacoes) {
+        document.getElementById('notificacoes').checked = notificacoes === 'true';
+    }
 }
 
 // Função para salvar preferências

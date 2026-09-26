@@ -8,25 +8,25 @@
 (function (root) {
     'use strict';
 
-    var SALVAR_URL = '/api/auth/me/setores';
+    const SALVAR_URL = '/api/auth/me/setores';
 
     // null = ainda nao semeado a partir do usuario logado.
-    var estado = null;
-    var timerSalvar = null;
+    let estado = null;
+    let timerSalvar = null;
 
     function normalizar(lista) {
         if (!Array.isArray(lista)) {
             return [];
         }
 
-        var vistos = new Set();
+        const vistos = new Set();
 
         lista.forEach(function (item) {
             if (item === null || item === undefined || typeof item === 'object') {
                 return;
             }
 
-            var id = String(item).trim();
+            const id = String(item).trim();
 
             if (id) {
                 vistos.add(id);
@@ -41,7 +41,7 @@
     // primeira leitura apos o login pegue a preferencia salva.
     function garantirEstado() {
         if (estado === null) {
-            var doUsuario = root.__usuarioAtual && root.__usuarioAtual.setoresVisiveis;
+            const doUsuario = root.__usuarioAtual && root.__usuarioAtual.setoresVisiveis;
 
             if (Array.isArray(doUsuario)) {
                 estado = normalizar(doUsuario);
@@ -74,7 +74,7 @@
     // um pequeno debounce (evita uma requisicao por clique quando o gestor
     // liga/desliga varios setores em sequencia).
     function salvarMeusSetores(lista) {
-        var atual = setMeusSetoresLocal(lista);
+        const atual = setMeusSetoresLocal(lista);
 
         if (timerSalvar) {
             clearTimeout(timerSalvar);

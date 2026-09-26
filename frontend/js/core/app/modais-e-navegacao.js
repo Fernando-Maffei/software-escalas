@@ -16,7 +16,9 @@ let paginaCarregadaAtual = null;
 function carregarPagina(pagina) {
     console.log('Carregando página:', pagina);
 
-    if (!appContent) return;
+    if (!appContent) {
+        return;
+    }
 
     paginaCarregadaAtual = pagina;
 

@@ -269,7 +269,7 @@ function getServerAccessUrls(host, port, options = {}) {
                 return;
             }
 
-            if (networkInterface.family !== 'IPv4' && networkInterface.family !== 4) {
+            if (networkInterface.family !== 'IPv4') {
                 return;
             }
 
@@ -653,7 +653,7 @@ function start(options = {}) {
                 try {
                     const backupResult = await executeAutomaticBackup('auto-shutdown');
 
-                    if (backupResult?.success) {
+                    if (backupResult && 'fileName' in backupResult) {
                         console.log(`Backup automatico de encerramento gerado: ${backupResult.fileName}`);
                     }
                 } catch (error) {

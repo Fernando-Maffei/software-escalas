@@ -63,10 +63,18 @@
             const almocoInicio = document.querySelector(`[data-jornada-almoco-inicio="${dia.diaSemana}"]`);
             const almocoFim = document.querySelector(`[data-jornada-almoco-fim="${dia.diaSemana}"]`);
 
-            if (entrada) entrada.value = formatarHora(dia.trabalhoInicio) || '';
-            if (saida) saida.value = formatarHora(dia.trabalhoFim) || '';
-            if (almocoInicio) almocoInicio.value = formatarHora(dia.almocoInicio) || '';
-            if (almocoFim) almocoFim.value = formatarHora(dia.almocoFim) || '';
+            if (entrada) {
+                entrada.value = formatarHora(dia.trabalhoInicio) || '';
+            }
+            if (saida) {
+                saida.value = formatarHora(dia.trabalhoFim) || '';
+            }
+            if (almocoInicio) {
+                almocoInicio.value = formatarHora(dia.almocoInicio) || '';
+            }
+            if (almocoFim) {
+                almocoFim.value = formatarHora(dia.almocoFim) || '';
+            }
         });
 
         atualizarHintTipoEscala();
@@ -272,10 +280,18 @@
             const almocoInicio = document.querySelector(`[data-jornada-almoco-inicio="${day}"]`);
             const almocoFim = document.querySelector(`[data-jornada-almoco-fim="${day}"]`);
 
-            if (entrada) entrada.value = padrao.trabalhoInicio;
-            if (saida) saida.value = padrao.trabalhoFim;
-            if (almocoInicio) almocoInicio.value = padrao.almocoInicio;
-            if (almocoFim) almocoFim.value = padrao.almocoFim;
+            if (entrada) {
+                entrada.value = padrao.trabalhoInicio;
+            }
+            if (saida) {
+                saida.value = padrao.trabalhoFim;
+            }
+            if (almocoInicio) {
+                almocoInicio.value = padrao.almocoInicio;
+            }
+            if (almocoFim) {
+                almocoFim.value = padrao.almocoFim;
+            }
         });
 
         if (checkedDays.length > 0) {

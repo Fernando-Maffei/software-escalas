@@ -157,9 +157,13 @@ function solicitarSenhaModal(options = {}) {
             return;
         }
 
-        if (mensagem) mensagem.textContent = options.mensagem || 'Esta ação não pode ser desfeita.';
+        if (mensagem) {
+            mensagem.textContent = options.mensagem || 'Esta ação não pode ser desfeita.';
+        }
         input.value = '';
-        if (erro) { erro.textContent = ''; erro.hidden = true; }
+        if (erro) {
+            erro.textContent = ''; erro.hidden = true;
+        }
         // O CSS mostra os modais via .modal.active (opacity/visibility). Sem
         // adicionar .active o modal ficava display:flex porem opacity:0 —
         // invisivel — dando a impressao de que "clicar nao faz nada".
@@ -172,20 +176,26 @@ function solicitarSenhaModal(options = {}) {
         function limpar() {
             btnOk.removeEventListener('click', aoConfirmar);
             btnCancelar.removeEventListener('click', aoCancelar);
-            if (btnFechar) btnFechar.removeEventListener('click', aoCancelar);
+            if (btnFechar) {
+                btnFechar.removeEventListener('click', aoCancelar);
+            }
             input.removeEventListener('keydown', aoTeclar);
             modal.classList.remove('active');
             modal.classList.add('hidden');
         }
 
         function mostrarErro(texto) {
-            if (erro) { erro.textContent = texto; erro.hidden = false; }
+            if (erro) {
+                erro.textContent = texto; erro.hidden = false;
+            }
             input.focus();
             input.select();
         }
 
         async function aoConfirmar() {
-            if (ocupado) return;
+            if (ocupado) {
+                return;
+            }
             const senha = input.value;
 
             if (!senha) {
@@ -228,7 +238,9 @@ function solicitarSenhaModal(options = {}) {
 
         btnOk.addEventListener('click', aoConfirmar);
         btnCancelar.addEventListener('click', aoCancelar);
-        if (btnFechar) btnFechar.addEventListener('click', aoCancelar);
+        if (btnFechar) {
+            btnFechar.addEventListener('click', aoCancelar);
+        }
         input.addEventListener('keydown', aoTeclar);
     });
 }
@@ -257,7 +269,9 @@ async function carregarColaboradores() {
 async function carregarSetores() {
     try {
         const res = await fetch(`${getApiBaseUrl()}/setores`);
-        if (!res.ok) throw new Error(`Erro ${res.status}: ${res.statusText}`);
+        if (!res.ok) {
+            throw new Error(`Erro ${res.status}: ${res.statusText}`);
+        }
         const data = await res.json();
         setores = Array.isArray(data) ? data : [];
         window.setores = setores;

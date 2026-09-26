@@ -75,7 +75,7 @@ async function buscarProximosEventos() {
 }
 
 function formatarDataBR(dataISO) {
-    const [ano, mes, dia] = dataISO.split('-');
+    const [, mes, dia] = dataISO.split('-');
     return `${dia}/${mes}`;
 }
 

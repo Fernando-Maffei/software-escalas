@@ -172,9 +172,28 @@ tranca o dono fora. A troca tambem nao derruba as outras sessoes da conta.
 Correcao: exigir `senhaAtual` (a tela precisa mandar) e revogar as demais sessoes.
 Muda o contrato da rota → ver pergunta P4.
 
-**A8 — Sem linter, formatter, checagem de tipos ou testes de rota** · `ABERTO`
+**A8 — Sem linter, formatter, checagem de tipos ou testes de rota** · `RESOLVIDO`
 Nenhum erro de rota, SQL ou transacao e pego antes de produção — C1 e C2 existem
 exatamente por isso. Fase 2.
+**Feito:**
+- **Testes de integracao** (`tests/integracao/`, `npm run test:integracao`): sobem
+  o servidor de verdade contra um SQL Server descartavel (`npm run
+  integracao:banco:subir`; trava que so aceita banco com "Integracao" no nome) e
+  cobrem autenticacao, permissoes, colaboradores, lancamentos, folgas de domingo e
+  backup — 24 testes. `npm run integracao:servidor` sobe o app com dados de
+  exemplo na porta 4480 para conferencia no navegador.
+- **ESLint 9** (`npm run lint`), sem nenhum erro no repositorio. No frontend os
+  globais sao calculados a partir do proprio codigo, entao `no-undef` pega funcao
+  inexistente (foi assim que A10 e A11 apareceram). As correcoes automaticas
+  (`curly`, `no-var`) tiveram equivalencia provada por comparacao de AST.
+- **Checagem de tipos** (`npm run typecheck`): TypeScript em modo `checkJs` no
+  backend, scripts e testes, sem nenhum erro. Tipagem por JSDoc e por
+  `backend/types/express.d.ts` (sem `any` nem supressoes). Pegou, alem do A10,
+  `?search=` repetido derrubando duas rotas com 500.
+- **Prettier** configurado (`npm run format`); aplicado so nos arquivos novos ate
+  a decisao P7.
+- `npm run verificar` roda sintaxe, lint, tipos, formatacao e unitarios; o CI roda
+  isso e um job de integracao com SQL Server.
 
 **A9 — Folga de domingo com reposicao sempre dava erro 500** · `RESOLVIDO`
 `backend/services/folgas-domingo.js:249-252` (achado pelos testes de integracao)

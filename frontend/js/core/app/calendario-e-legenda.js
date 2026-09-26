@@ -1,12 +1,22 @@
 function gerarLegendaMensal() {
     const container = document.getElementById("legendaMensalContent");
-    if (!container) return;
+    if (!container) {
+        return;
+    }
 
     // Verificar se os dados existem
-    if (!colaboradores) colaboradores = [];
-    if (!ausencias) ausencias = [];
-    if (!feriados) feriados = [];
-    if (!feriadosLocais) feriadosLocais = [];
+    if (!colaboradores) {
+        colaboradores = [];
+    }
+    if (!ausencias) {
+        ausencias = [];
+    }
+    if (!feriados) {
+        feriados = [];
+    }
+    if (!feriadosLocais) {
+        feriadosLocais = [];
+    }
 
     const mes = mesAtual;
     const ano = anoAtual;
@@ -64,7 +74,9 @@ function gerarLegendaMensal() {
                 const dataFim = new Date(a.DataFim);
                 const colaborador = colaboradores.find(c => c.Id === (a.colaboradorId || a.ColaboradorId));
                 
-                if (!colaborador) return;
+                if (!colaborador) {
+                    return;
+                }
 
                 // Verificar se o período cruza com o mês atual
                 const primeiroDiaMes = new Date(ano, mes, 1);

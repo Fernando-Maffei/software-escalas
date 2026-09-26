@@ -1,4 +1,4 @@
-/* eslint-disable */
+ 
 // Motor de Relatorio de Escala: dois submodos, Quadro Mensal e Detalhado, mais a
 // geracao de PDF/export compartilhada entre eles. Depende de
 // frontend/js/telas/escala-dia-shared.js (deve carregar antes deste arquivo).

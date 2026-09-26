@@ -159,7 +159,7 @@ router.get('/resumo', async (req, res) => {
 
     const request = pool.request();
     const clauses = [];
-    const search = (req.query.search || '').trim();
+    const search = String(req.query.search || '').trim();
 
     if (req.query.colaboradorId) {
         request.input('colaboradorId', sql.Int, ensurePositiveInt(req.query.colaboradorId, 'Colaborador'));

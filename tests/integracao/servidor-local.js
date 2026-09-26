@@ -8,6 +8,11 @@
 // Login: admin / Admin!Integracao1. O banco e recriado a cada subida.
 // Alguns nomes trazem HTML de proposito: se aparecerem como texto (e nao
 // como imagem/alerta), o escape das telas esta funcionando.
+//
+// Banco proprio (…IntegracaoLocal): rodar a suite de integracao com este
+// servidor no ar recriaria o banco debaixo dele.
+process.env.INTEGRACAO_DB_DATABASE = process.env.INTEGRACAO_DB_DATABASE || 'SoftwareEscalasIntegracaoLocal';
+
 const { ADMIN, criarCliente, subirServidor } = require('./apoio');
 const {
     DATAS,

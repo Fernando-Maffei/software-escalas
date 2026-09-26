@@ -152,7 +152,13 @@ module.exports = [
             // HTML: "nao usada neste arquivo" nao significa morta.
             'no-unused-vars': [
                 'error',
-                { vars: 'local', args: 'after-used', argsIgnorePattern: '^_', caughtErrors: 'none', ignoreRestSiblings: true }
+                {
+                    vars: 'local',
+                    args: 'after-used',
+                    argsIgnorePattern: '^_',
+                    caughtErrors: 'none',
+                    ignoreRestSiblings: true
+                }
             ],
             // O linter analisa um arquivo por vez e nao ve que um `let` global
             // (ex.: `colaboradores` em core/app.js) e reatribuido em OUTRO

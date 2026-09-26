@@ -6,6 +6,10 @@
 // innerHTML — um nome com HTML executava no navegador de todo mundo.
 //
 // UMD: no navegador vira o global escapeHtml; no Node (testes) e um modulo.
+/**
+ * @param {Record<string, unknown>} raiz
+ * @param {() => { escapeHtml: (valor: unknown) => string }} fabrica
+ */
 (function criarHtmlSeguro(raiz, fabrica) {
     const modulo = fabrica();
 
@@ -15,7 +19,7 @@
     }
 
     raiz.escapeHtml = modulo.escapeHtml;
-})(typeof globalThis !== 'undefined' ? globalThis : this, function montarHtmlSeguro() {
+})(globalThis, function montarHtmlSeguro() {
     const ENTIDADES = {
         '&': '&amp;',
         '<': '&lt;',

@@ -362,7 +362,7 @@ function calcularDescontoNaJanela(ausencia, colaborador, inicioISO, fimISO) {
     // tambem desconta.
     const umDia = 24 * 60 * 60 * 1000;
     const dias = Math.floor(
-        (new Date(`${janelaFim}T00:00:00Z`) - new Date(`${janelaInicio}T00:00:00Z`)) / umDia
+        (new Date(`${janelaFim}T00:00:00Z`).getTime() - new Date(`${janelaInicio}T00:00:00Z`).getTime()) / umDia
     ) + 1;
     return { minutos: minutosDia * dias, aviso: null };
 }

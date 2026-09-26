@@ -1,3 +1,7 @@
+/**
+ * @param {Record<string, unknown>} root
+ * @param {() => object} factory
+ */
 (function createEscalaReportUtils(root, factory) {
     if (typeof module === 'object' && module.exports) {
         module.exports = factory();
@@ -5,7 +9,7 @@
     }
 
     root.EscalaReportUtils = factory();
-}(typeof globalThis !== 'undefined' ? globalThis : this, function buildEscalaReportUtils() {
+}(globalThis, function buildEscalaReportUtils() {
     const DIA_LABELS = ['Domingo', 'Segunda', 'Terca', 'Quarta', 'Quinta', 'Sexta', 'Sabado'];
     // Espelha TIPOS_SEM_TRABALHO de telas/escala-dia-shared.js. Duplicado de
     // proposito: este arquivo e UMD e roda tambem no runner de testes, sem o

@@ -616,8 +616,12 @@
         const contadorPessoal = el('lcCountPessoal');
         const contadorFeriados = el('lcCountFeriados');
 
-        if (contadorPessoal) contadorPessoal.textContent = String(pessoais.length);
-        if (contadorFeriados) contadorFeriados.textContent = String(feriados.length);
+        if (contadorPessoal) {
+            contadorPessoal.textContent = String(pessoais.length);
+        }
+        if (contadorFeriados) {
+            contadorFeriados.textContent = String(feriados.length);
+        }
 
         const listaPessoal = el('listaPessoal');
         const listaFeriados = el('listaFeriados');
@@ -673,8 +677,12 @@
         const pessoal = el('listaPessoalContainer');
         const feriados = el('listaFeriadosContainer');
 
-        if (pessoal) pessoal.classList.toggle('active', state.aba === 'pessoal');
-        if (feriados) feriados.classList.toggle('active', state.aba === 'feriados');
+        if (pessoal) {
+            pessoal.classList.toggle('active', state.aba === 'pessoal');
+        }
+        if (feriados) {
+            feriados.classList.toggle('active', state.aba === 'feriados');
+        }
     }
 
     function setCarregando(ligado) {
@@ -767,9 +775,15 @@
             titulo.innerHTML = `<i class="fas ${icone}"></i> ${texto}`;
         }
 
-        if (chip) chip.classList.toggle('hidden', !editando);
-        if (cancelar) cancelar.classList.toggle('hidden', !editando);
-        if (pane) pane.classList.toggle('is-editing', editando);
+        if (chip) {
+            chip.classList.toggle('hidden', !editando);
+        }
+        if (cancelar) {
+            cancelar.classList.toggle('hidden', !editando);
+        }
+        if (pane) {
+            pane.classList.toggle('is-editing', editando);
+        }
 
         if (salvar && salvar.dataset.enviando !== 'true') {
             salvar.innerHTML = editando
@@ -792,17 +806,33 @@
 
         const sugestao = state.dataISO || '';
 
-        if (el('dataInicio')) el('dataInicio').value = sugestao;
-        if (el('dataFim')) el('dataFim').value = sugestao;
-        if (el('horaInicio')) el('horaInicio').value = '';
-        if (el('horaFim')) el('horaFim').value = '';
-        if (el('periodoTipo')) el('periodoTipo').value = 'dia_inteiro';
-        if (el('feriadoNome')) el('feriadoNome').value = '';
-        if (el('feriadoTipo')) el('feriadoTipo').value = 'municipal';
+        if (el('dataInicio')) {
+            el('dataInicio').value = sugestao;
+        }
+        if (el('dataFim')) {
+            el('dataFim').value = sugestao;
+        }
+        if (el('horaInicio')) {
+            el('horaInicio').value = '';
+        }
+        if (el('horaFim')) {
+            el('horaFim').value = '';
+        }
+        if (el('periodoTipo')) {
+            el('periodoTipo').value = 'dia_inteiro';
+        }
+        if (el('feriadoNome')) {
+            el('feriadoNome').value = '';
+        }
+        if (el('feriadoTipo')) {
+            el('feriadoTipo').value = 'municipal';
+        }
         // A observacao so era limpa no "Cancelar edicao": depois de salvar (ou
         // ao reabrir a modal) o texto anterior ficava no campo e ia junto no
         // proximo lancamento.
-        if (el('observacaoLancamento')) el('observacaoLancamento').value = '';
+        if (el('observacaoLancamento')) {
+            el('observacaoLancamento').value = '';
+        }
 
         setEdicao(null);
 
@@ -842,11 +872,21 @@
 
             const data = toISODate(item.Data ?? item.data);
 
-            if (el('tipoLancamento')) el('tipoLancamento').value = 'feriado';
-            if (el('feriadoNome')) el('feriadoNome').value = item.Nome || item.nome || '';
-            if (el('feriadoTipo')) el('feriadoTipo').value = String(item.Tipo || item.tipo || 'municipal').toLowerCase();
-            if (el('dataInicio')) el('dataInicio').value = data;
-            if (el('dataFim')) el('dataFim').value = data;
+            if (el('tipoLancamento')) {
+                el('tipoLancamento').value = 'feriado';
+            }
+            if (el('feriadoNome')) {
+                el('feriadoNome').value = item.Nome || item.nome || '';
+            }
+            if (el('feriadoTipo')) {
+                el('feriadoTipo').value = String(item.Tipo || item.tipo || 'municipal').toLowerCase();
+            }
+            if (el('dataInicio')) {
+                el('dataInicio').value = data;
+            }
+            if (el('dataFim')) {
+                el('dataFim').value = data;
+            }
 
             setEdicao({ tipo: 'feriado', id: alvo });
 
@@ -873,17 +913,29 @@
         const tipoItem = String(item.tipo || item.Tipo || 'folga').toLowerCase();
         const periodoTipo = item.periodoTipo || item.PeriodoTipo || 'dia_inteiro';
 
-        if (el('tipoLancamento')) el('tipoLancamento').value = tipoItem;
+        if (el('tipoLancamento')) {
+            el('tipoLancamento').value = tipoItem;
+        }
 
         preencherSelectColaboradores(item.colaboradorId ?? item.ColaboradorId);
 
-        if (el('dataInicio')) el('dataInicio').value = toISODate(item.DataInicio ?? item.dataInicio);
-        if (el('dataFim')) el('dataFim').value = toISODate(item.DataFim ?? item.dataFim);
-        if (el('periodoTipo')) el('periodoTipo').value = periodoTipo;
+        if (el('dataInicio')) {
+            el('dataInicio').value = toISODate(item.DataInicio ?? item.dataInicio);
+        }
+        if (el('dataFim')) {
+            el('dataFim').value = toISODate(item.DataFim ?? item.dataFim);
+        }
+        if (el('periodoTipo')) {
+            el('periodoTipo').value = periodoTipo;
+        }
 
         if (periodoTipo === 'horas') {
-            if (el('horaInicio')) el('horaInicio').value = formatarHora(item.horaInicio ?? item.HoraInicio);
-            if (el('horaFim')) el('horaFim').value = formatarHora(item.horaFim ?? item.HoraFim);
+            if (el('horaInicio')) {
+                el('horaInicio').value = formatarHora(item.horaInicio ?? item.HoraInicio);
+            }
+            if (el('horaFim')) {
+                el('horaFim').value = formatarHora(item.horaFim ?? item.HoraFim);
+            }
         }
 
         setEdicao({ tipo: 'pessoal', id: alvo });
@@ -1255,7 +1307,7 @@
 
         try {
             // Binding compartilhado declarado em app.js.
-            colaboradores = lista; // eslint-disable-line no-undef
+            colaboradores = lista;  
         } catch (error) {
             // ignore
         }

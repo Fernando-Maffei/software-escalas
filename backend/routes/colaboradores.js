@@ -132,7 +132,7 @@ router.get('/', async (req, res) => {
     const schema = await getSchemaInfo(pool);
     const request = pool.request();
     const clauses = [];
-    const search = (req.query.search || '').trim();
+    const search = String(req.query.search || '').trim();
 
     if (search) {
         request.input('search', sql.NVarChar(300), `%${search}%`);

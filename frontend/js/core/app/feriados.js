@@ -37,10 +37,14 @@ async function carregarListaFeriados() {
     console.log("=== CARREGANDO FERIADOS (API + MANUAIS) ===");
     
     const container = document.getElementById("listaFeriados");
-    if (!container) return;
+    if (!container) {
+        return;
+    }
     
     const loadingEl = document.getElementById("loadingLancamentos");
-    if (loadingEl) loadingEl.classList.remove("hidden");
+    if (loadingEl) {
+        loadingEl.classList.remove("hidden");
+    }
     container.innerHTML = '';
     
     try {
@@ -83,7 +87,9 @@ async function carregarListaFeriados() {
         feriadosManuais.forEach(f => {
             // 🔥 USAR OS CAMPOS CORRETOS (maiúsculos)
             const dataFeriado = f.Data || f.data;
-            if (!dataFeriado) return;
+            if (!dataFeriado) {
+                return;
+            }
             
             // Extrair apenas a data (remover o T00:00:00.000Z)
             const dataStr = dataFeriado.split('T')[0];
@@ -103,7 +109,9 @@ async function carregarListaFeriados() {
             });
         });
         
-        if (loadingEl) loadingEl.classList.add("hidden");
+        if (loadingEl) {
+            loadingEl.classList.add("hidden");
+        }
         
         if (todosFeriados.length === 0) {
             container.innerHTML = '<div class="empty-state">Nenhum feriado encontrado</div>';
@@ -171,7 +179,9 @@ async function carregarListaFeriados() {
         
     } catch (error) {
         console.error("❌ Erro:", error);
-        if (loadingEl) loadingEl.classList.add("hidden");
+        if (loadingEl) {
+            loadingEl.classList.add("hidden");
+        }
         container.innerHTML = `<div class="empty-state">Erro: ${error.message}</div>`;
     }
 }
@@ -179,7 +189,9 @@ async function carregarListaFeriados() {
 // Excluir feriado
 async function excluirFeriado(id) {
 
-    if (!confirm("Deseja realmente excluir este feriado?")) return;
+    if (!confirm("Deseja realmente excluir este feriado?")) {
+        return;
+    }
 
     try {
 

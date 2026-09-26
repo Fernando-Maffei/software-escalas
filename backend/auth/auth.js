@@ -175,6 +175,11 @@ async function countOtherActiveAdmins(pool, excludedUserId) {
     return result.recordset[0]?.total || 0;
 }
 
+/**
+ * @param {import('mssql').ConnectionPool} pool
+ * @param {number} userId
+ * @param {{ ativo?: boolean, isAdmin?: boolean }} flags
+ */
 async function updateUserFlags(pool, userId, { ativo, isAdmin }) {
     const assignments = [];
 

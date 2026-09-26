@@ -8,6 +8,8 @@ const AUTHENTICATION_TYPES = Object.freeze({
     SQL: 'sql',
     WINDOWS: 'windows'
 });
+/** @type {readonly string[]} */
+const AUTHENTICATION_TYPE_VALUES = Object.freeze(Object.values(AUTHENTICATION_TYPES));
 
 function normalizeTrimmedString(value) {
     if (value === undefined || value === null) {
@@ -72,10 +74,14 @@ function normalizeBoolean(value, defaultValue) {
     throw new AppError(400, 'Valor booleano invalido na configuracao do banco.');
 }
 
+/**
+ * @param {unknown} value
+ * @param {string} [fallback]
+ */
 function normalizeAuthenticationType(value, fallback = AUTHENTICATION_TYPES.SQL) {
     const normalized = normalizeTrimmedString(value).toLowerCase() || fallback;
 
-    if (!Object.values(AUTHENTICATION_TYPES).includes(normalized)) {
+    if (!AUTHENTICATION_TYPE_VALUES.includes(normalized)) {
         throw new AppError(400, 'Tipo de autenticacao invalido.');
     }
 

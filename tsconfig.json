@@ -10,10 +10,12 @@
         "strict": false,
         "noImplicitAny": false,
         "skipLibCheck": true,
-        "types": ["node"]
+        "types": ["node"],
+        "resolveJsonModule": true
     },
     "include": [
         "backend/**/*.js",
+        "backend/types/**/*.d.ts",
         "scripts/**/*.js",
         "tests/unit/**/*.js",
         "tests/integracao/**/*.js",

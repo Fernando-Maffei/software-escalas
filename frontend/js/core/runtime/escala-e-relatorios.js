@@ -116,7 +116,7 @@
         }
     }
 
-    window.__refreshVisibleViews = async function refreshVisibleViewsEscala(options = {}) {
+    window.__refreshVisibleViews = async function refreshVisibleViewsEscala() {
         if (document.getElementById('calendar') && typeof gerarCalendario === 'function') {
             const mes = window.mesAtual ?? new Date().getMonth();
             const ano = window.anoAtual ?? new Date().getFullYear();

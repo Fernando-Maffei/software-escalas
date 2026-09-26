@@ -3,7 +3,9 @@
    UTILITÁRIOS
 =========================== */
 function formatarHora(hora) {
-    if (!hora) return "";
+    if (!hora) {
+        return "";
+    }
 
     if (hora instanceof Date && !isNaN(hora.getTime())) {
         const isTimeOnlyDate = hora.getUTCFullYear() === 1970
@@ -50,9 +52,15 @@ function mostrarToast(mensagem, tipo = "success") {
     toast.className = `toast ${tipo}`;
     
     let icone = "fa-info-circle";
-    if (tipo === "success") icone = "fa-check-circle";
-    else if (tipo === "error") icone = "fa-exclamation-circle";
-    else if (tipo === "warning") icone = "fa-exclamation-triangle";
+    if (tipo === "success") {
+        icone = "fa-check-circle";
+    }
+    else if (tipo === "error") {
+        icone = "fa-exclamation-circle";
+    }
+    else if (tipo === "warning") {
+        icone = "fa-exclamation-triangle";
+    }
     
     toast.innerHTML = `<i class="fas ${icone}"></i> ${mensagem}`;
     

@@ -111,6 +111,7 @@ function criarCliente() {
     let cookie = '';
 
     async function requisitar(metodo, rota, corpo, cabecalhosExtras = {}) {
+        /** @type {Record<string, string>} */
         const cabecalhos = { ...cabecalhosExtras };
 
         if (cookie) {
@@ -153,6 +154,10 @@ function criarCliente() {
         definirCookie(valor) {
             cookie = valor;
         },
+        /**
+         * @param {string} [usuario]
+         * @param {string} [senha]
+         */
         async entrar(usuario = ADMIN.username, senha = ADMIN.password) {
             const resposta = await requisitar('POST', '/api/auth/login', { username: usuario, password: senha });
 
