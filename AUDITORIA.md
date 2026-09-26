@@ -381,11 +381,23 @@ diz o que acontece de verdade (e que os dados do sistema nao sao apagados). O
 **M13 — Container roda como root** · `ABERTO`
 `Dockerfile`: sem `USER node`.
 
-**M14 — Funcoes gigantes** · `ABERTO` (parcial)
+**M14 — Funcoes gigantes** · `RESOLVIDO`
 Maiores: `renderConfiguracoes` (593 linhas), `gerarHtmlPdfRelatorioEscala` (562),
 `gerarHtmlPdfRelatorioMensalExpandido` (469), `gerarTimelineVisualComAusencias`
 (261), rotas `banco-horas-semanal /verificar` (174) e `/gerar-semana` (167),
 `POST /plantoes` (162), `hydrateHistoricSourcesIntoEscala` (130).
+**Feito:** `server.js` (700 linhas, com `start()` de 175) dividido por
+responsabilidade: `app.js` (Express, portoes e rotas), `lib/cors.js`,
+`lib/rede.js`, `lib/bootstrap-banco.js` (retentativa e limpeza de sessoes) e o
+`server.js` so com o ciclo de vida (223 linhas). O calculo duplicado de
+`/verificar` e `/gerar-semana` foi para `services/horas-em-carteira.js` (rota de
+915 para 629 linhas). O backend nao tem mais funcao acima de ~130 linhas, e as
+que ficaram perto disso sao regras de dominio coesas. Golden master identico;
+caminho de falha do bootstrap (banco fora: 503 e retentativa) conferido a mao.
+**Aceito:** no frontend as maiores funcoes (`renderConfiguracoes`,
+`gerarHtmlPdfRelatorioEscala`, relatorio mensal) sao quase so template HTML;
+parti-las em pedacos nao melhora a leitura e seria refatoracao de risco sem
+teste de tela — fica para quando o frontend virar modulos (M15).
 
 **M15 — Arquitetura do frontend por monkey-patch** · `PROPOSTA`
 `frontend/js/core/runtime/*` redefine globais de `core/app/*` com
@@ -414,7 +426,7 @@ monta o grafo de chamadas das funcoes globais do front a partir do que executa
 esta declarado em dois arquivos. Removidas **66 funcoes, ~2.100 linhas**, e dois
 arquivos que ficaram vazios (`core/app/conexao-backend.js`,
 `core/app/ausencias-e-timeline.js`, tirados tambem dos dois index.html). A rota
-`GET /api/test` continua (ver B1b). Prova de que nada ficou chamando o que saiu:
+A rota de depuracao `GET /api/test` (sem nenhum uso) saiu na divisao do `server.js`. Prova de que nada ficou chamando o que saiu:
 zero `no-undef` no ESLint + as 9 telas renderizando o mesmo HTML de antes, sem
 erro de JS. **O que saiu** (todas sem nenhum chamador):
 - timeline antiga: `gerarTimelineVisualComAusencias`, `gerarHeaderTimeline`,
