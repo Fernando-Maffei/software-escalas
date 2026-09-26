@@ -4,25 +4,25 @@ const router = express.Router();
 const { sql, conectar } = require('../db');
 const { AppError } = require('../lib/errors');
 const { getSetoresPermitidosRequest, idsPermitidosNumericos } = require('../auth/acesso-setores');
-const {
-    calculateDailyWorkMinutes,
-    calculateIntervalMinutes,
-    normalizeSubtipo,
-    parseBalanceInputToMinutes,
-    resolveDefaultDescontaBancoHoras
-} = require('../services/bancoHoras');
+const { parseBalanceInputToMinutes } = require('../services/bancoHoras');
 const {
     ensurePositiveInt,
-    extractDateString,
     normalizeIsoDate,
     normalizeOptionalText
 } = require('../lib/validation');
 const { montarRelatorioHorasExtras, serializePlantaoRecord } = require('../services/plantoes');
+const { withTransaction } = require('../db/transactions');
+const {
+    PLANTAO_COLUNAS_CREDITO,
+    calcularSaldo,
+    carregarBases,
+    carregarMovimentacao,
+    listarColaboradoresAtivosVisiveis,
+    minutosParaRelogio,
+    semanaISO
+} = require('../services/horas-em-carteira');
 
 const SEMANAS_PADRAO = 8;
-
-// Colunas de plantao usadas nos calculos de credito.
-const PLANTAO_COLUNAS_CREDITO = 'id, data_plantao, colaboradores_ids, hora_inicio, hora_fim, tipo_credito';
 
 // Custo de uma folga em minutos (8h). Usado na coluna "Sugestao" do Verificar:
 // quantos dias de folga cabem nas horas em carteira.
@@ -47,17 +47,6 @@ function addDaysISO(dateISO, days) {
 
 function todayMondayISO() {
     return toMondayISO(new Date().toISOString().slice(0, 10));
-}
-
-// Formata minutos como relogio HH:MM com sinal apenas quando negativo.
-// Aceita totais grandes (ex: 163:37), como na planilha.
-function minutosParaRelogio(minutos) {
-    const safe = Number.isFinite(Number(minutos)) ? Math.round(Number(minutos)) : 0;
-    const sinal = safe < 0 ? '-' : '';
-    const total = Math.abs(safe);
-    const horas = Math.floor(total / 60);
-    const restante = total % 60;
-    return `${sinal}${horas}:${String(restante).padStart(2, '0')}`;
 }
 
 function formatDateLabelISO(dateISO) {
@@ -297,108 +286,10 @@ router.put('/nota', async (req, res) => {
     res.json({ success: true, removido: false, semanaSegunda: semanaISO, observacao });
 });
 
-// Desconto de uma ausencia dentro da janela [inicioISO, fimISO] (inclusive).
-// Espelha a regra de calculateAusenciaDebitMinutes, mas limitado a janela,
-// para nao descontar de novo o que ja estava no saldo manual da semana base.
-// Retorna { minutos, aviso }.
-function calcularDescontoNaJanela(ausencia, colaborador, inicioISO, fimISO) {
-    const tipo = String(ausencia.Tipo || '').trim().toLowerCase();
-    const subtipo = normalizeSubtipo(ausencia.Subtipo);
-    const temExplicito = ausencia.DescontaBancoHoras !== undefined && ausencia.DescontaBancoHoras !== null;
-    const desconta = temExplicito
-        ? Boolean(ausencia.DescontaBancoHoras)
-        : resolveDefaultDescontaBancoHoras(tipo, subtipo);
-
-    if (!desconta || tipo === 'ferias') {
-        return { minutos: 0, aviso: null };
-    }
-
-    const periodoTipo = String(ausencia.PeriodoTipo || 'dia_inteiro').trim().toLowerCase();
-
-    if (periodoTipo === 'horas') {
-        const dataISO = extractDateString(ausencia.DataInicio);
-
-        if (!dataISO || dataISO < inicioISO || dataISO > fimISO) {
-            return { minutos: 0, aviso: null };
-        }
-
-        try {
-            return { minutos: calculateIntervalMinutes(ausencia.HoraInicio, ausencia.HoraFim), aviso: null };
-        } catch (error) {
-            return { minutos: 0, aviso: `Ausencia ${ausencia.Id}: ${error.message}` };
-        }
-    }
-
-    const inicioAusencia = extractDateString(ausencia.DataInicio);
-    const fimAusencia = extractDateString(ausencia.DataFim);
-    const janelaInicio = inicioAusencia > inicioISO ? inicioAusencia : inicioISO;
-    const janelaFim = fimAusencia < fimISO ? fimAusencia : fimISO;
-
-    if (!janelaInicio || !janelaFim || janelaInicio > janelaFim) {
-        return { minutos: 0, aviso: null };
-    }
-
-    let minutosDia = 0;
-
-    try {
-        minutosDia = calculateDailyWorkMinutes(colaborador);
-    } catch (error) {
-        return { minutos: 0, aviso: `Colaborador ${colaborador.Nome}: ${error.message}` };
-    }
-
-    // Conta TODOS os dias da janela (inclusive sabado/domingo): a escala agora
-    // tem plantonista de fim de semana, entao folga/ausencia em fim de semana
-    // tambem desconta.
-    const umDia = 24 * 60 * 60 * 1000;
-    const dias = Math.floor(
-        (new Date(`${janelaFim}T00:00:00Z`).getTime() - new Date(`${janelaInicio}T00:00:00Z`).getTime()) / umDia
-    ) + 1;
-    return { minutos: minutosDia * dias, aviso: null };
-}
-
-// Credito de plantao para um colaborador na janela [inicioISO, fimISO]:
-// para cada plantao em que ele trabalhou no periodo, soma (hora fim - hora inicio).
-function calcularCreditoPlantaoNaJanela(plantoes, colaboradorId, inicioISO, fimISO) {
-    let minutos = 0;
-    const avisos = [];
-
-    for (const plantao of plantoes) {
-        const dataISO = plantao.dataISO;
-
-        if (!dataISO || dataISO < inicioISO || dataISO > fimISO) {
-            continue;
-        }
-
-        if (!(plantao.colaboradores || []).map(Number).includes(Number(colaboradorId))) {
-            continue;
-        }
-
-        // Hora extra e paga em folha e nao entra no saldo. Creditar aqui fazia
-        // a grade semanal e o "em carteira" pagarem a mesma hora duas vezes:
-        // uma na folha e outra em folga.
-        if (plantao.tipoCredito === 'extra') {
-            continue;
-        }
-
-        if (!plantao.horaInicio || !plantao.horaFim) {
-            avisos.push(`Plantao ${plantao.id}: sem horario, credito ignorado.`);
-            continue;
-        }
-
-        try {
-            minutos += calculateIntervalMinutes(plantao.horaInicio, plantao.horaFim);
-        } catch (error) {
-            avisos.push(`Plantao ${plantao.id}: ${error.message}`);
-        }
-    }
-
-    return { minutos, avisos };
-}
-
 // GET /api/banco-horas-semanal/verificar?data=YYYY-MM-DD
 // Horas em carteira de cada colaborador no dia informado:
 // saldo do ultimo lancamento manual ate a data, menos ausencias/folgas
-// lancadas entre essa semana base e a data.
+// lancadas entre essa semana base e a data (ver services/horas-em-carteira.js).
 router.get('/verificar', async (req, res) => {
     const pool = await conectar();
 
@@ -406,94 +297,13 @@ router.get('/verificar', async (req, res) => {
         ? normalizeIsoDate(req.query.data, 'Data')
         : new Date().toISOString().slice(0, 10);
 
-    const permitidos = await getSetoresPermitidosRequest(pool, req);
-    const idsPermitidos = new Set(idsPermitidosNumericos(permitidos));
-
-    const colaboradoresResult = await pool.request()
-        .query('SELECT * FROM Colaboradores WHERE Ativo = 1 ORDER BY Nome');
-
-    const colaboradores = idsPermitidos.size
-        ? colaboradoresResult.recordset.filter((item) => idsPermitidos.has(Number(item.SetorId)))
-        : colaboradoresResult.recordset;
-
-    const basesResult = await pool.request()
-        .input('data', sql.Date, dataISO)
-        .query(`
-            SELECT b.ColaboradorId, b.SemanaSegunda, b.Minutos
-            FROM BancoHorasSemanal b
-            INNER JOIN (
-                SELECT ColaboradorId, MAX(SemanaSegunda) AS SemanaSegunda
-                FROM BancoHorasSemanal
-                WHERE SemanaSegunda <= @data
-                GROUP BY ColaboradorId
-            ) ultima
-                ON ultima.ColaboradorId = b.ColaboradorId
-               AND ultima.SemanaSegunda = b.SemanaSegunda
-        `);
-
-    const basePorColaborador = new Map();
-
-    for (const row of basesResult.recordset) {
-        const semanaISO = row.SemanaSegunda instanceof Date
-            ? row.SemanaSegunda.toISOString().slice(0, 10)
-            : String(row.SemanaSegunda).slice(0, 10);
-
-        basePorColaborador.set(Number(row.ColaboradorId), {
-            semanaSegunda: semanaISO,
-            minutos: Number(row.Minutos)
-        });
-    }
-
-    // Piso global para buscar ausencias: a base mais antiga entre os colaboradores.
-    const bases = [...basePorColaborador.values()];
-    const pisoGlobal = bases.length > 0
-        ? bases.map((item) => item.semanaSegunda).sort()[0]
-        : dataISO;
-
-    const ausenciasPorColaborador = new Map();
-
-    if (bases.length > 0) {
-        const ausenciasResult = await pool.request()
-            .input('piso', sql.Date, pisoGlobal)
-            .input('data', sql.Date, dataISO)
-            .query(`
-                SELECT Id, ColaboradorId, Tipo, Subtipo, DescontaBancoHoras,
-                       PeriodoTipo, DataInicio, DataFim, HoraInicio, HoraFim
-                FROM Ausencias
-                WHERE DataInicio <= @data AND DataFim >= @piso
-            `);
-
-        for (const ausencia of ausenciasResult.recordset) {
-            const colaboradorId = Number(ausencia.ColaboradorId);
-
-            if (!ausenciasPorColaborador.has(colaboradorId)) {
-                ausenciasPorColaborador.set(colaboradorId, []);
-            }
-
-            ausenciasPorColaborador.get(colaboradorId).push(ausencia);
-        }
-    }
-
-    // Plantoes da janela (creditos: sabado/domingo trabalhado soma hora).
-    let plantoesJanela = [];
-
-    if (bases.length > 0) {
-        const plantoesResult = await pool.request()
-            .input('piso', sql.Date, pisoGlobal)
-            .input('data', sql.Date, dataISO)
-            .query(`
-                SELECT ${PLANTAO_COLUNAS_CREDITO}
-                FROM plantoes
-                WHERE data_plantao <= @data AND data_plantao >= @piso
-            `);
-
-        plantoesJanela = plantoesResult.recordset.map((row) => serializePlantaoRecord(row));
-    }
-
+    const colaboradores = await listarColaboradoresAtivosVisiveis(pool, req);
+    const bases = await carregarBases(pool, dataISO, { ateInclusive: true });
+    const movimentacao = await carregarMovimentacao(pool, bases, dataISO);
     const avisos = [];
 
     const itens = colaboradores.map((colaborador) => {
-        const base = basePorColaborador.get(colaborador.Id) || null;
+        const base = bases.get(colaborador.Id) || null;
         const setorId = colaborador.SetorId === null || colaborador.SetorId === undefined
             ? null
             : Number(colaborador.SetorId);
@@ -517,36 +327,7 @@ router.get('/verificar', async (req, res) => {
             };
         }
 
-        const ausencias = ausenciasPorColaborador.get(colaborador.Id) || [];
-        let descontoMinutos = 0;
-
-        for (const ausencia of ausencias) {
-            const { minutos, aviso } = calcularDescontoNaJanela(
-                ausencia,
-                colaborador,
-                base.semanaSegunda,
-                dataISO
-            );
-
-            descontoMinutos += minutos;
-
-            if (aviso) {
-                avisos.push(aviso);
-            }
-        }
-
-        const credito = calcularCreditoPlantaoNaJanela(
-            plantoesJanela,
-            colaborador.Id,
-            base.semanaSegunda,
-            dataISO
-        );
-
-        const plantaoMinutos = credito.minutos;
-        credito.avisos.forEach((aviso) => avisos.push(aviso));
-
-        const resultadoMinutos = base.minutos + plantaoMinutos - descontoMinutos;
-        const sugestaoDias = resultadoMinutos > 0 ? Math.floor(resultadoMinutos / FOLGA_MINUTOS) : 0;
+        const saldo = calcularSaldo(colaborador, base, movimentacao, dataISO, avisos);
 
         return {
             colaboradorId: colaborador.Id,
@@ -556,13 +337,13 @@ router.get('/verificar', async (req, res) => {
             semanaBase: base.semanaSegunda,
             baseMinutos: base.minutos,
             baseFormatado: minutosParaRelogio(base.minutos),
-            plantaoMinutos,
-            plantaoFormatado: minutosParaRelogio(plantaoMinutos),
-            descontoMinutos,
-            descontoFormatado: minutosParaRelogio(descontoMinutos),
-            resultadoMinutos,
-            resultadoFormatado: minutosParaRelogio(resultadoMinutos),
-            sugestaoDias
+            plantaoMinutos: saldo.plantaoMinutos,
+            plantaoFormatado: minutosParaRelogio(saldo.plantaoMinutos),
+            descontoMinutos: saldo.descontoMinutos,
+            descontoFormatado: minutosParaRelogio(saldo.descontoMinutos),
+            resultadoMinutos: saldo.resultadoMinutos,
+            resultadoFormatado: minutosParaRelogio(saldo.resultadoMinutos),
+            sugestaoDias: saldo.resultadoMinutos > 0 ? Math.floor(saldo.resultadoMinutos / FOLGA_MINUTOS) : 0
         };
     });
 
@@ -606,9 +387,7 @@ router.get('/saldos', async (req, res) => {
         .filter((row) => !idsPermitidos.size || idsPermitidos.has(Number(row.SetorId)))
         .map((row) => ({
             colaboradorId: Number(row.ColaboradorId),
-            semanaSegunda: row.SemanaSegunda instanceof Date
-                ? row.SemanaSegunda.toISOString().slice(0, 10)
-                : String(row.SemanaSegunda).slice(0, 10),
+            semanaSegunda: semanaISO(row.SemanaSegunda),
             minutos: Number(row.Minutos),
             formatado: minutosParaRelogio(row.Minutos)
         }));
@@ -628,42 +407,9 @@ router.post('/gerar-semana', async (req, res) => {
     const alvoISO = toMondayISO(req.body?.semana);
     const aplicar = req.body?.aplicar === true;
 
-    const permitidos = await getSetoresPermitidosRequest(pool, req);
-    const idsPermitidos = new Set(idsPermitidosNumericos(permitidos));
-
-    const colaboradoresResult = await pool.request()
-        .query('SELECT * FROM Colaboradores WHERE Ativo = 1 ORDER BY Nome');
-
-    const colaboradores = idsPermitidos.size
-        ? colaboradoresResult.recordset.filter((item) => idsPermitidos.has(Number(item.SetorId)))
-        : colaboradoresResult.recordset;
-
+    const colaboradores = await listarColaboradoresAtivosVisiveis(pool, req);
     // Semana anterior = ultimo lancamento de cada colaborador antes do alvo.
-    const anterioresResult = await pool.request()
-        .input('alvo', sql.Date, alvoISO)
-        .query(`
-            SELECT b.ColaboradorId, b.SemanaSegunda, b.Minutos
-            FROM BancoHorasSemanal b
-            INNER JOIN (
-                SELECT ColaboradorId, MAX(SemanaSegunda) AS SemanaSegunda
-                FROM BancoHorasSemanal
-                WHERE SemanaSegunda < @alvo
-                GROUP BY ColaboradorId
-            ) ultima
-                ON ultima.ColaboradorId = b.ColaboradorId
-               AND ultima.SemanaSegunda = b.SemanaSegunda
-        `);
-
-    const anteriorPorColaborador = new Map();
-    for (const row of anterioresResult.recordset) {
-        const semanaISO = row.SemanaSegunda instanceof Date
-            ? row.SemanaSegunda.toISOString().slice(0, 10)
-            : String(row.SemanaSegunda).slice(0, 10);
-        anteriorPorColaborador.set(Number(row.ColaboradorId), {
-            semanaSegunda: semanaISO,
-            minutos: Number(row.Minutos)
-        });
-    }
+    const anteriores = await carregarBases(pool, alvoISO, { ateInclusive: false });
 
     // Status ja existente na semana alvo (para nao sobrescrever confirmado).
     const alvoResult = await pool.request()
@@ -671,70 +417,23 @@ router.post('/gerar-semana', async (req, res) => {
         .query('SELECT ColaboradorId, Status FROM BancoHorasSemanal WHERE SemanaSegunda = @alvo');
     const statusAlvo = new Map(alvoResult.recordset.map((row) => [Number(row.ColaboradorId), row.Status]));
 
-    const anteriores = [...anteriorPorColaborador.values()];
-    const pisoGlobal = anteriores.length > 0
-        ? anteriores.map((item) => item.semanaSegunda).sort()[0]
-        : alvoISO;
-
-    let plantoesJanela = [];
-    const ausenciasPorColaborador = new Map();
-
-    if (anteriores.length > 0) {
-        const ausenciasResult = await pool.request()
-            .input('piso', sql.Date, pisoGlobal)
-            .input('alvo', sql.Date, alvoISO)
-            .query(`
-                SELECT Id, ColaboradorId, Tipo, Subtipo, DescontaBancoHoras,
-                       PeriodoTipo, DataInicio, DataFim, HoraInicio, HoraFim
-                FROM Ausencias
-                WHERE DataInicio <= @alvo AND DataFim >= @piso
-            `);
-        for (const ausencia of ausenciasResult.recordset) {
-            const cid = Number(ausencia.ColaboradorId);
-            if (!ausenciasPorColaborador.has(cid)) {
-                ausenciasPorColaborador.set(cid, []);
-            }
-            ausenciasPorColaborador.get(cid).push(ausencia);
-        }
-
-        const plantoesResult = await pool.request()
-            .input('piso', sql.Date, pisoGlobal)
-            .input('alvo', sql.Date, alvoISO)
-            .query(`
-                SELECT ${PLANTAO_COLUNAS_CREDITO}
-                FROM plantoes
-                WHERE data_plantao <= @alvo AND data_plantao >= @piso
-            `);
-        plantoesJanela = plantoesResult.recordset.map((row) => serializePlantaoRecord(row));
-    }
-
+    const movimentacao = await carregarMovimentacao(pool, anteriores, alvoISO);
     const avisos = [];
 
     const itens = colaboradores.map((colaborador) => {
-        const anterior = anteriorPorColaborador.get(colaborador.Id) || null;
+        const anterior = anteriores.get(colaborador.Id) || null;
+        const jaConfirmado = statusAlvo.get(colaborador.Id) === 'confirmado';
 
         if (!anterior) {
             return {
                 colaboradorId: colaborador.Id,
                 nome: colaborador.Nome,
                 semBase: true,
-                jaConfirmado: statusAlvo.get(colaborador.Id) === 'confirmado'
+                jaConfirmado
             };
         }
 
-        const credito = calcularCreditoPlantaoNaJanela(plantoesJanela, colaborador.Id, anterior.semanaSegunda, alvoISO);
-        credito.avisos.forEach((aviso) => avisos.push(aviso));
-
-        let descontoMinutos = 0;
-        for (const ausencia of (ausenciasPorColaborador.get(colaborador.Id) || [])) {
-            const { minutos, aviso } = calcularDescontoNaJanela(ausencia, colaborador, anterior.semanaSegunda, alvoISO);
-            descontoMinutos += minutos;
-            if (aviso) {
-                avisos.push(aviso);
-            }
-        }
-
-        const propostoMinutos = anterior.minutos + credito.minutos - descontoMinutos;
+        const saldo = calcularSaldo(colaborador, anterior, movimentacao, alvoISO, avisos);
 
         return {
             colaboradorId: colaborador.Id,
@@ -743,41 +442,49 @@ router.post('/gerar-semana', async (req, res) => {
             semanaAnterior: anterior.semanaSegunda,
             anteriorMinutos: anterior.minutos,
             anteriorFormatado: minutosParaRelogio(anterior.minutos),
-            plantaoMinutos: credito.minutos,
-            plantaoFormatado: minutosParaRelogio(credito.minutos),
-            descontoMinutos,
-            descontoFormatado: minutosParaRelogio(descontoMinutos),
-            propostoMinutos,
-            propostoFormatado: minutosParaRelogio(propostoMinutos),
-            jaConfirmado: statusAlvo.get(colaborador.Id) === 'confirmado'
+            plantaoMinutos: saldo.plantaoMinutos,
+            plantaoFormatado: minutosParaRelogio(saldo.plantaoMinutos),
+            descontoMinutos: saldo.descontoMinutos,
+            descontoFormatado: minutosParaRelogio(saldo.descontoMinutos),
+            propostoMinutos: saldo.resultadoMinutos,
+            propostoFormatado: minutosParaRelogio(saldo.resultadoMinutos),
+            jaConfirmado
         };
     });
 
     let gravados = 0;
 
     if (aplicar) {
-        for (const item of itens) {
-            if (item.semBase || item.jaConfirmado) {
-                continue;
-            }
-            await pool.request()
-                .input('colaboradorId', sql.Int, item.colaboradorId)
-                .input('semana', sql.Date, alvoISO)
-                .input('minutos', sql.Int, item.propostoMinutos)
-                .query(`
-                    UPDATE BancoHorasSemanal
-                    SET Minutos = @minutos, Status = 'auto', AtualizadoEm = GETDATE()
-                    WHERE ColaboradorId = @colaboradorId AND SemanaSegunda = @semana AND Status <> 'confirmado';
+        // Uma transacao: ou a semana inteira e proposta, ou nada muda.
+        gravados = await withTransaction(sql, pool, async (tx) => {
+            let total = 0;
 
-                    IF @@ROWCOUNT = 0 AND NOT EXISTS (
-                        SELECT 1 FROM BancoHorasSemanal
-                        WHERE ColaboradorId = @colaboradorId AND SemanaSegunda = @semana
-                    )
-                        INSERT INTO BancoHorasSemanal (ColaboradorId, SemanaSegunda, Minutos, Status)
-                        VALUES (@colaboradorId, @semana, @minutos, 'auto');
-                `);
-            gravados += 1;
-        }
+            for (const item of itens) {
+                if (item.semBase || item.jaConfirmado) {
+                    continue;
+                }
+
+                await tx.request()
+                    .input('colaboradorId', sql.Int, item.colaboradorId)
+                    .input('semana', sql.Date, alvoISO)
+                    .input('minutos', sql.Int, item.propostoMinutos)
+                    .query(`
+                        UPDATE BancoHorasSemanal
+                        SET Minutos = @minutos, Status = 'auto', AtualizadoEm = GETDATE()
+                        WHERE ColaboradorId = @colaboradorId AND SemanaSegunda = @semana AND Status <> 'confirmado';
+
+                        IF @@ROWCOUNT = 0 AND NOT EXISTS (
+                            SELECT 1 FROM BancoHorasSemanal
+                            WHERE ColaboradorId = @colaboradorId AND SemanaSegunda = @semana
+                        )
+                            INSERT INTO BancoHorasSemanal (ColaboradorId, SemanaSegunda, Minutos, Status)
+                            VALUES (@colaboradorId, @semana, @minutos, 'auto');
+                    `);
+                total += 1;
+            }
+
+            return total;
+        });
     }
 
     res.json({
