@@ -356,9 +356,14 @@ o `ALTER COLUMN`/`DROP+ADD CONSTRAINT` sem guarda em
 Proposta: tabela `SchemaMigrations` registrando o que ja rodou. Mexe no fluxo de
 atualizacao da producao → pergunta P5.
 
-**M10 — Backups nunca sao apagados** · `ABERTO`
+**M10 — Backups nunca sao apagados** · `PROPOSTA`
 Backup automatico a cada 180 min (padrao) mais um por desligamento, sem
 retencao: ~8 arquivos/dia para sempre. Proposta: manter os N mais recentes (configuravel).
+**Nao implementado:** a correcao apaga arquivos na pasta de backup da producao,
+que pode conter copias que o usuario guarda de proposito (manuais, pre-restauracao).
+Proposta concreta: campo "manter os ultimos N backups automaticos" na tela de
+backup (padrao desligado), apagando so arquivos `generatedBy: 'automatico'` com o
+prefixo do sistema, nunca os manuais nem os de pre-restauracao. Precisa do seu ok (P8).
 
 **M11 — `/trocar-senha` e `deveTrocarSenha` so no front** · `RESOLVIDO`
 O servidor nao impede uma conta com `deveTrocarSenha = 1` de usar a API.
@@ -378,8 +383,13 @@ preferencias deste navegador"); a funcao continua.
 diz o que acontece de verdade (e que os dados do sistema nao sao apagados). O
 "digite RESET" saiu: a acao nao destroi nada.
 
-**M13 — Container roda como root** · `ABERTO`
+**M13 — Container roda como root** · `PROPOSTA`
 `Dockerfile`: sem `USER node`.
+**Nao implementado:** o volume de dados e de backups da producao ja pertence ao
+root; trocar o usuario sem migrar as permissoes faria o servidor perder escrita
+nos backups e na configuracao. Proposta concreta: `USER node` no Dockerfile mais
+um passo unico de `chown -R node:node` nos volumes, feito na janela de
+atualizacao, depois de backup (P9).
 
 **M14 — Funcoes gigantes** · `RESOLVIDO`
 Maiores: `renderConfiguracoes` (593 linhas), `gerarHtmlPdfRelatorioEscala` (562),
@@ -510,6 +520,14 @@ Tabelas pequenas; o collation padrao ja e case-insensitive. Nao vale o risco ago
 - **P5** (M9, M17): tabela de controle de migrations e tabela de ligacao
   plantao↔colaborador — mudancas de banco na producao.
 - **P6** (M15): migrar o frontend para modulos ES (fim dos monkey-patches)?
+- **P7**: formatacao em massa do codigo legado com Prettier?
+- **P8** (M10): retencao automatica de backups (apaga arquivos)?
+- **P9** (M13): container sem root (exige `chown` nos volumes da producao)?
+
+**Respondidas:** P1 sim (M7 resolvido), P2 sim (A5 resolvido), P4 sim, com
+derrubada das outras sessoes (A7 resolvido), P7 "nao agora" (o `.prettierignore`
+exclui o legado; codigo novo ja segue o formato). P3 foi decidida pelo menor
+risco: contas continuam fora do backup (A3). P5, P6, P8 e P9 seguem abertas.
 
 ---
 
@@ -550,6 +568,18 @@ salvar) e loga.
 `relatorio-mensal.js`, `feriados-export.js`, `plantao-regua-e-relatorios.js`;
 e o fechamento do pool no backend passou a logar a falha.
 
+**S7 — Restauracao gerava backup de seguranca antes de validar o arquivo** · `RESOLVIDO`
+`backend/routes/configuracao-banco.js`: um arquivo invalido criava um backup
+"pre-restauracao" inutil antes de ser recusado. **Feito:** o arquivo e validado
+primeiro (`coerceBackupPayload`); invalido volta 400 sem tocar no banco nem na
+pasta. Teste de integracao novo prova tambem que um arquivo acima de 1 MB chega a
+validacao (o limite de 25 MB da rota de restauracao vale).
+
+**S8 — Id de setor fora da faixa do INT no teto de setores** · `RESOLVIDO`
+`backend/auth/acesso-setores.js` (`idsPermitidosNumericos`): um id enorme no JSON
+do usuario virava parametro `sql.Int` invalido e a consulta estourava em 500.
+**Feito:** ids fora de 1..2147483647 sao descartados (nao existem na tabela).
+
 Quedas deliberadas que **ficaram** (documentadas no codigo): JSON invalido de
 cache/`localStorage`, `setPointerCapture` em navegador antigo, corpo de erro que
 nao e JSON (mensagem de reserva), pool que nem conectou, previa opcional da
@@ -559,7 +589,8 @@ escala e a fonte do PDF.
 
 ## 4. Registro das correcoes
 
-_(preenchido na Fase 3)_
+Cada item da secao 2 traz o **Feito:** com o que mudou; os commits da branch
+seguem a mesma ordem (um por item ou grupo pequeno). Item investigado depois:
 
 **B11 — Rajada repetida de requisicoes com sessao ativa** · `ACEITO`
 No servidor de teste, com sessao ativa, o navegador registrou mais de 1.900
@@ -574,23 +605,56 @@ uma com recarga da pagina — nao e bug.
 
 ---
 
-## 5. Resumo final (sessao interrompida pelo limite de uso)
+## 5. Resumo final
 
-**Resolvido:** C1, C2; A1, A2, A3, A4, A6, A8, A9, A10, A11, A12, A13; M1, M2,
-M3, M4, M5, M6, M8, M12, M16; B1, B2, B4, B5, B6, B7, B10. Rede de seguranca
-criada: 123 testes unitarios, 28 de integracao com SQL Server real, roteiro
-golden master (87 passos), ESLint e checagem de tipos sem nenhum erro, CI
-atualizado. Cerca de 3.000 linhas de codigo morto ou redundante removidas.
+### O que mudou e por que
 
-**Pendente (depende de decisao — ver secao 3):** A5 (P2, exportar backup
-completo), A7 (P4, senha atual na troca), M7 (P1), M9/M17 (P5), M15 (P6),
-formatacao em massa (P7), M13 (container como root: o volume de producao ja
-pertence ao root; trocar de usuario exige migrar as permissoes do volume).
+- **Criticos:** excluir colaborador nao deixa mais registros orfaos nem apaga
+  historico por engano (C1, `services/exclusao-colaborador.js`, em transacao); o
+  backup passou a cobrir todas as tabelas, a partir de uma especificacao unica
+  conferida contra o `INFORMATION_SCHEMA` em teste (C2).
+- **Seguranca:** hash de senha assincrono e comparacao em tempo constante, sem
+  enumeracao de usuarios; limite de tentativas; senha atual exigida na troca,
+  com as outras sessoes derrubadas; senha provisoria bloqueia a API ate a troca;
+  teto de setores aplicado em todas as APIs de dados e falhando fechado;
+  cabecalhos de seguranca; corpo JSON limitado; IP do cliente so via proxy
+  confiavel; erro inesperado nao vaza mensagem interna; `escapeHtml` unico e
+  aplicado nas interpolacoes de nome/erro.
+- **Dados:** "Exportar Dados" baixa o backup completo (antes gerava um arquivo
+  que, reimportado, apagava todo o resto); restauracao valida antes de mexer e
+  guarda um backup de seguranca; escrita multi-tabela em transacao.
+- **Estrutura:** `server.js` dividido por responsabilidade; calculo duplicado do
+  banco semanal num servico; `db/schema.js` e o parametro `schema` de 35 funcoes
+  removidos (as colunas sempre existem depois das migrations); listas de dominio
+  num lugar so; ~3.000 linhas de codigo morto removidas, com analisador proprio
+  (`npm run analisar:codigo-morto`).
+- **Rede de seguranca:** 128 testes unitarios, 34 de integracao contra SQL Server
+  descartavel, golden master de 87 passos + 14 tabelas (usado para provar
+  equivalencia das refatoracoes), ESLint, checagem de tipos (`checkJs`),
+  Prettier no codigo novo e `npm run verificar` no CI.
 
-**Pendente (sem bloqueio):** M10 (retencao de backups), M11, M14 (funcoes
-gigantes do frontend), B3 (versao no export antigo, junto com A5), B9, B11 e a
-atualizacao do README (Fase 5).
+### Resolvidos
 
-**Recomendacoes:** responder P1–P7; rodar `npm run test:integracao` e o golden
-master antes de qualquer refatoracao grande do backend; aplicar as tres
-migrations pendentes em producao so depois de backup.
+C1, C2; A1–A13; M1–M8, M11, M12, M14, M16; B1–B7, B9, B10; S1–S8.
+Aceitos com justificativa: B8, B11 e a parte de frontend do M14.
+
+### Pendente (propostas, dependem de decisao)
+
+- **M9 / M17 (P5):** tabela de controle de migrations e tabela de ligacao
+  plantao↔colaborador — mudam o banco da producao.
+- **M15 (P6):** frontend em modulos ES, acabando com os monkey-patches de
+  `core/runtime/` (e abrindo caminho para quebrar as funcoes-template gigantes).
+- **M10 (P8):** retencao de backups automaticos.
+- **M13 (P9):** container sem root.
+- **P7:** formatacao em massa do legado (adiada a seu pedido).
+
+### Recomendacoes futuras
+
+1. **Antes de atualizar a producao:** gerar backup (tela ou `/backup/gerar`) e so
+   entao subir a imagem nova. Esta branch nao traz migration nova, mas a imagem
+   em producao e anterior a varias migrations da `main`, que rodam no boot.
+2. Rodar `npm run verificar`, `npm run test:integracao` e o golden master
+   antes de qualquer refatoracao grande do backend.
+3. Avisar os usuarios: a troca de senha agora pede a senha atual, e o arquivo de
+   "Exportar Dados" mudou de formato (os arquivos antigos continuam importaveis).
+4. Decidir P5, P6, P8 e P9; a proxima maior melhoria de qualidade e o M15.
