@@ -1,11 +1,19 @@
 {
-    "tabWidth": 4,
-    "useTabs": false,
-    "printWidth": 120,
-    "singleQuote": true,
-    "semi": true,
-    "trailingComma": "none",
-    "arrowParens": "always",
-    "bracketSpacing": true,
-    "endOfLine": "lf"
+  "tabWidth": 4,
+  "useTabs": false,
+  "printWidth": 120,
+  "singleQuote": true,
+  "semi": true,
+  "trailingComma": "none",
+  "arrowParens": "always",
+  "bracketSpacing": true,
+  "endOfLine": "lf",
+  "overrides": [
+    {
+      "files": ["*.json"],
+      "options": {
+        "tabWidth": 2
+      }
+    }
+  ]
 }

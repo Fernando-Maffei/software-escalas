@@ -16,7 +16,7 @@ function openNativeFolderPicker(options = {}) {
         '$dialog = New-Object System.Windows.Forms.FolderBrowserDialog',
         "$dialog.Description = 'Selecione a pasta para salvar os backups do sistema.'",
         '$dialog.ShowNewFolderButton = $true',
-        '$initialPath = $env:CODEX_BACKUP_INITIAL_DIRECTORY',
+        '$initialPath = $env:ESCALAS_PASTA_BACKUP_INICIAL',
         'if ($initialPath -and (Test-Path -LiteralPath $initialPath -PathType Container)) {',
         '    $dialog.SelectedPath = $initialPath',
         '}',
@@ -35,7 +35,7 @@ function openNativeFolderPicker(options = {}) {
                 timeout: 300000,
                 env: {
                     ...process.env,
-                    CODEX_BACKUP_INITIAL_DIRECTORY: initialDirectory
+                    ESCALAS_PASTA_BACKUP_INICIAL: initialDirectory
                 }
             },
             (error, stdout, stderr) => {

@@ -1,6 +1,7 @@
 const express = require('express');
 
-const { conectar } = require('../db');
+const { sql, conectar } = require('../db');
+const { withTransaction } = require('../db/transactions');
 const { AppError } = require('../lib/errors');
 const {
     countOtherActiveAdmins,
@@ -125,6 +126,7 @@ router.put('/:id', async (req, res, next) => {
             }
         }
 
+        /** @type {{ ativo?: boolean, isAdmin?: boolean }} */
         const flags = {};
 
         if (querDesativar || querReativar) {
@@ -135,44 +137,45 @@ router.put('/:id', async (req, res, next) => {
             flags.isAdmin = req.body.isAdmin;
         }
 
-        await updateUserFlags(pool, alvo.id, flags);
-
-        // Setores permitidos (teto de acesso imposto). So aplica quando o campo
-        // vem no corpo, para nao zerar a permissao numa atualizacao de flags.
-        // Nao derruba a sessao: a imposicao no backend le o teto fresco do banco
-        // a cada request, entao a mudanca ja vale no proximo carregamento.
-        if (Array.isArray(req.body?.setoresPermitidos)) {
-            await updateUserSetoresPermitidos(pool, alvo.id, req.body.setoresPermitidos);
-        }
-
+        // Valida ANTES de gravar qualquer coisa: antes uma senha curta dava 400
+        // depois de ja ter mudado ativo/admin.
+        // Senha definida explicitamente pelo administrador (diferente do reset,
+        // que gera uma aleatoria). Vale como esta e nao exige troca no primeiro
+        // acesso — quem definiu ja escolheu a senha final.
+        const novaSenha = querDefinirSenha ? normalizePassword(req.body.novaSenha, 'Nova senha') : null;
         let senhaTemporaria = null;
 
-        if (querDefinirSenha) {
-            // Senha definida explicitamente pelo administrador (diferente do
-            // reset, que gera uma aleatoria). Vale como esta e nao exige troca
-            // no primeiro acesso — quem definiu ja escolheu a senha final.
-            const novaSenha = normalizePassword(req.body.novaSenha, 'Nova senha');
+        await withTransaction(sql, pool, async (tx) => {
+            await updateUserFlags(tx, alvo.id, flags);
 
-            await updateUserPassword(pool, alvo.id, novaSenha, {
-                deveTrocarSenha: false
-            });
-        } else if (querResetarSenha) {
-            // Le o papel depois de updateUserFlags: se a mesma requisicao
-            // promoveu ou rebaixou o usuario, quem vale e o papel novo.
-            const alvoAtualizado = await findUserById(pool, alvo.id);
+            // Setores permitidos (teto de acesso imposto). So aplica quando o
+            // campo vem no corpo, para nao zerar a permissao numa atualizacao de
+            // flags. Nao derruba a sessao: a imposicao no backend le o teto
+            // fresco do banco a cada request.
+            if (Array.isArray(req.body?.setoresPermitidos)) {
+                await updateUserSetoresPermitidos(tx, alvo.id, req.body.setoresPermitidos);
+            }
 
-            senhaTemporaria = generateRandomPassword();
-            await updateUserPassword(pool, alvo.id, senhaTemporaria, {
-                // Mesma razao da criacao: conta de visualizacao e
-                // compartilhada e nao pode exigir troca no primeiro acesso.
-                deveTrocarSenha: alvoAtualizado.isAdmin
-            });
-        }
+            if (novaSenha) {
+                await updateUserPassword(tx, alvo.id, novaSenha, { deveTrocarSenha: false });
+            } else if (querResetarSenha) {
+                // Le o papel depois de updateUserFlags: se a mesma requisicao
+                // promoveu ou rebaixou o usuario, quem vale e o papel novo.
+                const alvoAtualizado = await findUserById(tx, alvo.id);
 
-        // Mudancas restritivas valem imediatamente, nao so no proximo login.
-        if (querDesativar || querRemoverAdmin || querResetarSenha || querDefinirSenha) {
-            await revokeUserSessions(pool, alvo.id);
-        }
+                senhaTemporaria = generateRandomPassword();
+                await updateUserPassword(tx, alvo.id, senhaTemporaria, {
+                    // Mesma razao da criacao: conta de visualizacao e
+                    // compartilhada e nao pode exigir troca no primeiro acesso.
+                    deveTrocarSenha: alvoAtualizado.isAdmin
+                });
+            }
+
+            // Mudancas restritivas valem imediatamente, nao so no proximo login.
+            if (querDesativar || querRemoverAdmin || querResetarSenha || querDefinirSenha) {
+                await revokeUserSessions(tx, alvo.id);
+            }
+        });
 
         const atualizado = await findUserById(pool, alvo.id);
 

@@ -1,54 +1,54 @@
 {
-    "name": "app-de-escalas",
-    "version": "1.6.3",
-    "description": "Sistema web para gestao de escalas de trabalho.",
-    "productName": "App de Escalas",
-    "engines": {
-        "node": ">=20"
-    },
-    "scripts": {
-        "start": "node backend/server.js",
-        "dev": "node backend/server.js",
-        "test": "node tests/unit/run-tests.js",
-        "test:integracao": "node tests/integracao/run-tests.js",
-        "integracao:banco:subir": "node scripts/banco-integracao.js subir",
-        "integracao:banco:derrubar": "node scripts/banco-integracao.js derrubar",
-        "lint": "eslint .",
-        "lint:fix": "eslint . --fix",
-        "typecheck": "tsc -p tsconfig.json",
-        "format": "prettier --write .",
-        "format:check": "prettier --check .",
-        "verificar": "npm run smoke && npm run lint && npm run typecheck && npm run format:check && npm test",
-        "e2e": "playwright test",
-        "e2e:demo": "playwright test --project=demo",
-        "e2e:teste": "playwright test --project=teste",
-        "e2e:relatorio": "playwright show-report tests/e2e/relatorio",
-        "teste:subir": "docker compose -f docker-compose.teste.yml up -d --build",
-        "teste:derrubar": "docker compose -f docker-compose.teste.yml down -v",
-        "limpar-feriados-nacionais": "node scripts/limpar-feriados-nacionais.js",
-        "smoke": "node tests/smoke.js",
-        "integracao:servidor": "node tests/integracao/servidor-local.js",
-        "analisar:codigo-morto": "node scripts/analisar-codigo-morto.js"
-    },
-    "keywords": [],
-    "author": "Fernando Maffei",
-    "license": "ISC",
-    "type": "commonjs",
-    "dependencies": {
-        "cors": "^2.8.6",
-        "express": "^5.2.1",
-        "mssql": "^12.2.0"
-    },
-    "devDependencies": {
-        "@eslint/js": "^9.39.5",
-        "@playwright/test": "^1.63.0",
-        "@types/express": "^5.0.6",
-        "@types/mssql": "^12.3.0",
-        "@types/node": "^20.19.43",
-        "eslint": "^9.39.5",
-        "espree": "^10.4.0",
-        "globals": "^16.5.0",
-        "prettier": "^3.9.9",
-        "typescript": "^5.9.3"
-    }
+  "name": "app-de-escalas",
+  "version": "1.6.3",
+  "description": "Sistema web para gestao de escalas de trabalho.",
+  "productName": "App de Escalas",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node backend/server.js",
+    "dev": "node backend/server.js",
+    "test": "node tests/unit/run-tests.js",
+    "test:integracao": "node tests/integracao/run-tests.js",
+    "integracao:banco:subir": "node scripts/banco-integracao.js subir",
+    "integracao:banco:derrubar": "node scripts/banco-integracao.js derrubar",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "typecheck": "tsc -p tsconfig.json",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "verificar": "npm run smoke && npm run lint && npm run typecheck && npm run format:check && npm test",
+    "e2e": "playwright test",
+    "e2e:demo": "playwright test --project=demo",
+    "e2e:teste": "playwright test --project=teste",
+    "e2e:relatorio": "playwright show-report tests/e2e/relatorio",
+    "teste:subir": "docker compose -f docker-compose.teste.yml up -d --build",
+    "teste:derrubar": "docker compose -f docker-compose.teste.yml down -v",
+    "limpar-feriados-nacionais": "node scripts/limpar-feriados-nacionais.js",
+    "smoke": "node tests/smoke.js",
+    "integracao:servidor": "node tests/integracao/servidor-local.js",
+    "analisar:codigo-morto": "node scripts/analisar-codigo-morto.js"
+  },
+  "keywords": [],
+  "author": "Fernando Maffei",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "cors": "^2.8.6",
+    "express": "^5.2.1",
+    "mssql": "^12.2.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.5",
+    "@playwright/test": "^1.63.0",
+    "@types/express": "^5.0.6",
+    "@types/mssql": "^12.3.0",
+    "@types/node": "^20.19.43",
+    "eslint": "^9.39.5",
+    "espree": "^10.4.0",
+    "globals": "^16.5.0",
+    "prettier": "^3.9.9",
+    "typescript": "^5.9.3"
+  }
 }

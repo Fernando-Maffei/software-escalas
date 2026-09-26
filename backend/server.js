@@ -12,6 +12,7 @@ const {
 const { AppError } = require('./lib/errors');
 const { getClientIp, parseTrustProxy } = require('./lib/ip-cliente');
 const { tratadorDeErros } = require('./lib/tratador-erros');
+const { cabecalhosDeSeguranca } = require('./lib/cabecalhos-seguranca');
 const { requireAuth, purgeExpiredSessions } = require('./auth/auth');
 const { checkAccess } = require('./auth/permissoes');
 const { ensureApplicationSchema } = require('./db/database-schema');
@@ -366,8 +367,13 @@ function getNetworkStatusPayload(req) {
 app.disable('x-powered-by');
 // Sem TRUST_PROXY, X-Forwarded-For e ignorado (ver lib/ip-cliente.js).
 app.set('trust proxy', parseTrustProxy(process.env.TRUST_PROXY));
+app.use(cabecalhosDeSeguranca);
 app.use(cors(corsOptionsDelegate));
-app.use(express.json({ limit: '25mb' }));
+// So a restauracao de backup recebe o arquivo inteiro no corpo; o resto da
+// API trafega formularios pequenos. Um limite unico de 25 MB deixava qualquer
+// rota aceitar (e parsear) corpos enormes.
+app.use('/api/configuracao-banco/backup/restaurar', express.json({ limit: '25mb' }));
+app.use(express.json({ limit: '1mb' }));
 // Sem cache nos arquivos do front-end: garante que o time sempre recebe a
 // versao atual (CSS/JS/HTML). Sem isso, o navegador segurava versoes velhas
 // e mudancas so apareciam com hard refresh — pior ainda com o ?v fixo dos

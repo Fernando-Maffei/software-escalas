@@ -1,24 +1,24 @@
 {
-    "compilerOptions": {
-        "target": "ES2022",
-        "module": "commonjs",
-        "moduleResolution": "node",
-        "lib": ["ES2022"],
-        "allowJs": true,
-        "checkJs": true,
-        "noEmit": true,
-        "strict": false,
-        "noImplicitAny": false,
-        "skipLibCheck": true,
-        "types": ["node"],
-        "resolveJsonModule": true
-    },
-    "include": [
-        "backend/**/*.js",
-        "backend/types/**/*.d.ts",
-        "scripts/**/*.js",
-        "tests/unit/**/*.js",
-        "tests/integracao/**/*.js",
-        "tests/smoke.js"
-    ]
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "lib": ["ES2022"],
+    "allowJs": true,
+    "checkJs": true,
+    "noEmit": true,
+    "strict": false,
+    "noImplicitAny": false,
+    "skipLibCheck": true,
+    "types": ["node"],
+    "resolveJsonModule": true
+  },
+  "include": [
+    "backend/**/*.js",
+    "backend/types/**/*.d.ts",
+    "scripts/**/*.js",
+    "tests/unit/**/*.js",
+    "tests/integracao/**/*.js",
+    "tests/smoke.js"
+  ]
 }

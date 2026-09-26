@@ -262,17 +262,29 @@ acima do INT do SQL Server (antes virava 500 no driver).
 **Feito:** cookie com escape invalido e ignorado (sessao ausente → 401). Testes
 unitario e de integracao.
 
-**M4 — Atualizacao de usuario nao e atomica** · `ABERTO`
+**M4 — Atualizacao de usuario nao e atomica** · `RESOLVIDO`
 `backend/routes/usuarios.js:93-190`: flags sao gravadas antes de validar
 `novaSenha`; senha curta devolve 400 **depois** de ja ter mudado ativo/admin.
+**Feito:** a senha nova e validada antes de qualquer escrita, e flags, setores,
+senha e revogacao de sessoes vao numa transacao so. Teste de integracao:
+`ativo:false` + senha curta devolve 400 e o usuario continua ativo.
 
-**M5 — Transacao depende de campo privado do mssql** · `ABERTO`
+**M5 — Transacao depende de campo privado do mssql** · `RESOLVIDO`
 `backend/db/transactions.js:10` le `transaction._aborted`.
+**Feito:** `withTransaction` escuta o evento publico `rollback` do mssql para
+saber se o servidor ja abortou; falha do rollback manual e logada (antes era
+engolida) e o erro original e o que sobe.
 
-**M6 — Sem cabecalhos de seguranca** · `ABERTO`
+**M6 — Sem cabecalhos de seguranca** · `RESOLVIDO`
 Sem `X-Content-Type-Options`, `X-Frame-Options`/`frame-ancestors`,
 `Referrer-Policy`. Limite de corpo JSON de 25 MB vale para **todas** as rotas
 (so a restauracao de backup precisa).
+**Feito:** `backend/lib/cabecalhos-seguranca.js` (nosniff, `X-Frame-Options:
+SAMEORIGIN`, `frame-ancestors 'self'`, `Referrer-Policy: same-origin`) em toda
+resposta; corpo JSON limitado a 1 MB, com 25 MB so em
+`/backup/restaurar`. Testes de integracao dos cabecalhos e do 413. **Fica de
+fora:** CSP de script — as telas usam `onclick` inline em muitos pontos; exigiria
+`'unsafe-inline'`, que anula a protecao (ver M15).
 
 **M7 — Controle de acesso por setor so no cadastro de colaboradores** · `PROPOSTA`
 `getSetoresPermitidosRequest` e aplicado em colaboradores, escala e banco semanal,
@@ -325,7 +337,9 @@ Maiores: `renderConfiguracoes` (593 linhas), `gerarHtmlPdfRelatorioEscala` (562)
 "mortas" das funcoes originais que ninguem chama. Resolver de verdade e migrar
 para modulos ES — mudanca estrutural grande → pergunta P6.
 
-**M16 — `npm audit`: body-parser e qs** · `ABERTO` (`npm audit fix`).
+**M16 — `npm audit`: body-parser e qs** · `RESOLVIDO`.
+**Feito:** `npm audit fix` (body-parser 2.3.0, qs 6.16.0); `npm audit` zerado.
+Testes unitarios e de integracao passando com as versoes novas.
 
 **M17 — Plantao guarda colaboradores como JSON em texto** · `PROPOSTA`
 `plantoes.colaboradores_ids` (NVARCHAR com array JSON): sem FK, exige ler a
@@ -369,17 +383,24 @@ Ex.: `ausencias-e-timeline.js:6-52` loga cada ausencia recebida (dados pessoais 
 **B3 — Versao fixa `'1.2.0'` nos metadados do backup/export** · `ABERTO` (backup do servidor resolvido: usa a versao do package.json; falta o export do front, ver A5)
 `backup-service.js:441`, `configuracoes-tela.js:636` (o sistema esta na 1.6.3).
 
-**B4 — Nome de variavel herdado de outra ferramenta** · `ABERTO`
+**B4 — Nome de variavel herdado de outra ferramenta** · `RESOLVIDO`
 `CODEX_BACKUP_INITIAL_DIRECTORY` em `backend/lib/folder-picker.js:19,38`.
+**Feito:** renomeada para `ESCALAS_PASTA_BACKUP_INICIAL` (so interna ao picker).
 
-**B5 — Comentario solto** · `ABERTO`
+**B5 — Comentario solto** · `RESOLVIDO`
 `backend/routes/auth.js:126-129`: o comentario de `verify-password` ficou em cima de `PUT /me/setores`.
+**Feito:** o comentario voltou para cima de `POST /verify-password`.
 
-**B6 — `scryptSync`/`spawnSync` bloqueiam o event loop** · `ABERTO`
+**B6 — `scryptSync`/`spawnSync` bloqueiam o event loop** · `RESOLVIDO`
 Login (`auth.js:21,26`) e rotas de `/sistema` (`background-service.js:15`).
+**Feito (scrypt):** `crypto.scrypt` assincrono em hash e verificacao. `spawnSync`
+em `/sistema` ficou: so roda no Windows, em acao manual de admin, e dura
+milissegundos — `ACEITO`.
 
-**B7 — Enumeracao de usuario por tempo de resposta no login** · `ABERTO`
+**B7 — Enumeracao de usuario por tempo de resposta no login** · `RESOLVIDO`
 Usuario inexistente responde sem rodar o scrypt (mais rapido).
+**Feito:** `credenciaisValidas` roda o scrypt contra um hash ficticio quando o
+usuario nao existe; login e verify-password usam essa funcao. Teste unitario.
 
 **B9 — Telas pedem dados antes do login** · `ABERTO`
 Ao abrir o sistema deslogado, ~15 requisicoes de dados saem antes da tela de login

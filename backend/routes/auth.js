@@ -4,6 +4,7 @@ const { conectar } = require('../db');
 const { AppError } = require('../lib/errors');
 const {
     clearSessionCookie,
+    credenciaisValidas,
     createSession,
     destroySession,
     findUserById,
@@ -15,8 +16,7 @@ const {
     setSessionCookie,
     touchLastLogin,
     updateUserPassword,
-    updateUserSetoresVisiveis,
-    verifyPassword
+    updateUserSetoresVisiveis
 } = require('../auth/auth');
 
 const { createRateLimiter } = require('../auth/rate-limit');
@@ -56,7 +56,7 @@ router.post('/login', async (req, res, next) => {
         const pool = await conectar();
         const user = await findUserByUsername(pool, username);
 
-        if (!user || !user.ativo || !verifyPassword(password, user.passwordHash, user.passwordSalt)) {
+        if (!(await credenciaisValidas(user, password))) {
             loginRateLimiter.registerFailure(rateKey);
             throw new AppError(401, 'Usuario ou senha invalidos.');
         }
@@ -121,10 +121,6 @@ router.post('/trocar-senha', requireAuth, async (req, res, next) => {
     }
 });
 
-// Confirma a senha do PROPRIO usuario logado. Serve de "portao" para acoes
-// sensiveis (ex.: excluir um colaborador) sem alterar o contrato dessas rotas:
-// o front chama isto ANTES de agir e so prossegue se der 200. Usa o mesmo
-// limitador de forca bruta do login, com chave propria.
 // Salva a preferencia "Meus setores" do PROPRIO usuario logado (nao e area
 // administrativa: cada um ajusta a propria visao). Corpo: { setores: [ids] }.
 // Lista vazia = ver todos (sem filtro). Retorna a lista ja normalizada.
@@ -140,6 +136,10 @@ router.put('/me/setores', requireAuth, async (req, res, next) => {
     }
 });
 
+// Confirma a senha do PROPRIO usuario logado. Serve de "portao" para acoes
+// sensiveis (ex.: excluir um colaborador) sem alterar o contrato dessas rotas:
+// o front chama isto ANTES de agir e so prossegue se der 200. Usa o mesmo
+// limitador de forca bruta do login, com chave propria.
 router.post('/verify-password', requireAuth, async (req, res, next) => {
     try {
         const password = String(req.body?.password || '');
@@ -159,7 +159,7 @@ router.post('/verify-password', requireAuth, async (req, res, next) => {
         const pool = await conectar();
         const user = await findUserById(pool, req.user.id);
 
-        if (!user || !user.ativo || !verifyPassword(password, user.passwordHash, user.passwordSalt)) {
+        if (!(await credenciaisValidas(user, password))) {
             loginRateLimiter.registerFailure(rateKey);
             throw new AppError(403, 'Senha incorreta.');
         }

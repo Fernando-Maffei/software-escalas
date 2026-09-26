@@ -16,14 +16,34 @@ const MIN_PASSWORD_LENGTH = 8;
 // custo e uma consulta por request autenticado, trivial pelo indice na chave.
 // A validade desliza a cada acesso (getSession renova o ExpiresAt), como antes.
 
-function hashPassword(password) {
+// scrypt assincrono: a versao Sync travava o event loop (~50 ms por login),
+// e com varios logins juntos o servidor inteiro parava de responder.
+/**
+ * @param {string} password
+ * @param {string} salt
+ * @returns {Promise<Buffer>}
+ */
+function derivarChave(password, salt) {
+    return new Promise((resolve, reject) => {
+        crypto.scrypt(password, salt, SCRYPT_KEYLEN, (error, chave) => {
+            if (error) {
+                reject(error);
+                return;
+            }
+
+            resolve(chave);
+        });
+    });
+}
+
+async function hashPassword(password) {
     const salt = crypto.randomBytes(16).toString('hex');
-    const hash = crypto.scryptSync(password, salt, SCRYPT_KEYLEN).toString('hex');
+    const hash = (await derivarChave(password, salt)).toString('hex');
     return { hash, salt };
 }
 
-function verifyPassword(password, hash, salt) {
-    const candidate = crypto.scryptSync(password, salt, SCRYPT_KEYLEN);
+async function verifyPassword(password, hash, salt) {
+    const candidate = await derivarChave(password, salt);
     const stored = Buffer.from(hash, 'hex');
 
     if (candidate.length !== stored.length) {
@@ -31,6 +51,31 @@ function verifyPassword(password, hash, salt) {
     }
 
     return crypto.timingSafeEqual(candidate, stored);
+}
+
+// Hash de uma senha qualquer, calculado uma vez. Login de usuario que nao
+// existe roda o mesmo scrypt contra ele, para responder no mesmo tempo que uma
+// senha errada — senao a demora revelaria quais usuarios existem.
+let hashFicticio = null;
+
+async function verificarContraHashFicticio(password) {
+    if (!hashFicticio) {
+        hashFicticio = await hashPassword(crypto.randomBytes(16).toString('hex'));
+    }
+
+    await verifyPassword(password, hashFicticio.hash, hashFicticio.salt);
+    return false;
+}
+
+// Confere usuario + senha. Usuario inexistente ou inativo leva o mesmo tempo
+// de uma senha errada.
+async function credenciaisValidas(user, password) {
+    if (!user) {
+        return verificarContraHashFicticio(password);
+    }
+
+    const senhaConfere = await verifyPassword(password, user.passwordHash, user.passwordSalt);
+    return senhaConfere && user.ativo;
 }
 
 function normalizeUsername(value) {
@@ -141,7 +186,7 @@ async function findUserById(pool, id) {
 async function createUser(pool, { username, password, deveTrocarSenha = false, isAdmin = false }) {
     const normalizedUsername = normalizeUsername(username);
     const normalizedPassword = normalizePassword(password);
-    const { hash, salt } = hashPassword(normalizedPassword);
+    const { hash, salt } = await hashPassword(normalizedPassword);
 
     await pool.request()
         .input('username', sql.NVarChar(100), normalizedUsername)
@@ -176,7 +221,7 @@ async function countOtherActiveAdmins(pool, excludedUserId) {
 }
 
 /**
- * @param {import('mssql').ConnectionPool} pool
+ * @param {import('mssql').ConnectionPool | import('mssql').Transaction} pool
  * @param {number} userId
  * @param {{ ativo?: boolean, isAdmin?: boolean }} flags
  */
@@ -211,7 +256,7 @@ async function updateUserFlags(pool, userId, { ativo, isAdmin }) {
 async function updateUserPassword(pool, userId, newPassword, options = {}) {
     const { deveTrocarSenha = false } = options;
     const normalizedPassword = normalizePassword(newPassword, 'Nova senha');
-    const { hash, salt } = hashPassword(normalizedPassword);
+    const { hash, salt } = await hashPassword(normalizedPassword);
 
     await pool.request()
         .input('id', sql.Int, userId)
@@ -473,6 +518,7 @@ module.exports = {
     createSession,
     createUser,
     clearSessionCookie,
+    credenciaisValidas,
     deleteUser,
     destroySession,
     ensureDefaultAdmin,

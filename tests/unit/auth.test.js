@@ -1,6 +1,7 @@
 const assert = require('node:assert/strict');
 
 const {
+    credenciaisValidas,
     ensureDefaultAdmin,
     getSessionTokenFromRequest,
     verifyPassword
@@ -90,7 +91,7 @@ module.exports = [
             assert.equal(resultado.generated, false);
 
             const [linha] = pool.estado.usuarios;
-            assert.equal(verifyPassword('Senha!Valida1', linha.PasswordHash, linha.PasswordSalt), true);
+            assert.equal(await verifyPassword('Senha!Valida1', linha.PasswordHash, linha.PasswordSalt), true);
             assert.equal(linha.DeveTrocarSenha, false);
         }
     },
@@ -109,7 +110,7 @@ module.exports = [
             assert.ok(resultado.password && resultado.password !== 'curta');
 
             const [linha] = pool.estado.usuarios;
-            assert.equal(verifyPassword(resultado.password, linha.PasswordHash, linha.PasswordSalt), true);
+            assert.equal(await verifyPassword(resultado.password, linha.PasswordHash, linha.PasswordSalt), true);
             assert.equal(linha.DeveTrocarSenha, true);
         }
     },
@@ -140,6 +141,23 @@ module.exports = [
             const req = { headers: { cookie: 'escalas_sid=%E0%A4%A; tema=%' } };
 
             assert.equal(getSessionTokenFromRequest(req), null);
+        }
+    }
+,
+    {
+        // B7 da auditoria: usuario inexistente respondia sem rodar o scrypt, e o
+        // tempo de resposta revelava quais contas existem.
+        name: 'credenciaisValidas recusa inexistente, inativo e senha errada; aceita a certa',
+        async run() {
+            const pool = criarPoolFalso();
+            await comAmbiente({ ADMIN_USERNAME: 'chefe', ADMIN_PASSWORD: 'Senha!Valida1' }, () => ensureDefaultAdmin(pool));
+            const [linha] = pool.estado.usuarios;
+            const usuario = { passwordHash: linha.PasswordHash, passwordSalt: linha.PasswordSalt, ativo: true };
+
+            assert.equal(await credenciaisValidas(usuario, 'Senha!Valida1'), true);
+            assert.equal(await credenciaisValidas(usuario, 'errada-123'), false);
+            assert.equal(await credenciaisValidas({ ...usuario, ativo: false }, 'Senha!Valida1'), false);
+            assert.equal(await credenciaisValidas(null, 'qualquer-coisa'), false);
         }
     }
 ];

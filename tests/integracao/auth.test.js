@@ -110,5 +110,45 @@ module.exports = [
             assert.equal(resposta.status, 400);
             assert.doesNotMatch(String(resposta.body?.error), /Validation failed|mssql|tedious/i);
         }
+    },
+    {
+        // M4 da auditoria: as flags eram gravadas antes de validar a senha nova;
+        // o 400 chegava com o usuario ja desativado.
+        name: 'atualizar usuario com senha invalida nao grava nada',
+        async run() {
+            const { username } = await criarUsuarioComum();
+            const admin = criarCliente();
+            await admin.entrar();
+
+            const lista = esperarSucesso(await admin.get('/api/usuarios'), 'listar usuarios');
+            const alvo = lista.usuarios.find((usuario) => usuario.username === username);
+            const resposta = await admin.put(`/api/usuarios/${alvo.id}`, { ativo: false, novaSenha: 'curta' });
+
+            assert.equal(resposta.status, 400);
+
+            const depois = esperarSucesso(await admin.get('/api/usuarios'), 'listar usuarios');
+            assert.equal(depois.usuarios.find((usuario) => usuario.id === alvo.id).ativo, true);
+        }
+    },
+    {
+        name: 'respostas levam cabecalhos de seguranca',
+        async run() {
+            const resposta = await criarCliente().get('/api/setup/status');
+
+            assert.equal(resposta.headers.get('x-content-type-options'), 'nosniff');
+            assert.equal(resposta.headers.get('x-frame-options'), 'SAMEORIGIN');
+            assert.match(resposta.headers.get('content-security-policy'), /frame-ancestors 'self'/);
+        }
+    },
+    {
+        // M6 da auditoria: o limite de 25 MB valia para toda a API.
+        name: 'corpo acima de 1 MB e recusado fora da restauracao de backup',
+        async run() {
+            const cliente = criarCliente();
+            await cliente.entrar();
+
+            const resposta = await cliente.post('/api/setores', { nome: 'x'.repeat(1024 * 1024 + 10) });
+            assert.equal(resposta.status, 413);
+        }
     }
 ];
