@@ -89,7 +89,7 @@ Tamanho: ~62 mil linhas. Os maiores focos sao `backend/services/escala.js`
 
 ### ALTO
 
-**A1 — Limite de forca bruta do login contornavel** · `ABERTO`
+**A1 — Limite de forca bruta do login contornavel** · `RESOLVIDO`
 `backend/routes/auth.js:31-35`, `backend/server.js:320-324`
 A chave do rate limit usa o primeiro valor de `X-Forwarded-For`, que o cliente
 controla. Trocando o header a cada tentativa, o limite nunca dispara. Como o Map
@@ -97,13 +97,20 @@ nunca expira chaves que nao voltam, o mesmo truque faz o processo crescer em
 memoria. Correcao: usar o IP do socket; so confiar em `X-Forwarded-For` com
 `TRUST_PROXY` explicito (Express `trust proxy`); varredura periodica do Map.
 Duplicacao: a funcao existe duas vezes (server e rota).
+**Feito:** um helper so (`backend/lib/ip-cliente.js`) usa `req.ip`, e o Express so
+confia em `X-Forwarded-For` com `TRUST_PROXY` explicito (documentado no
+`.env.example`). O limitador varre chaves expiradas quando passa de 1000
+entradas. Testes: integracao (6 tentativas trocando o header → 429) e unitarios.
 
-**A2 — Admin inicial pode nascer com senha que ninguem conhece** · `ABERTO`
+**A2 — Admin inicial pode nascer com senha que ninguem conhece** · `RESOLVIDO`
 `backend/auth/auth.js:268-290`
 Com `ADMIN_PASSWORD` definida mas com menos de 8 caracteres, gera-se senha
 aleatoria, porem `generated = !envPassword` = `false`: o log diz "senha definida
 via ADMIN_PASSWORD", a senha real nunca e exibida e ninguem consegue entrar.
 **Reproduzido** no banco de teste.
+**Feito:** senha do `.env` curta e ignorada com aviso no log; a aleatoria e
+marcada como gerada (aparece na tela/console) e exige troca no primeiro acesso.
+Teste unitario com pool falso cobre os tres casos.
 
 **A3 — Backup grava hashes de senha e tokens de sessao validos** · `RESOLVIDO`
 `backend/services/backup-service.js:423-437`
@@ -185,13 +192,19 @@ O servidor so libera as rotas de dados (`schemaReady`) depois de aplicar
 triplica o tamanho das rotas — e causaram C1 (lista incompleta). Correcao
 gradual: remover rota por rota com teste de integracao cobrindo.
 
-**M2 — Mensagens de erro 500 vazam detalhe interno** · `ABERTO`
+**M2 — Mensagens de erro 500 vazam detalhe interno** · `RESOLVIDO`
 `backend/server.js:539-551`: qualquer erro nao tratado devolve `error.message`
 cru (texto do SQL Server, nomes de tabela). Correcao: 500 com mensagem generica
 e o detalhe so no log.
+**Feito:** tratador extraido para `backend/lib/tratador-erros.js`: `AppError` e
+erro 4xx exposto do Express mantem a mensagem; qualquer outro vira mensagem
+generica, com o detalhe so no log. `ensurePositiveInt` passou a recusar valor
+acima do INT do SQL Server (antes virava 500 no driver).
 
-**M3 — Cookie malformado derruba a requisicao com 500** · `ABERTO`
+**M3 — Cookie malformado derruba a requisicao com 500** · `RESOLVIDO`
 `backend/auth/auth.js:393`: `decodeURIComponent` lanca `URIError` com `%` solto.
+**Feito:** cookie com escape invalido e ignorado (sessao ausente → 401). Testes
+unitario e de integracao.
 
 **M4 — Atualizacao de usuario nao e atomica** · `ABERTO`
 `backend/routes/usuarios.js:93-190`: flags sao gravadas antes de validar
