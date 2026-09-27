@@ -1,3 +1,6 @@
+import { API } from '../api.js';
+import { getApiBaseUrl } from './api-e-cores.js';
+import { mostrarToast } from './horas-e-resumo.js';
 
 const CONFIGURACOES_SECOES = [
     {
@@ -46,7 +49,7 @@ const CONFIGURACOES_SECOES = [
 
 const CONFIGURACOES_SECAO_STORAGE_KEY = 'configuracoesSecaoAtual';
 
-function gerarMenuConfiguracoesHtml() {
+export function gerarMenuConfiguracoesHtml() {
     const secaoAtual = getSecaoConfiguracoesAtual();
 
     return CONFIGURACOES_SECOES.map((secao) => `
@@ -87,7 +90,7 @@ function ativarSecaoConfiguracoes(secaoId) {
     });
 }
 
-function inicializarSecoesConfiguracoes() {
+export function inicializarSecoesConfiguracoes() {
     document.querySelectorAll('[data-config-tab]').forEach((button) => {
         button.addEventListener('click', () => {
             ativarSecaoConfiguracoes(button.getAttribute('data-config-tab'));
@@ -97,7 +100,7 @@ function inicializarSecoesConfiguracoes() {
     ativarSecaoConfiguracoes(getSecaoConfiguracoesAtual());
 }
 
-function escapeNetworkText(value) {
+export function escapeNetworkText(value) {
     return String(value ?? '')
         .replace(/&/g, '&amp;')
         .replace(/</g, '&lt;')
@@ -153,11 +156,11 @@ async function testarComunicacaoRede(options = {}) {
     definirStatusComunicacaoRede(
         'loading',
         'Testando comunicacao com o servidor...',
-        `Base atual da API: ${window.API?.baseURL || getApiBaseUrl()}`
+        `Base atual da API: ${API?.baseURL || getApiBaseUrl()}`
     );
 
     try {
-        const payload = await window.API.getNetworkStatus();
+        const payload = await API.getNetworkStatus();
         const latency = Math.max(1, Math.round(performance.now() - startedAt));
         const dbStatus = payload.database?.status === 'connected'
             ? 'banco conectado'
@@ -193,7 +196,7 @@ async function testarComunicacaoRede(options = {}) {
     }
 }
 
-function inicializarDiagnosticoRede() {
+export function inicializarDiagnosticoRede() {
     const testarBtn = document.getElementById('testarComunicacaoRedeBtn');
     const copiarBtn = document.getElementById('copiarUrlRedeBtn');
 
@@ -201,7 +204,7 @@ function inicializarDiagnosticoRede() {
     copiarBtn?.addEventListener('click', async () => {
         const url = window.location.origin && window.location.origin !== 'null'
             ? window.location.origin
-            : (window.API?.baseURL || getApiBaseUrl()).replace(/\/api$/, '');
+            : (API?.baseURL || getApiBaseUrl()).replace(/\/api$/, '');
 
         try {
             if (!navigator.clipboard?.writeText) {
@@ -349,7 +352,7 @@ async function executarAcaoServidorSegundoPlano(action) {
     }
 }
 
-function inicializarServidorSegundoPlano() {
+export function inicializarServidorSegundoPlano() {
     const panel = document.getElementById('backgroundServerPanel');
 
     if (!panel) {
@@ -363,4 +366,3 @@ function inicializarServidorSegundoPlano() {
 
     carregarServidorSegundoPlanoStatus();
 }
-

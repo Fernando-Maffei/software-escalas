@@ -1,8 +1,11 @@
+import { escapeHtml } from '../../lib/html-seguro.js';
+import { inicializarUsuariosTela } from '../../telas/configuracoes-usuarios.js';
+import { appContent } from '../app.js';
 
 /* ===========================
    UTILITÁRIOS
 =========================== */
-function formatarHora(hora) {
+export function formatarHora(hora) {
     if (!hora) {
         return "";
     }
@@ -36,8 +39,8 @@ function formatarHora(hora) {
 }
 
 // Função para mostrar toast
-function mostrarToast(mensagem, tipo = "success") {
-    
+export function mostrarToast(mensagem, tipo = "success") {
+
     // Cria o container se não existir
     let container = document.getElementById("toastContainer");
     if (!container) {
@@ -46,10 +49,10 @@ function mostrarToast(mensagem, tipo = "success") {
         container.className = "toast-container";
         document.body.appendChild(container);
     }
-    
+
     const toast = document.createElement("div");
     toast.className = `toast ${tipo}`;
-    
+
     let icone = "fa-info-circle";
     if (tipo === "success") {
         icone = "fa-check-circle";
@@ -60,12 +63,12 @@ function mostrarToast(mensagem, tipo = "success") {
     else if (tipo === "warning") {
         icone = "fa-exclamation-triangle";
     }
-    
+
     // A mensagem traz texto do usuario e do servidor (nome, erro): vai escapada.
     toast.innerHTML = `<i class="fas ${icone}"></i> ${escapeHtml(mensagem)}`;
-    
+
     container.appendChild(toast);
-    
+
     // Remove após 3 segundos
     setTimeout(() => {
         toast.style.animation = "slideOut 0.3s ease";
@@ -73,7 +76,7 @@ function mostrarToast(mensagem, tipo = "success") {
             if (toast.parentNode === container) {
                 toast.remove();
             }
-            
+
             // Remove container se estiver vazio
             if (container.children.length === 0) {
                 container.remove();
@@ -87,7 +90,7 @@ function mostrarToast(mensagem, tipo = "success") {
 // inicializarUsuariosTela() em configuracoes-usuarios.js, que popula o
 // #usuariosCardConteudo. A visibilidade e navegacao ja sao filtradas por
 // permissoes.js (o item some e a rota cai no calendario para nao-admin).
-function renderUsuarios() {
+export function renderUsuarios() {
     if (!appContent) {
         return;
     }
@@ -107,8 +110,5 @@ function renderUsuarios() {
         </div>
     `;
 
-    if (typeof window.inicializarUsuariosTela === 'function') {
-        window.inicializarUsuariosTela();
-    }
+    inicializarUsuariosTela();
 }
-

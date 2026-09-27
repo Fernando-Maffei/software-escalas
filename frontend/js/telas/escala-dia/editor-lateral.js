@@ -1,133 +1,144 @@
-    function getScaleEditorRecordEscala(colaboradorId) {
-        return (getCurrentScaleState().items || []).find((item) => Number(item.colaboradorId) === Number(colaboradorId)) || null;
+import { API } from '../../core/api.js';
+import { mostrarToast } from '../../core/app/horas-e-resumo.js';
+import { estado } from '../../core/estado.js';
+import { escapeHtml } from '../../lib/html-seguro.js';
+import { clampMinutesEscala, ESCALA_EDITOR_MINUTO_FINAL, ESCALA_EDITOR_MINUTO_INICIAL, ESCALA_EDITOR_PASSO_MINUTOS, formatDatePtBrEscala, formatMinutesToTimeEscala, formatTimeInputEscala, formatTimeRangeEscala, getDayLabelEscala, getTimeMinutesEscala, roundMinutesEscala, TIPO_LABELS, toISODateEscala } from '../escala-dia-shared.js';
+import { renderScaleHeaderEscala } from './cabecalho-e-cobertura.js';
+import { getCurrentScaleState, setCurrentScaleState } from './estado-e-layout.js';
+import { renderScaleSectorTabsEscala } from './filtros-setor.js';
+import { renderScaleRowsEscala } from './linhas-timeline.js';
+import { renderScaleErrorEscala, renderScaleLoadingEscala, renderWeekStripEscala } from './mensagens-e-semana.js';
+
+export function getScaleEditorRecordEscala(colaboradorId) {
+    return (getCurrentScaleState().items || []).find((item) => Number(item.colaboradorId) === Number(colaboradorId)) || null;
+}
+
+function getScaleEditorTimeValueEscala(inputId, fallbackValue = null) {
+    const input = document.getElementById(inputId);
+    const currentValue = input?.value || fallbackValue;
+    return getTimeMinutesEscala(currentValue);
+}
+
+function getScaleEditorWorkBoundsEscala(colaboradorId) {
+    const record = getScaleEditorRecordEscala(colaboradorId);
+    const workStart = getScaleEditorTimeValueEscala(`escalaHoraInicio-${colaboradorId}`, record?.horaInicio);
+    const workEnd = getScaleEditorTimeValueEscala(`escalaHoraFim-${colaboradorId}`, record?.horaFim);
+
+    if (workStart === null || workEnd === null || workEnd <= workStart) {
+        return {
+            min: ESCALA_EDITOR_MINUTO_INICIAL,
+            max: ESCALA_EDITOR_MINUTO_FINAL,
+            isValid: false
+        };
     }
 
-    function getScaleEditorTimeValueEscala(inputId, fallbackValue = null) {
-        const input = document.getElementById(inputId);
-        const currentValue = input?.value || fallbackValue;
-        return getTimeMinutesEscala(currentValue);
+    return {
+        min: workStart,
+        max: workEnd,
+        isValid: true
+    };
+}
+
+function setScaleRangeInputsEscala(startInputId, endInputId, startMinutes, endMinutes) {
+    const startInput = document.getElementById(startInputId);
+    const endInput = document.getElementById(endInputId);
+
+    if (startInput) {
+        startInput.value = formatMinutesToTimeEscala(startMinutes);
     }
 
-    function getScaleEditorWorkBoundsEscala(colaboradorId) {
-        const record = getScaleEditorRecordEscala(colaboradorId);
-        const workStart = getScaleEditorTimeValueEscala(`escalaHoraInicio-${colaboradorId}`, record?.horaInicio);
-        const workEnd = getScaleEditorTimeValueEscala(`escalaHoraFim-${colaboradorId}`, record?.horaFim);
+    if (endInput) {
+        endInput.value = formatMinutesToTimeEscala(endMinutes);
+    }
+}
 
-        if (workStart === null || workEnd === null || workEnd <= workStart) {
-            return {
+function buildScaleDragTrackConfigEscala(colaboradorId, kind) {
+    const record = getScaleEditorRecordEscala(colaboradorId);
+    const isLunch = kind === 'lunch';
+    const startInputId = isLunch
+        ? `escalaAlmocoInicio-${colaboradorId}`
+        : `escalaHoraInicio-${colaboradorId}`;
+    const endInputId = isLunch
+        ? `escalaAlmocoFim-${colaboradorId}`
+        : `escalaHoraFim-${colaboradorId}`;
+    let currentStart = getScaleEditorTimeValueEscala(startInputId, isLunch ? record?.almocoInicio : record?.horaInicio);
+    let currentEnd = getScaleEditorTimeValueEscala(endInputId, isLunch ? record?.almocoFim : record?.horaFim);
+    const workBounds = getScaleEditorWorkBoundsEscala(colaboradorId);
+    const bounds = isLunch
+        ? {
+            min: workBounds.isValid ? workBounds.min : ESCALA_EDITOR_MINUTO_INICIAL,
+            max: workBounds.isValid ? workBounds.max : ESCALA_EDITOR_MINUTO_FINAL,
+            isValid: workBounds.isValid
+        }
+            : {
                 min: ESCALA_EDITOR_MINUTO_INICIAL,
                 max: ESCALA_EDITOR_MINUTO_FINAL,
-                isValid: false
+                isValid: true
             };
+
+    if (Number.isFinite(currentStart) && Number.isFinite(currentEnd) && bounds.max > bounds.min) {
+        currentStart = clampMinutesEscala(currentStart, bounds.min, bounds.max - ESCALA_EDITOR_PASSO_MINUTOS);
+        currentEnd = clampMinutesEscala(currentEnd, currentStart + ESCALA_EDITOR_PASSO_MINUTOS, bounds.max);
+
+        if (currentEnd <= currentStart) {
+            currentEnd = clampMinutesEscala(currentStart + ESCALA_EDITOR_PASSO_MINUTOS, currentStart + ESCALA_EDITOR_PASSO_MINUTOS, bounds.max);
         }
 
-        return {
-            min: workStart,
-            max: workEnd,
-            isValid: true
-        };
+        setScaleRangeInputsEscala(startInputId, endInputId, currentStart, currentEnd);
     }
 
-    function setScaleRangeInputsEscala(startInputId, endInputId, startMinutes, endMinutes) {
-        const startInput = document.getElementById(startInputId);
-        const endInput = document.getElementById(endInputId);
+    return {
+        kind,
+        colaboradorId,
+        startInputId,
+        endInputId,
+        startMinutes: currentStart,
+        endMinutes: currentEnd,
+        minMinutes: bounds.min,
+        maxMinutes: bounds.max,
+        isValidBounds: bounds.isValid,
+        accentClass: isLunch ? 'is-lunch' : 'is-work',
+        label: isLunch ? 'Almoco' : 'Jornada',
+        emptyMessage: isLunch
+            ? 'Sem almoco definido. Crie a faixa abaixo e depois arraste.'
+            : 'Informe inicio e fim da jornada para liberar o arraste.'
+    };
+}
 
-        if (startInput) {
-            startInput.value = formatMinutesToTimeEscala(startMinutes);
-        }
-
-        if (endInput) {
-            endInput.value = formatMinutesToTimeEscala(endMinutes);
-        }
+function renderScaleDragTrackEscala(shell, config) {
+    if (!shell) {
+        return;
     }
 
-    function buildScaleDragTrackConfigEscala(colaboradorId, kind) {
-        const record = getScaleEditorRecordEscala(colaboradorId);
-        const isLunch = kind === 'lunch';
-        const startInputId = isLunch
-            ? `escalaAlmocoInicio-${colaboradorId}`
-            : `escalaHoraInicio-${colaboradorId}`;
-        const endInputId = isLunch
-            ? `escalaAlmocoFim-${colaboradorId}`
-            : `escalaHoraFim-${colaboradorId}`;
-        let currentStart = getScaleEditorTimeValueEscala(startInputId, isLunch ? record?.almocoInicio : record?.horaInicio);
-        let currentEnd = getScaleEditorTimeValueEscala(endInputId, isLunch ? record?.almocoFim : record?.horaFim);
-        const workBounds = getScaleEditorWorkBoundsEscala(colaboradorId);
-        const bounds = isLunch
-            ? {
-                min: workBounds.isValid ? workBounds.min : ESCALA_EDITOR_MINUTO_INICIAL,
-                max: workBounds.isValid ? workBounds.max : ESCALA_EDITOR_MINUTO_FINAL,
-                isValid: workBounds.isValid
-            }
-                : {
-                    min: ESCALA_EDITOR_MINUTO_INICIAL,
-                    max: ESCALA_EDITOR_MINUTO_FINAL,
-                    isValid: true
-                };
+    const hasRange = Number.isFinite(config.startMinutes)
+        && Number.isFinite(config.endMinutes)
+        && config.endMinutes > config.startMinutes
+        && config.maxMinutes > config.minMinutes;
 
-        if (Number.isFinite(currentStart) && Number.isFinite(currentEnd) && bounds.max > bounds.min) {
-            currentStart = clampMinutesEscala(currentStart, bounds.min, bounds.max - ESCALA_EDITOR_PASSO_MINUTOS);
-            currentEnd = clampMinutesEscala(currentEnd, currentStart + ESCALA_EDITOR_PASSO_MINUTOS, bounds.max);
+    shell.dataset.kind = config.kind;
+    shell.dataset.startInputId = config.startInputId;
+    shell.dataset.endInputId = config.endInputId;
+    shell.dataset.colaboradorId = String(config.colaboradorId);
 
-            if (currentEnd <= currentStart) {
-                currentEnd = clampMinutesEscala(currentStart + ESCALA_EDITOR_PASSO_MINUTOS, currentStart + ESCALA_EDITOR_PASSO_MINUTOS, bounds.max);
-            }
-
-            setScaleRangeInputsEscala(startInputId, endInputId, currentStart, currentEnd);
-        }
-
-        return {
-            kind,
-            colaboradorId,
-            startInputId,
-            endInputId,
-            startMinutes: currentStart,
-            endMinutes: currentEnd,
-            minMinutes: bounds.min,
-            maxMinutes: bounds.max,
-            isValidBounds: bounds.isValid,
-            accentClass: isLunch ? 'is-lunch' : 'is-work',
-            label: isLunch ? 'Almoco' : 'Jornada',
-            emptyMessage: isLunch
-                ? 'Sem almoco definido. Crie a faixa abaixo e depois arraste.'
-                : 'Informe inicio e fim da jornada para liberar o arraste.'
-        };
-    }
-
-    function renderScaleDragTrackEscala(shell, config) {
-        if (!shell) {
-            return;
-        }
-
-        const hasRange = Number.isFinite(config.startMinutes)
-            && Number.isFinite(config.endMinutes)
-            && config.endMinutes > config.startMinutes
-            && config.maxMinutes > config.minMinutes;
-
-        shell.dataset.kind = config.kind;
-        shell.dataset.startInputId = config.startInputId;
-        shell.dataset.endInputId = config.endInputId;
-        shell.dataset.colaboradorId = String(config.colaboradorId);
-
-        if (!hasRange) {
-            shell.innerHTML = `
+    if (!hasRange) {
+        shell.innerHTML = `
                 <div class="escala-range-placeholder">
                     <i class="fas fa-up-down-left-right"></i>
                     <span>${escapeHtml(config.emptyMessage)}</span>
                 </div>
             `;
-            return;
-        }
+        return;
+    }
 
-        const span = config.maxMinutes - config.minMinutes;
-        const left = ((config.startMinutes - config.minMinutes) / span) * 100;
-        const width = ((config.endMinutes - config.startMinutes) / span) * 100;
-        const middleLabel = formatTimeRangeEscala(
-            formatMinutesToTimeEscala(config.startMinutes),
-            formatMinutesToTimeEscala(config.endMinutes)
-        );
+    const span = config.maxMinutes - config.minMinutes;
+    const left = ((config.startMinutes - config.minMinutes) / span) * 100;
+    const width = ((config.endMinutes - config.startMinutes) / span) * 100;
+    const middleLabel = formatTimeRangeEscala(
+        formatMinutesToTimeEscala(config.startMinutes),
+        formatMinutesToTimeEscala(config.endMinutes)
+    );
 
-        shell.innerHTML = `
+    shell.innerHTML = `
             <div class="escala-range-head">
                 <span>${escapeHtml(config.label)}</span>
                 <strong>${escapeHtml(middleLabel)}</strong>
@@ -148,145 +159,145 @@
             </div>
         `;
 
-        bindScaleDragTrackEscala(shell, config);
+    bindScaleDragTrackEscala(shell, config);
+}
+
+function bindScaleDragTrackEscala(shell, config) {
+    const track = shell.querySelector('[data-track-role="track"]');
+    const selection = shell.querySelector('[data-track-role="selection"]');
+    const startHandle = shell.querySelector('[data-track-role="start"]');
+    const endHandle = shell.querySelector('[data-track-role="end"]');
+    const startInput = document.getElementById(config.startInputId);
+    const endInput = document.getElementById(config.endInputId);
+
+    if (!track || !selection || !startHandle || !endHandle || !startInput || !endInput) {
+        return;
     }
 
-    function bindScaleDragTrackEscala(shell, config) {
-        const track = shell.querySelector('[data-track-role="track"]');
-        const selection = shell.querySelector('[data-track-role="selection"]');
-        const startHandle = shell.querySelector('[data-track-role="start"]');
-        const endHandle = shell.querySelector('[data-track-role="end"]');
-        const startInput = document.getElementById(config.startInputId);
-        const endInput = document.getElementById(config.endInputId);
+    const minimumDuration = ESCALA_EDITOR_PASSO_MINUTOS;
 
-        if (!track || !selection || !startHandle || !endHandle || !startInput || !endInput) {
+    const getPointerMinutes = (clientX) => {
+        const rect = track.getBoundingClientRect();
+        if (rect.width <= 0) {
+            return config.startMinutes;
+        }
+
+        const ratio = clampMinutesEscala((clientX - rect.left) / rect.width, 0, 1);
+        const absolute = config.minMinutes + ((config.maxMinutes - config.minMinutes) * ratio);
+        return roundMinutesEscala(absolute);
+    };
+
+    const updateRange = (startMinutes, endMinutes) => {
+        setScaleRangeInputsEscala(config.startInputId, config.endInputId, startMinutes, endMinutes);
+
+        const span = config.maxMinutes - config.minMinutes;
+        const left = ((startMinutes - config.minMinutes) / span) * 100;
+        const width = ((endMinutes - startMinutes) / span) * 100;
+
+        selection.style.left = `${left}%`;
+        selection.style.width = `${width}%`;
+
+        const label = shell.querySelector('.escala-range-head strong');
+        if (label) {
+            label.textContent = formatTimeRangeEscala(
+                formatMinutesToTimeEscala(startMinutes),
+                formatMinutesToTimeEscala(endMinutes)
+            );
+        }
+    };
+
+    const beginDrag = (mode, event) => {
+        event.preventDefault();
+
+        const initialStart = getTimeMinutesEscala(startInput.value);
+        const initialEnd = getTimeMinutesEscala(endInput.value);
+
+        if (initialStart === null || initialEnd === null) {
             return;
         }
 
-        const minimumDuration = ESCALA_EDITOR_PASSO_MINUTOS;
-
-        const getPointerMinutes = (clientX) => {
-            const rect = track.getBoundingClientRect();
-            if (rect.width <= 0) {
-                return config.startMinutes;
-            }
-
-            const ratio = clampMinutesEscala((clientX - rect.left) / rect.width, 0, 1);
-            const absolute = config.minMinutes + ((config.maxMinutes - config.minMinutes) * ratio);
-            return roundMinutesEscala(absolute);
+        const duration = initialEnd - initialStart;
+        const pointerState = {
+            mode,
+            startPointerMinutes: getPointerMinutes(event.clientX),
+            initialStart,
+            initialEnd,
+            duration
         };
 
-        const updateRange = (startMinutes, endMinutes) => {
-            setScaleRangeInputsEscala(config.startInputId, config.endInputId, startMinutes, endMinutes);
+        const move = (moveEvent) => {
+            let nextStart = pointerState.initialStart;
+            let nextEnd = pointerState.initialEnd;
 
-            const span = config.maxMinutes - config.minMinutes;
-            const left = ((startMinutes - config.minMinutes) / span) * 100;
-            const width = ((endMinutes - startMinutes) / span) * 100;
-
-            selection.style.left = `${left}%`;
-            selection.style.width = `${width}%`;
-
-            const label = shell.querySelector('.escala-range-head strong');
-            if (label) {
-                label.textContent = formatTimeRangeEscala(
-                    formatMinutesToTimeEscala(startMinutes),
-                    formatMinutesToTimeEscala(endMinutes)
-                );
+            if (pointerState.mode === 'move') {
+                const currentPointerMinutes = getPointerMinutes(moveEvent.clientX);
+                const delta = currentPointerMinutes - pointerState.startPointerMinutes;
+                nextStart = clampMinutesEscala(pointerState.initialStart + delta, config.minMinutes, config.maxMinutes - duration);
+                nextStart = roundMinutesEscala(nextStart);
+                nextEnd = nextStart + duration;
+            } else if (pointerState.mode === 'start') {
+                nextStart = clampMinutesEscala(getPointerMinutes(moveEvent.clientX), config.minMinutes, pointerState.initialEnd - minimumDuration);
+                nextStart = roundMinutesEscala(nextStart);
+            } else {
+                nextEnd = clampMinutesEscala(getPointerMinutes(moveEvent.clientX), pointerState.initialStart + minimumDuration, config.maxMinutes);
+                nextEnd = roundMinutesEscala(nextEnd);
             }
+
+            if (nextEnd <= nextStart) {
+                nextEnd = nextStart + minimumDuration;
+            }
+
+            updateRange(nextStart, nextEnd);
         };
 
-        const beginDrag = (mode, event) => {
-            event.preventDefault();
-
-            const initialStart = getTimeMinutesEscala(startInput.value);
-            const initialEnd = getTimeMinutesEscala(endInput.value);
-
-            if (initialStart === null || initialEnd === null) {
-                return;
-            }
-
-            const duration = initialEnd - initialStart;
-            const pointerState = {
-                mode,
-                startPointerMinutes: getPointerMinutes(event.clientX),
-                initialStart,
-                initialEnd,
-                duration
-            };
-
-            const move = (moveEvent) => {
-                let nextStart = pointerState.initialStart;
-                let nextEnd = pointerState.initialEnd;
-
-                if (pointerState.mode === 'move') {
-                    const currentPointerMinutes = getPointerMinutes(moveEvent.clientX);
-                    const delta = currentPointerMinutes - pointerState.startPointerMinutes;
-                    nextStart = clampMinutesEscala(pointerState.initialStart + delta, config.minMinutes, config.maxMinutes - duration);
-                    nextStart = roundMinutesEscala(nextStart);
-                    nextEnd = nextStart + duration;
-                } else if (pointerState.mode === 'start') {
-                    nextStart = clampMinutesEscala(getPointerMinutes(moveEvent.clientX), config.minMinutes, pointerState.initialEnd - minimumDuration);
-                    nextStart = roundMinutesEscala(nextStart);
-                } else {
-                    nextEnd = clampMinutesEscala(getPointerMinutes(moveEvent.clientX), pointerState.initialStart + minimumDuration, config.maxMinutes);
-                    nextEnd = roundMinutesEscala(nextEnd);
-                }
-
-                if (nextEnd <= nextStart) {
-                    nextEnd = nextStart + minimumDuration;
-                }
-
-                updateRange(nextStart, nextEnd);
-            };
-
-            const stop = () => {
-                window.removeEventListener('pointermove', move);
-                window.removeEventListener('pointerup', stop);
-                syncScaleDragEditorEscala(config.colaboradorId);
-            };
-
-            window.addEventListener('pointermove', move);
-            window.addEventListener('pointerup', stop, { once: true });
+        const stop = () => {
+            window.removeEventListener('pointermove', move);
+            window.removeEventListener('pointerup', stop);
+            syncScaleDragEditorEscala(config.colaboradorId);
         };
 
-        selection.addEventListener('pointerdown', (event) => {
-            if (event.target === startHandle || event.target === endHandle) {
-                return;
-            }
+        window.addEventListener('pointermove', move);
+        window.addEventListener('pointerup', stop, { once: true });
+    };
 
-            beginDrag('move', event);
-        });
-
-        startHandle.addEventListener('pointerdown', (event) => beginDrag('start', event));
-        endHandle.addEventListener('pointerdown', (event) => beginDrag('end', event));
-    }
-
-    function syncScaleDragEditorEscala(colaboradorId) {
-        const workShell = document.getElementById(`escalaRangeWork-${colaboradorId}`);
-        const lunchShell = document.getElementById(`escalaRangeLunch-${colaboradorId}`);
-
-        renderScaleDragTrackEscala(workShell, buildScaleDragTrackConfigEscala(colaboradorId, 'work'));
-        renderScaleDragTrackEscala(lunchShell, buildScaleDragTrackConfigEscala(colaboradorId, 'lunch'));
-    }
-
-    function renderScaleEditorEscala(record) {
-        const sidebar = document.getElementById('sidebarEditor');
-        const content = document.getElementById('editorContent');
-        const toggleIcon = document.getElementById('toggleIcon');
-
-        if (!sidebar || !content) {
+    selection.addEventListener('pointerdown', (event) => {
+        if (event.target === startHandle || event.target === endHandle) {
             return;
         }
 
-        const lunchRange = formatTimeRangeEscala(record.almocoInicio, record.almocoFim);
+        beginDrag('move', event);
+    });
 
-        // Almoco personalizado = veio de AlmocosPersonalizados (aplicacao por
-        // periodo ou ajuste manual), nao do cadastro do colaborador. Sem um
-        // aviso aqui o usuario nao tem como lembrar que aquele dia esta fora
-        // do padrao — o que so aparecia discretamente na barra da grade.
-        const almocoPersonalizado = Boolean(record.almocoPersonalizado || record.almocoAjustado);
-        const avisoAlmocoPersonalizado = almocoPersonalizado
-            ? `
+    startHandle.addEventListener('pointerdown', (event) => beginDrag('start', event));
+    endHandle.addEventListener('pointerdown', (event) => beginDrag('end', event));
+}
+
+function syncScaleDragEditorEscala(colaboradorId) {
+    const workShell = document.getElementById(`escalaRangeWork-${colaboradorId}`);
+    const lunchShell = document.getElementById(`escalaRangeLunch-${colaboradorId}`);
+
+    renderScaleDragTrackEscala(workShell, buildScaleDragTrackConfigEscala(colaboradorId, 'work'));
+    renderScaleDragTrackEscala(lunchShell, buildScaleDragTrackConfigEscala(colaboradorId, 'lunch'));
+}
+
+export function renderScaleEditorEscala(record) {
+    const sidebar = document.getElementById('sidebarEditor');
+    const content = document.getElementById('editorContent');
+    const toggleIcon = document.getElementById('toggleIcon');
+
+    if (!sidebar || !content) {
+        return;
+    }
+
+    const lunchRange = formatTimeRangeEscala(record.almocoInicio, record.almocoFim);
+
+    // Almoco personalizado = veio de AlmocosPersonalizados (aplicacao por
+    // periodo ou ajuste manual), nao do cadastro do colaborador. Sem um
+    // aviso aqui o usuario nao tem como lembrar que aquele dia esta fora
+    // do padrao — o que so aparecia discretamente na barra da grade.
+    const almocoPersonalizado = Boolean(record.almocoPersonalizado || record.almocoAjustado);
+    const avisoAlmocoPersonalizado = almocoPersonalizado
+        ? `
                 <div class="editor-aviso-almoco">
                     <i class="fas fa-circle-exclamation"></i>
                     <div>
@@ -295,14 +306,14 @@
                     </div>
                 </div>
             `
-            : '';
+        : '';
 
-        sidebar.classList.remove('collapsed');
-        if (toggleIcon) {
-            toggleIcon.className = 'fas fa-chevron-right';
-        }
+    sidebar.classList.remove('collapsed');
+    if (toggleIcon) {
+        toggleIcon.className = 'fas fa-chevron-right';
+    }
 
-        content.innerHTML = `
+    content.innerHTML = `
             <div class="editor-colaborador">
                 <div class="editor-header">
                     <div>
@@ -377,62 +388,59 @@
             </div>
         `;
 
+}
+
+// Sequencia da requisicao do dia. Cada carregamento recebe um numero e so
+// o mais recente pode pintar a tela: clicar rapido em "proximo dia" dispara
+// varias buscas, e sem isto a que voltasse por ultimo venceria — mesmo
+// sendo de um dia que o usuario ja abandonou (race condition classica).
+let escalaLoadSeq = 0;
+
+export async function carregarEscalaDiaEscala(dataISO) {
+    const normalized = toISODateEscala(dataISO) || toISODateEscala(new Date());
+    const meuLoad = ++escalaLoadSeq;
+
+    estado.dataEscalaSelecionada = normalized;
+    const selector = document.getElementById('seletorDataEscala');
+    if (selector) {
+        selector.value = normalized;
     }
 
-    // Sequencia da requisicao do dia. Cada carregamento recebe um numero e so
-    // o mais recente pode pintar a tela: clicar rapido em "proximo dia" dispara
-    // varias buscas, e sem isto a que voltasse por ultimo venceria — mesmo
-    // sendo de um dia que o usuario ja abandonou (race condition classica).
-    let escalaLoadSeq = 0;
+    // Cabecalho e faixa da semana ja refletem a data pedida; so a area de
+    // linhas espera os dados.
+    renderScaleHeaderEscala();
+    renderScaleLoadingEscala(normalized);
 
-    async function carregarEscalaDiaEscala(dataISO) {
-        const normalized = toISODateEscala(dataISO) || toISODateEscala(new Date());
-        const meuLoad = ++escalaLoadSeq;
+    let payload;
 
-        window.dataEscalaSelecionada = normalized;
-        const selector = document.getElementById('seletorDataEscala');
-        if (selector) {
-            selector.value = normalized;
-        }
-
-        // Cabecalho e faixa da semana ja refletem a data pedida; so a area de
-        // linhas espera os dados.
-        renderScaleHeaderEscala();
-        renderScaleLoadingEscala(normalized);
-
-        let payload;
-
-        try {
-            payload = await window.API.getEscalaDia(normalized);
-        } catch (error) {
-            if (meuLoad !== escalaLoadSeq) {
-                return null;
-            }
-
-            // Sem isto a tela ficava com os dados do dia anterior e nenhum
-            // aviso, dando a impressao de que a data nao tinha registros.
-            renderScaleErrorEscala(normalized, error);
-
-            if (typeof mostrarToast === 'function') {
-                mostrarToast(error?.message || 'Falha ao carregar a escala do dia.', 'error');
-            }
-
-            return null;
-        }
-
+    try {
+        payload = await API.getEscalaDia(normalized);
+    } catch (error) {
         if (meuLoad !== escalaLoadSeq) {
             return null;
         }
 
-        const state = setCurrentScaleState({
-            dataISO: normalized,
-            items: Array.isArray(payload?.items) ? payload.items : []
-        });
+        // Sem isto a tela ficava com os dados do dia anterior e nenhum
+        // aviso, dando a impressao de que a data nao tinha registros.
+        renderScaleErrorEscala(normalized, error);
 
-        renderScaleSectorTabsEscala(state.items || []);
-        renderScaleRowsEscala(state);
-        renderWeekStripEscala(normalized);
+        mostrarToast(error?.message || 'Falha ao carregar a escala do dia.', 'error');
 
-        return state;
+        return null;
     }
 
+    if (meuLoad !== escalaLoadSeq) {
+        return null;
+    }
+
+    const state = setCurrentScaleState({
+        dataISO: normalized,
+        items: Array.isArray(payload?.items) ? payload.items : []
+    });
+
+    renderScaleSectorTabsEscala(state.items || []);
+    renderScaleRowsEscala(state);
+    renderWeekStripEscala(normalized);
+
+    return state;
+}

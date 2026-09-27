@@ -1,4 +1,9 @@
-async function buscarProximosEventos() {
+import { estado } from '../../core/estado.js';
+import { formatarDataBR } from '../../core/runtime/relatorio-mensal.js';
+import { escapeHtml } from '../../lib/html-seguro.js';
+import { toISODate } from './datas-e-jornada.js';
+
+export async function buscarProximosEventos() {
     const eventos = [];
     const hoje = new Date();
 
@@ -9,7 +14,7 @@ async function buscarProximosEventos() {
     });
 
     periodo.forEach((dataISO) => {
-        (window.feriados || []).filter((feriado) => feriado.date === dataISO).forEach((feriado) => {
+        (estado.feriados || []).filter((feriado) => feriado.date === dataISO).forEach((feriado) => {
             eventos.push({
                 dataStr: dataISO,
                 data: new Date(`${dataISO}T12:00:00`),
@@ -20,7 +25,7 @@ async function buscarProximosEventos() {
             });
         });
 
-        (window.feriadosLocais || []).filter((feriado) => toISODate(feriado.Data || feriado.data) === dataISO).forEach((feriado) => {
+        (estado.feriadosLocais || []).filter((feriado) => toISODate(feriado.Data || feriado.data) === dataISO).forEach((feriado) => {
             eventos.push({
                 dataStr: dataISO,
                 data: new Date(`${dataISO}T12:00:00`),
@@ -34,11 +39,11 @@ async function buscarProximosEventos() {
 
     const eventosAgrupados = new Map();
 
-    (window.ausencias || []).forEach((ausencia) => {
+    (estado.ausencias || []).forEach((ausencia) => {
         const inicio = toISODate(ausencia.DataInicio || ausencia.dataInicio);
         const fim = toISODate(ausencia.DataFim || ausencia.dataFim);
         const tipo = String(ausencia.tipo || ausencia.Tipo || '').toLowerCase();
-        const colaborador = (window.colaboradores || []).find((item) => item.Id === (ausencia.colaboradorId || ausencia.ColaboradorId));
+        const colaborador = (estado.colaboradores || []).find((item) => item.Id === (ausencia.colaboradorId || ausencia.ColaboradorId));
 
         if (!inicio || !fim || !colaborador) {
             return;
@@ -74,12 +79,7 @@ async function buscarProximosEventos() {
     return eventos.slice(0, 10);
 }
 
-function formatarDataBR(dataISO) {
-    const [, mes, dia] = dataISO.split('-');
-    return `${dia}/${mes}`;
-}
-
-function gerarEventItem(evento) {
+export function gerarEventItem(evento) {
     const [, mes, dia] = evento.dataStr.split('-');
     const badgeMap = {
         ferias: 'Férias',
@@ -106,4 +106,3 @@ function gerarEventItem(evento) {
         </div>
     `;
 }
-

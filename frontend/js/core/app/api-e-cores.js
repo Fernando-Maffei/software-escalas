@@ -1,7 +1,10 @@
+import { API } from '../api.js';
+import { ESCALA_CORES_PADRAO, ESCALA_CORES_STORAGE_KEY } from '../app.js';
+import { mostrarToast } from './horas-e-resumo.js';
 
-function getApiBaseUrl() {
-    if (window.API?.baseURL) {
-        return window.API.baseURL;
+export function getApiBaseUrl() {
+    if (API?.baseURL) {
+        return API.baseURL;
     }
 
     const origin = window.location.origin && window.location.origin !== 'null'
@@ -47,7 +50,7 @@ function carregarCoresEscala() {
     }, {});
 }
 
-function aplicarCoresEscala(cores = carregarCoresEscala()) {
+export function aplicarCoresEscala(cores = carregarCoresEscala()) {
     const root = document.documentElement;
 
     ESCALA_CORES_PADRAO.forEach((item) => {
@@ -62,7 +65,7 @@ function aplicarCoresEscala(cores = carregarCoresEscala()) {
     });
 }
 
-function gerarConfiguracaoCoresEscalaHtml() {
+export function gerarConfiguracaoCoresEscalaHtml() {
     const cores = carregarCoresEscala();
 
     return ESCALA_CORES_PADRAO.map((item) => `
@@ -125,7 +128,7 @@ function resetarCoresEscala() {
     mostrarToast('Cores padrao restauradas!', 'success');
 }
 
-function inicializarPersonalizacaoEscala() {
+export function inicializarPersonalizacaoEscala() {
     const inputs = document.querySelectorAll('[data-escala-color-key]');
 
     inputs.forEach((input) => {
@@ -146,4 +149,3 @@ function inicializarPersonalizacaoEscala() {
     document.getElementById('resetarCoresEscalaBtn')?.addEventListener('click', resetarCoresEscala);
     atualizarInputsCoresEscala();
 }
-

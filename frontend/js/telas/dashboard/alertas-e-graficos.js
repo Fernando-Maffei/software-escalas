@@ -1,4 +1,9 @@
-function gerarAlertas(metricas, dataHoje, jornadaSemanalIndex, colaboradoresBase = window.colaboradores || []) {
+import { estado } from '../../core/estado.js';
+import { escapeHtml } from '../../lib/html-seguro.js';
+import { getColaboradorScheduleForDate, getTimeMinutesDashboard, hasColaboradorHorarioPadrao, toISODate } from './datas-e-jornada.js';
+import { colaboradorDisponivelAgora, obterAusenciasNaData } from './disponibilidade.js';
+
+export function gerarAlertas(metricas, dataHoje, jornadaSemanalIndex, colaboradoresBase = estado.colaboradores || []) {
     const alertas = [];
     const colaboradores = Array.isArray(colaboradoresBase) ? colaboradoresBase : [];
     const ausenciasHoje = obterAusenciasNaData(dataHoje);
@@ -59,7 +64,7 @@ function gerarAlertas(metricas, dataHoje, jornadaSemanalIndex, colaboradoresBase
     }
 
     const hoje = new Date(`${dataHoje}T12:00:00`);
-    const feriasProximas = (window.ausencias || []).filter((ausencia) => {
+    const feriasProximas = (estado.ausencias || []).filter((ausencia) => {
         if (String(ausencia.tipo || ausencia.Tipo || '').toLowerCase() !== 'ferias') {
             return false;
         }
@@ -91,7 +96,7 @@ function gerarAlertas(metricas, dataHoje, jornadaSemanalIndex, colaboradoresBase
     return alertas;
 }
 
-function gerarAlertItem(alerta) {
+export function gerarAlertItem(alerta) {
     return `
         <div class="alert-item ${alerta.tipo}">
             <i class="fas fa-${alerta.icone}"></i>
@@ -103,14 +108,14 @@ function gerarAlertItem(alerta) {
     `;
 }
 
-function gerarGraficoAusencias() {
+export function gerarGraficoAusencias() {
     const tipos = {
         ferias: 0,
         folga: 0,
         ausencia: 0
     };
 
-    (window.ausencias || []).forEach((ausencia) => {
+    (estado.ausencias || []).forEach((ausencia) => {
         const tipo = String(ausencia.tipo || ausencia.Tipo || '').toLowerCase();
         if (tipos[tipo] !== undefined) {
             tipos[tipo] += 1;
@@ -144,7 +149,7 @@ function gerarGraficoAusencias() {
     `;
 }
 
-function gerarGraficoOcupacao(dataHoje, jornadaSemanalIndex, colaboradoresBase = window.colaboradores || []) {
+export function gerarGraficoOcupacao(dataHoje, jornadaSemanalIndex, colaboradoresBase = estado.colaboradores || []) {
     const ocupacao = [];
     const colaboradores = Array.isArray(colaboradoresBase) ? colaboradoresBase : [];
     const horariosAtivos = colaboradores
@@ -181,4 +186,3 @@ function gerarGraficoOcupacao(dataHoje, jornadaSemanalIndex, colaboradoresBase =
         </div>
     `;
 }
-

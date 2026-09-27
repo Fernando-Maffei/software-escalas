@@ -1,4 +1,9 @@
-function calcularMetricas(agora, dataHoje, jornadaSemanalIndex, colaboradoresBase = window.colaboradores || []) {
+import { estado } from '../../core/estado.js';
+import { escapeHtml } from '../../lib/html-seguro.js';
+import { getColaboradorScheduleForDate, toISODate } from './datas-e-jornada.js';
+import { colaboradorDisponivelAgora, filtrarColaboradoresPorSetorDashboard, getDashboardSetorId, getDashboardSetorNome, obterAusenciasNaData } from './disponibilidade.js';
+
+export function calcularMetricas(agora, dataHoje, jornadaSemanalIndex, colaboradoresBase = estado.colaboradores || []) {
     const colaboradores = Array.isArray(colaboradoresBase) ? colaboradoresBase : [];
     const minutosAtuais = (agora.getHours() * 60) + agora.getMinutes();
     const ativosHoje = colaboradores.filter((colaborador) => Boolean(
@@ -20,7 +25,7 @@ function calcularMetricas(agora, dataHoje, jornadaSemanalIndex, colaboradoresBas
     ).length;
     const feriasHoje = ausenciasHoje.filter((ausencia) => String(ausencia.tipo || ausencia.Tipo || '').toLowerCase() === 'ferias').length;
 
-    const proximosPlantoes = (window.plantoesLancados || []).filter((plantao) => {
+    const proximosPlantoes = (estado.plantoesLancados || []).filter((plantao) => {
         const dataPlantao = toISODate(plantao.dataISO || plantao.data_plantao);
         if (!dataPlantao) {
             return false;
@@ -59,11 +64,11 @@ function calcularMetricas(agora, dataHoje, jornadaSemanalIndex, colaboradoresBas
     };
 }
 
-function calcularMetricasPorSetor(agora, dataHoje, jornadaSemanalIndex) {
+export function calcularMetricasPorSetor(agora, dataHoje, jornadaSemanalIndex) {
     // Respeita "Meus setores": so agrupa os setores que o gestor escolheu ver.
-    const colaboradores = filtrarColaboradoresPorSetorDashboard(window.colaboradores);
+    const colaboradores = filtrarColaboradoresPorSetorDashboard(estado.colaboradores);
     const setoresById = new Map(
-        (Array.isArray(window.setores) ? window.setores : [])
+        (Array.isArray(estado.setores) ? estado.setores : [])
             .map((setor) => [String(setor.id ?? setor.Id ?? ''), setor])
             .filter(([id]) => id)
     );
@@ -92,7 +97,7 @@ function calcularMetricasPorSetor(agora, dataHoje, jornadaSemanalIndex) {
         }));
 }
 
-function gerarCardMetrica(titulo, valor, icone, subtitulo, destaque) {
+export function gerarCardMetrica(titulo, valor, icone, subtitulo, destaque) {
     return `
         <div class="dashboard-card">
             <div class="dashboard-card-header">
@@ -114,7 +119,7 @@ function gerarCardMetrica(titulo, valor, icone, subtitulo, destaque) {
     `;
 }
 
-function gerarSetoresDashboard(gruposSetor = []) {
+export function gerarSetoresDashboard(gruposSetor = []) {
     if (!Array.isArray(gruposSetor) || gruposSetor.length === 0) {
         return '';
     }
@@ -165,4 +170,3 @@ function gerarSetoresDashboard(gruposSetor = []) {
         </section>
     `;
 }
-

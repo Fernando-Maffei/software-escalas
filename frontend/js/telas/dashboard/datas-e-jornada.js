@@ -1,4 +1,4 @@
-function toISODate(value) {
+export function toISODate(value) {
     if (!value) {
         return null;
     }
@@ -41,7 +41,7 @@ function formatTimeInputDashboard(value) {
     return raw.slice(0, 5);
 }
 
-function getTimeMinutesDashboard(value) {
+export function getTimeMinutesDashboard(value) {
     const formatted = formatTimeInputDashboard(value);
 
     if (!formatted) {
@@ -63,7 +63,7 @@ function getIsoDayOfWeekDashboard(dataISO) {
     return new Date(year, month - 1, day, 12, 0, 0).getDay();
 }
 
-function buildJornadaSemanalIndex(items = []) {
+export function buildJornadaSemanalIndex(items = []) {
     const map = new Map();
 
     (Array.isArray(items) ? items : []).forEach((item) => {
@@ -97,7 +97,7 @@ function buildJornadaSemanalIndex(items = []) {
     return map;
 }
 
-function hasColaboradorHorarioPadrao(colaborador) {
+export function hasColaboradorHorarioPadrao(colaborador) {
     return Boolean(
         formatTimeInputDashboard(colaborador?.TrabalhoInicio || colaborador?.trabalhoInicio)
         && formatTimeInputDashboard(colaborador?.TrabalhoFim || colaborador?.trabalhoFim)
@@ -127,7 +127,7 @@ function getFallbackScheduleForDate(colaborador, dataISO) {
     };
 }
 
-function getColaboradorScheduleForDate(colaborador, dataISO, jornadaSemanalIndex) {
+export function getColaboradorScheduleForDate(colaborador, dataISO, jornadaSemanalIndex) {
     const colaboradorId = Number(colaborador?.Id || colaborador?.id || 0);
     const weekday = getIsoDayOfWeekDashboard(dataISO);
     const jornadaByDay = jornadaSemanalIndex.get(colaboradorId);
@@ -147,4 +147,3 @@ function getColaboradorScheduleForDate(colaborador, dataISO, jornadaSemanalIndex
 
     return getFallbackScheduleForDate(colaborador, dataISO);
 }
-

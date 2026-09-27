@@ -1,7 +1,15 @@
-function renderConfiguracoes() {
+import { inicializarBackupSistemaTela, inicializarConfiguracaoBancoTela } from '../../telas/configuracoes-backup.js';
+import { inicializarTiposEscala } from '../../telas/tipos-escala.js';
+import { API } from '../api.js';
+import { appContent } from '../app.js';
+import { gerarConfiguracaoCoresEscalaHtml, getApiBaseUrl, inicializarPersonalizacaoEscala } from './api-e-cores.js';
+import { escapeNetworkText, gerarMenuConfiguracoesHtml, inicializarDiagnosticoRede, inicializarSecoesConfiguracoes, inicializarServidorSegundoPlano } from './configuracoes-infra.js';
+import { mostrarToast } from './horas-e-resumo.js';
+
+export function renderConfiguracoes() {
     // Verifica o tema atual salvo
     const temaAtual = localStorage.getItem('tema') || 'light';
-    
+
     appContent.innerHTML = `
         <div class="page-header">
             <h1><i class="fas fa-cog"></i> Configurações</h1>
@@ -442,7 +450,7 @@ function renderConfiguracoes() {
                         </div>
                         <p id="configNetworkStatusTexto">Clique em testar para validar a API.</p>
                         <small id="configNetworkStatusDetalhe" class="config-status-detail">
-                            Base atual da API: ${escapeNetworkText(window.API?.baseURL || getApiBaseUrl())}
+                            Base atual da API: ${escapeNetworkText(API?.baseURL || getApiBaseUrl())}
                         </small>
                     </div>
 
@@ -557,7 +565,7 @@ function renderConfiguracoes() {
         opcao.addEventListener('click', function() {
             const tema = this.dataset.tema;
             mudarTema(tema);
-            
+
             // Atualiza a classe active
             document.querySelectorAll('.tema-opcao').forEach(o => o.classList.remove('active'));
             this.classList.add('active');
@@ -568,35 +576,29 @@ function renderConfiguracoes() {
     carregarPreferencias();
     inicializarSecoesConfiguracoes();
     inicializarPersonalizacaoEscala();
-    
+
     // Eventos para salvar preferências
     document.getElementById('primeiroDiaSemana').addEventListener('change', salvarPreferencias);
     document.getElementById('formatoHora').addEventListener('change', salvarPreferencias);
     document.getElementById('notificacoes').addEventListener('change', salvarPreferencias);
 
-    if (typeof window.inicializarConfiguracaoBancoTela === 'function') {
-        window.inicializarConfiguracaoBancoTela();
-    }
+    inicializarConfiguracaoBancoTela();
 
-    if (typeof window.inicializarBackupSistemaTela === 'function') {
-        window.inicializarBackupSistemaTela();
-    }
+    inicializarBackupSistemaTela();
 
     inicializarDiagnosticoRede();
     inicializarServidorSegundoPlano();
 
     // Banco sem a migracao dos tipos de escala: a lista fica vazia com um
     // aviso, e o resto das Configuracoes segue funcionando.
-    if (typeof window.inicializarTiposEscala === 'function') {
-        window.inicializarTiposEscala();
-    }
+    inicializarTiposEscala();
 }
 
 // Função para mudar o tema
 function mudarTema(tema) {
     document.documentElement.setAttribute('data-theme', tema);
     localStorage.setItem('tema', tema);
-    
+
     mostrarToast(`Tema ${tema === 'dark' ? 'escuro' : 'claro'} ativado!`, 'success');
 }
 
@@ -605,7 +607,7 @@ function carregarPreferencias() {
     const primeiroDia = localStorage.getItem('primeiroDiaSemana');
     const formatoHora = localStorage.getItem('formatoHora');
     const notificacoes = localStorage.getItem('notificacoes');
-    
+
     if (primeiroDia) {
         document.getElementById('primeiroDiaSemana').value = primeiroDia;
     }
@@ -630,9 +632,9 @@ function salvarPreferencias() {
 // preferencias deste navegador. "Importar Dados" com este arquivo devolve o
 // sistema inteiro. Antes o arquivo tinha so colaboradores e ausencias, e
 // importa-lo apagava plantoes, feriados, setores e banco de horas.
-async function exportarDados() {
+export async function exportarDados() {
     try {
-        const backup = await window.API.baixarBackup();
+        const backup = await API.baixarBackup();
         backup.preferencias = {
             tema: localStorage.getItem('tema') || 'light',
             primeiroDiaSemana: localStorage.getItem('primeiroDiaSemana') || '1',
@@ -655,7 +657,7 @@ async function exportarDados() {
     }
 }
 
-function aplicarPreferenciasImportadas(preferencias = {}) {
+export function aplicarPreferenciasImportadas(preferencias = {}) {
     if (!preferencias || typeof preferencias !== 'object') {
         return;
     }
@@ -677,4 +679,3 @@ function aplicarPreferenciasImportadas(preferencias = {}) {
         localStorage.setItem('notificacoes', String(preferencias.notificacoes));
     }
 }
-

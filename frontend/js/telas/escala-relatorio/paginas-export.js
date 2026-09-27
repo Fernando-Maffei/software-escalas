@@ -1,93 +1,103 @@
-    function buildMonthlyEscalaExportPageEntries(snapshot) {
-        // Uma semana sozinha na folha comporta ate essa quantidade de linhas no
-        // dia mais cheio; e o tamanho de cada fatia quando nem isso basta.
-        const maxRowsPerWeekDay = getMonthlyEscalaOnePageMaxRows(1);
-        const sectorEntries = Array.isArray(snapshot.setorGroups) && snapshot.setorGroups.length > 0
-            ? snapshot.setorGroups
-            : [{
-                setorNome: 'Sem setor',
-                calendarWeeks: Array.isArray(snapshot.calendarWeeks) ? snapshot.calendarWeeks : []
-            }];
+import { escapeHtml } from '../../lib/html-seguro.js';
+import { ESCALA_QUADRO_WEEKDAY_HEADERS, formatDatePtBrEscala, getDayLabelEscala, TIPO_LABELS } from '../escala-dia-shared.js';
+import { groupEscalaItemsBySetor } from './agrupamento-setor.js';
+import { renderEscalaExportStats, renderEscalaHolidayList } from './feriados-export.js';
+import { getRelatorioEscalaSetorNome } from './filtros.js';
+import { buildEscalaExportHolidayMap, getEscalaExportEntryMaxRows, getEscalaExportWeekSlots, getMonthlyEscalaOnePageMaxRows, renderEscalaSheetDayTable, sliceEscalaExportDayRows } from './folha-helpers.js';
+import { formatEscalaMonthHeading } from './quadro-mensal.js';
+import { chunkEscalaItems } from './relatorio-detalhado.js';
+import { escolherBlocosDeSemanasPlantao } from './snapshot-export.js';
 
-        return sectorEntries.flatMap((sector) => {
-            const weeks = Array.isArray(sector.calendarWeeks) && sector.calendarWeeks.length > 0
-                ? sector.calendarWeeks
-                : [Array(7).fill(null)];
-            // O atalho que jogava o mes todo numa folha saiu: ele passava por
-            // cima do teto de semanas por folha e era justamente o que deixava
-            // o quadro miudo demais para ler.
+function buildMonthlyEscalaExportPageEntries(snapshot) {
+    // Uma semana sozinha na folha comporta ate essa quantidade de linhas no
+    // dia mais cheio; e o tamanho de cada fatia quando nem isso basta.
+    const maxRowsPerWeekDay = getMonthlyEscalaOnePageMaxRows(1);
+    const sectorEntries = Array.isArray(snapshot.setorGroups) && snapshot.setorGroups.length > 0
+        ? snapshot.setorGroups
+        : [{
+            setorNome: 'Sem setor',
+            calendarWeeks: Array.isArray(snapshot.calendarWeeks) ? snapshot.calendarWeeks : []
+        }];
 
-            // Nao cabendo tudo em uma folha, procura o MENOR numero de folhas em
-            // que todas as semanas cabem, dividindo o mes em blocos iguais.
-            // Antes o codigo pulava direto para "uma semana por pagina", e so
-            // emparelhava duas se ambas tivessem <= 12 linhas — o que nunca
-            // acontece justamente nos meses cheios. Dai um setor de 15 pessoas
-            // sair em 5 folhas, e um mes de 6 semanas sair em 3 mesmo com 11.
-            // Menos semanas por folha = mais altura para cada dia, entao a
-            // divisao ganha capacidade sem precisar encolher a fonte.
-            const blocosPorPagina = escolherBlocosDeSemanasPlantao(weeks);
+    return sectorEntries.flatMap((sector) => {
+        const weeks = Array.isArray(sector.calendarWeeks) && sector.calendarWeeks.length > 0
+            ? sector.calendarWeeks
+            : [Array(7).fill(null)];
+        // O atalho que jogava o mes todo numa folha saiu: ele passava por
+        // cima do teto de semanas por folha e era justamente o que deixava
+        // o quadro miudo demais para ler.
 
-            if (blocosPorPagina) {
-                return blocosPorPagina.map((bloco, indice) => {
-                    const inicio = blocosPorPagina
-                        .slice(0, indice)
-                        .reduce((total, anterior) => total + anterior.length, 0);
-                    const fim = inicio + bloco.length - 1;
+        // Nao cabendo tudo em uma folha, procura o MENOR numero de folhas em
+        // que todas as semanas cabem, dividindo o mes em blocos iguais.
+        // Antes o codigo pulava direto para "uma semana por pagina", e so
+        // emparelhava duas se ambas tivessem <= 12 linhas — o que nunca
+        // acontece justamente nos meses cheios. Dai um setor de 15 pessoas
+        // sair em 5 folhas, e um mes de 6 semanas sair em 3 mesmo com 11.
+        // Menos semanas por folha = mais altura para cada dia, entao a
+        // divisao ganha capacidade sem precisar encolher a fonte.
+        const blocosPorPagina = escolherBlocosDeSemanasPlantao(weeks);
 
-                    return {
-                        sector,
-                        weeks: bloco,
-                        kind: bloco.length > 1 ? 'weeks' : 'week',
-                        weekIndex: inicio,
-                        endWeekIndex: fim,
-                        label: bloco.length === weeks.length
-                            ? 'Mes completo'
-                            : (bloco.length > 1
-                                ? `Semanas ${inicio + 1}-${fim + 1}`
-                                : `Semana ${inicio + 1}`)
-                    };
-                });
-            }
+        if (blocosPorPagina) {
+            return blocosPorPagina.map((bloco, indice) => {
+                const inicio = blocosPorPagina
+                    .slice(0, indice)
+                    .reduce((total, anterior) => total + anterior.length, 0);
+                const fim = inicio + bloco.length - 1;
 
-            // Nenhuma divisao resolve: ha um dia com mais linhas do que cabe
-            // numa folha inteira. Ai cada semana vai numa folha, e a que nao
-            // cabe e fatiada em partes.
-            return weeks.flatMap((week, weekIndex) => {
-                const currentWeek = Array.isArray(week) ? week : Array(7).fill(null);
-                const partCount = Math.max(1, Math.ceil(getEscalaExportEntryMaxRows([currentWeek]) / maxRowsPerWeekDay));
-
-                if (partCount === 1) {
-                    return [{
-                        sector,
-                        weeks: [currentWeek],
-                        kind: 'week',
-                        weekIndex,
-                        endWeekIndex: weekIndex,
-                        label: `Semana ${weekIndex + 1}`
-                    }];
-                }
-
-                return Array.from({ length: partCount }, (_, partIndex) => ({
+                return {
                     sector,
-                    weeks: [currentWeek.map((day) => sliceEscalaExportDayRows(day, partIndex * maxRowsPerWeekDay, maxRowsPerWeekDay))],
+                    weeks: bloco,
+                    kind: bloco.length > 1 ? 'weeks' : 'week',
+                    weekIndex: inicio,
+                    endWeekIndex: fim,
+                    label: bloco.length === weeks.length
+                        ? 'Mes completo'
+                        : (bloco.length > 1
+                            ? `Semanas ${inicio + 1}-${fim + 1}`
+                            : `Semana ${inicio + 1}`)
+                };
+            });
+        }
+
+        // Nenhuma divisao resolve: ha um dia com mais linhas do que cabe
+        // numa folha inteira. Ai cada semana vai numa folha, e a que nao
+        // cabe e fatiada em partes.
+        return weeks.flatMap((week, weekIndex) => {
+            const currentWeek = Array.isArray(week) ? week : Array(7).fill(null);
+            const partCount = Math.max(1, Math.ceil(getEscalaExportEntryMaxRows([currentWeek]) / maxRowsPerWeekDay));
+
+            if (partCount === 1) {
+                return [{
+                    sector,
+                    weeks: [currentWeek],
                     kind: 'week',
                     weekIndex,
-                    partIndex,
-                    partCount,
-                    label: `Semana ${weekIndex + 1} - parte ${partIndex + 1}`
-                }));
-            });
+                    endWeekIndex: weekIndex,
+                    label: `Semana ${weekIndex + 1}`
+                }];
+            }
+
+            return Array.from({ length: partCount }, (_, partIndex) => ({
+                sector,
+                weeks: [currentWeek.map((day) => sliceEscalaExportDayRows(day, partIndex * maxRowsPerWeekDay, maxRowsPerWeekDay))],
+                kind: 'week',
+                weekIndex,
+                partIndex,
+                partCount,
+                label: `Semana ${weekIndex + 1} - parte ${partIndex + 1}`
+            }));
         });
-    }
+    });
+}
 
-    function renderMonthlyEscalaExportPages(snapshot) {
-        const pageEntries = buildMonthlyEscalaExportPageEntries(snapshot);
-        const holidayMap = buildEscalaExportHolidayMap(snapshot.feriados);
-        const pageTitle = formatEscalaMonthHeading(snapshot.filters?.month, snapshot.filters?.year);
+export function renderMonthlyEscalaExportPages(snapshot) {
+    const pageEntries = buildMonthlyEscalaExportPageEntries(snapshot);
+    const holidayMap = buildEscalaExportHolidayMap(snapshot.feriados);
+    const pageTitle = formatEscalaMonthHeading(snapshot.filters?.month, snapshot.filters?.year);
 
-        // A densidade (tamanho da fonte) nao e escolhida aqui: sai da medicao
-        // da folha ja montada, em ajustarDensidadeFolhasEscala.
-        return pageEntries.map((entry, pageIndex) => `
+    // A densidade (tamanho da fonte) nao e escolhida aqui: sai da medicao
+    // da folha ja montada, em ajustarDensidadeFolhasEscala.
+    return pageEntries.map((entry, pageIndex) => `
             <section class="pdf-pagina escala-export-page escala-export-month-page">
                 <div class="escala-sheet-title">${escapeHtml(pageTitle)}</div>
                 <div class="escala-sheet-meta">
@@ -99,37 +109,37 @@
                 </div>
                 <div class="escala-sheet-grid" style="--weekday-count:7; --week-count:${entry.weeks.length || 1};">
                     ${entry.weeks.flatMap((week) => (
-                        getEscalaExportWeekSlots(week).map((day, weekDayIndex) => renderEscalaSheetDayTable(day, {
-                            weekDayIndex,
-                            holidayMap
-                        }))
-                    )).join('')}
+                    getEscalaExportWeekSlots(week).map((day, weekDayIndex) => renderEscalaSheetDayTable(day, {
+                        weekDayIndex,
+                        holidayMap
+                    }))
+                )).join('')}
                 </div>
             </section>
         `).join('');
-    }
+}
 
-    function renderDetailedEscalaExportPages(snapshot) {
-        const setorGroups = Array.isArray(snapshot.setorGroups) && snapshot.setorGroups.length > 0
-            ? snapshot.setorGroups
-            : groupEscalaItemsBySetor(snapshot.items);
-        const pageEntries = [];
+export function renderDetailedEscalaExportPages(snapshot) {
+    const setorGroups = Array.isArray(snapshot.setorGroups) && snapshot.setorGroups.length > 0
+        ? snapshot.setorGroups
+        : groupEscalaItemsBySetor(snapshot.items);
+    const pageEntries = [];
 
-        (setorGroups.length > 0 ? setorGroups : [{ setorNome: 'Sem setor', items: [] }]).forEach((sector) => {
-            const chunks = chunkEscalaItems(sector.items, 22);
-            const pages = chunks.length > 0 ? chunks : [[]];
+    (setorGroups.length > 0 ? setorGroups : [{ setorNome: 'Sem setor', items: [] }]).forEach((sector) => {
+        const chunks = chunkEscalaItems(sector.items, 22);
+        const pages = chunks.length > 0 ? chunks : [[]];
 
-            pages.forEach((group, sectorPageIndex) => {
-                pageEntries.push({
-                    sector,
-                    group,
-                    sectorPageIndex,
-                    sectorPageCount: pages.length
-                });
+        pages.forEach((group, sectorPageIndex) => {
+            pageEntries.push({
+                sector,
+                group,
+                sectorPageIndex,
+                sectorPageCount: pages.length
             });
         });
+    });
 
-        return pageEntries.map((entry, pageIndex) => `
+    return pageEntries.map((entry, pageIndex) => `
             <section class="pdf-pagina escala-export-page escala-export-detailed">
                 <div class="escala-export-header">
                     <h1>${escapeHtml(snapshot.title)}</h1>
@@ -179,5 +189,4 @@
                 </table>
             </section>
         `).join('');
-    }
-
+}

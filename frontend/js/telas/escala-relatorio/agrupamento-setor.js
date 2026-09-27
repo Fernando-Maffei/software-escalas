@@ -1,91 +1,98 @@
-    function getEscalaSetorNome(item) {
-        const nome = item?.setorNome ?? item?.SetorNome ?? item?.setor ?? item?.Setor;
-        const normalized = String(nome ?? '').trim();
-        return normalized || 'Sem setor';
+import { normalizeRuntimeEscalaTipo } from '../../core/runtime/normalizacao.js';
+import { escapeHtml } from '../../lib/html-seguro.js';
+import { MESES_LABELS } from '../escala-dia-shared.js';
+import { renderRelatorioEscalaFiltrosAtivos } from './filtros.js';
+import { getEscalaCalendarSlots, renderEscalaQuadroDayCard } from './quadro-mensal.js';
+import * as EscalaReportUtils from '../../lib/escala-report-utils.js';
+
+function getEscalaSetorNome(item) {
+    const nome = item?.setorNome ?? item?.SetorNome ?? item?.setor ?? item?.Setor;
+    const normalized = String(nome ?? '').trim();
+    return normalized || 'Sem setor';
+}
+
+function getEscalaSetorKey(item) {
+    const id = item?.setorId ?? item?.SetorId;
+
+    if (id !== undefined && id !== null && String(id).trim() !== '') {
+        return `id:${String(id).trim()}`;
     }
 
-    function getEscalaSetorKey(item) {
-        const id = item?.setorId ?? item?.SetorId;
+    return `nome:${getEscalaSetorNome(item).toLowerCase()}`;
+}
 
-        if (id !== undefined && id !== null && String(id).trim() !== '') {
-            return `id:${String(id).trim()}`;
-        }
+export function groupEscalaItemsBySetor(items, options = {}) {
+    const source = Array.isArray(items) ? items : [];
+    const groups = new Map();
 
-        return `nome:${getEscalaSetorNome(item).toLowerCase()}`;
-    }
+    source.forEach((item) => {
+        const key = getEscalaSetorKey(item);
 
-    function groupEscalaItemsBySetor(items, options = {}) {
-        const source = Array.isArray(items) ? items : [];
-        const groups = new Map();
-
-        source.forEach((item) => {
-            const key = getEscalaSetorKey(item);
-
-            if (!groups.has(key)) {
-                groups.set(key, {
-                    key,
-                    setorNome: getEscalaSetorNome(item),
-                    items: []
-                });
-            }
-
-            groups.get(key).items.push(item);
-        });
-
-        const result = [...groups.values()].sort((first, second) => (
-            first.setorNome.localeCompare(second.setorNome, 'pt-BR', { sensitivity: 'base' })
-        ));
-
-        if (result.length === 0 && options.includeEmpty) {
-            return [{
-                key: 'sem-setor',
-                setorNome: 'Sem setor',
+        if (!groups.has(key)) {
+            groups.set(key, {
+                key,
+                setorNome: getEscalaSetorNome(item),
                 items: []
-            }];
+            });
         }
 
-        return result;
+        groups.get(key).items.push(item);
+    });
+
+    const result = [...groups.values()].sort((first, second) => (
+        first.setorNome.localeCompare(second.setorNome, 'pt-BR', { sensitivity: 'base' })
+    ));
+
+    if (result.length === 0 && options.includeEmpty) {
+        return [{
+            key: 'sem-setor',
+            setorNome: 'Sem setor',
+            items: []
+        }];
     }
 
-    function normalizeEscalaReportItems(items) {
-        return (Array.isArray(items) ? items : []).map((item) => ({
-            ...item,
-            tipo: window.normalizeRuntimeEscalaTipo(item.tipo || item.Tipo || 'normal'),
-            setorNome: getEscalaSetorNome(item)
-        }));
-    }
+    return result;
+}
 
-    function renderMonthlyEscalaReport(items, filters) {
-        const boardUtils = window.EscalaReportUtils;
+export function normalizeEscalaReportItems(items) {
+    return (Array.isArray(items) ? items : []).map((item) => ({
+        ...item,
+        tipo: normalizeRuntimeEscalaTipo(item.tipo || item.Tipo || 'normal'),
+        setorNome: getEscalaSetorNome(item)
+    }));
+}
 
-        if (!boardUtils || typeof boardUtils.buildEscalaQuadroMensal !== 'function') {
-            return `
+export function renderMonthlyEscalaReport(items, filters) {
+    const boardUtils = EscalaReportUtils;
+
+    if (!boardUtils || typeof boardUtils.buildEscalaQuadroMensal !== 'function') {
+        return `
                 <div class="empty-state">
                     <i class="fas fa-exclamation-circle"></i>
                     <p>Os utilitarios do quadro mensal nao foram carregados.</p>
                 </div>
             `;
-        }
+    }
 
-        const normalizedItems = normalizeEscalaReportItems(items);
-        const setorGroups = groupEscalaItemsBySetor(normalizedItems, { includeEmpty: true }).map((group) => {
-            const days = boardUtils.buildEscalaQuadroMensal(group.items, {
-                month: filters.month,
-                year: filters.year
-            });
-
-            return {
-                ...group,
-                days,
-                calendarSlots: getEscalaCalendarSlots(boardUtils, days),
-                daysWithScale: days.filter((day) => day.hasScale).length,
-                totalRows: days.reduce((sum, day) => sum + day.rows.length, 0)
-            };
+    const normalizedItems = normalizeEscalaReportItems(items);
+    const setorGroups = groupEscalaItemsBySetor(normalizedItems, { includeEmpty: true }).map((group) => {
+        const days = boardUtils.buildEscalaQuadroMensal(group.items, {
+            month: filters.month,
+            year: filters.year
         });
-        const daysWithScale = setorGroups.reduce((sum, group) => sum + group.daysWithScale, 0);
-        const totalRows = setorGroups.reduce((sum, group) => sum + group.totalRows, 0);
 
-        return `
+        return {
+            ...group,
+            days,
+            calendarSlots: getEscalaCalendarSlots(boardUtils, days),
+            daysWithScale: days.filter((day) => day.hasScale).length,
+            totalRows: days.reduce((sum, day) => sum + day.rows.length, 0)
+        };
+    });
+    const daysWithScale = setorGroups.reduce((sum, group) => sum + group.daysWithScale, 0);
+    const totalRows = setorGroups.reduce((sum, group) => sum + group.totalRows, 0);
+
+    return `
             <div class="escala-quadro-mensal">
                 ${renderRelatorioEscalaFiltrosAtivos(filters)}
                 <div class="relatorio-total" hidden>
@@ -107,6 +114,4 @@
                 `).join('')}
             </div>
         `;
-    }
-
-
+}

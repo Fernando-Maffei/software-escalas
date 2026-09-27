@@ -1,80 +1,71 @@
-(function initRuntimeNormalizationHelpers(root) {
-    if (root.__runtimeNormalizationHelpersLoaded) {
-        return;
+export function normalizeRuntimeToken(value) {
+    return String(value || '')
+        .trim()
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[\s-]+/g, '_')
+        .replace(/_+/g, '_');
+}
+
+export function normalizeRuntimeAusenciaTipo(value) {
+    const token = normalizeRuntimeToken(value);
+
+    if (token.startsWith('ferias')) {
+        return 'ferias';
     }
 
-    root.__runtimeNormalizationHelpersLoaded = true;
+    if (token.startsWith('folga')) {
+        return 'folga';
+    }
 
-    root.normalizeRuntimeToken = function normalizeRuntimeToken(value) {
-        return String(value || '')
-            .trim()
-            .toLowerCase()
-            .normalize('NFD')
-            .replace(/[\u0300-\u036f]/g, '')
-            .replace(/[\s-]+/g, '_')
-            .replace(/_+/g, '_');
-    };
-
-    root.normalizeRuntimeAusenciaTipo = function normalizeRuntimeAusenciaTipo(value) {
-        const token = root.normalizeRuntimeToken(value);
-
-        if (token.startsWith('ferias')) {
-            return 'ferias';
-        }
-
-        if (token.startsWith('folga')) {
-            return 'folga';
-        }
-
-        if (token.startsWith('ausencia')) {
-            return 'ausencia';
-        }
-
+    if (token.startsWith('ausencia')) {
         return 'ausencia';
-    };
+    }
 
-    root.normalizeRuntimePeriodoTipo = function normalizeRuntimePeriodoTipo(value) {
-        const token = root.normalizeRuntimeToken(value);
-        return token === 'horas' ? 'horas' : 'dia_inteiro';
-    };
+    return 'ausencia';
+}
 
-    // Precisa casar com ESCALA_TIPOS de backend/services/escala.js.
-    root.RUNTIME_ESCALA_TIPOS = [
-        'normal', 'plantao', 'folga', 'ferias', 'ausencia', 'ajuste',
-        'domingo_folgado', 'reposicao', 'folga_compensatoria', 'cobertura'
-    ];
+export function normalizeRuntimePeriodoTipo(value) {
+    const token = normalizeRuntimeToken(value);
+    return token === 'horas' ? 'horas' : 'dia_inteiro';
+}
 
-    root.normalizeRuntimeEscalaTipo = function normalizeRuntimeEscalaTipo(value) {
-        const token = root.normalizeRuntimeToken(value);
+// Precisa casar com ESCALA_TIPOS de backend/services/escala.js.
+const RUNTIME_ESCALA_TIPOS = [
+    'normal', 'plantao', 'folga', 'ferias', 'ausencia', 'ajuste',
+    'domingo_folgado', 'reposicao', 'folga_compensatoria', 'cobertura'
+];
 
-        // Valor exato PRIMEIRO: os startsWith abaixo cobrem dado legado, mas
-        // 'folga_compensatoria' comeca com 'folga' e viraria 'folga', perdendo
-        // a distincao em silencio.
-        if (root.RUNTIME_ESCALA_TIPOS.includes(token)) {
-            return token;
-        }
+export function normalizeRuntimeEscalaTipo(value) {
+    const token = normalizeRuntimeToken(value);
 
-        if (token.startsWith('plantao')) {
-            return 'plantao';
-        }
+    // Valor exato PRIMEIRO: os startsWith abaixo cobrem dado legado, mas
+    // 'folga_compensatoria' comeca com 'folga' e viraria 'folga', perdendo
+    // a distincao em silencio.
+    if (RUNTIME_ESCALA_TIPOS.includes(token)) {
+        return token;
+    }
 
-        if (token.startsWith('folga')) {
-            return 'folga';
-        }
+    if (token.startsWith('plantao')) {
+        return 'plantao';
+    }
 
-        if (token.startsWith('ferias')) {
-            return 'ferias';
-        }
+    if (token.startsWith('folga')) {
+        return 'folga';
+    }
 
-        if (token.startsWith('ausencia')) {
-            return 'ausencia';
-        }
+    if (token.startsWith('ferias')) {
+        return 'ferias';
+    }
 
-        if (token.startsWith('ajuste')) {
-            return 'ajuste';
-        }
+    if (token.startsWith('ausencia')) {
+        return 'ausencia';
+    }
 
-        return 'normal';
-    };
-}(window));
+    if (token.startsWith('ajuste')) {
+        return 'ajuste';
+    }
 
+    return 'normal';
+}

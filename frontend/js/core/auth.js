@@ -1,479 +1,473 @@
-(function () {
-    // Permite que o bootstrap do app.js espere o perfil do usuario antes de
-    // renderizar a primeira tela. Fica pendente enquanto ninguem estiver
-    // logado — o que e proposital: nao ha pagina a renderizar atras da tela
-    // de login.
-    let resolverUsuarioAutenticado = null;
-    const usuarioAutenticadoPromise = new Promise((resolve) => {
-        resolverUsuarioAutenticado = resolve;
-    });
+import { mostrarToast } from './app/horas-e-resumo.js';
+import { estado } from './estado.js';
+import { aplicarPermissoesUI } from './permissoes.js';
 
-    window.aguardarUsuarioAutenticado = function aguardarUsuarioAutenticado() {
-        return usuarioAutenticadoPromise;
-    };
+// Permite que o bootstrap do app.js espere o perfil do usuario antes de
+// renderizar a primeira tela. Fica pendente enquanto ninguem estiver
+// logado — o que e proposital: nao ha pagina a renderizar atras da tela
+// de login.
+let resolverUsuarioAutenticado = null;
+const usuarioAutenticadoPromise = new Promise((resolve) => {
+    resolverUsuarioAutenticado = resolve;
+});
 
-    const AUTH_ME_URL = '/api/auth/me';
-    const AUTH_LOGIN_URL = '/api/auth/login';
-    const AUTH_LOGOUT_URL = '/api/auth/logout';
-    const AUTH_TROCAR_SENHA_URL = '/api/auth/trocar-senha';
-    const SETUP_STATUS_URL = '/api/setup/status';
-    const SETUP_TESTAR_URL = '/api/configuracao-banco/testar';
-    const SETUP_SALVAR_URL = '/api/configuracao-banco/salvar';
+export function aguardarUsuarioAutenticado() {
+    return usuarioAutenticadoPromise;
+}
 
-    const loginScreen = document.getElementById('loginScreen');
-    const setupScreen = document.getElementById('setupScreen');
-    const setupForm = document.getElementById('setupForm');
-    const setupError = document.getElementById('setupError');
-    const setupSuccess = document.getElementById('setupSuccess');
-    const setupTestarBtn = document.getElementById('setupTestarBtn');
-    const setupSalvarBtn = document.getElementById('setupSalvarBtn');
-    const setupAdminResultado = document.getElementById('setupAdminResultado');
-    const setupIrLoginBtn = document.getElementById('setupIrLoginBtn');
-    const trocarSenhaScreen = document.getElementById('trocarSenhaScreen');
-    const loginForm = document.getElementById('loginForm');
-    const loginError = document.getElementById('loginError');
-    const loginSubmitBtn = document.getElementById('loginSubmitBtn');
-    const trocarSenhaForm = document.getElementById('trocarSenhaForm');
-    const trocarSenhaError = document.getElementById('trocarSenhaError');
-    const logoutBtn = document.getElementById('logoutBtn');
+const AUTH_ME_URL = '/api/auth/me';
+const AUTH_LOGIN_URL = '/api/auth/login';
+const AUTH_LOGOUT_URL = '/api/auth/logout';
+const AUTH_TROCAR_SENHA_URL = '/api/auth/trocar-senha';
+const SETUP_STATUS_URL = '/api/setup/status';
+const SETUP_TESTAR_URL = '/api/configuracao-banco/testar';
+const SETUP_SALVAR_URL = '/api/configuracao-banco/salvar';
 
-    const abrirTrocarSenhaBtn = document.getElementById('abrirTrocarSenhaBtn');
-    const modalTrocarSenha = document.getElementById('modalTrocarSenha');
-    const modalTrocarSenhaForm = document.getElementById('modalTrocarSenhaForm');
-    const modalTrocarSenhaError = document.getElementById('modalTrocarSenhaError');
-    const fecharModalTrocarSenhaBtn = document.getElementById('fecharModalTrocarSenhaBtn');
-    const cancelarModalTrocarSenhaBtn = document.getElementById('cancelarModalTrocarSenhaBtn');
+const loginScreen = document.getElementById('loginScreen');
+const setupScreen = document.getElementById('setupScreen');
+const setupForm = document.getElementById('setupForm');
+const setupError = document.getElementById('setupError');
+const setupSuccess = document.getElementById('setupSuccess');
+const setupTestarBtn = document.getElementById('setupTestarBtn');
+const setupSalvarBtn = document.getElementById('setupSalvarBtn');
+const setupAdminResultado = document.getElementById('setupAdminResultado');
+const setupIrLoginBtn = document.getElementById('setupIrLoginBtn');
+const trocarSenhaScreen = document.getElementById('trocarSenhaScreen');
+const loginForm = document.getElementById('loginForm');
+const loginError = document.getElementById('loginError');
+const loginSubmitBtn = document.getElementById('loginSubmitBtn');
+const trocarSenhaForm = document.getElementById('trocarSenhaForm');
+const trocarSenhaError = document.getElementById('trocarSenhaError');
+const logoutBtn = document.getElementById('logoutBtn');
 
-    let hasBeenAuthenticated = false;
-    let setupMode = false;
+const abrirTrocarSenhaBtn = document.getElementById('abrirTrocarSenhaBtn');
+const modalTrocarSenha = document.getElementById('modalTrocarSenha');
+const modalTrocarSenhaForm = document.getElementById('modalTrocarSenhaForm');
+const modalTrocarSenhaError = document.getElementById('modalTrocarSenhaError');
+const fecharModalTrocarSenhaBtn = document.getElementById('fecharModalTrocarSenhaBtn');
+const cancelarModalTrocarSenhaBtn = document.getElementById('cancelarModalTrocarSenhaBtn');
 
-    function showError(element, message) {
-        if (!element) {
-            return;
-        }
+let hasBeenAuthenticated = false;
+let setupMode = false;
 
-        element.textContent = message;
-        element.classList.remove('hidden');
+function showError(element, message) {
+    if (!element) {
+        return;
     }
 
-    function hideError(element) {
-        if (!element) {
-            return;
-        }
+    element.textContent = message;
+    element.classList.remove('hidden');
+}
 
-        element.classList.add('hidden');
-        element.textContent = '';
+function hideError(element) {
+    if (!element) {
+        return;
     }
 
-    function showLoginScreen() {
-        document.body.classList.remove('authenticated');
+    element.classList.add('hidden');
+    element.textContent = '';
+}
 
-        if (loginScreen) {
-            loginScreen.classList.remove('hidden');
-        }
+function showLoginScreen() {
+    document.body.classList.remove('authenticated');
 
-        if (setupScreen) {
-            setupScreen.classList.add('hidden');
-        }
-
-        if (trocarSenhaScreen) {
-            trocarSenhaScreen.classList.add('hidden');
-        }
+    if (loginScreen) {
+        loginScreen.classList.remove('hidden');
     }
 
-    function showSetupScreen() {
-        setupMode = true;
-        document.body.classList.remove('authenticated');
-
-        if (loginScreen) {
-            loginScreen.classList.add('hidden');
-        }
-
-        if (trocarSenhaScreen) {
-            trocarSenhaScreen.classList.add('hidden');
-        }
-
-        if (setupScreen) {
-            setupScreen.classList.remove('hidden');
-        }
+    if (setupScreen) {
+        setupScreen.classList.add('hidden');
     }
 
-    function showTrocarSenhaScreen() {
-        document.body.classList.remove('authenticated');
+    if (trocarSenhaScreen) {
+        trocarSenhaScreen.classList.add('hidden');
+    }
+}
 
-        if (loginScreen) {
-            loginScreen.classList.add('hidden');
-        }
+function showSetupScreen() {
+    setupMode = true;
+    document.body.classList.remove('authenticated');
 
-        if (trocarSenhaScreen) {
-            trocarSenhaScreen.classList.remove('hidden');
-        }
+    if (loginScreen) {
+        loginScreen.classList.add('hidden');
     }
 
-    function showApp() {
-        hasBeenAuthenticated = true;
-        document.body.classList.add('authenticated');
+    if (trocarSenhaScreen) {
+        trocarSenhaScreen.classList.add('hidden');
     }
 
-    function handleAuthenticatedUser(user) {
-        // Compartilha o usuario logado com o restante do front-end (ex.: o
-        // card de Usuarios em Configuracoes precisa saber se e admin).
-        window.__usuarioAtual = user || null;
+    if (setupScreen) {
+        setupScreen.classList.remove('hidden');
+    }
+}
 
-        if (user && user.deveTrocarSenha) {
-            showTrocarSenhaScreen();
-            return;
-        }
+function showTrocarSenhaScreen() {
+    document.body.classList.remove('authenticated');
 
-        showApp();
-
-        // Ajusta a interface ao perfil (esconde telas de admin do usuario
-        // comum). Checado com typeof porque permissoes.js e carregado depois
-        // deste arquivo — se por algum motivo ainda nao estiver pronto, o
-        // proprio permissoes.js reaplica no DOMContentLoaded.
-        if (typeof window.aplicarPermissoesUI === 'function') {
-            window.aplicarPermissoesUI();
-        }
-
-        // Libera o bootstrap do app so agora, com o perfil ja conhecido.
-        resolverUsuarioAutenticado(user || null);
+    if (loginScreen) {
+        loginScreen.classList.add('hidden');
     }
 
-    async function isSetupPending() {
-        try {
-            const response = await fetch(SETUP_STATUS_URL, { method: 'GET' });
+    if (trocarSenhaScreen) {
+        trocarSenhaScreen.classList.remove('hidden');
+    }
+}
 
-            if (!response.ok) {
-                return false;
-            }
+function showApp() {
+    hasBeenAuthenticated = true;
+    document.body.classList.add('authenticated');
+}
 
-            const data = await response.json();
-            return data.databaseConfigured === false;
-        } catch (error) {
-            // Se nem o status respondeu, segue para o fluxo normal de login,
-            // que ja sabe apresentar erros de comunicacao.
+function handleAuthenticatedUser(user) {
+    // Compartilha o usuario logado com o restante do front-end (ex.: o
+    // card de Usuarios em Configuracoes precisa saber se e admin).
+    estado.usuarioAtual = user || null;
+
+    if (user && user.deveTrocarSenha) {
+        showTrocarSenhaScreen();
+        return;
+    }
+
+    showApp();
+
+    // Ajusta a interface ao perfil (esconde telas de admin do usuario comum).
+    aplicarPermissoesUI();
+
+    // Libera o bootstrap do app so agora, com o perfil ja conhecido.
+    resolverUsuarioAutenticado(user || null);
+}
+
+async function isSetupPending() {
+    try {
+        const response = await fetch(SETUP_STATUS_URL, { method: 'GET' });
+
+        if (!response.ok) {
             return false;
         }
+
+        const data = await response.json();
+        return data.databaseConfigured === false;
+    } catch (error) {
+        // Se nem o status respondeu, segue para o fluxo normal de login,
+        // que ja sabe apresentar erros de comunicacao.
+        return false;
+    }
+}
+
+async function checkSession() {
+    if (await isSetupPending()) {
+        showSetupScreen();
+        return;
     }
 
-    async function checkSession() {
-        if (await isSetupPending()) {
-            showSetupScreen();
+    try {
+        const response = await fetch(AUTH_ME_URL, { method: 'GET' });
+
+        if (!response.ok) {
+            showLoginScreen();
+            return;
+        }
+
+        const data = await response.json();
+        handleAuthenticatedUser(data.user);
+    } catch (error) {
+        showLoginScreen();
+    }
+}
+
+function coletarSetupPayload() {
+    const port = document.getElementById('setupPort').value.trim();
+
+    return {
+        host: document.getElementById('setupHost').value.trim(),
+        instanceName: document.getElementById('setupInstance').value.trim(),
+        port: port ? Number(port) : null,
+        database: document.getElementById('setupDatabase').value.trim(),
+        user: document.getElementById('setupUser').value.trim(),
+        password: document.getElementById('setupPassword').value,
+        authenticationType: 'sql'
+    };
+}
+
+function setSetupBotoesDesabilitados(disabled) {
+    if (setupTestarBtn) {
+        setupTestarBtn.disabled = disabled;
+    }
+
+    if (setupSalvarBtn) {
+        setupSalvarBtn.disabled = disabled;
+    }
+}
+
+if (setupTestarBtn) {
+    setupTestarBtn.addEventListener('click', async () => {
+        hideError(setupError);
+
+        if (setupSuccess) {
+            setupSuccess.classList.add('hidden');
+        }
+
+        setSetupBotoesDesabilitados(true);
+
+        try {
+            const response = await fetch(SETUP_TESTAR_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(coletarSetupPayload())
+            });
+            const data = await response.json().catch(() => ({}));
+
+            if (!response.ok) {
+                showError(setupError, data.error || 'Nao foi possivel conectar com os dados informados.');
+                return;
+            }
+
+            if (setupSuccess) {
+                setupSuccess.textContent = 'Conexao realizada com sucesso. Pode salvar.';
+                setupSuccess.classList.remove('hidden');
+            }
+        } catch (error) {
+            showError(setupError, 'Falha de comunicacao com o servidor. Tente novamente.');
+        } finally {
+            setSetupBotoesDesabilitados(false);
+        }
+    });
+}
+
+if (setupForm) {
+    setupForm.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        hideError(setupError);
+
+        if (setupSuccess) {
+            setupSuccess.classList.add('hidden');
+        }
+
+        setSetupBotoesDesabilitados(true);
+
+        try {
+            const response = await fetch(SETUP_SALVAR_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(coletarSetupPayload())
+            });
+            const data = await response.json().catch(() => ({}));
+
+            if (!response.ok) {
+                showError(setupError, data.error || 'Nao foi possivel salvar a configuracao.');
+                return;
+            }
+
+            if (data.schemaWarning) {
+                showError(setupError, data.schemaWarning);
+                return;
+            }
+
+            const admin = data.adminBootstrap;
+
+            if (admin && admin.password) {
+                // Banco novo: mostra as credenciais geradas uma unica vez.
+                setupForm.classList.add('hidden');
+                document.getElementById('setupAdminUsuario').textContent = admin.username;
+                document.getElementById('setupAdminSenha').textContent = admin.password;
+
+                if (setupAdminResultado) {
+                    setupAdminResultado.classList.remove('hidden');
+                }
+
+                return;
+            }
+
+            // Banco ja tinha usuarios (ex.: reinstalacao apontando para um
+            // banco existente): segue direto para o login.
+            window.location.reload();
+        } catch (error) {
+            showError(setupError, 'Falha de comunicacao com o servidor. Tente novamente.');
+        } finally {
+            setSetupBotoesDesabilitados(false);
+        }
+    });
+}
+
+if (setupIrLoginBtn) {
+    setupIrLoginBtn.addEventListener('click', () => {
+        window.location.reload();
+    });
+}
+
+if (loginForm) {
+    loginForm.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        hideError(loginError);
+
+        const username = document.getElementById('loginUsername').value.trim();
+        const password = document.getElementById('loginPassword').value;
+
+        if (loginSubmitBtn) {
+            loginSubmitBtn.disabled = true;
+        }
+
+        try {
+            const response = await fetch(AUTH_LOGIN_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password })
+            });
+            const data = await response.json().catch(() => ({}));
+
+            if (!response.ok) {
+                showError(loginError, data.error || 'Nao foi possivel entrar. Verifique usuario e senha.');
+                return;
+            }
+
+            loginForm.reset();
+            // Recarrega a pagina em vez de revelar o app em memoria: o app.js
+            // ja pode ter tentado buscar dados protegidos antes do login (e
+            // ficado com esse erro em cache), entao um load limpo com a
+            // sessao ja valida evita esses estados de erro presos na tela.
+            window.location.reload();
+        } catch (error) {
+            showError(loginError, 'Falha de comunicacao com o servidor. Tente novamente.');
+        } finally {
+            if (loginSubmitBtn) {
+                loginSubmitBtn.disabled = false;
+            }
+        }
+    });
+}
+
+if (trocarSenhaForm) {
+    trocarSenhaForm.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        hideError(trocarSenhaError);
+
+        const senhaAtual = document.getElementById('senhaAtualInput').value;
+        const novaSenha = document.getElementById('novaSenhaInput').value;
+        const confirmarSenha = document.getElementById('confirmarSenhaInput').value;
+
+        if (novaSenha !== confirmarSenha) {
+            showError(trocarSenhaError, 'As senhas informadas nao coincidem.');
             return;
         }
 
         try {
-            const response = await fetch(AUTH_ME_URL, { method: 'GET' });
+            const response = await fetch(AUTH_TROCAR_SENHA_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ senhaAtual, novaSenha })
+            });
+            const data = await response.json().catch(() => ({}));
 
             if (!response.ok) {
-                showLoginScreen();
+                showError(trocarSenhaError, data.error || 'Nao foi possivel salvar a nova senha.');
                 return;
             }
 
-            const data = await response.json();
-            handleAuthenticatedUser(data.user);
+            trocarSenhaForm.reset();
+            window.location.reload();
         } catch (error) {
-            showLoginScreen();
-        }
-    }
-
-    function coletarSetupPayload() {
-        const port = document.getElementById('setupPort').value.trim();
-
-        return {
-            host: document.getElementById('setupHost').value.trim(),
-            instanceName: document.getElementById('setupInstance').value.trim(),
-            port: port ? Number(port) : null,
-            database: document.getElementById('setupDatabase').value.trim(),
-            user: document.getElementById('setupUser').value.trim(),
-            password: document.getElementById('setupPassword').value,
-            authenticationType: 'sql'
-        };
-    }
-
-    function setSetupBotoesDesabilitados(disabled) {
-        if (setupTestarBtn) {
-            setupTestarBtn.disabled = disabled;
-        }
-
-        if (setupSalvarBtn) {
-            setupSalvarBtn.disabled = disabled;
-        }
-    }
-
-    if (setupTestarBtn) {
-        setupTestarBtn.addEventListener('click', async () => {
-            hideError(setupError);
-
-            if (setupSuccess) {
-                setupSuccess.classList.add('hidden');
-            }
-
-            setSetupBotoesDesabilitados(true);
-
-            try {
-                const response = await fetch(SETUP_TESTAR_URL, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(coletarSetupPayload())
-                });
-                const data = await response.json().catch(() => ({}));
-
-                if (!response.ok) {
-                    showError(setupError, data.error || 'Nao foi possivel conectar com os dados informados.');
-                    return;
-                }
-
-                if (setupSuccess) {
-                    setupSuccess.textContent = 'Conexao realizada com sucesso. Pode salvar.';
-                    setupSuccess.classList.remove('hidden');
-                }
-            } catch (error) {
-                showError(setupError, 'Falha de comunicacao com o servidor. Tente novamente.');
-            } finally {
-                setSetupBotoesDesabilitados(false);
-            }
-        });
-    }
-
-    if (setupForm) {
-        setupForm.addEventListener('submit', async (event) => {
-            event.preventDefault();
-            hideError(setupError);
-
-            if (setupSuccess) {
-                setupSuccess.classList.add('hidden');
-            }
-
-            setSetupBotoesDesabilitados(true);
-
-            try {
-                const response = await fetch(SETUP_SALVAR_URL, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(coletarSetupPayload())
-                });
-                const data = await response.json().catch(() => ({}));
-
-                if (!response.ok) {
-                    showError(setupError, data.error || 'Nao foi possivel salvar a configuracao.');
-                    return;
-                }
-
-                if (data.schemaWarning) {
-                    showError(setupError, data.schemaWarning);
-                    return;
-                }
-
-                const admin = data.adminBootstrap;
-
-                if (admin && admin.password) {
-                    // Banco novo: mostra as credenciais geradas uma unica vez.
-                    setupForm.classList.add('hidden');
-                    document.getElementById('setupAdminUsuario').textContent = admin.username;
-                    document.getElementById('setupAdminSenha').textContent = admin.password;
-
-                    if (setupAdminResultado) {
-                        setupAdminResultado.classList.remove('hidden');
-                    }
-
-                    return;
-                }
-
-                // Banco ja tinha usuarios (ex.: reinstalacao apontando para um
-                // banco existente): segue direto para o login.
-                window.location.reload();
-            } catch (error) {
-                showError(setupError, 'Falha de comunicacao com o servidor. Tente novamente.');
-            } finally {
-                setSetupBotoesDesabilitados(false);
-            }
-        });
-    }
-
-    if (setupIrLoginBtn) {
-        setupIrLoginBtn.addEventListener('click', () => {
-            window.location.reload();
-        });
-    }
-
-    if (loginForm) {
-        loginForm.addEventListener('submit', async (event) => {
-            event.preventDefault();
-            hideError(loginError);
-
-            const username = document.getElementById('loginUsername').value.trim();
-            const password = document.getElementById('loginPassword').value;
-
-            if (loginSubmitBtn) {
-                loginSubmitBtn.disabled = true;
-            }
-
-            try {
-                const response = await fetch(AUTH_LOGIN_URL, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ username, password })
-                });
-                const data = await response.json().catch(() => ({}));
-
-                if (!response.ok) {
-                    showError(loginError, data.error || 'Nao foi possivel entrar. Verifique usuario e senha.');
-                    return;
-                }
-
-                loginForm.reset();
-                // Recarrega a pagina em vez de revelar o app em memoria: o app.js
-                // ja pode ter tentado buscar dados protegidos antes do login (e
-                // ficado com esse erro em cache), entao um load limpo com a
-                // sessao ja valida evita esses estados de erro presos na tela.
-                window.location.reload();
-            } catch (error) {
-                showError(loginError, 'Falha de comunicacao com o servidor. Tente novamente.');
-            } finally {
-                if (loginSubmitBtn) {
-                    loginSubmitBtn.disabled = false;
-                }
-            }
-        });
-    }
-
-    if (trocarSenhaForm) {
-        trocarSenhaForm.addEventListener('submit', async (event) => {
-            event.preventDefault();
-            hideError(trocarSenhaError);
-
-            const senhaAtual = document.getElementById('senhaAtualInput').value;
-            const novaSenha = document.getElementById('novaSenhaInput').value;
-            const confirmarSenha = document.getElementById('confirmarSenhaInput').value;
-
-            if (novaSenha !== confirmarSenha) {
-                showError(trocarSenhaError, 'As senhas informadas nao coincidem.');
-                return;
-            }
-
-            try {
-                const response = await fetch(AUTH_TROCAR_SENHA_URL, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ senhaAtual, novaSenha })
-                });
-                const data = await response.json().catch(() => ({}));
-
-                if (!response.ok) {
-                    showError(trocarSenhaError, data.error || 'Nao foi possivel salvar a nova senha.');
-                    return;
-                }
-
-                trocarSenhaForm.reset();
-                window.location.reload();
-            } catch (error) {
-                showError(trocarSenhaError, 'Falha de comunicacao com o servidor. Tente novamente.');
-            }
-        });
-    }
-
-    if (logoutBtn) {
-        logoutBtn.addEventListener('click', async () => {
-            try {
-                await fetch(AUTH_LOGOUT_URL, { method: 'POST' });
-            } catch (error) {
-                // Ignora falha de rede no logout - a sessao expira sozinha no servidor.
-            }
-
-            window.location.reload();
-        });
-    }
-
-    window.addEventListener('auth:expired', () => {
-        // Na configuracao inicial, as cargas de dados do app disparam 401
-        // (nao ha banco nem sessao) — isso nao pode arrancar o usuario da
-        // tela de setup de volta para o login.
-        if (setupMode) {
-            return;
-        }
-
-        const shouldNotify = hasBeenAuthenticated;
-        showLoginScreen();
-
-        if (shouldNotify) {
-            showError(loginError, 'Sua sessao expirou. Entre novamente para continuar.');
+            showError(trocarSenhaError, 'Falha de comunicacao com o servidor. Tente novamente.');
         }
     });
+}
 
-    function openTrocarSenhaModal() {
-        if (!modalTrocarSenha) {
+if (logoutBtn) {
+    logoutBtn.addEventListener('click', async () => {
+        try {
+            await fetch(AUTH_LOGOUT_URL, { method: 'POST' });
+        } catch (error) {
+            // Ignora falha de rede no logout - a sessao expira sozinha no servidor.
+        }
+
+        window.location.reload();
+    });
+}
+
+window.addEventListener('auth:expired', () => {
+    // Na configuracao inicial, as cargas de dados do app disparam 401
+    // (nao ha banco nem sessao) — isso nao pode arrancar o usuario da
+    // tela de setup de volta para o login.
+    if (setupMode) {
+        return;
+    }
+
+    const shouldNotify = hasBeenAuthenticated;
+    showLoginScreen();
+
+    if (shouldNotify) {
+        showError(loginError, 'Sua sessao expirou. Entre novamente para continuar.');
+    }
+});
+
+export function openTrocarSenhaModal() {
+    if (!modalTrocarSenha) {
+        return;
+    }
+
+    hideError(modalTrocarSenhaError);
+
+    if (modalTrocarSenhaForm) {
+        modalTrocarSenhaForm.reset();
+    }
+
+    modalTrocarSenha.classList.add('active');
+}
+
+function closeTrocarSenhaModal() {
+    if (modalTrocarSenha) {
+        modalTrocarSenha.classList.remove('active');
+    }
+}
+
+// Exposto para a tela de Usuarios: o "Alterar senha" saiu da sidebar e
+// virou um botao "Minha senha" dentro dessa tela, que reaproveita este modal.
+
+if (abrirTrocarSenhaBtn) {
+    abrirTrocarSenhaBtn.addEventListener('click', openTrocarSenhaModal);
+}
+
+if (fecharModalTrocarSenhaBtn) {
+    fecharModalTrocarSenhaBtn.addEventListener('click', closeTrocarSenhaModal);
+}
+
+if (cancelarModalTrocarSenhaBtn) {
+    cancelarModalTrocarSenhaBtn.addEventListener('click', closeTrocarSenhaModal);
+}
+
+if (modalTrocarSenhaForm) {
+    modalTrocarSenhaForm.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        hideError(modalTrocarSenhaError);
+
+        const senhaAtual = document.getElementById('modalSenhaAtualInput').value;
+        const novaSenha = document.getElementById('modalNovaSenhaInput').value;
+        const confirmarSenha = document.getElementById('modalConfirmarSenhaInput').value;
+
+        if (novaSenha !== confirmarSenha) {
+            showError(modalTrocarSenhaError, 'As senhas informadas nao coincidem.');
             return;
         }
 
-        hideError(modalTrocarSenhaError);
+        try {
+            const response = await fetch(AUTH_TROCAR_SENHA_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ senhaAtual, novaSenha })
+            });
+            const data = await response.json().catch(() => ({}));
 
-        if (modalTrocarSenhaForm) {
-            modalTrocarSenhaForm.reset();
-        }
-
-        modalTrocarSenha.classList.add('active');
-    }
-
-    function closeTrocarSenhaModal() {
-        if (modalTrocarSenha) {
-            modalTrocarSenha.classList.remove('active');
-        }
-    }
-
-    // Exposto para a tela de Usuarios: o "Alterar senha" saiu da sidebar e
-    // virou um botao "Minha senha" dentro dessa tela, que reaproveita este modal.
-    window.abrirModalTrocarSenha = openTrocarSenhaModal;
-
-    if (abrirTrocarSenhaBtn) {
-        abrirTrocarSenhaBtn.addEventListener('click', openTrocarSenhaModal);
-    }
-
-    if (fecharModalTrocarSenhaBtn) {
-        fecharModalTrocarSenhaBtn.addEventListener('click', closeTrocarSenhaModal);
-    }
-
-    if (cancelarModalTrocarSenhaBtn) {
-        cancelarModalTrocarSenhaBtn.addEventListener('click', closeTrocarSenhaModal);
-    }
-
-    if (modalTrocarSenhaForm) {
-        modalTrocarSenhaForm.addEventListener('submit', async (event) => {
-            event.preventDefault();
-            hideError(modalTrocarSenhaError);
-
-            const senhaAtual = document.getElementById('modalSenhaAtualInput').value;
-            const novaSenha = document.getElementById('modalNovaSenhaInput').value;
-            const confirmarSenha = document.getElementById('modalConfirmarSenhaInput').value;
-
-            if (novaSenha !== confirmarSenha) {
-                showError(modalTrocarSenhaError, 'As senhas informadas nao coincidem.');
+            if (!response.ok) {
+                showError(modalTrocarSenhaError, data.error || 'Nao foi possivel salvar a nova senha.');
                 return;
             }
 
-            try {
-                const response = await fetch(AUTH_TROCAR_SENHA_URL, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ senhaAtual, novaSenha })
-                });
-                const data = await response.json().catch(() => ({}));
+            closeTrocarSenhaModal();
 
-                if (!response.ok) {
-                    showError(modalTrocarSenhaError, data.error || 'Nao foi possivel salvar a nova senha.');
-                    return;
-                }
+            mostrarToast('Senha alterada com sucesso.', 'success');
+        } catch (error) {
+            showError(modalTrocarSenhaError, 'Falha de comunicacao com o servidor. Tente novamente.');
+        }
+    });
+}
 
-                closeTrocarSenhaModal();
-
-                if (typeof window.mostrarToast === 'function') {
-                    window.mostrarToast('Senha alterada com sucesso.', 'success');
-                }
-            } catch (error) {
-                showError(modalTrocarSenhaError, 'Falha de comunicacao com o servidor. Tente novamente.');
-            }
-        });
-    }
-
-    checkSession();
-})();
+checkSession();

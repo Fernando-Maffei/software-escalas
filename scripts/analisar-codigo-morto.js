@@ -1,114 +1,94 @@
-// Procura funcoes GLOBAIS do frontend que nada consegue chamar
+// Procura exports do frontend que nenhum modulo importa
 // (npm run analisar:codigo-morto).
 //
-// O frontend nao tem bundler: toda funcao declarada no topo de um arquivo vira
-// global, e o linter nao tem como saber se ela ainda e usada. Esta analise
-// monta o grafo de chamadas e percorre a partir do que de fato executa:
-//   - no: funcao declarada no topo de um arquivo de frontend/js;
-//   - aresta: QUALQUER mencao ao nome dentro do corpo de outra funcao global
-//     (chamada, window.X, 'X' em string, onclick="X()" em template);
-//   - raizes: mencoes no codigo de topo (roda ao carregar), nos dois
-//     index.html e nos scripts da demo. Linhas "window.X = X;" nao contam:
-//     so re-exportam, o uso de verdade seria um onclick ou uma chamada.
-// E conservadora de proposito (mencao em comentario ou string ja conta como
-// uso). Limite: nao ve funcoes privadas dentro de IIFE.
+// O frontend e feito de modulos ES (frontend/js, entrada em main.js). Funcao
+// ou variavel de topo que nada usa e nao e exportada o ESLint ja acusa
+// (no-unused-vars). O que escapa dele e o export que ninguem importa: o
+// linter olha um arquivo por vez e, para ele, exportar ja conta como uso.
+// Esta analise junta os imports de todos os modulos e lista esses exports.
+// core/acoes-html.js importa as funcoes chamadas por onclick="..." — elas
+// contam como usadas por esse import, como qualquer outra.
 const fs = require('fs');
 const path = require('path');
 const espree = require('espree');
 
 const RAIZ = path.join(__dirname, '..');
-const ARQUIVOS = (function listar(p) {
-    return fs.readdirSync(p, { withFileTypes: true }).flatMap((e) => {
-        const c = path.join(p, e.name);
-        return e.isDirectory() ? listar(c) : e.name.endsWith('.js') ? [c] : [];
+const PASTA = path.join(RAIZ, 'frontend/js');
+
+function listar(pasta) {
+    return fs.readdirSync(pasta, { withFileTypes: true }).flatMap((e) => {
+        const caminho = path.join(pasta, e.name);
+        if (e.isDirectory()) {
+            return listar(caminho);
+        }
+        return e.name.endsWith('.js') ? [caminho] : [];
     });
-})(path.join(RAIZ, 'frontend/js'));
-const HTMLS = ['frontend/index.html', 'demo/index.html'].map((f) => fs.readFileSync(path.join(RAIZ, f), 'utf8'));
-const DEMO_JS = fs
-    .readdirSync(path.join(RAIZ, 'demo'))
-    .filter((f) => f.endsWith('.js'))
-    .map((f) => fs.readFileSync(path.join(RAIZ, 'demo', f), 'utf8'));
+}
 
-const funcoes = new Map(); // nome -> { arquivo, linha, linhas, corpo }
-const topo = []; // trechos de codigo de topo (fora de declaracoes de funcao)
+const arquivos = listar(PASTA);
+const exportados = new Map(); // arquivo -> Map(nome -> linha)
+const importados = new Map(); // arquivo -> Set(nome) ('*' = namespace)
 
-for (const arquivo of ARQUIVOS) {
-    const texto = fs.readFileSync(arquivo, 'utf8');
-    const ast = espree.parse(texto, { ecmaVersion: 2023, sourceType: 'script', range: true, loc: true });
+for (const arquivo of arquivos) {
+    const ast = espree.parse(fs.readFileSync(arquivo, 'utf8'), { ecmaVersion: 2023, sourceType: 'module', loc: true });
+    const meus = new Map();
     for (const no of ast.body) {
-        if (no.type === 'FunctionDeclaration') {
-            const nome = no.id.name;
-            const corpo = texto.slice(no.body.range[0], no.body.range[1]);
-            if (funcoes.has(nome)) {
-                funcoes.get(nome).duplicatas.push(path.relative(RAIZ, arquivo));
+        if (no.type === 'ExportNamedDeclaration') {
+            if (no.declaration) {
+                const d = no.declaration;
+                const nomes = d.declarations ? d.declarations.map((x) => x.id.name) : [d.id.name];
+                nomes.forEach((n) => meus.set(n, no.loc.start.line));
             }
-            funcoes.set(nome, {
-                nome,
-                arquivo: path.relative(RAIZ, arquivo),
-                linha: no.loc.start.line,
-                linhas: no.loc.end.line - no.loc.start.line + 1,
-                corpo,
-                duplicatas: funcoes.get(nome)?.duplicatas || []
+            no.specifiers.forEach((s) => meus.set(s.exported.name, no.loc.start.line));
+        } else if (no.type === 'ImportDeclaration') {
+            const alvo = path.resolve(path.dirname(arquivo), no.source.value);
+            if (!importados.has(alvo)) {
+                importados.set(alvo, new Set());
+            }
+            if (!no.specifiers.length) {
+                continue; // import so pelo efeito (main.js)
+            }
+            no.specifiers.forEach((s) => {
+                importados.get(alvo).add(s.type === 'ImportNamespaceSpecifier' ? '*' : s.imported.name);
             });
-        } else {
-            const trecho = texto.slice(no.range[0], no.range[1]);
-            // window.X = X; so re-exporta: nao e uso.
-            if (!/^window\.([\w$]+)\s*=\s*\1;?$/.test(trecho.trim())) {
-                topo.push(trecho);
-            }
         }
     }
+    exportados.set(arquivo, meus);
 }
 
-const nomes = [...funcoes.keys()];
-function mencionados(texto) {
-    const achados = new Set();
-    for (const nome of nomes) {
-        if (new RegExp(`(^|[^\\w$])${nome.replace(/\$/g, '\\$')}([^\\w$]|$)`).test(texto)) {
-            achados.add(nome);
-        }
-    }
-    return achados;
-}
-
-const raizes = new Set([
-    ...mencionados(topo.join('\n')),
-    ...mencionados(HTMLS.join('\n')),
-    ...mencionados(DEMO_JS.join('\n'))
-]);
-const vivos = new Set();
-const fila = [...raizes];
-while (fila.length) {
-    const nome = fila.pop();
-    if (vivos.has(nome) || !funcoes.has(nome)) {
+let total = 0;
+for (const [arquivo, nomes] of exportados) {
+    const usados = importados.get(arquivo) || new Set();
+    if (usados.has('*')) {
         continue;
     }
-    vivos.add(nome);
-    for (const outro of mencionados(funcoes.get(nome).corpo)) {
-        if (outro !== nome && !vivos.has(outro)) {
-            fila.push(outro);
+    for (const [nome, linha] of nomes) {
+        if (!usados.has(nome)) {
+            total++;
+            console.log(`${path.relative(RAIZ, arquivo)}:${linha}\t${nome}`);
+        }
+    }
+}
+console.log(`\n${total} export(s) que nenhum modulo importa.`);
+
+// Import de algo que o modulo de destino nao exporta: o navegador recusaria
+// carregar a pagina inteira (SyntaxError de link).
+let quebrados = 0;
+for (const [alvo, nomes] of importados) {
+    const disponiveis = exportados.get(alvo);
+    if (!disponiveis) {
+        quebrados++;
+        console.log(`IMPORT DE ARQUIVO INEXISTENTE: ${path.relative(RAIZ, alvo)}`);
+        continue;
+    }
+    for (const nome of nomes) {
+        if (nome !== '*' && !disponiveis.has(nome)) {
+            quebrados++;
+            console.log(`IMPORT SEM EXPORT: ${nome} de ${path.relative(RAIZ, alvo)}`);
         }
     }
 }
 
-const mortos = nomes.filter((n) => !vivos.has(n)).map((n) => funcoes.get(n));
-mortos.sort((a, b) => a.arquivo.localeCompare(b.arquivo) || a.linha - b.linha);
-let total = 0;
-for (const f of mortos) {
-    total += f.linhas;
-    console.log(`${f.arquivo}:${f.linha}\t${f.linhas}\t${f.nome}`);
-}
-console.log(
-    `\n${mortos.length} funcoes globais sem caminho a partir das raizes, ${total} linhas (de ${nomes.length} funcoes globais).`
-);
-
-// Mesmo nome declarado no topo de dois arquivos: vale o que carregar por
-// ultimo, e a outra copia vira codigo morto que parece vivo.
-const duplicadas = [...funcoes.values()].filter((f) => f.duplicatas.length > 0);
-for (const f of duplicadas) {
-    console.log(`DUPLICADA ${f.nome}: ${[f.arquivo, ...f.duplicatas].join(', ')}`);
-}
-
-if (mortos.length > 0 || duplicadas.length > 0) {
+if (total > 0 || quebrados > 0) {
     process.exitCode = 1;
 }

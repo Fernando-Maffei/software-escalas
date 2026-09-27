@@ -1,8 +1,11 @@
+import { exportarComoPDF } from '../runtime/relatorio-mensal.js';
+import { mostrarToast } from './horas-e-resumo.js';
+
 // Limpa so o que este navegador guarda (tema, cores da escala, filtros, cache
 // de feriados) e recarrega. Os dados do sistema ficam no servidor e nao sao
 // tocados. Antes o aviso dizia "apagar TODOS os dados do sistema" e pedia para
 // digitar RESET — assustava sem motivo e descrevia outra coisa.
-function resetarSistema() {
+export function resetarSistema() {
     const confirmou = confirm(
         'Isso limpa as preferencias salvas neste navegador (tema, cores, filtros).\n\n'
         + 'Os dados do sistema (colaboradores, escalas, lancamentos) NAO sao apagados.\n\n'
@@ -21,46 +24,29 @@ function resetarSistema() {
     }, 1000);
 }
 
-function gerarOptionsMeses(mesSelecionado) {
+export function gerarOptionsMeses(mesSelecionado) {
     const meses = [
         'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
         'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
     ];
-    
+
     let options = '';
     meses.forEach((mes, index) => {
         const selected = index === mesSelecionado ? 'selected' : '';
         options += `<option value="${index}" ${selected}>${mes}</option>`;
     });
-    
+
     return options;
 }
 
-// ========== RELATÓRIO MENSAL COMPLETO ==========
-async function gerarRelatorioCompleto() {
-    const mes = parseInt(document.getElementById('relatorioMesCompleto').value);
-    const ano = parseInt(document.getElementById('relatorioAnoCompleto').value);
-    
-
-    // 🔥 IMPORTANTE: Carregar todos os dados
-    await carregarColaboradores();
-    await carregarAusencias();
-    await carregarFeriadosLocais();
-    await carregarFeriadosAPI(ano); // 🔥 Carregar feriados da API
-
-    // Gerar o relatório calendário
-    gerarRelatorioCalendarioCompleto(mes, ano);
-}
-
-function fecharRelatorio() {
+export function fecharRelatorio() {
     document.getElementById('relatorioVisualizacao').style.display = 'none';
 }
 
 // ========== FUNÇÕES DE EXPORTAÇÃO ==========
-async function exportarRelatorioCompleto() {
+export async function exportarRelatorioCompleto() {
     const mes = parseInt(document.getElementById('relatorioMesCompleto').value);
     const ano = parseInt(document.getElementById('relatorioAnoCompleto').value);
-    
+
     await exportarComoPDF(mes, ano);
 }
-

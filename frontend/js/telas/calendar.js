@@ -1,19 +1,13 @@
-let mesAtual;
-let anoAtual;
-let feriados = [];
+import { buscarFeriadosNacionais } from '../core/api.js';
+import { estado } from '../core/estado.js';
+import { usuarioEhAdmin } from '../core/permissoes.js';
+import { abrirModalLancamento, carregarDiretorioColaboradores, carregarListagens, carregarListagensComFiltro, resolverColaborador as resolverColaboradorLancamento } from './lancamentos.js';
 
 const cacheFeriadosPorAno = new Map();
 const dataAtual = new Date();
 
-mesAtual = dataAtual.getMonth();
-anoAtual = dataAtual.getFullYear();
-
-window.mesAtual = mesAtual;
-window.anoAtual = anoAtual;
-window.feriados = feriados;
-window.gerarCalendario = gerarCalendario;
-window.inicializarCalendario = inicializarCalendario;
-window.carregarFeriadosNacionais = carregarFeriados;
+estado.mesAtual = dataAtual.getMonth();
+estado.anoAtual = dataAtual.getFullYear();
 
 function formatarDataISO(ano, mes, dia) {
     return `${ano}-${String(mes + 1).padStart(2, '0')}-${String(dia).padStart(2, '0')}`;
@@ -70,36 +64,32 @@ function ensureCalendarDatePicker() {
             return;
         }
 
-        mesAtual = mesSelecionado - 1;
-        anoAtual = anoSelecionado;
-        window.mesAtual = mesAtual;
-        window.anoAtual = anoAtual;
+        estado.mesAtual = mesSelecionado - 1;
+        estado.anoAtual = anoSelecionado;
 
-        await carregarFeriados(anoAtual);
-        gerarCalendario(mesAtual, anoAtual);
+        await carregarFeriados(estado.anoAtual);
+        gerarCalendario(estado.mesAtual, estado.anoAtual);
     });
 
     monthNav.appendChild(input);
     return input;
 }
 
-async function carregarFeriados(ano) {
+export async function carregarFeriados(ano) {
     if (cacheFeriadosPorAno.has(ano)) {
-        feriados = cacheFeriadosPorAno.get(ano);
-        window.feriados = feriados;
-        return feriados;
+        estado.feriados = cacheFeriadosPorAno.get(ano);
+        return estado.feriados;
     }
 
     try {
-        feriados = await window.buscarFeriadosNacionais(ano);
-        cacheFeriadosPorAno.set(ano, feriados);
+        estado.feriados = await buscarFeriadosNacionais(ano);
+        cacheFeriadosPorAno.set(ano, estado.feriados);
     } catch (erro) {
         console.error('Erro ao carregar feriados nacionais:', erro);
-        feriados = [];
+        estado.feriados = [];
     }
 
-    window.feriados = feriados;
-    return feriados;
+    return estado.feriados;
 }
 
 function normalizarNomeFeriado(valor) {
@@ -116,9 +106,9 @@ function normalizarNomeFeriado(valor) {
 // iguais viram uma tag so; nomes diferentes no mesmo dia continuam sendo dois
 // eventos legitimos e seguem aparecendo.
 function feriadosDoDia(dataISO) {
-    const nacionais = feriados.filter((feriado) => feriado.date === dataISO);
+    const nacionais = estado.feriados.filter((feriado) => feriado.date === dataISO);
 
-    const locais = (window.feriadosLocais || [])
+    const locais = (estado.feriadosLocais || [])
         .filter((item) => extrairDataISO(item.Data || item.data) === dataISO);
 
     const usados = new Set();
@@ -161,15 +151,13 @@ function feriadosDoDia(dataISO) {
 // era dai que vinham as tags "Desconhecido" no calendario. O diretorio completo
 // e mantido por lancamentos.js; aqui so consultamos, com fallback.
 function nomeColaboradorCalendario(colaboradorId) {
-    if (typeof window.resolverColaboradorLancamento === 'function') {
-        const registro = window.resolverColaboradorLancamento(colaboradorId);
+    const registro = resolverColaboradorLancamento(colaboradorId);
 
-        if (registro && registro.nome) {
-            return { nome: registro.nome, ativo: registro.ativo !== false };
-        }
+    if (registro && registro.nome) {
+        return { nome: registro.nome, ativo: registro.ativo !== false };
     }
 
-    const colaborador = (window.colaboradores || [])
+    const colaborador = (estado.colaboradores || [])
         .find((item) => Number(item.Id ?? item.id) === Number(colaboradorId));
 
     return colaborador
@@ -177,17 +165,15 @@ function nomeColaboradorCalendario(colaboradorId) {
         : { nome: `Colaborador #${colaboradorId}`, ativo: false };
 }
 
-function gerarCalendario(mes, ano) {
+export function gerarCalendario(mes, ano) {
     const calendar = document.getElementById('calendar');
 
     if (!calendar) {
         return;
     }
 
-    mesAtual = mes;
-    anoAtual = ano;
-    window.mesAtual = mesAtual;
-    window.anoAtual = anoAtual;
+    estado.mesAtual = mes;
+    estado.anoAtual = ano;
 
     calendar.innerHTML = '';
 
@@ -259,7 +245,7 @@ function gerarCalendario(mes, ano) {
             cell.appendChild(tag);
         });
 
-        const ausenciasDoDia = (window.ausencias || []).filter((ausencia) => {
+        const ausenciasDoDia = (estado.ausencias || []).filter((ausencia) => {
             const inicio = extrairDataISO(ausencia.DataInicio || ausencia.dataInicio);
             const fim = extrairDataISO(ausencia.DataFim || ausencia.dataFim);
 
@@ -292,7 +278,7 @@ function gerarCalendario(mes, ano) {
 
         // Usuario comum enxerga o calendario da equipe, mas nao lanca nada:
         // sem o clique, nao ha modal de lancamento que resultaria em 403.
-        if (typeof window.usuarioEhAdmin === 'function' && !window.usuarioEhAdmin()) {
+        if (!usuarioEhAdmin()) {
             cell.classList.add('calendario-somente-leitura');
             calendar.appendChild(cell);
             continue;
@@ -301,7 +287,7 @@ function gerarCalendario(mes, ano) {
         cell.addEventListener('click', (event) => {
             event.stopPropagation();
 
-            window.abrirModalLancamento(cell.classList.contains('holiday') ? 'feriados' : 'pessoal', dataISO, true);
+            abrirModalLancamento(cell.classList.contains('holiday') ? 'feriados' : 'pessoal', dataISO, true);
         });
 
         calendar.appendChild(cell);
@@ -327,26 +313,23 @@ function gerarDiasSemana() {
 }
 
 async function alterarMes(diferenca) {
-    mesAtual += diferenca;
+    estado.mesAtual += diferenca;
 
-    if (mesAtual < 0) {
-        mesAtual = 11;
-        anoAtual -= 1;
-    } else if (mesAtual > 11) {
-        mesAtual = 0;
-        anoAtual += 1;
+    if (estado.mesAtual < 0) {
+        estado.mesAtual = 11;
+        estado.anoAtual -= 1;
+    } else if (estado.mesAtual > 11) {
+        estado.mesAtual = 0;
+        estado.anoAtual += 1;
     }
 
-    window.mesAtual = mesAtual;
-    window.anoAtual = anoAtual;
-
-    await carregarFeriados(anoAtual);
-    gerarCalendario(mesAtual, anoAtual);
+    await carregarFeriados(estado.anoAtual);
+    gerarCalendario(estado.mesAtual, estado.anoAtual);
 
     const modalLancamento = document.getElementById('modalLancamento');
-    if (modalLancamento && !modalLancamento.classList.contains('hidden') && typeof carregarListagens === 'function') {
-        if (window.modalFiltroData && window.modalDataSelecionada && typeof carregarListagensComFiltro === 'function') {
-            await carregarListagensComFiltro(window.modalDataSelecionada, true);
+    if (modalLancamento && !modalLancamento.classList.contains('hidden')) {
+        if (estado.modalFiltroData && estado.modalDataSelecionada) {
+            await carregarListagensComFiltro(estado.modalDataSelecionada, true);
         } else {
             await carregarListagens();
         }
@@ -366,14 +349,12 @@ function configurarNavegacaoCalendario() {
     }
 }
 
-async function inicializarCalendario() {
+export async function inicializarCalendario() {
     // O diretorio com desligados precisa estar em memoria antes do primeiro
     // render, senao as ausencias de quem saiu voltam a virar "Desconhecido".
-    const diretorio = typeof window.carregarDiretorioColaboradores === 'function'
-        ? window.carregarDiretorioColaboradores()
-        : Promise.resolve();
+    const diretorio = carregarDiretorioColaboradores();
 
-    await Promise.allSettled([carregarFeriados(anoAtual), diretorio]);
+    await Promise.allSettled([carregarFeriados(estado.anoAtual), diretorio]);
 
     // O usuario pode ter trocado de tela enquanto os dados chegavam.
     if (!document.getElementById('calendar')) {
@@ -381,6 +362,6 @@ async function inicializarCalendario() {
     }
 
     gerarDiasSemana();
-    gerarCalendario(mesAtual, anoAtual);
+    gerarCalendario(estado.mesAtual, estado.anoAtual);
     configurarNavegacaoCalendario();
 }

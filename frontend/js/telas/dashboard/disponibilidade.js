@@ -1,5 +1,9 @@
-function obterAusenciasNaData(dataISO) {
-    return (window.ausencias || []).filter((ausencia) => {
+import { estado } from '../../core/estado.js';
+import { getMeusSetores } from '../../core/meus-setores.js';
+import { getColaboradorScheduleForDate, getTimeMinutesDashboard, toISODate } from './datas-e-jornada.js';
+
+export function obterAusenciasNaData(dataISO) {
+    return (estado.ausencias || []).filter((ausencia) => {
         const inicio = toISODate(ausencia.DataInicio || ausencia.dataInicio);
         const fim = toISODate(ausencia.DataFim || ausencia.dataFim);
 
@@ -11,7 +15,7 @@ function obterAusenciaDoColaboradorNaData(colaboradorId, dataISO) {
     return obterAusenciasNaData(dataISO).find((ausencia) => Number(ausencia.colaboradorId || ausencia.ColaboradorId) === Number(colaboradorId)) || null;
 }
 
-function getDashboardSetorId(colaborador) {
+export function getDashboardSetorId(colaborador) {
     const value = colaborador?.SetorId ?? colaborador?.setorId ?? colaborador?.setor_id ?? null;
 
     if (value === null || value === undefined || String(value).trim() === '') {
@@ -21,7 +25,7 @@ function getDashboardSetorId(colaborador) {
     return String(value);
 }
 
-function getDashboardSetorNome(colaborador, setoresById = new Map()) {
+export function getDashboardSetorNome(colaborador, setoresById = new Map()) {
     const setorId = getDashboardSetorId(colaborador);
     const nomeDireto = colaborador?.SetorNome ?? colaborador?.setorNome ?? colaborador?.setor ?? colaborador?.Setor;
     const nomeSetor = nomeDireto || setoresById.get(setorId)?.nome || setoresById.get(setorId)?.Nome;
@@ -30,7 +34,7 @@ function getDashboardSetorNome(colaborador, setoresById = new Map()) {
     return normalized || 'Sem setor';
 }
 
-function colaboradorDisponivelAgora(colaborador, minutosAtuais, dataISO, jornadaSemanalIndex) {
+export function colaboradorDisponivelAgora(colaborador, minutosAtuais, dataISO, jornadaSemanalIndex) {
     const ausencia = obterAusenciaDoColaboradorNaData(colaborador.Id, dataISO);
     const tipo = String(ausencia?.tipo || ausencia?.Tipo || '').toLowerCase();
     const periodoTipo = String(ausencia?.periodoTipo || ausencia?.PeriodoTipo || '').toLowerCase();
@@ -75,9 +79,9 @@ function colaboradorDisponivelAgora(colaborador, minutosAtuais, dataISO, jornada
 // Restringe uma lista de colaboradores aos setores de "Meus setores" (a
 // preferencia por usuario, servida por meus-setores.js). Lista vazia de
 // preferencia = ver todos (sem filtro).
-function filtrarColaboradoresPorSetorDashboard(lista) {
+export function filtrarColaboradoresPorSetorDashboard(lista) {
     const base = Array.isArray(lista) ? lista : [];
-    const meusSetores = typeof window.getMeusSetores === 'function' ? window.getMeusSetores() : [];
+    const meusSetores = getMeusSetores();
 
     if (!meusSetores.length) {
         return base;
@@ -87,4 +91,3 @@ function filtrarColaboradoresPorSetorDashboard(lista) {
 
     return base.filter((colaborador) => permitidos.has(String(getDashboardSetorId(colaborador) ?? '')));
 }
-

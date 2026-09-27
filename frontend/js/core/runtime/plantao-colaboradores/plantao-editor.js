@@ -1,317 +1,330 @@
-    // Aplica "Meus setores" a lista do checklist, mas SEMPRE mantem quem ja
-    // esta selecionado (mesmo de outro setor). Sem isso, abrir um plantao com
-    // equipe de outro setor e salvar dropava esses membros — o salvar so le os
-    // checkboxes visiveis e marcados. Preferencia vazia = todos.
-    function filtrarChecklistPorMeusSetoresPlantao(lista, selecionados = []) {
-        const base = Array.isArray(lista) ? lista : [];
-        const meusSetores = typeof window.getMeusSetores === 'function' ? window.getMeusSetores() : [];
+import { escapeHtml } from '../../../lib/html-seguro.js';
+import { bindPainelFolgasDomingo, renderPainelFolgasDomingo } from '../../../telas/folgas-domingo.js';
+import { API } from '../../api.js';
+import { formatarHora, mostrarToast } from '../../app/horas-e-resumo.js';
+import { estado } from '../../estado.js';
+import { getMeusSetores } from '../../meus-setores.js';
+import { abrirExtratoBancoHoras, renderCardBancoHoras, renderResumoBancoHorasAviso } from './banco-horas-lancamento.js';
+import { abrirEditorColaboradores } from './colaboradores-e-jornada.js';
+import { formatarHoraInput, getPlantaoEditorState, mapBancoHorasResumo, minutosParaTexto, withInFlight } from './helpers.js';
+import { construirMapaFeriadosPlantao, rotuloTipoPlantao } from './plantao-regua-e-relatorios.js';
 
-        if (!meusSetores.length) {
-            return base;
-        }
+// Aplica "Meus setores" a lista do checklist, mas SEMPRE mantem quem ja
+// esta selecionado (mesmo de outro setor). Sem isso, abrir um plantao com
+// equipe de outro setor e salvar dropava esses membros — o salvar so le os
+// checkboxes visiveis e marcados. Preferencia vazia = todos.
+let disponibilidadeTimer = null;
 
-        const permitidos = new Set(meusSetores.map(String));
-        const jaSelecionados = new Set((selecionados || []).map(Number));
+function filtrarChecklistPorMeusSetoresPlantao(lista, selecionados = []) {
+    const base = Array.isArray(lista) ? lista : [];
+    const meusSetores = getMeusSetores();
 
-        return base.filter((colaborador) => {
-            const setorId = String(colaborador.SetorId ?? colaborador.setorId ?? colaborador.setor_id ?? '');
-            return permitidos.has(setorId) || jaSelecionados.has(Number(colaborador.Id));
+    if (!meusSetores.length) {
+        return base;
+    }
+
+    const permitidos = new Set(meusSetores.map(String));
+    const jaSelecionados = new Set((selecionados || []).map(Number));
+
+    return base.filter((colaborador) => {
+        const setorId = String(colaborador.SetorId ?? colaborador.setorId ?? colaborador.setor_id ?? '');
+        return permitidos.has(setorId) || jaSelecionados.has(Number(colaborador.Id));
+    });
+}
+
+// ---- Lancamentos do dia ----------------------------------------------
+// Cada linha da tela e UM colaborador com UM horario e UM destino para as
+// horas. Um dia pode ter varias. Quem compartilha horario e destino e
+// agrupado so na hora de gravar, no backend — aqui a linha por pessoa e o
+// que deixa montar turnos diferentes (um das 08h as 13h, outro das 13h as
+// 18h) e escolher banco de horas ou hora extra caso a caso.
+export const PLANTAO_CREDITO_META = {
+    banco: {
+        label: 'Banco de horas',
+        curto: 'Banco',
+        icone: 'fa-piggy-bank',
+        ajuda: 'As horas entram como credito no saldo do colaborador.'
+    },
+    extra: {
+        label: 'Hora extra',
+        curto: 'Extra',
+        icone: 'fa-money-bill-wave',
+        ajuda: 'As horas nao entram no banco: saem como extra na folha.'
+    }
+};
+
+export function normalizarTipoCreditoPlantao(valor) {
+    return String(valor || '').trim().toLowerCase() === 'extra' ? 'extra' : 'banco';
+}
+
+function nomeColaboradorPlantao(colaboradorId) {
+    const colaborador = (estado.colaboradores || [])
+        .find((item) => Number(item.Id) === Number(colaboradorId));
+
+    return colaborador ? colaborador.Nome : 'Colaborador removido';
+}
+
+function minutosDoHorarioPlantao(hora) {
+    const [h, m] = String(hora || '').split(':').map(Number);
+    return Number.isFinite(h) && Number.isFinite(m) ? (h * 60) + m : null;
+}
+
+export function duracaoLancamentoPlantao(linha) {
+    const inicio = minutosDoHorarioPlantao(linha.horaInicio);
+    const fim = minutosDoHorarioPlantao(linha.horaFim);
+
+    return inicio !== null && fim !== null && fim > inicio ? fim - inicio : null;
+}
+
+function ordenarLancamentosPlantao(linhas) {
+    return [...linhas].sort((a, b) => (
+        String(a.horaInicio).localeCompare(String(b.horaInicio))
+        || nomeColaboradorPlantao(a.colaboradorId).localeCompare(nomeColaboradorPlantao(b.colaboradorId))
+    ));
+}
+
+// Monta as linhas da tela a partir do que ja esta gravado. Cada registro do
+// banco pode trazer varios colaboradores no mesmo horario: aqui ele volta a
+// ser uma linha por pessoa, que e como a tela edita.
+export function lancamentosDoDiaPlantao(dataISO) {
+    const linhas = [];
+
+    (estado.plantoesLancados || [])
+        .filter((item) => item.dataISO === dataISO)
+        .forEach((registro) => {
+            const horaInicio = formatarHoraInput(registro.horaInicio) || '';
+            const horaFim = formatarHoraInput(registro.horaFim) || '';
+            const tipoCredito = normalizarTipoCreditoPlantao(registro.tipoCredito);
+
+            (registro.colaboradores || []).forEach((colaboradorId) => {
+                linhas.push({
+                    colaboradorId: Number(colaboradorId),
+                    horaInicio,
+                    horaFim,
+                    tipoCredito
+                });
+            });
         });
-    }
 
-    // ---- Lancamentos do dia ----------------------------------------------
-    // Cada linha da tela e UM colaborador com UM horario e UM destino para as
-    // horas. Um dia pode ter varias. Quem compartilha horario e destino e
-    // agrupado so na hora de gravar, no backend — aqui a linha por pessoa e o
-    // que deixa montar turnos diferentes (um das 08h as 13h, outro das 13h as
-    // 18h) e escolher banco de horas ou hora extra caso a caso.
-    const PLANTAO_CREDITO_META = {
-        banco: {
-            label: 'Banco de horas',
-            curto: 'Banco',
-            icone: 'fa-piggy-bank',
-            ajuda: 'As horas entram como credito no saldo do colaborador.'
-        },
-        extra: {
-            label: 'Hora extra',
-            curto: 'Extra',
-            icone: 'fa-money-bill-wave',
-            ajuda: 'As horas nao entram no banco: saem como extra na folha.'
+    return ordenarLancamentosPlantao(linhas);
+}
+
+// Mesma regra do backend: ninguem em dois turnos que se sobrepoem. Ao editar,
+// a propria linha e ignorada — senao ela sempre colidiria consigo mesma.
+function conflitoDeLancamentoPlantao(linhas, nova, ignorarIndice = null) {
+    const inicioNovo = minutosDoHorarioPlantao(nova.horaInicio);
+    const fimNovo = minutosDoHorarioPlantao(nova.horaFim);
+
+    return linhas.some((linha, indice) => {
+        if (indice === ignorarIndice) {
+            return false;
         }
-    };
 
-    function normalizarTipoCreditoPlantao(valor) {
-        return String(valor || '').trim().toLowerCase() === 'extra' ? 'extra' : 'banco';
-    }
+        if (Number(linha.colaboradorId) !== Number(nova.colaboradorId)) {
+            return false;
+        }
 
-    function nomeColaboradorPlantao(colaboradorId) {
-        const colaborador = (window.colaboradores || [])
-            .find((item) => Number(item.Id) === Number(colaboradorId));
-
-        return colaborador ? colaborador.Nome : 'Colaborador removido';
-    }
-
-    function minutosDoHorarioPlantao(hora) {
-        const [h, m] = String(hora || '').split(':').map(Number);
-        return Number.isFinite(h) && Number.isFinite(m) ? (h * 60) + m : null;
-    }
-
-    function duracaoLancamentoPlantao(linha) {
         const inicio = minutosDoHorarioPlantao(linha.horaInicio);
         const fim = minutosDoHorarioPlantao(linha.horaFim);
 
-        return inicio !== null && fim !== null && fim > inicio ? fim - inicio : null;
+        return inicio < fimNovo && inicioNovo < fim;
+    });
+}
+
+// A observacao e do dia inteiro e vive num textarea que sobrevive a varios
+// redesenhos da lista; sem guardar antes de redesenhar, o texto se perderia.
+export function capturarRascunhoPlantao(state) {
+    if (!state) {
+        return;
     }
 
-    function ordenarLancamentosPlantao(linhas) {
-        return [...linhas].sort((a, b) => (
-            String(a.horaInicio).localeCompare(String(b.horaInicio))
-            || nomeColaboradorPlantao(a.colaboradorId).localeCompare(nomeColaboradorPlantao(b.colaboradorId))
-        ));
+    const observacao = document.getElementById('plantaoObservacao');
+
+    if (observacao) {
+        state.observacao = observacao.value;
     }
 
-    // Monta as linhas da tela a partir do que ja esta gravado. Cada registro do
-    // banco pode trazer varios colaboradores no mesmo horario: aqui ele volta a
-    // ser uma linha por pessoa, que e como a tela edita.
-    function lancamentosDoDiaPlantao(dataISO) {
-        const linhas = [];
+    const inicio = document.getElementById('plantaoNovoInicio');
+    const fim = document.getElementById('plantaoNovoFim');
+    const colaborador = document.getElementById('plantaoNovoColaborador');
 
-        (window.plantoesLancados || [])
-            .filter((item) => item.dataISO === dataISO)
-            .forEach((registro) => {
-                const horaInicio = formatarHoraInput(registro.horaInicio) || '';
-                const horaFim = formatarHoraInput(registro.horaFim) || '';
-                const tipoCredito = normalizarTipoCreditoPlantao(registro.tipoCredito);
+    state.rascunho = state.rascunho || {};
 
-                (registro.colaboradores || []).forEach((colaboradorId) => {
-                    linhas.push({
-                        colaboradorId: Number(colaboradorId),
-                        horaInicio,
-                        horaFim,
-                        tipoCredito
-                    });
-                });
-            });
+    if (inicio) { state.rascunho.horaInicio = inicio.value; }
+    if (fim) { state.rascunho.horaFim = fim.value; }
+    if (colaborador) { state.rascunho.colaboradorId = Number(colaborador.value || 0); }
+}
 
-        return ordenarLancamentosPlantao(linhas);
+function lerFormularioLancamentoPlantao(state) {
+    return {
+        colaboradorId: Number(document.getElementById('plantaoNovoColaborador')?.value || 0),
+        horaInicio: document.getElementById('plantaoNovoInicio')?.value || '',
+        horaFim: document.getElementById('plantaoNovoFim')?.value || '',
+        tipoCredito: normalizarTipoCreditoPlantao(state?.rascunho?.tipoCredito)
+    };
+}
+
+// Troca o destino das horas sem redesenhar o painel: um render completo aqui
+// roubaria o foco de quem esta no meio do preenchimento.
+export function definirTipoCreditoPlantao(tipo) {
+    const state = getPlantaoEditorState();
+
+    if (!state) {
+        return;
     }
 
-    // Mesma regra do backend: ninguem em dois turnos que se sobrepoem. Ao editar,
-    // a propria linha e ignorada — senao ela sempre colidiria consigo mesma.
-    function conflitoDeLancamentoPlantao(linhas, nova, ignorarIndice = null) {
-        const inicioNovo = minutosDoHorarioPlantao(nova.horaInicio);
-        const fimNovo = minutosDoHorarioPlantao(nova.horaFim);
+    const escolhido = normalizarTipoCreditoPlantao(tipo);
+    state.rascunho = state.rascunho || {};
+    state.rascunho.tipoCredito = escolhido;
 
-        return linhas.some((linha, indice) => {
-            if (indice === ignorarIndice) {
-                return false;
-            }
+    document.querySelectorAll('[data-plantao-credito]').forEach((botao) => {
+        const ativo = botao.getAttribute('data-plantao-credito') === escolhido;
+        botao.classList.toggle('is-active', ativo);
+        botao.setAttribute('aria-pressed', ativo ? 'true' : 'false');
+    });
 
-            if (Number(linha.colaboradorId) !== Number(nova.colaboradorId)) {
-                return false;
-            }
+    const ajuda = document.getElementById('plantaoCreditoAjuda');
 
-            const inicio = minutosDoHorarioPlantao(linha.horaInicio);
-            const fim = minutosDoHorarioPlantao(linha.horaFim);
+    if (ajuda) {
+        ajuda.textContent = PLANTAO_CREDITO_META[escolhido].ajuda;
+    }
+}
 
-            return inicio < fimNovo && inicioNovo < fim;
-        });
+export function confirmarLancamentoPlantao() {
+    const state = getPlantaoEditorState();
+
+    if (!state) {
+        return;
     }
 
-    // A observacao e do dia inteiro e vive num textarea que sobrevive a varios
-    // redesenhos da lista; sem guardar antes de redesenhar, o texto se perderia.
-    function capturarRascunhoPlantao(state) {
-        if (!state) {
-            return;
-        }
+    capturarRascunhoPlantao(state);
 
-        const observacao = document.getElementById('plantaoObservacao');
+    const nova = lerFormularioLancamentoPlantao(state);
+    const editando = Number.isInteger(state.editandoIndice) ? state.editandoIndice : null;
 
-        if (observacao) {
-            state.observacao = observacao.value;
-        }
-
-        const inicio = document.getElementById('plantaoNovoInicio');
-        const fim = document.getElementById('plantaoNovoFim');
-        const colaborador = document.getElementById('plantaoNovoColaborador');
-
-        state.rascunho = state.rascunho || {};
-
-        if (inicio) { state.rascunho.horaInicio = inicio.value; }
-        if (fim) { state.rascunho.horaFim = fim.value; }
-        if (colaborador) { state.rascunho.colaboradorId = Number(colaborador.value || 0); }
+    if (!nova.colaboradorId) {
+        mostrarToast('Escolha o colaborador.', 'error');
+        return;
     }
 
-    function lerFormularioLancamentoPlantao(state) {
-        return {
-            colaboradorId: Number(document.getElementById('plantaoNovoColaborador')?.value || 0),
-            horaInicio: document.getElementById('plantaoNovoInicio')?.value || '',
-            horaFim: document.getElementById('plantaoNovoFim')?.value || '',
-            tipoCredito: normalizarTipoCreditoPlantao(state?.rascunho?.tipoCredito)
-        };
+    if (!nova.horaInicio || !nova.horaFim) {
+        mostrarToast('Informe a hora inicial e a final.', 'error');
+        return;
     }
 
-    // Troca o destino das horas sem redesenhar o painel: um render completo aqui
-    // roubaria o foco de quem esta no meio do preenchimento.
-    window.definirTipoCreditoPlantao = function definirTipoCreditoPlantao(tipo) {
-        const state = getPlantaoEditorState();
+    if (nova.horaFim <= nova.horaInicio) {
+        mostrarToast('A hora final precisa ser maior que a inicial.', 'error');
+        return;
+    }
 
-        if (!state) {
-            return;
-        }
+    if (conflitoDeLancamentoPlantao(state.lancamentos, nova, editando)) {
+        mostrarToast(nomeColaboradorPlantao(nova.colaboradorId) + ' ja tem um lancamento que cruza esse horario.', 'error');
+        return;
+    }
 
-        const escolhido = normalizarTipoCreditoPlantao(tipo);
-        state.rascunho = state.rascunho || {};
-        state.rascunho.tipoCredito = escolhido;
+    if (editando === null) {
+        state.lancamentos = ordenarLancamentosPlantao([...state.lancamentos, nova]);
+    } else {
+        const atualizados = [...state.lancamentos];
+        atualizados[editando] = nova;
+        state.lancamentos = ordenarLancamentosPlantao(atualizados);
+        mostrarToast('Lancamento atualizado. Salve o dia para gravar.', 'success');
+    }
 
-        document.querySelectorAll('[data-plantao-credito]').forEach((botao) => {
-            const ativo = botao.getAttribute('data-plantao-credito') === escolhido;
-            botao.classList.toggle('is-active', ativo);
-            botao.setAttribute('aria-pressed', ativo ? 'true' : 'false');
-        });
-
-        const ajuda = document.getElementById('plantaoCreditoAjuda');
-
-        if (ajuda) {
-            ajuda.textContent = PLANTAO_CREDITO_META[escolhido].ajuda;
-        }
+    // Mantem horario e destino para encadear varios colaboradores no mesmo
+    // turno; so o colaborador volta ao vazio.
+    state.editandoIndice = null;
+    state.rascunho = {
+        colaboradorId: 0,
+        horaInicio: nova.horaInicio,
+        horaFim: nova.horaFim,
+        tipoCredito: nova.tipoCredito
     };
 
-    window.confirmarLancamentoPlantao = function confirmarLancamentoPlantao() {
-        const state = getPlantaoEditorState();
+    renderPlantaoEditor(state);
+    document.getElementById('plantaoNovoColaborador')?.focus();
+}
 
-        if (!state) {
-            return;
-        }
+export function editarLancamentoPlantao(indice) {
+    const state = getPlantaoEditorState();
+    const linha = state?.lancamentos?.[Number(indice)];
 
-        capturarRascunhoPlantao(state);
+    if (!state || !linha) {
+        return;
+    }
 
-        const nova = lerFormularioLancamentoPlantao(state);
-        const editando = Number.isInteger(state.editandoIndice) ? state.editandoIndice : null;
+    capturarRascunhoPlantao(state);
 
-        if (!nova.colaboradorId) {
-            mostrarToast('Escolha o colaborador.', 'error');
-            return;
-        }
+    state.editandoIndice = Number(indice);
+    state.rascunho = { ...linha };
 
-        if (!nova.horaInicio || !nova.horaFim) {
-            mostrarToast('Informe a hora inicial e a final.', 'error');
-            return;
-        }
+    renderPlantaoEditor(state);
+    document.getElementById('plantaoNovoColaborador')?.focus();
+}
 
-        if (nova.horaFim <= nova.horaInicio) {
-            mostrarToast('A hora final precisa ser maior que a inicial.', 'error');
-            return;
-        }
+export function cancelarEdicaoLancamentoPlantao() {
+    const state = getPlantaoEditorState();
 
-        if (conflitoDeLancamentoPlantao(state.lancamentos, nova, editando)) {
-            mostrarToast(nomeColaboradorPlantao(nova.colaboradorId) + ' ja tem um lancamento que cruza esse horario.', 'error');
-            return;
-        }
+    if (!state) {
+        return;
+    }
 
-        if (editando === null) {
-            state.lancamentos = ordenarLancamentosPlantao([...state.lancamentos, nova]);
-        } else {
-            const atualizados = [...state.lancamentos];
-            atualizados[editando] = nova;
-            state.lancamentos = ordenarLancamentosPlantao(atualizados);
-            mostrarToast('Lancamento atualizado. Salve o dia para gravar.', 'success');
-        }
+    capturarRascunhoPlantao(state);
 
-        // Mantem horario e destino para encadear varios colaboradores no mesmo
-        // turno; so o colaborador volta ao vazio.
-        state.editandoIndice = null;
-        state.rascunho = {
-            colaboradorId: 0,
-            horaInicio: nova.horaInicio,
-            horaFim: nova.horaFim,
-            tipoCredito: nova.tipoCredito
-        };
-
-        renderPlantaoEditor(state);
-        document.getElementById('plantaoNovoColaborador')?.focus();
+    state.editandoIndice = null;
+    state.rascunho = {
+        colaboradorId: 0,
+        horaInicio: state.rascunho?.horaInicio || '',
+        horaFim: state.rascunho?.horaFim || '',
+        tipoCredito: normalizarTipoCreditoPlantao(state.rascunho?.tipoCredito)
     };
 
-    window.editarLancamentoPlantao = function editarLancamentoPlantao(indice) {
-        const state = getPlantaoEditorState();
-        const linha = state?.lancamentos?.[Number(indice)];
+    renderPlantaoEditor(state);
+}
 
-        if (!state || !linha) {
-            return;
+export function removerLancamentoPlantao(indice) {
+    const state = getPlantaoEditorState();
+
+    if (!state) {
+        return;
+    }
+
+    capturarRascunhoPlantao(state);
+
+    const posicao = Number(indice);
+    state.lancamentos = state.lancamentos.filter((_, atual) => atual !== posicao);
+
+    // Remover uma linha reindexa a lista: a edicao em curso passaria a
+    // apontar para outra pessoa.
+    if (Number.isInteger(state.editandoIndice)) {
+        if (state.editandoIndice === posicao) {
+            state.editandoIndice = null;
+        } else if (state.editandoIndice > posicao) {
+            state.editandoIndice -= 1;
         }
+    }
 
-        capturarRascunhoPlantao(state);
+    renderPlantaoEditor(state);
+}
 
-        state.editandoIndice = Number(indice);
-        state.rascunho = { ...linha };
+function renderResumoLancamentosPlantao(state) {
+    const totais = state.lancamentos.reduce((acumulado, linha) => {
+        acumulado[linha.tipoCredito] += duracaoLancamentoPlantao(linha) || 0;
+        return acumulado;
+    }, { banco: 0, extra: 0 });
 
-        renderPlantaoEditor(state);
-        document.getElementById('plantaoNovoColaborador')?.focus();
-    };
+    const pessoas = new Set(state.lancamentos.map((linha) => Number(linha.colaboradorId))).size;
+    const parcelas = [];
 
-    window.cancelarEdicaoLancamentoPlantao = function cancelarEdicaoLancamentoPlantao() {
-        const state = getPlantaoEditorState();
+    if (totais.banco > 0) {
+        parcelas.push(`<span class="plantao-total plantao-total--banco"><i class="fas fa-piggy-bank"></i> ${escapeHtml(minutosParaTexto(totais.banco))} em banco</span>`);
+    }
 
-        if (!state) {
-            return;
-        }
+    if (totais.extra > 0) {
+        parcelas.push(`<span class="plantao-total plantao-total--extra"><i class="fas fa-money-bill-wave"></i> ${escapeHtml(minutosParaTexto(totais.extra))} em hora extra</span>`);
+    }
 
-        capturarRascunhoPlantao(state);
-
-        state.editandoIndice = null;
-        state.rascunho = {
-            colaboradorId: 0,
-            horaInicio: state.rascunho?.horaInicio || '',
-            horaFim: state.rascunho?.horaFim || '',
-            tipoCredito: normalizarTipoCreditoPlantao(state.rascunho?.tipoCredito)
-        };
-
-        renderPlantaoEditor(state);
-    };
-
-    window.removerLancamentoPlantao = function removerLancamentoPlantao(indice) {
-        const state = getPlantaoEditorState();
-
-        if (!state) {
-            return;
-        }
-
-        capturarRascunhoPlantao(state);
-
-        const posicao = Number(indice);
-        state.lancamentos = state.lancamentos.filter((_, atual) => atual !== posicao);
-
-        // Remover uma linha reindexa a lista: a edicao em curso passaria a
-        // apontar para outra pessoa.
-        if (Number.isInteger(state.editandoIndice)) {
-            if (state.editandoIndice === posicao) {
-                state.editandoIndice = null;
-            } else if (state.editandoIndice > posicao) {
-                state.editandoIndice -= 1;
-            }
-        }
-
-        renderPlantaoEditor(state);
-    };
-
-    function renderResumoLancamentosPlantao(state) {
-        const totais = state.lancamentos.reduce((acumulado, linha) => {
-            acumulado[linha.tipoCredito] += duracaoLancamentoPlantao(linha) || 0;
-            return acumulado;
-        }, { banco: 0, extra: 0 });
-
-        const pessoas = new Set(state.lancamentos.map((linha) => Number(linha.colaboradorId))).size;
-        const parcelas = [];
-
-        if (totais.banco > 0) {
-            parcelas.push(`<span class="plantao-total plantao-total--banco"><i class="fas fa-piggy-bank"></i> ${escapeHtml(minutosParaTexto(totais.banco))} em banco</span>`);
-        }
-
-        if (totais.extra > 0) {
-            parcelas.push(`<span class="plantao-total plantao-total--extra"><i class="fas fa-money-bill-wave"></i> ${escapeHtml(minutosParaTexto(totais.extra))} em hora extra</span>`);
-        }
-
-        return `
+    return `
             <div class="plantao-lancamentos-resumo">
                 <span class="plantao-resumo-contagem">
                     <i class="fas fa-list-check"></i> ${state.lancamentos.length} lancamento(s) &middot; ${pessoas} pessoa(s)
@@ -319,32 +332,32 @@
                 ${parcelas.length > 0 ? `<span class="plantao-resumo-totais">${parcelas.join('')}</span>` : ''}
             </div>
         `;
-    }
+}
 
-    function renderLancamentosPlantao(state) {
-        if (state.lancamentos.length === 0) {
-            return `
+function renderLancamentosPlantao(state) {
+    if (state.lancamentos.length === 0) {
+        return `
                 <p class="plantao-lancamentos-vazio">
                     <i class="fas fa-inbox"></i>
                     Nenhum lancamento ainda. Escolha o colaborador, o horario e o destino das horas acima.
                 </p>
             `;
-        }
+    }
 
-        const indisponiveis = new Set(
-            (state.disponibilidade || [])
-                .filter((item) => item.disponivel === false)
-                .map((item) => Number(item.id))
-        );
+    const indisponiveis = new Set(
+        (state.disponibilidade || [])
+            .filter((item) => item.disponivel === false)
+            .map((item) => Number(item.id))
+    );
 
-        const linhas = state.lancamentos.map((linha, indice) => {
-            const minutos = duracaoLancamentoPlantao(linha);
-            const indisponivel = indisponiveis.has(Number(linha.colaboradorId));
-            const meta = PLANTAO_CREDITO_META[linha.tipoCredito];
-            const emEdicao = state.editandoIndice === indice;
-            const nome = nomeColaboradorPlantao(linha.colaboradorId);
+    const linhas = state.lancamentos.map((linha, indice) => {
+        const minutos = duracaoLancamentoPlantao(linha);
+        const indisponivel = indisponiveis.has(Number(linha.colaboradorId));
+        const meta = PLANTAO_CREDITO_META[linha.tipoCredito];
+        const emEdicao = state.editandoIndice === indice;
+        const nome = nomeColaboradorPlantao(linha.colaboradorId);
 
-            return `
+        return `
                 <li class="plantao-lancamento${indisponivel ? ' is-indisponivel' : ''}${emEdicao ? ' is-editando' : ''}">
                     <div class="plantao-lancamento-info">
                         <div class="plantao-lancamento-topo">
@@ -369,91 +382,91 @@
                     </div>
                 </li>
             `;
-        }).join('');
+    }).join('');
 
-        return `
+    return `
             <ul class="plantao-lancamentos">${linhas}</ul>
             ${renderResumoLancamentosPlantao(state)}
         `;
+}
+
+function renderOpcoesColaboradorPlantao(state) {
+    const indisponiveis = new Map(
+        (state.disponibilidade || [])
+            .filter((item) => item.disponivel === false)
+            .map((item) => [Number(item.id), item.motivoLabel || 'Indisponivel'])
+    );
+
+    const lista = filtrarChecklistPorMeusSetoresPlantao(
+        Array.isArray(estado.colaboradores) ? estado.colaboradores : [],
+        state.lancamentos.map((linha) => linha.colaboradorId)
+    );
+
+    const selecionado = Number(state.rascunho?.colaboradorId || 0);
+
+    return ['<option value="">Selecione o colaborador</option>'].concat(
+        lista.map((colaborador) => {
+            const id = Number(colaborador.Id);
+            const motivo = indisponiveis.get(id);
+            // Quem esta sendo editado continua selecionavel mesmo marcado
+            // como indisponivel; senao o select abriria vazio na edicao.
+            const bloqueado = Boolean(motivo) && id !== selecionado;
+            const rotulo = escapeHtml(colaborador.Nome) + (motivo ? ` (${escapeHtml(motivo)})` : '');
+
+            return `<option value="${id}"${bloqueado ? ' disabled' : ''}${id === selecionado ? ' selected' : ''}>${rotulo}</option>`;
+        })
+    ).join('');
+}
+
+export async function carregarDisponibilidadePlantao(state) {
+    try {
+        const response = await API.getPlantaoDisponibilidade(state.dataISO, {
+            horaInicio: state.rascunho?.horaInicio || undefined,
+            horaFim: state.rascunho?.horaFim || undefined
+        });
+
+        state.disponibilidade = Array.isArray(response?.colaboradores) ? response.colaboradores : [];
+    } catch (error) {
+        // Sem a checagem, a lista segue aberta para o lancamento nao travar,
+        // mas o usuario precisa saber: quem estiver de folga ou ausente so
+        // sera barrado pelo servidor na hora de salvar.
+        console.error('[plantao] falha ao verificar disponibilidade:', error);
+        mostrarToast('Nao foi possivel verificar a disponibilidade agora. O servidor confere ao salvar.', 'warning');
+        state.disponibilidade = (estado.colaboradores || []).map((item) => ({
+            id: item.Id,
+            nome: item.Nome,
+            disponivel: true,
+            motivoLabel: null
+        }));
     }
 
-    function renderOpcoesColaboradorPlantao(state) {
-        const indisponiveis = new Map(
-            (state.disponibilidade || [])
-                .filter((item) => item.disponivel === false)
-                .map((item) => [Number(item.id), item.motivoLabel || 'Indisponivel'])
-        );
+    return state;
+}
 
-        const lista = filtrarChecklistPorMeusSetoresPlantao(
-            Array.isArray(window.colaboradores) ? window.colaboradores : [],
-            state.lancamentos.map((linha) => linha.colaboradorId)
-        );
+export function renderPlantaoEditor(state) {
+    const editorPanel = document.getElementById('plantaoEditor');
+    const editorTitle = document.getElementById('plantaoDataTitle');
+    const editorContent = document.getElementById('plantaoEditorContent');
 
-        const selecionado = Number(state.rascunho?.colaboradorId || 0);
-
-        return ['<option value="">Selecione o colaborador</option>'].concat(
-            lista.map((colaborador) => {
-                const id = Number(colaborador.Id);
-                const motivo = indisponiveis.get(id);
-                // Quem esta sendo editado continua selecionavel mesmo marcado
-                // como indisponivel; senao o select abriria vazio na edicao.
-                const bloqueado = Boolean(motivo) && id !== selecionado;
-                const rotulo = escapeHtml(colaborador.Nome) + (motivo ? ` (${escapeHtml(motivo)})` : '');
-
-                return `<option value="${id}"${bloqueado ? ' disabled' : ''}${id === selecionado ? ' selected' : ''}>${rotulo}</option>`;
-            })
-        ).join('');
+    if (!editorPanel || !editorTitle || !editorContent) {
+        return;
     }
 
-    async function carregarDisponibilidadePlantao(state) {
-        try {
-            const response = await window.API.getPlantaoDisponibilidade(state.dataISO, {
-                horaInicio: state.rascunho?.horaInicio || undefined,
-                horaFim: state.rascunho?.horaFim || undefined
-            });
+    const tipo = state.tipoPlantao || 'sabado';
+    const rotuloTipo = rotuloTipoPlantao(tipo, construirMapaFeriadosPlantao().get(state.dataISO));
+    const jaLancado = (estado.plantoesLancados || []).some((item) => item.dataISO === state.dataISO);
+    const editando = Number.isInteger(state.editandoIndice);
+    const tipoCredito = normalizarTipoCreditoPlantao(state.rascunho?.tipoCredito);
 
-            state.disponibilidade = Array.isArray(response?.colaboradores) ? response.colaboradores : [];
-        } catch (error) {
-            // Sem a checagem, a lista segue aberta para o lancamento nao travar,
-            // mas o usuario precisa saber: quem estiver de folga ou ausente so
-            // sera barrado pelo servidor na hora de salvar.
-            console.error('[plantao] falha ao verificar disponibilidade:', error);
-            mostrarToast('Nao foi possivel verificar a disponibilidade agora. O servidor confere ao salvar.', 'warning');
-            state.disponibilidade = (window.colaboradores || []).map((item) => ({
-                id: item.Id,
-                nome: item.Nome,
-                disponivel: true,
-                motivoLabel: null
-            }));
-        }
+    editorPanel.style.display = 'block';
+    editorTitle.innerText = state.dataFormatada;
 
-        return state;
-    }
+    // O tipo do dia e detectado pela data e nao e editavel: como campo de
+    // formulario ele so ocupava espaco. Vira etiqueta no cabecalho.
+    const editorSubtitulo = document.getElementById('plantaoEditorSubtitulo');
 
-    function renderPlantaoEditor(state) {
-        const editorPanel = document.getElementById('plantaoEditor');
-        const editorTitle = document.getElementById('plantaoDataTitle');
-        const editorContent = document.getElementById('plantaoEditorContent');
-
-        if (!editorPanel || !editorTitle || !editorContent) {
-            return;
-        }
-
-        const tipo = state.tipoPlantao || 'sabado';
-        const rotuloTipo = rotuloTipoPlantao(tipo, construirMapaFeriadosPlantao().get(state.dataISO));
-        const jaLancado = (window.plantoesLancados || []).some((item) => item.dataISO === state.dataISO);
-        const editando = Number.isInteger(state.editandoIndice);
-        const tipoCredito = normalizarTipoCreditoPlantao(state.rascunho?.tipoCredito);
-
-        editorPanel.style.display = 'block';
-        editorTitle.innerText = state.dataFormatada;
-
-        // O tipo do dia e detectado pela data e nao e editavel: como campo de
-        // formulario ele so ocupava espaco. Vira etiqueta no cabecalho.
-        const editorSubtitulo = document.getElementById('plantaoEditorSubtitulo');
-
-        if (editorSubtitulo) {
-            editorSubtitulo.innerHTML = `
+    if (editorSubtitulo) {
+        editorSubtitulo.innerHTML = `
                 <span class="plantao-tipo-chip plantao-tipo--${tipo}">
                     <i class="fas fa-circle"></i> ${escapeHtml(rotuloTipo)}
                 </span>
@@ -461,9 +474,9 @@
                     ${jaLancado ? 'Plantao lancado' : 'Ainda nao lancado'}
                 </span>
             `;
-        }
+    }
 
-        editorContent.innerHTML = `
+    editorContent.innerHTML = `
             <div class="editor-plantao">
                 <div class="editor-form-group plantao-form-novo${editando ? ' is-editando' : ''}">
                     <label>
@@ -535,124 +548,120 @@
                     ` : ''}
                 </div>
 
-                ${typeof window.renderPainelFolgasDomingo === 'function'
-                    ? window.renderPainelFolgasDomingo(state.dataISO)
-                    : ''}
+                ${renderPainelFolgasDomingo(state.dataISO)}
             </div>
         `;
 
-        // Depois do innerHTML: o painel de folga liga os proprios eventos e
-        // busca a lista dele. Em dia que nao e domingo ele nao renderiza nada
-        // e esta chamada sai na hora.
-        if (typeof window.bindPainelFolgasDomingo === 'function') {
-            window.bindPainelFolgasDomingo(state.dataISO);
-        }
+    // Depois do innerHTML: o painel de folga liga os proprios eventos e
+    // busca a lista dele. Em dia que nao e domingo ele nao renderiza nada
+    // e esta chamada sai na hora.
+    bindPainelFolgasDomingo(state.dataISO);
 
-        const novoInicio = document.getElementById('plantaoNovoInicio');
-        const novoFim = document.getElementById('plantaoNovoFim');
-        const novoColaborador = document.getElementById('plantaoNovoColaborador');
+    const novoInicio = document.getElementById('plantaoNovoInicio');
+    const novoFim = document.getElementById('plantaoNovoFim');
+    const novoColaborador = document.getElementById('plantaoNovoColaborador');
 
-        // O horario digitado sobrevive ao redesenho da lista e ainda refiltra a
-        // disponibilidade: quem esta ausente naquele intervalo some do select.
-        [novoInicio, novoFim].forEach((campo) => {
-            campo?.addEventListener('input', () => {
-                const currentState = getPlantaoEditorState();
-
-                if (!currentState) {
-                    return;
-                }
-
-                currentState.rascunho = currentState.rascunho || {};
-                currentState.rascunho.horaInicio = novoInicio?.value || '';
-                currentState.rascunho.horaFim = novoFim?.value || '';
-
-                if (disponibilidadeTimer) {
-                    clearTimeout(disponibilidadeTimer);
-                }
-
-                disponibilidadeTimer = setTimeout(async () => {
-                    const ultimoState = getPlantaoEditorState();
-
-                    if (!ultimoState) {
-                        return;
-                    }
-
-                    capturarRascunhoPlantao(ultimoState);
-                    await carregarDisponibilidadePlantao(ultimoState);
-                    renderPlantaoEditor(ultimoState);
-                }, 400);
-            });
-        });
-
-        novoColaborador?.addEventListener('change', () => {
+    // O horario digitado sobrevive ao redesenho da lista e ainda refiltra a
+    // disponibilidade: quem esta ausente naquele intervalo some do select.
+    [novoInicio, novoFim].forEach((campo) => {
+        campo?.addEventListener('input', () => {
             const currentState = getPlantaoEditorState();
 
-            if (currentState) {
-                currentState.rascunho = currentState.rascunho || {};
-                currentState.rascunho.colaboradorId = Number(novoColaborador.value || 0);
-            }
-        });
-
-        // Enter em qualquer campo do formulario adiciona/salva a linha.
-        [novoInicio, novoFim, novoColaborador].forEach((campo) => {
-            campo?.addEventListener('keydown', (event) => {
-                if (event.key === 'Enter') {
-                    event.preventDefault();
-                    window.confirmarLancamentoPlantao();
-                }
-            });
-        });
-    }
-
-    window.carregarBancoHorasResumo = carregarBancoHorasResumo = function carregarBancoHorasResumoComCache() {
-        return withInFlight('banco-horas-resumo', async () => {
-            let items = [];
-            let status = { enabled: true, message: null };
-
-            try {
-                const payload = await window.API.getBancoHorasResumo();
-                items = Array.isArray(payload?.items) ? payload.items.map(mapBancoHorasResumo) : [];
-                status = {
-                    enabled: payload?.enabled !== false,
-                    message: null
-                };
-            } catch (error) {
-                items = [];
-                status = {
-                    enabled: false,
-                    message: error.message || 'Banco de horas indisponivel.'
-                };
-            }
-
-            window.bancoHorasResumo = items;
-            window.bancoHorasStatus = status;
-
-            // Saldo "atual" do cadastro = ultimo lancamento da grade semanal
-            // (BancoHorasSemanal), para bater com a tela de Banco de Horas.
-            try {
-                const saldosPayload = await window.API.getBancoHorasSaldosSemanais();
-                const mapa = {};
-                (saldosPayload?.saldos || []).forEach((saldo) => {
-                    mapa[Number(saldo.colaboradorId)] = saldo;
-                });
-                window.bancoHorasSaldoSemanal = mapa;
-            } catch (error) {
-                window.bancoHorasSaldoSemanal = window.bancoHorasSaldoSemanal || {};
-            }
-
-            return { items, status };
-        });
-    };
-
-    window.renderListaColaboradores = renderListaColaboradores = function renderListaColaboradoresComBancoHoras(lista = window.colaboradores || []) {
-            const container = document.getElementById('listaColaboradores');
-
-            if (!container) {
+            if (!currentState) {
                 return;
             }
 
-            if (!lista || lista.length === 0) {
-                container.innerHTML = `
+            currentState.rascunho = currentState.rascunho || {};
+            currentState.rascunho.horaInicio = novoInicio?.value || '';
+            currentState.rascunho.horaFim = novoFim?.value || '';
+
+            if (disponibilidadeTimer) {
+                clearTimeout(disponibilidadeTimer);
+            }
+
+            disponibilidadeTimer = setTimeout(async () => {
+                const ultimoState = getPlantaoEditorState();
+
+                if (!ultimoState) {
+                    return;
+                }
+
+                capturarRascunhoPlantao(ultimoState);
+                await carregarDisponibilidadePlantao(ultimoState);
+                renderPlantaoEditor(ultimoState);
+            }, 400);
+        });
+    });
+
+    novoColaborador?.addEventListener('change', () => {
+        const currentState = getPlantaoEditorState();
+
+        if (currentState) {
+            currentState.rascunho = currentState.rascunho || {};
+            currentState.rascunho.colaboradorId = Number(novoColaborador.value || 0);
+        }
+    });
+
+    // Enter em qualquer campo do formulario adiciona/salva a linha.
+    [novoInicio, novoFim, novoColaborador].forEach((campo) => {
+        campo?.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                confirmarLancamentoPlantao();
+            }
+        });
+    });
+}
+
+export function carregarBancoHorasResumo() {
+    return withInFlight('banco-horas-resumo', async () => {
+        let items = [];
+        let status = { enabled: true, message: null };
+
+        try {
+            const payload = await API.getBancoHorasResumo();
+            items = Array.isArray(payload?.items) ? payload.items.map(mapBancoHorasResumo) : [];
+            status = {
+                enabled: payload?.enabled !== false,
+                message: null
+            };
+        } catch (error) {
+            items = [];
+            status = {
+                enabled: false,
+                message: error.message || 'Banco de horas indisponivel.'
+            };
+        }
+
+        estado.bancoHorasResumo = items;
+        estado.bancoHorasStatus = status;
+
+        // Saldo "atual" do cadastro = ultimo lancamento da grade semanal
+        // (BancoHorasSemanal), para bater com a tela de Banco de Horas.
+        try {
+            const saldosPayload = await API.getBancoHorasSaldosSemanais();
+            const mapa = {};
+            (saldosPayload?.saldos || []).forEach((saldo) => {
+                mapa[Number(saldo.colaboradorId)] = saldo;
+            });
+            estado.bancoHorasSaldoSemanal = mapa;
+        } catch (error) {
+            estado.bancoHorasSaldoSemanal = estado.bancoHorasSaldoSemanal || {};
+        }
+
+        return { items, status };
+    });
+}
+
+export function renderListaColaboradores(lista = estado.colaboradores || []) {
+        const container = document.getElementById('listaColaboradores');
+
+        if (!container) {
+            return;
+        }
+
+        if (!lista || lista.length === 0) {
+            container.innerHTML = `
                     ${renderResumoBancoHorasAviso()}
                     <div class="empty-state">
                         <i class="fas fa-users"></i>
@@ -660,10 +669,10 @@
                         <small>Clique em "Novo Colaborador" para adicionar</small>
                     </div>
                 `;
-                return;
-            }
+            return;
+        }
 
-            container.innerHTML = `
+        container.innerHTML = `
                 ${renderResumoBancoHorasAviso()}
                 ${lista.map((colaborador) => `
                     <article class="colaborador-card" data-colaborador-id="${colaborador.Id}">
@@ -694,28 +703,23 @@
                 `).join('')}
             `;
 
-            container.querySelectorAll('.colaborador-card').forEach((card) => {
-                card.addEventListener('click', (event) => {
-                    if (event.target.closest('[data-extrato-colaborador]')) {
-                        return;
-                    }
+        container.querySelectorAll('.colaborador-card').forEach((card) => {
+            card.addEventListener('click', (event) => {
+                if (event.target.closest('[data-extrato-colaborador]')) {
+                    return;
+                }
 
-                    const colaboradorId = Number(card.dataset.colaboradorId);
+                const colaboradorId = Number(card.dataset.colaboradorId);
 
-                    if (typeof window.abrirEditorColaboradores === 'function') {
-                        window.abrirEditorColaboradores(colaboradorId);
-                    } else if (typeof abrirEditorColaboradores === 'function') {
-                        abrirEditorColaboradores(colaboradorId);
-                    }
-                });
+                abrirEditorColaboradores(colaboradorId);
             });
+        });
 
-            container.querySelectorAll('[data-extrato-colaborador]').forEach((button) => {
-                button.addEventListener('click', (event) => {
-                    event.preventDefault();
-                    event.stopPropagation();
-                    abrirExtratoBancoHoras(button.dataset.extratoColaborador);
-                });
+        container.querySelectorAll('[data-extrato-colaborador]').forEach((button) => {
+            button.addEventListener('click', (event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                abrirExtratoBancoHoras(button.dataset.extratoColaborador);
             });
-        };
-
+        });
+    }

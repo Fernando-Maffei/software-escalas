@@ -1,18 +1,17 @@
-
+import { buscarFeriadosNacionais } from '../api.js';
+import { estado } from '../estado.js';
 
 // ========== FUNÇÃO PARA CARREGAR OS FERIADOS NACIONAIS ==========
 // A lista vem do servidor (que a calcula); a BrasilAPI ficou como reserva
 // dentro de buscarFeriadosNacionais, em api.js.
-async function carregarFeriadosAPI(ano) {
+export async function carregarFeriadosAPI(ano) {
     try {
-        feriadosAPI = await window.buscarFeriadosNacionais(ano);
-        window.feriadosAPI = feriadosAPI; // Disponibilizar globalmente
-        return feriadosAPI;
+        estado.feriadosAPI = await buscarFeriadosNacionais(ano);
+        return estado.feriadosAPI;
     } catch (error) {
         console.error("❌ Erro ao carregar feriados nacionais:", error);
-        feriadosAPI = [];
-        window.feriadosAPI = [];
+        estado.feriadosAPI = [];
+        estado.feriadosAPI = [];
         return [];
     }
 }
-

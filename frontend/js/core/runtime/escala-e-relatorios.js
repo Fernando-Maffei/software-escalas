@@ -1,290 +1,292 @@
-(function () {
-    if (window.__escalaDiaUiFixLoaded) {
+import { escapeHtml } from '../../lib/html-seguro.js';
+import { aguardarLayoutRelatorioPdf, baixarPdfSemPreview, criarContainerTemporarioRelatorioPdf, criarPdfMultipaginasComCanvas, lockPdfViewportOverflow, renderizarPaginaPdfEmCanvas } from '../../lib/pdf-utils.js';
+import { gerarCalendario } from '../../telas/calendar.js';
+import { renderDashboard } from '../../telas/dashboard/render.js';
+import { abrirEditorNaEscala } from '../../telas/escala-dia-editor.js';
+import { buildEscalaMonthOptions, formatDatePtBrEscala, formatDurationEscala, formatTimeRangeEscala, getMonthBoundsEscala, getTimeMinutesEscala, RELATORIO_ESCALA_MODOS, toISODateEscala } from '../../telas/escala-dia-shared.js';
+import { atualizarAcoesCabecalhoEscala, obterDataSelecionadaEscala } from '../../telas/escala-dia/acoes-do-dia.js';
+import { carregarEscalaDiaEscala } from '../../telas/escala-dia/editor-lateral.js';
+import { gerarRelatorioEscala } from '../../telas/escala-relatorio.js';
+import { buildColaboradorOptionsEscala, buildSetorOptionsRelatorioEscala, buildTipoOptionsEscala } from '../../telas/escala-relatorio/filtros.js';
+import { toggleEscalaReportModeFilters } from '../../telas/escala-relatorio/quadro-mensal.js';
+import { API } from '../api.js';
+import { gerarLegendaMensal } from '../app/calendario-e-legenda.js';
+import { mostrarToast } from '../app/horas-e-resumo.js';
+import { gerarOptionsMeses } from '../app/relatorios-export.js';
+import { estado } from '../estado.js';
+import { carregarColaboradores, carregarPlantoes, carregarSetores } from './dados-e-modais.js';
+import { normalizeRuntimeToken } from './normalizacao.js';
+import { isColaboradoresScreenVisible } from './plantao-colaboradores/helpers.js';
+import { renderListaColaboradores } from './plantao-colaboradores/plantao-editor.js';
+import { ehDataPlantaoValida, renderLancamentoPlantao } from './plantao-colaboradores/plantao-regua-e-relatorios.js';
+import { gerarRelatorioCompleto } from './relatorio-mensal.js';
+
+function getCurrentPageKeyEscala() {
+    const hash = (window.location.hash || '#dashboard').replace(/^#/, '').trim();
+    return hash || 'dashboard';
+}
+
+async function refreshEscalaViewEscala() {
+    if (!document.getElementById('timelineBody')) {
         return;
     }
 
-    window.__escalaDiaUiFixLoaded = true;
+    const selectedDate = obterDataSelecionadaEscala();
+    await carregarEscalaDiaEscala(selectedDate);
+    atualizarAcoesCabecalhoEscala();
 
-    function getCurrentPageKeyEscala() {
-        const hash = (window.location.hash || '#dashboard').replace(/^#/, '').trim();
-        return hash || 'dashboard';
+    if (estado.escalaEditorColaboradorId) {
+        abrirEditorNaEscala(estado.escalaEditorColaboradorId);
+    }
+}
+
+function refreshColaboradoresViewEscala() {
+    if (!isColaboradoresScreenVisible()) {
+        return;
     }
 
-    async function refreshEscalaViewEscala() {
-        if (!document.getElementById('timelineBody')) {
-            return;
-        }
+    const termoBusca = document.getElementById('searchColaborador')?.value?.trim()?.toLowerCase() || '';
+    const lista = termoBusca
+        ? (estado.colaboradores || []).filter((item) => item.Nome?.toLowerCase().includes(termoBusca))
+        : (estado.colaboradores || []);
 
-        const selectedDate = obterDataSelecionadaEscala();
-        await carregarEscalaDiaEscala(selectedDate);
-        atualizarAcoesCabecalhoEscala();
+    renderListaColaboradores(lista);
+}
 
-        if (window.__escalaEditorColaboradorId) {
-            abrirEditorNaEscala(window.__escalaEditorColaboradorId);
-        }
-    }
+function captureRelatoriosStateEscala() {
+    const visualization = document.getElementById('relatorioVisualizacao');
+    const title = document.getElementById('relatorioTitulo')?.innerText || '';
 
-    function refreshColaboradoresViewEscala() {
-        if (!isColaboradoresScreenVisible() || typeof renderListaColaboradores !== 'function') {
-            return;
-        }
+    return {
+        reportVisible: Boolean(visualization && visualization.style.display !== 'none'),
+        reportTitle: title,
+        escalaMode: document.getElementById('relatorioEscalaModo')?.value || RELATORIO_ESCALA_MODOS.QUADRO_MENSAL,
+        escalaMes: document.getElementById('relatorioEscalaMes')?.value || '',
+        escalaAno: document.getElementById('relatorioEscalaAno')?.value || '',
+        escalaDataInicio: document.getElementById('relatorioEscalaDataInicio')?.value || '',
+        escalaDataFim: document.getElementById('relatorioEscalaDataFim')?.value || '',
+        escalaSetor: document.getElementById('relatorioEscalaSetor')?.value || '',
+        escalaColaborador: document.getElementById('relatorioEscalaColaborador')?.value || '',
+        escalaTipo: document.getElementById('relatorioEscalaTipo')?.value || '',
+        plantaoDataInicio: document.getElementById('relatorioPlantaoDataInicio')?.value || '',
+        plantaoDataFim: document.getElementById('relatorioPlantaoDataFim')?.value || '',
+        plantaoColaborador: document.getElementById('relatorioPlantaoColaborador')?.value || '',
+        plantaoStatus: document.getElementById('relatorioPlantaoStatus')?.value || 'todos'
+    };
+}
 
-        const termoBusca = document.getElementById('searchColaborador')?.value?.trim()?.toLowerCase() || '';
-        const lista = termoBusca
-            ? (window.colaboradores || []).filter((item) => item.Nome?.toLowerCase().includes(termoBusca))
-            : (window.colaboradores || []);
-
-        renderListaColaboradores(lista);
-    }
-
-    function captureRelatoriosStateEscala() {
-        const visualization = document.getElementById('relatorioVisualizacao');
-        const title = document.getElementById('relatorioTitulo')?.innerText || '';
-
-        return {
-            reportVisible: Boolean(visualization && visualization.style.display !== 'none'),
-            reportTitle: title,
-            escalaMode: document.getElementById('relatorioEscalaModo')?.value || RELATORIO_ESCALA_MODOS.QUADRO_MENSAL,
-            escalaMes: document.getElementById('relatorioEscalaMes')?.value || '',
-            escalaAno: document.getElementById('relatorioEscalaAno')?.value || '',
-            escalaDataInicio: document.getElementById('relatorioEscalaDataInicio')?.value || '',
-            escalaDataFim: document.getElementById('relatorioEscalaDataFim')?.value || '',
-            escalaSetor: document.getElementById('relatorioEscalaSetor')?.value || '',
-            escalaColaborador: document.getElementById('relatorioEscalaColaborador')?.value || '',
-            escalaTipo: document.getElementById('relatorioEscalaTipo')?.value || '',
-            plantaoDataInicio: document.getElementById('relatorioPlantaoDataInicio')?.value || '',
-            plantaoDataFim: document.getElementById('relatorioPlantaoDataFim')?.value || '',
-            plantaoColaborador: document.getElementById('relatorioPlantaoColaborador')?.value || '',
-            plantaoStatus: document.getElementById('relatorioPlantaoStatus')?.value || 'todos'
-        };
-    }
-
-    function restoreRelatoriosStateEscala(snapshot) {
-        const setValue = (id, value) => {
-            const element = document.getElementById(id);
-            if (element && value !== undefined) {
-                element.value = value;
-            }
-        };
-
-        setValue('relatorioEscalaModo', snapshot.escalaMode);
-        if (typeof toggleEscalaReportModeFilters === 'function') {
-            toggleEscalaReportModeFilters();
-        }
-
-        setValue('relatorioEscalaMes', snapshot.escalaMes);
-        setValue('relatorioEscalaAno', snapshot.escalaAno);
-        setValue('relatorioEscalaDataInicio', snapshot.escalaDataInicio);
-        setValue('relatorioEscalaDataFim', snapshot.escalaDataFim);
-        setValue('relatorioEscalaSetor', snapshot.escalaSetor);
-        setValue('relatorioEscalaColaborador', snapshot.escalaColaborador);
-        setValue('relatorioEscalaTipo', snapshot.escalaTipo);
-        setValue('relatorioPlantaoDataInicio', snapshot.plantaoDataInicio);
-        setValue('relatorioPlantaoDataFim', snapshot.plantaoDataFim);
-        setValue('relatorioPlantaoColaborador', snapshot.plantaoColaborador);
-        setValue('relatorioPlantaoStatus', snapshot.plantaoStatus);
-    }
-
-    async function refreshRelatoriosViewEscala() {
-        if (!document.querySelector('.relatorios-grid')) {
-            return;
-        }
-
-        const snapshot = captureRelatoriosStateEscala();
-
-        if (!snapshot.reportVisible || typeof renderRelatorios !== 'function') {
-            return;
-        }
-
-        await renderRelatorios();
-        restoreRelatoriosStateEscala(snapshot);
-
-        const reportKey = window.normalizeRuntimeToken(snapshot.reportTitle);
-
-        if (reportKey.includes('plantao') && typeof gerarRelatorioPlantoes === 'function') {
-            await gerarRelatorioPlantoes();
-            return;
-        }
-
-        if (reportKey.includes('escala') && typeof gerarRelatorioEscala === 'function') {
-            await gerarRelatorioEscala();
-            return;
-        }
-
-        if ((reportKey.includes('mensal') || reportKey.includes('completo')) && typeof gerarRelatorioCompleto === 'function') {
-            await gerarRelatorioCompleto();
-        }
-    }
-
-    window.__refreshVisibleViews = async function refreshVisibleViewsEscala() {
-        if (document.getElementById('calendar') && typeof gerarCalendario === 'function') {
-            const mes = window.mesAtual ?? new Date().getMonth();
-            const ano = window.anoAtual ?? new Date().getFullYear();
-            gerarCalendario(mes, ano);
-        }
-
-        if (typeof gerarLegendaMensal === 'function') {
-            gerarLegendaMensal();
-        }
-
-        const currentPage = getCurrentPageKeyEscala();
-
-        if (currentPage === 'dashboard' && typeof renderDashboard === 'function') {
-            await renderDashboard();
-            return;
-        }
-
-        if (currentPage === 'escala') {
-            await refreshEscalaViewEscala();
-            return;
-        }
-
-        if (currentPage === 'lancamentoPlantao' && typeof renderLancamentoPlantao === 'function') {
-            await renderLancamentoPlantao();
-            return;
-        }
-
-        if (currentPage === 'colaboradores') {
-            refreshColaboradoresViewEscala();
-            return;
-        }
-
-        if (currentPage === 'relatorios') {
-            await refreshRelatoriosViewEscala();
+function restoreRelatoriosStateEscala(snapshot) {
+    const setValue = (id, value) => {
+        const element = document.getElementById(id);
+        if (element && value !== undefined) {
+            element.value = value;
         }
     };
 
-    window.editarPlantao = editarPlantao = function editarPlantaoSeguroEscala(dataISO) {
-        const normalized = toISODateEscala(dataISO);
+    setValue('relatorioEscalaModo', snapshot.escalaMode);
+    toggleEscalaReportModeFilters();
 
-        if (typeof window.abrirEditorPlantao === 'function') {
-            window.abrirEditorPlantao(normalized, formatDatePtBrEscala(normalized));
-        }
-    };
+    setValue('relatorioEscalaMes', snapshot.escalaMes);
+    setValue('relatorioEscalaAno', snapshot.escalaAno);
+    setValue('relatorioEscalaDataInicio', snapshot.escalaDataInicio);
+    setValue('relatorioEscalaDataFim', snapshot.escalaDataFim);
+    setValue('relatorioEscalaSetor', snapshot.escalaSetor);
+    setValue('relatorioEscalaColaborador', snapshot.escalaColaborador);
+    setValue('relatorioEscalaTipo', snapshot.escalaTipo);
+    setValue('relatorioPlantaoDataInicio', snapshot.plantaoDataInicio);
+    setValue('relatorioPlantaoDataFim', snapshot.plantaoDataFim);
+    setValue('relatorioPlantaoColaborador', snapshot.plantaoColaborador);
+    setValue('relatorioPlantaoStatus', snapshot.plantaoStatus);
+}
 
-    function buildPlantaoColaboradorOptions(selectedId = '') {
-        return `
+async function refreshRelatoriosViewEscala() {
+    if (!document.querySelector('.relatorios-grid')) {
+        return;
+    }
+
+    const snapshot = captureRelatoriosStateEscala();
+
+    if (!snapshot.reportVisible) {
+        return;
+    }
+
+    await renderRelatorios();
+    restoreRelatoriosStateEscala(snapshot);
+
+    const reportKey = normalizeRuntimeToken(snapshot.reportTitle);
+
+    if (reportKey.includes('plantao')) {
+        await gerarRelatorioPlantoes();
+        return;
+    }
+
+    if (reportKey.includes('escala')) {
+        await gerarRelatorioEscala();
+        return;
+    }
+
+    if (reportKey.includes('mensal') || reportKey.includes('completo')) {
+        await gerarRelatorioCompleto();
+    }
+}
+
+export async function __refreshVisibleViews() {
+    if (document.getElementById('calendar')) {
+        const mes = estado.mesAtual ?? new Date().getMonth();
+        const ano = estado.anoAtual ?? new Date().getFullYear();
+        gerarCalendario(mes, ano);
+    }
+
+    gerarLegendaMensal();
+
+    const currentPage = getCurrentPageKeyEscala();
+
+    if (currentPage === 'dashboard') {
+        await renderDashboard();
+        return;
+    }
+
+    if (currentPage === 'escala') {
+        await refreshEscalaViewEscala();
+        return;
+    }
+
+    if (currentPage === 'lancamentoPlantao') {
+        await renderLancamentoPlantao();
+        return;
+    }
+
+    if (currentPage === 'colaboradores') {
+        refreshColaboradoresViewEscala();
+        return;
+    }
+
+    if (currentPage === 'relatorios') {
+        await refreshRelatoriosViewEscala();
+    }
+}
+
+function buildPlantaoColaboradorOptions(selectedId = '') {
+    return `
             <option value="">Todos os colaboradores</option>
-            ${(window.colaboradores || []).map((item) => `
+            ${(estado.colaboradores || []).map((item) => `
                 <option value="${item.Id}" ${String(selectedId) === String(item.Id) ? 'selected' : ''}>
                     ${escapeHtml(item.Nome)}
                 </option>
             `).join('')}
         `;
+}
+
+function getPlantaoDurationMinutesReport(plantao) {
+    const directMinutes = Number(plantao?.duracaoMinutos);
+
+    if (Number.isFinite(directMinutes) && directMinutes > 0) {
+        return directMinutes;
     }
 
-    function getPlantaoDurationMinutesReport(plantao) {
-        const directMinutes = Number(plantao?.duracaoMinutos);
+    const start = getTimeMinutesEscala(plantao?.horaInicio);
+    const end = getTimeMinutesEscala(plantao?.horaFim);
 
-        if (Number.isFinite(directMinutes) && directMinutes > 0) {
-            return directMinutes;
+    if (start === null || end === null || end <= start) {
+        return 0;
+    }
+
+    return end - start;
+}
+
+function getPlantaoDurationLabelReport(plantao) {
+    const minutes = getPlantaoDurationMinutesReport(plantao);
+    return minutes > 0 ? formatDurationEscala(minutes) : '--';
+}
+
+function buildPlantaoReportSummary(items) {
+    const uniqueCollaborators = new Set();
+    const dias = new Set();
+    let totalMinutes = 0;
+    // Hora extra nao entra no banco: somar tudo num "credito" so daria um
+    // numero que nao bate com nenhum saldo. Os dois totais vao separados.
+    let bancoMinutes = 0;
+    let extraMinutes = 0;
+
+    items.forEach((plantao) => {
+        const colaboradoresCount = Array.isArray(plantao.colaboradores) ? plantao.colaboradores.length : 0;
+        const durationMinutes = getPlantaoDurationMinutesReport(plantao);
+        const horasEquipe = durationMinutes * Math.max(colaboradoresCount, 0);
+
+        (plantao.colaboradores || []).forEach((id) => uniqueCollaborators.add(Number(id)));
+        dias.add(plantao.dataISO);
+        totalMinutes += durationMinutes;
+
+        if (plantao.tipoCredito === 'extra') {
+            extraMinutes += horasEquipe;
+        } else {
+            bancoMinutes += horasEquipe;
         }
+    });
 
-        const start = getTimeMinutesEscala(plantao?.horaInicio);
-        const end = getTimeMinutesEscala(plantao?.horaFim);
+    return {
+        // Conta DIAS de plantao: um dia com dois turnos e um plantao so.
+        totalPlantoes: dias.size,
+        totalColaboradores: uniqueCollaborators.size,
+        horasProgramadas: formatDurationEscala(totalMinutes || 0),
+        horasBanco: formatDurationEscala(bancoMinutes || 0),
+        horasExtra: formatDurationEscala(extraMinutes || 0)
+    };
+}
 
-        if (start === null || end === null || end <= start) {
-            return 0;
-        }
+function getPlantaoReportFiltersFromUI() {
+    return {
+        dataInicio: document.getElementById('relatorioPlantaoDataInicio')?.value || '',
+        dataFim: document.getElementById('relatorioPlantaoDataFim')?.value || '',
+        colaboradorId: document.getElementById('relatorioPlantaoColaborador')?.value || '',
+        status: document.getElementById('relatorioPlantaoStatus')?.value || 'todos'
+    };
+}
 
-        return end - start;
-    }
+async function buildPlantaoReportItems(filters) {
+    await carregarColaboradores();
 
-    function getPlantaoDurationLabelReport(plantao) {
-        const minutes = getPlantaoDurationMinutesReport(plantao);
-        return minutes > 0 ? formatDurationEscala(minutes) : '--';
-    }
+    const payload = await API.getPlantoes({
+        from: filters.dataInicio,
+        to: filters.dataFim
+    });
 
-    function buildPlantaoReportSummary(items) {
-        const uniqueCollaborators = new Set();
-        const dias = new Set();
-        let totalMinutes = 0;
-        // Hora extra nao entra no banco: somar tudo num "credito" so daria um
-        // numero que nao bate com nenhum saldo. Os dois totais vao separados.
-        let bancoMinutes = 0;
-        let extraMinutes = 0;
-
-        items.forEach((plantao) => {
-            const colaboradoresCount = Array.isArray(plantao.colaboradores) ? plantao.colaboradores.length : 0;
-            const durationMinutes = getPlantaoDurationMinutesReport(plantao);
-            const horasEquipe = durationMinutes * Math.max(colaboradoresCount, 0);
-
-            (plantao.colaboradores || []).forEach((id) => uniqueCollaborators.add(Number(id)));
-            dias.add(plantao.dataISO);
-            totalMinutes += durationMinutes;
-
-            if (plantao.tipoCredito === 'extra') {
-                extraMinutes += horasEquipe;
-            } else {
-                bancoMinutes += horasEquipe;
+    return (Array.isArray(payload) ? payload : [])
+        .map((item) => ({
+            ...item,
+            dataISO: toISODateEscala(item.dataISO || item.data_plantao),
+            tipoPlantao: item.tipoPlantao || item.tipo_plantao || null,
+            tipoCredito: String(item.tipoCredito || item.tipo_credito || '').toLowerCase() === 'extra' ? 'extra' : 'banco',
+            colaboradores: Array.isArray(item.colaboradores) ? item.colaboradores : [],
+            horaInicio: item.horaInicio || item.hora_inicio || null,
+            horaFim: item.horaFim || item.hora_fim || null,
+            observacao: item.observacao || null,
+            duracaoMinutos: Number(item.duracaoMinutos || 0) || null,
+            duracaoFormatada: item.duracaoFormatada || null
+        }))
+        .filter((plantao) => {
+            if (!['sabado', 'domingo', 'feriado'].includes(plantao.tipoPlantao) && !ehDataPlantaoValida(plantao.dataISO)) {
+                return false;
             }
+
+            if (filters.colaboradorId && !(plantao.colaboradores || []).some((id) => Number(id) === Number(filters.colaboradorId))) {
+                return false;
+            }
+
+            if (filters.status === 'com_equipe') {
+                return (plantao.colaboradores || []).length > 0;
+            }
+
+            if (filters.status === 'sem_equipe') {
+                return (plantao.colaboradores || []).length === 0;
+            }
+
+            return true;
         });
+}
 
-        return {
-            // Conta DIAS de plantao: um dia com dois turnos e um plantao so.
-            totalPlantoes: dias.size,
-            totalColaboradores: uniqueCollaborators.size,
-            horasProgramadas: formatDurationEscala(totalMinutes || 0),
-            horasBanco: formatDurationEscala(bancoMinutes || 0),
-            horasExtra: formatDurationEscala(extraMinutes || 0)
-        };
-    }
-
-    function getPlantaoReportFiltersFromUI() {
-        return {
-            dataInicio: document.getElementById('relatorioPlantaoDataInicio')?.value || '',
-            dataFim: document.getElementById('relatorioPlantaoDataFim')?.value || '',
-            colaboradorId: document.getElementById('relatorioPlantaoColaborador')?.value || '',
-            status: document.getElementById('relatorioPlantaoStatus')?.value || 'todos'
-        };
-    }
-
-    async function buildPlantaoReportItems(filters) {
-        if (typeof carregarColaboradores === 'function') {
-            await carregarColaboradores();
-        }
-
-        const payload = await window.API.getPlantoes({
-            from: filters.dataInicio,
-            to: filters.dataFim
-        });
-
-        return (Array.isArray(payload) ? payload : [])
-            .map((item) => ({
-                ...item,
-                dataISO: toISODateEscala(item.dataISO || item.data_plantao),
-                tipoPlantao: item.tipoPlantao || item.tipo_plantao || null,
-                tipoCredito: String(item.tipoCredito || item.tipo_credito || '').toLowerCase() === 'extra' ? 'extra' : 'banco',
-                colaboradores: Array.isArray(item.colaboradores) ? item.colaboradores : [],
-                horaInicio: item.horaInicio || item.hora_inicio || null,
-                horaFim: item.horaFim || item.hora_fim || null,
-                observacao: item.observacao || null,
-                duracaoMinutos: Number(item.duracaoMinutos || 0) || null,
-                duracaoFormatada: item.duracaoFormatada || null
-            }))
-            .filter((plantao) => {
-                if (!['sabado', 'domingo', 'feriado'].includes(plantao.tipoPlantao) && !ehDataPlantaoValida(plantao.dataISO)) {
-                    return false;
-                }
-
-                if (filters.colaboradorId && !(plantao.colaboradores || []).some((id) => Number(id) === Number(filters.colaboradorId))) {
-                    return false;
-                }
-
-                if (filters.status === 'com_equipe') {
-                    return (plantao.colaboradores || []).length > 0;
-                }
-
-                if (filters.status === 'sem_equipe') {
-                    return (plantao.colaboradores || []).length === 0;
-                }
-
-                return true;
-            });
-    }
-
-    function gerarHtmlPdfRelatorioPlantoes(items, filters = {}) {
-        return `
+function gerarHtmlPdfRelatorioPlantoes(items, filters = {}) {
+    return `
             <!DOCTYPE html>
             <html>
             <head>
@@ -421,109 +423,91 @@
             </body>
             </html>
         `;
+}
+
+export async function gerarRelatorioPlantoes() {
+    const filters = getPlantaoReportFiltersFromUI();
+
+    if (!filters.dataInicio || !filters.dataFim) {
+        mostrarToast('Informe a data inicial e final do relatorio de plantoes.', 'error');
+        return;
     }
 
-    window.gerarRelatorioPlantoes = gerarRelatorioPlantoes = async function gerarRelatorioPlantoesAtualizado() {
-        const filters = getPlantaoReportFiltersFromUI();
+    try {
+        const items = await buildPlantaoReportItems(filters);
 
-        if (!filters.dataInicio || !filters.dataFim) {
-            if (typeof mostrarToast === 'function') {
-                mostrarToast('Informe a data inicial e final do relatorio de plantoes.', 'error');
-            }
-            return;
-        }
+        document.getElementById('relatorioTitulo').innerText = `Relatorio de Plantoes de Sabado - ${formatDatePtBrEscala(filters.dataInicio)} ate ${formatDatePtBrEscala(filters.dataFim)}`;
+        document.getElementById('relatorioConteudo').innerHTML = renderRelatorioPlantoes(items, filters);
+        document.getElementById('relatorioVisualizacao').style.display = 'block';
+    } catch (error) {
+        mostrarToast(`Erro ao gerar relatorio de plantoes: ${error.message}`, 'error');
+    }
+}
 
-        try {
-            const items = await buildPlantaoReportItems(filters);
+export async function exportarRelatorioPlantoes() {
+    const filters = getPlantaoReportFiltersFromUI();
 
-            document.getElementById('relatorioTitulo').innerText = `Relatorio de Plantoes de Sabado - ${formatDatePtBrEscala(filters.dataInicio)} ate ${formatDatePtBrEscala(filters.dataFim)}`;
-            document.getElementById('relatorioConteudo').innerHTML = renderRelatorioPlantoes(items, filters);
-            document.getElementById('relatorioVisualizacao').style.display = 'block';
-        } catch (error) {
-            if (typeof mostrarToast === 'function') {
-                mostrarToast(`Erro ao gerar relatorio de plantoes: ${error.message}`, 'error');
-            }
-        }
-    };
+    if (!filters.dataInicio || !filters.dataFim) {
+        mostrarToast('Informe a data inicial e final do relatorio de plantoes.', 'error');
+        return;
+    }
 
-    window.exportarRelatorioPlantoes = exportarRelatorioPlantoes = async function exportarRelatorioPlantoesAtualizado() {
-        const filters = getPlantaoReportFiltersFromUI();
+    if (typeof html2canvas !== 'function' || !window.jspdf || typeof window.jspdf.jsPDF !== 'function') {
+        mostrarToast('Bibliotecas de exportacao nao estao disponiveis.', 'error');
+        return;
+    }
 
-        if (!filters.dataInicio || !filters.dataFim) {
-            if (typeof mostrarToast === 'function') {
-                mostrarToast('Informe a data inicial e final do relatorio de plantoes.', 'error');
-            }
-            return;
-        }
+    let container = null;
+    let releaseViewportLock = null;
 
-        if (typeof html2canvas !== 'function' || !window.jspdf || typeof window.jspdf.jsPDF !== 'function') {
-            if (typeof mostrarToast === 'function') {
-                mostrarToast('Bibliotecas de exportacao nao estao disponiveis.', 'error');
-            }
-            return;
-        }
+    try {
+        mostrarToast('Gerando PDF de plantoes...', 'warning');
 
-        let container = null;
-        let releaseViewportLock = null;
+        const items = await buildPlantaoReportItems(filters);
+        const html = gerarHtmlPdfRelatorioPlantoes(items, filters);
 
-        try {
-            if (typeof mostrarToast === 'function') {
-                mostrarToast('Gerando PDF de plantoes...', 'warning');
-            }
+        releaseViewportLock = lockPdfViewportOverflow();
+        container = criarContainerTemporarioRelatorioPdf(html, { width: 1480 });
+        await aguardarLayoutRelatorioPdf();
 
-            const items = await buildPlantaoReportItems(filters);
-            const html = gerarHtmlPdfRelatorioPlantoes(items, filters);
+        const canvas = await renderizarPaginaPdfEmCanvas(container, {
+            minWidth: 1600,
+            minHeight: 1000,
+            scale: 1.65,
+            maxCanvasSide: 12000,
+            maxCanvasPixels: 22000000
+        });
+        const { pdf } = criarPdfMultipaginasComCanvas(canvas, {
+            preferLandscape: true,
+            marginMm: 6,
+            minScaleMmPerPixel: 0.065,
+            imageFormat: 'JPEG',
+            imageQuality: 0.94,
+            minimumPages: 1,
+            maxSourcePageHeight: 1300
+        });
+        const salvarPdf = baixarPdfSemPreview;
+        salvarPdf(pdf, `Relatorio_Plantoes_${filters.dataInicio}_${filters.dataFim}.pdf`);
 
-            releaseViewportLock = typeof window.lockPdfViewportOverflow === 'function'
-                ? window.lockPdfViewportOverflow()
-                : null;
-            container = window.criarContainerTemporarioRelatorioPdf(html, { width: 1480 });
-            await window.aguardarLayoutRelatorioPdf();
+        mostrarToast('PDF de plantoes gerado com sucesso!', 'success');
+    } catch (error) {
+        console.error('Erro ao exportar relatorio de plantoes:', error);
 
-            const canvas = await window.renderizarPaginaPdfEmCanvas(container, {
-                minWidth: 1600,
-                minHeight: 1000,
-                scale: 1.65,
-                maxCanvasSide: 12000,
-                maxCanvasPixels: 22000000
-            });
-            const { pdf } = window.criarPdfMultipaginasComCanvas(canvas, {
-                preferLandscape: true,
-                marginMm: 6,
-                minScaleMmPerPixel: 0.065,
-                imageFormat: 'JPEG',
-                imageQuality: 0.94,
-                minimumPages: 1,
-                maxSourcePageHeight: 1300
-            });
-            const salvarPdf = typeof window.baixarPdfSemPreview === 'function'
-                ? window.baixarPdfSemPreview
-                : (pdfDoc, nomeArquivo) => pdfDoc.save(nomeArquivo);
-            salvarPdf(pdf, `Relatorio_Plantoes_${filters.dataInicio}_${filters.dataFim}.pdf`);
+        mostrarToast(`Erro ao exportar relatorio de plantoes: ${error.message}`, 'error');
+    } finally {
+        releaseViewportLock?.();
+        container?.remove();
+    }
+}
 
-            if (typeof mostrarToast === 'function') {
-                mostrarToast('PDF de plantoes gerado com sucesso!', 'success');
-            }
-        } catch (error) {
-            console.error('Erro ao exportar relatorio de plantoes:', error);
+function renderRelatorioPlantoes(items, filters = {}) {
+    if (!items.length) {
+        return '<div class="empty-state">Nenhum plantao encontrado no periodo</div>';
+    }
 
-            if (typeof mostrarToast === 'function') {
-                mostrarToast(`Erro ao exportar relatorio de plantoes: ${error.message}`, 'error');
-            }
-        } finally {
-            releaseViewportLock?.();
-            container?.remove();
-        }
-    };
+    const summary = buildPlantaoReportSummary(items);
 
-    window.renderRelatorioPlantoes = renderRelatorioPlantoes = function renderRelatorioPlantoesSeguro(items, filters = {}) {
-        if (!items.length) {
-            return '<div class="empty-state">Nenhum plantao encontrado no periodo</div>';
-        }
-
-        const summary = buildPlantaoReportSummary(items);
-
-        return `
+    return `
             <div class="relatorio-tabela-container">
                 <div class="relatorio-total">
                     Periodo: <strong>${escapeHtml(formatDatePtBrEscala(filters.dataInicio || items[items.length - 1]?.dataISO))}</strong>
@@ -582,20 +566,20 @@
                     </thead>
                     <tbody>
                         ${[...items]
-                            .sort((first, second) => (
-                                String(second.dataISO).localeCompare(String(first.dataISO))
-                                || String(first.horaInicio || '').localeCompare(String(second.horaInicio || ''))
-                            ))
-                            .map((plantao) => {
-                                const colaboradores = (plantao.colaboradores || []).map((id) => {
-                                    const colaborador = (window.colaboradores || []).find((item) => Number(item.Id) === Number(id));
-                                    return colaborador?.Nome || 'Desconhecido';
-                                });
-                                const statusLabel = colaboradores.length > 0 ? 'Equipe definida' : 'Sem equipe';
-                                const statusClass = colaboradores.length > 0 ? 'badge-folga' : 'badge-ausencia';
-                                const extra = plantao.tipoCredito === 'extra';
+                        .sort((first, second) => (
+                            String(second.dataISO).localeCompare(String(first.dataISO))
+                            || String(first.horaInicio || '').localeCompare(String(second.horaInicio || ''))
+                        ))
+                        .map((plantao) => {
+                            const colaboradores = (plantao.colaboradores || []).map((id) => {
+                                const colaborador = (estado.colaboradores || []).find((item) => Number(item.Id) === Number(id));
+                                return colaborador?.Nome || 'Desconhecido';
+                            });
+                            const statusLabel = colaboradores.length > 0 ? 'Equipe definida' : 'Sem equipe';
+                            const statusClass = colaboradores.length > 0 ? 'badge-folga' : 'badge-ausencia';
+                            const extra = plantao.tipoCredito === 'extra';
 
-                                return `
+                            return `
                                     <tr>
                                         <td><strong>${escapeHtml(formatDatePtBrEscala(plantao.dataISO))}</strong></td>
                                         <td>${escapeHtml((plantao.tipoPlantao || 'sabado').charAt(0).toUpperCase() + (plantao.tipoPlantao || 'sabado').slice(1))}</td>
@@ -607,34 +591,34 @@
                                         <td>${escapeHtml(plantao.duracaoFormatada || getPlantaoDurationLabelReport(plantao))}</td>
                                     </tr>
                                 `;
-                            }).join('')}
+                        }).join('')}
                     </tbody>
                 </table>
             </div>
         `;
-    };
+}
 
-    window.renderRelatorios = renderRelatorios = async function renderRelatoriosAtualizados() {
-        const appContent = document.getElementById('appContent');
+export async function renderRelatorios() {
+    const appContent = document.getElementById('appContent');
 
-        if (!appContent) {
-            return;
-        }
+    if (!appContent) {
+        return;
+    }
 
-        const todayISO = toISODateEscala(new Date());
-        const monthBounds = getMonthBoundsEscala(todayISO);
-        const todayDate = new Date();
-        const currentMonth = todayDate.getMonth();
-        const currentMonthNumber = currentMonth + 1;
-        const currentYear = todayDate.getFullYear();
+    const todayISO = toISODateEscala(new Date());
+    const monthBounds = getMonthBoundsEscala(todayISO);
+    const todayDate = new Date();
+    const currentMonth = todayDate.getMonth();
+    const currentMonthNumber = currentMonth + 1;
+    const currentYear = todayDate.getFullYear();
 
-        await Promise.allSettled([
-            typeof carregarColaboradores === 'function' ? carregarColaboradores() : Promise.resolve([]),
-            typeof carregarSetores === 'function' ? carregarSetores() : Promise.resolve([]),
-            typeof carregarPlantoes === 'function' ? carregarPlantoes() : Promise.resolve([])
-        ]);
+    await Promise.allSettled([
+        carregarColaboradores(),
+        carregarSetores(),
+        carregarPlantoes()
+    ]);
 
-        appContent.innerHTML = `
+    appContent.innerHTML = `
             <div class="page-header relatorios-page-header">
                 <h1><i class="fas fa-chart-bar"></i> Relatorios</h1>
             </div>
@@ -671,7 +655,7 @@
                                 <label><i class="fas fa-calendar"></i> Mes/Ano</label>
                                 <div class="mes-selector">
                                     <select id="relatorioMesCompleto" class="form-control">
-                                        ${typeof gerarOptionsMeses === 'function' ? gerarOptionsMeses(currentMonth) : ''}
+                                        ${gerarOptionsMeses(currentMonth)}
                                     </select>
                                     <input type="number" id="relatorioAnoCompleto" class="form-control" value="${currentYear}" min="2020" max="2035">
                                 </div>
@@ -812,38 +796,37 @@
             </div>
         `;
 
-        document.getElementById('relatorioEscalaModo')?.addEventListener('change', toggleEscalaReportModeFilters);
-        toggleEscalaReportModeFilters();
-        ativarAbasRelatorios();
-    };
+    document.getElementById('relatorioEscalaModo')?.addEventListener('change', toggleEscalaReportModeFilters);
+    toggleEscalaReportModeFilters();
+    ativarAbasRelatorios();
+}
 
-    // Alterna qual relatorio esta visivel. Os paineis inativos continuam no
-    // DOM (apenas ocultos), entao os handlers de gerar/exportar seguem
-    // encontrando seus campos por getElementById sem nenhuma alteracao.
-    function ativarAbasRelatorios() {
-        const abas = Array.from(document.querySelectorAll('.relatorios-aba'));
-        const paineis = Array.from(document.querySelectorAll('[data-relatorio-painel]'));
+// Alterna qual relatorio esta visivel. Os paineis inativos continuam no
+// DOM (apenas ocultos), entao os handlers de gerar/exportar seguem
+// encontrando seus campos por getElementById sem nenhuma alteracao.
+function ativarAbasRelatorios() {
+    const abas = Array.from(document.querySelectorAll('.relatorios-aba'));
+    const paineis = Array.from(document.querySelectorAll('[data-relatorio-painel]'));
 
-        if (abas.length === 0 || paineis.length === 0) {
-            return;
-        }
+    if (abas.length === 0 || paineis.length === 0) {
+        return;
+    }
 
-        const selecionar = (chave) => {
-            abas.forEach((aba) => {
-                const ativa = aba.dataset.relatorioAba === chave;
-                aba.classList.toggle('is-ativa', ativa);
-                aba.setAttribute('aria-selected', ativa ? 'true' : 'false');
-            });
-
-            paineis.forEach((painel) => {
-                painel.classList.toggle('is-ativo', painel.dataset.relatorioPainel === chave);
-            });
-        };
-
+    const selecionar = (chave) => {
         abas.forEach((aba) => {
-            aba.addEventListener('click', () => selecionar(aba.dataset.relatorioAba));
+            const ativa = aba.dataset.relatorioAba === chave;
+            aba.classList.toggle('is-ativa', ativa);
+            aba.setAttribute('aria-selected', ativa ? 'true' : 'false');
         });
 
-        selecionar('mensal');
-    }
-})();
+        paineis.forEach((painel) => {
+            painel.classList.toggle('is-ativo', painel.dataset.relatorioPainel === chave);
+        });
+    };
+
+    abas.forEach((aba) => {
+        aba.addEventListener('click', () => selecionar(aba.dataset.relatorioAba));
+    });
+
+    selecionar('mensal');
+}

@@ -1,3 +1,16 @@
+import { API } from '../../core/api.js';
+import { estado } from '../../core/estado.js';
+import { carregarAusencias, carregarColaboradores, carregarFeriadosLocais, carregarPlantoes, carregarSetores } from '../../core/runtime/dados-e-modais.js';
+import { carregarFeriados as carregarFeriadosNacionais } from '../calendar.js';
+import { gerarAlertas, gerarAlertItem, gerarGraficoAusencias, gerarGraficoOcupacao } from './alertas-e-graficos.js';
+import { buildJornadaSemanalIndex, toISODate } from './datas-e-jornada.js';
+import { filtrarColaboradoresPorSetorDashboard } from './disponibilidade.js';
+import { buscarProximosEventos, gerarEventItem } from './eventos.js';
+import { calcularMetricas, calcularMetricasPorSetor, gerarCardMetrica, gerarSetoresDashboard } from './metricas.js';
+
+let dashboardInterval = null;
+let dashboardRenderPromise = null;
+
 async function renderDashboardInternal() {
     const appContent = document.getElementById('appContent');
     if (!appContent) {
@@ -9,22 +22,20 @@ async function renderDashboardInternal() {
 
     const [, , , , , , jornadaSemanalResponse] = await Promise.all([
         carregarColaboradores(),
-        typeof carregarSetores === 'function' ? carregarSetores() : Promise.resolve([]),
+        carregarSetores(),
         carregarAusencias(),
         carregarFeriadosLocais(),
-        typeof carregarPlantoes === 'function' ? carregarPlantoes() : Promise.resolve([]),
-        typeof window.carregarFeriadosNacionais === 'function'
-            ? window.carregarFeriadosNacionais(hoje.getFullYear())
-            : Promise.resolve([]),
-        typeof window.API?.getJornadaSemanal === 'function'
-            ? window.API.getJornadaSemanal().catch(() => ({ items: [] }))
+        carregarPlantoes(),
+        carregarFeriadosNacionais(hoje.getFullYear()),
+        typeof API?.getJornadaSemanal === 'function'
+            ? API.getJornadaSemanal().catch(() => ({ items: [] }))
             : Promise.resolve({ items: [] })
     ]);
 
     const jornadaSemanalIndex = buildJornadaSemanalIndex(jornadaSemanalResponse?.items || []);
     // "Meus setores": os cards, alertas e o grafico de ocupacao passam a
     // refletir so os colaboradores dos setores escolhidos pelo gestor.
-    const colaboradoresEscopo = filtrarColaboradoresPorSetorDashboard(window.colaboradores);
+    const colaboradoresEscopo = filtrarColaboradoresPorSetorDashboard(estado.colaboradores);
     const metricas = calcularMetricas(hoje, dataHoje, jornadaSemanalIndex, colaboradoresEscopo);
     const metricasPorSetor = calcularMetricasPorSetor(hoje, dataHoje, jornadaSemanalIndex);
     const alertas = gerarAlertas(metricas, dataHoje, jornadaSemanalIndex, colaboradoresEscopo);
@@ -109,7 +120,7 @@ async function renderDashboardInternal() {
     iniciarAtualizacaoAutomatica();
 }
 
-function renderDashboard() {
+export function renderDashboard() {
     if (!dashboardRenderPromise) {
         dashboardRenderPromise = renderDashboardInternal().finally(() => {
             dashboardRenderPromise = null;
@@ -131,7 +142,7 @@ function iniciarAtualizacaoAutomatica() {
     }, 60000);
 }
 
-function pararAtualizacaoAutomatica() {
+export function pararAtualizacaoAutomatica() {
     if (dashboardInterval) {
         clearInterval(dashboardInterval);
         dashboardInterval = null;

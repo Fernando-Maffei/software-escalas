@@ -1,4 +1,16 @@
-function renderColaboradores() {
+import { escapeHtml } from '../../lib/html-seguro.js';
+import { API } from '../api.js';
+import { appContent } from '../app.js';
+import { estado } from '../estado.js';
+import { carregarSetores } from '../runtime/dados-e-modais.js';
+import { abrirDesligadosColaboradores, abrirEditorColaborador } from '../runtime/plantao-colaboradores/colaboradores-e-jornada.js';
+import { renderListaColaboradores } from '../runtime/plantao-colaboradores/plantao-editor.js';
+import { mostrarToast } from './horas-e-resumo.js';
+
+let colaboradoresOffsetObserver;
+let colaboradoresOffsetResizeLigado;
+
+export function renderColaboradores() {
     appContent.innerHTML = `
         <div class="page-header colaboradores-page-header">
             <h1>Colaboradores</h1>
@@ -21,7 +33,7 @@ function renderColaboradores() {
                         <input type="text" id="searchColaborador" placeholder="Buscar colaborador..." class="form-control">
                     </div>
                     <span class="total-colaboradores">
-                        <i class="fas fa-users"></i> Total: ${colaboradores.length}
+                        <i class="fas fa-users"></i> Total: ${estado.colaboradores.length}
                     </span>
                 </div>
                 
@@ -44,7 +56,7 @@ function renderColaboradores() {
     `;
 
     renderListaColaboradores();
-    
+
     // Evento do botão novo colaborador
     document.getElementById('btnNovoColaborador').addEventListener('click', function() {
         abrirEditorColaborador(null);
@@ -52,12 +64,12 @@ function renderColaboradores() {
 
     // Evento do botão "Desligados" (soft delete / retencao / limpeza)
     const btnDesligados = document.getElementById('btnColaboradoresDesligados');
-    if (btnDesligados && typeof window.abrirDesligadosColaboradores === 'function') {
+    if (btnDesligados) {
         btnDesligados.addEventListener('click', function() {
-            window.abrirDesligadosColaboradores();
+            abrirDesligadosColaboradores();
         });
     }
-    
+
     // Evento de busca
     document.getElementById('searchColaborador').addEventListener('input', function(e) {
         filtrarColaboradores(e.target.value);
@@ -101,27 +113,26 @@ function ajustarOffsetCabecalhoColaboradores() {
     // A referencia do observer precisa ficar guardada: um ResizeObserver sem
     // referencia forte pode ser coletado e simplesmente parar de disparar.
     // O listener de resize cobre o caso de o observer nao estar disponivel.
-    if (window.__colaboradoresOffsetObserver) {
-        window.__colaboradoresOffsetObserver.disconnect();
+    if (colaboradoresOffsetObserver) {
+        colaboradoresOffsetObserver.disconnect();
     }
 
     if (typeof ResizeObserver === 'function') {
-        window.__colaboradoresOffsetObserver = new ResizeObserver(aplicar);
-        window.__colaboradoresOffsetObserver.observe(cabecalho);
+        colaboradoresOffsetObserver = new ResizeObserver(aplicar);
+        colaboradoresOffsetObserver.observe(cabecalho);
     }
 
-    if (!window.__colaboradoresOffsetResizeLigado) {
-        window.__colaboradoresOffsetResizeLigado = true;
+    if (!colaboradoresOffsetResizeLigado) {
+        colaboradoresOffsetResizeLigado = true;
         window.addEventListener('resize', aplicar);
     }
 }
 
-function fecharColaboradorEditor() {
+export function fecharColaboradorEditor() {
     const editorPanel = document.getElementById('colaboradorEditor');
     if (editorPanel) {
         editorPanel.style.display = 'none';
     }
-    editandoId = null;
 }
 
 function filtrarColaboradores(termo) {
@@ -129,11 +140,11 @@ function filtrarColaboradores(termo) {
         renderListaColaboradores();
         return;
     }
-    
-    const filtrados = colaboradores.filter(c =>
+
+    const filtrados = estado.colaboradores.filter(c =>
         String(c.Nome || c.nome || '').toLowerCase().includes(termo.toLowerCase())
     );
-    
+
     renderListaColaboradores(filtrados);
 }
 
@@ -142,7 +153,7 @@ function filtrarColaboradores(termo) {
 // se ele cancelar/fechar. Senha errada mantem a modal aberta com o erro — nada
 // e apagado. Interacao autocontida: nao mexe na modal generica de confirmacao.
 // Usada pela exclusao definitiva de colaborador desligado (core/runtime/plantao-colaboradores/colaboradores-e-jornada.js).
-function solicitarSenhaModal(options = {}) {
+export function solicitarSenhaModal(options = {}) {
     return new Promise((resolve) => {
         const modal = document.getElementById('modalSenhaExclusao');
         const mensagem = document.getElementById('senhaExclusaoMensagem');
@@ -249,7 +260,7 @@ function solicitarSenhaModal(options = {}) {
    CARREGAR DADOS
 =========================== */
 function buildSetorOptionsHtml(selectedId = null) {
-    const currentSetores = Array.isArray(window.setores) ? window.setores : [];
+    const currentSetores = Array.isArray(estado.setores) ? estado.setores : [];
 
     return [
         '<option value="">Selecione...</option>',
@@ -259,7 +270,7 @@ function buildSetorOptionsHtml(selectedId = null) {
     ].join('');
 }
 
-async function adicionarSetorRapido() {
+export async function adicionarSetorRapido() {
     const nome = window.prompt('Nome do novo setor:');
 
     if (!nome || !String(nome).trim()) {
@@ -267,11 +278,11 @@ async function adicionarSetorRapido() {
     }
 
     try {
-        await window.API.salvarSetor({ nome });
+        await API.salvarSetor({ nome });
         await carregarSetores();
 
         const select = document.getElementById('editorSetorId');
-        const setorCriado = (window.setores || []).find((item) => item.nome.toLowerCase() === String(nome).trim().toLowerCase());
+        const setorCriado = (estado.setores || []).find((item) => item.nome.toLowerCase() === String(nome).trim().toLowerCase());
 
         if (select) {
             select.innerHTML = buildSetorOptionsHtml(setorCriado?.id || null);
@@ -286,4 +297,3 @@ async function adicionarSetorRapido() {
         mostrarToast(error.message || 'Erro ao salvar setor.', 'error');
     }
 }
-

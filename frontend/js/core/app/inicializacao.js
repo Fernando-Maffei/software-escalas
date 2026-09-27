@@ -1,19 +1,23 @@
+import { aguardarUsuarioAutenticado } from '../auth.js';
+import { estado } from '../estado.js';
+import { carregarAusencias, carregarColaboradores, carregarFeriadosLocais, carregarPlantoes, configurarModais, configurarObservers } from '../runtime/dados-e-modais.js';
+import { getPaginaFromURL } from './calendario-e-legenda.js';
+import { mostrarToast } from './horas-e-resumo.js';
+import { carregarPagina, configurarNavegacao } from './modais-e-navegacao.js';
 
-function inicializarAplicacaoUmaVez() {
-    if (window.__appBootstrapPromise) {
-        return window.__appBootstrapPromise;
+export function inicializarAplicacaoUmaVez() {
+    if (estado.appBootstrapPromise) {
+        return estado.appBootstrapPromise;
     }
 
-    window.__appBootstrapPromise = (async () => {
+    estado.appBootstrapPromise = (async () => {
 
         const temaSalvo = localStorage.getItem('tema') || 'light';
         document.documentElement.setAttribute('data-theme', temaSalvo);
 
         // Dados so depois do login: antes, com a tela de login aberta, o app ja
         // disparava as cargas e todas voltavam 401.
-        if (typeof window.aguardarUsuarioAutenticado === 'function') {
-            await window.aguardarUsuarioAutenticado();
-        }
+        await aguardarUsuarioAutenticado();
 
         try {
             await carregarColaboradores();
@@ -22,9 +26,7 @@ function inicializarAplicacaoUmaVez() {
 
             await carregarFeriadosLocais();
 
-            if (typeof carregarPlantoes === 'function') {
-                await carregarPlantoes();
-            }
+            await carregarPlantoes();
         } catch (error) {
             console.error("Erro ao carregar dados:", error);
             mostrarToast("Erro ao carregar dados do servidor", "error");
@@ -34,20 +36,16 @@ function inicializarAplicacaoUmaVez() {
         configurarModais();
         configurarObservers();
 
-        const paginaInicial = typeof getPaginaFromURL === 'function'
-            ? getPaginaFromURL()
-            : 'dashboard';
+        const paginaInicial = getPaginaFromURL();
 
         // Espera o perfil do usuario antes de renderizar: sem isso, um
         // usuario comum veria o dashboard aparecer e so depois ser trocado
-        // pelo calendario. Usa window.carregarPagina (e nao a funcao local)
-        // porque e nela que js/core/permissoes.js instala o filtro de perfil.
-        if (typeof window.aguardarUsuarioAutenticado === 'function') {
-            await window.aguardarUsuarioAutenticado();
-        }
+        // pelo calendario (carregarPagina aplica o filtro de perfil de
+        // core/permissoes.js).
+        await aguardarUsuarioAutenticado();
 
-        window.carregarPagina(paginaInicial);
+        carregarPagina(paginaInicial);
     })();
 
-    return window.__appBootstrapPromise;
+    return estado.appBootstrapPromise;
 }

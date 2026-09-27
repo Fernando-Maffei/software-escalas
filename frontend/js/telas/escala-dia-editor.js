@@ -1,186 +1,162 @@
-    function ensureScaleSidebarToggleEscala() {
-        const sidebar = document.getElementById('sidebarEditor');
-        const toggle = document.getElementById('toggleEditor');
-        const icon = document.getElementById('toggleIcon');
+import { API } from '../core/api.js';
+import { mostrarToast } from '../core/app/horas-e-resumo.js';
+import { estado } from '../core/estado.js';
+import { carregarAusencias, carregarColaboradores, carregarPlantoes, carregarSetores } from '../core/runtime/dados-e-modais.js';
+import { atualizarTudo } from '../core/runtime/plantao-colaboradores/plantao-regua-e-relatorios.js';
+import { escapeHtml } from '../lib/html-seguro.js';
+import { toISODateEscala } from './escala-dia-shared.js';
+import { abrirLancamentoPessoalEscala, abrirPlantaoDaEscala, atualizarAcoesCabecalhoEscala, carregarEscalaSelecionadaEscala, obterDataSelecionadaEscala, restaurarAlmocosCadastroDiaEscala, shiftIsoDateEscala } from './escala-dia/acoes-do-dia.js';
+import { bindScrollHeightAutoEscala, renderScaleHeaderEscala } from './escala-dia/cabecalho-e-cobertura.js';
+import { renderScaleEditorEscala } from './escala-dia/editor-lateral.js';
+import { aplicarDensidadeEscala, getCurrentScaleState, getScaleSortModeEscala, lerDensidadeEscalaSalva, setScaleSortModeEscala } from './escala-dia/estado-e-layout.js';
+import { getScaleSectorSelectionEscala, renderScaleSectorTabsEscala } from './escala-dia/filtros-setor.js';
+import { renderScaleRowsEscala } from './escala-dia/linhas-timeline.js';
+import { renderScaleEmptyMessageEscala, renderWeekStripEscala } from './escala-dia/mensagens-e-semana.js';
 
-        if (!sidebar || !toggle || toggle.dataset.bound === 'true') {
-            return;
-        }
+function ensureScaleSidebarToggleEscala() {
+    const sidebar = document.getElementById('sidebarEditor');
+    const toggle = document.getElementById('toggleEditor');
+    const icon = document.getElementById('toggleIcon');
 
-        toggle.dataset.bound = 'true';
-        toggle.addEventListener('click', () => {
-            sidebar.classList.toggle('collapsed');
-            if (icon) {
-                icon.className = sidebar.classList.contains('collapsed')
-                    ? 'fas fa-chevron-left'
-                    : 'fas fa-chevron-right';
-            }
-        });
+    if (!sidebar || !toggle || toggle.dataset.bound === 'true') {
+        return;
     }
 
-    window.fecharEditor = fecharEditor = function fecharEditorEscala() {
-        const content = document.getElementById('editorContent');
-
-        window.__escalaEditorColaboradorId = null;
-        renderScaleRowsEscala(getCurrentScaleState());
-
-        if (!content) {
-            return;
+    toggle.dataset.bound = 'true';
+    toggle.addEventListener('click', () => {
+        sidebar.classList.toggle('collapsed');
+        if (icon) {
+            icon.className = sidebar.classList.contains('collapsed')
+                ? 'fas fa-chevron-left'
+                : 'fas fa-chevron-right';
         }
+    });
+}
 
-        content.innerHTML = `
+export function fecharEditor() {
+    const content = document.getElementById('editorContent');
+
+    estado.escalaEditorColaboradorId = null;
+    renderScaleRowsEscala(getCurrentScaleState());
+
+    if (!content) {
+        return;
+    }
+
+    content.innerHTML = `
             <div class="editor-empty">
                 <i class="fas fa-arrow-left"></i>
                 <p>Clique no nome de um colaborador para editar o dia ou aplicar almoco por periodo.</p>
             </div>
         `;
-    };
+}
 
-    window.abrirEditorNaEscala = abrirEditorNaEscala = function abrirEditorNaEscalaAtualizada(colaboradorId) {
-        const state = getCurrentScaleState();
-        const record = (state.items || []).find((item) => Number(item.colaboradorId) === Number(colaboradorId));
+export function abrirEditorNaEscala(colaboradorId) {
+    const state = getCurrentScaleState();
+    const record = (state.items || []).find((item) => Number(item.colaboradorId) === Number(colaboradorId));
 
-        if (!record) {
-            if (typeof mostrarToast === 'function') {
-                mostrarToast('Registro diario nao encontrado para este colaborador.', 'warning');
-            }
-            return;
-        }
-
-        window.__escalaEditorColaboradorId = Number(colaboradorId);
-        renderScaleRowsEscala(state);
-        renderScaleEditorEscala(record);
-    };
-
-    function bindScaleOutsideSelectionEscala() {
-        const escalaPage = document.querySelector('.escala-page');
-
-        if (!escalaPage || escalaPage.dataset.selectionBound === 'true') {
-            return;
-        }
-
-        escalaPage.dataset.selectionBound = 'true';
-        escalaPage.addEventListener('click', (event) => {
-            if (!window.__escalaEditorColaboradorId) {
-                return;
-            }
-
-            const clickedInsideTimeline = event.target.closest('.timeline-container');
-            const clickedInsideSidebar = event.target.closest('#sidebarEditor');
-
-            if (clickedInsideTimeline || clickedInsideSidebar) {
-                return;
-            }
-
-            if (typeof window.fecharEditor === 'function') {
-                window.fecharEditor();
-            }
-        });
+    if (!record) {
+        mostrarToast('Registro diario nao encontrado para este colaborador.', 'warning');
+        return;
     }
 
-    window.salvarEscalaDia = salvarEscalaDia = async function salvarEscalaDiaAtualizada(colaboradorId) {
-        const state = getCurrentScaleState();
-        const currentRecord = (state.items || []).find((item) => Number(item.colaboradorId) === Number(colaboradorId)) || {};
-        const payload = {
-            horaInicio: document.getElementById(`escalaHoraInicio-${colaboradorId}`)?.value || currentRecord.horaInicio || null,
-            horaFim: document.getElementById(`escalaHoraFim-${colaboradorId}`)?.value || currentRecord.horaFim || null,
-            almocoInicio: document.getElementById(`escalaAlmocoInicio-${colaboradorId}`)?.value || currentRecord.almocoInicio || null,
-            almocoFim: document.getElementById(`escalaAlmocoFim-${colaboradorId}`)?.value || currentRecord.almocoFim || null,
-            observacao: document.getElementById(`escalaObservacao-${colaboradorId}`)?.value ?? currentRecord.observacao ?? null
-        };
+    estado.escalaEditorColaboradorId = Number(colaboradorId);
+    renderScaleRowsEscala(state);
+    renderScaleEditorEscala(record);
+}
 
-        try {
-            await window.API.salvarEscalaDia(state.dataISO, colaboradorId, payload);
-            await atualizarTudo({ silent: true, source: 'escala' });
-            abrirEditorNaEscala(colaboradorId);
+function bindScaleOutsideSelectionEscala() {
+    const escalaPage = document.querySelector('.escala-page');
 
-            if (typeof mostrarToast === 'function') {
-                mostrarToast('Escala do dia atualizada com sucesso!', 'success');
-            }
-        } catch (error) {
-            if (typeof mostrarToast === 'function') {
-                mostrarToast(`Erro ao salvar escala: ${error.message}`, 'error');
-            }
-        }
-    };
+    if (!escalaPage || escalaPage.dataset.selectionBound === 'true') {
+        return;
+    }
 
-    window.aplicarAlmocoPeriodoEscala = aplicarAlmocoPeriodoEscala = async function aplicarAlmocoPeriodoEscalaAtualizado(colaboradorId) {
-        const state = getCurrentScaleState();
-        const payload = {
-            colaboradorId,
-            dataInicio: document.getElementById(`escalaPeriodoInicio-${colaboradorId}`)?.value,
-            dataFim: document.getElementById(`escalaPeriodoFim-${colaboradorId}`)?.value,
-            almocoInicio: document.getElementById(`escalaPeriodoAlmocoInicio-${colaboradorId}`)?.value,
-            almocoFim: document.getElementById(`escalaPeriodoAlmocoFim-${colaboradorId}`)?.value
-        };
-
-        if (!payload.dataInicio || !payload.dataFim || !payload.almocoInicio || !payload.almocoFim) {
-            if (typeof mostrarToast === 'function') {
-                mostrarToast('Preencha inicio, fim e periodo antes de aplicar o almoco em lote.', 'warning');
-            }
+    escalaPage.dataset.selectionBound = 'true';
+    escalaPage.addEventListener('click', (event) => {
+        if (!estado.escalaEditorColaboradorId) {
             return;
         }
 
-        try {
-            await window.API.aplicarAlmocoPeriodo(payload);
-            await atualizarTudo({ silent: true, source: 'escala' });
-            abrirEditorNaEscala(colaboradorId);
-            // Aplicacao em lote muda varios dias: refaz a previa da semana.
-            window.__escalaWeekCache = null;
-            renderWeekStripEscala(state.dataISO, { force: true });
+        const clickedInsideTimeline = event.target.closest('.timeline-container');
+        const clickedInsideSidebar = event.target.closest('#sidebarEditor');
 
-            if (typeof mostrarToast === 'function') {
-                mostrarToast('Almoco aplicado no periodo com sucesso!', 'success');
-            }
-        } catch (error) {
-            if (typeof mostrarToast === 'function') {
-                mostrarToast(`Erro ao aplicar almoco: ${error.message}`, 'error');
-            }
-        }
-    };
-
-    window.restaurarAlmocoPadraoEscala = restaurarAlmocoPadraoEscala = async function restaurarAlmocoPadraoEscalaAtualizado(colaboradorId) {
-        const colaborador = (window.colaboradores || []).find((item) => Number(item.Id) === Number(colaboradorId));
-
-        if (!colaborador) {
-            if (typeof mostrarToast === 'function') {
-                mostrarToast('Colaborador nao encontrado para restaurar o almoco.', 'warning');
-            }
+        if (clickedInsideTimeline || clickedInsideSidebar) {
             return;
         }
 
-        const inicioInput = document.getElementById(`escalaAlmocoInicio-${colaboradorId}`);
-        const fimInput = document.getElementById(`escalaAlmocoFim-${colaboradorId}`);
+        fecharEditor();
+    });
+}
 
-        if (inicioInput) {
-            inicioInput.value = formatarHora(colaborador.AlmocoInicio) || '';
-        }
-
-        if (fimInput) {
-            fimInput.value = formatarHora(colaborador.AlmocoFim) || '';
-        }
-
-        syncScaleDragEditorEscala(colaboradorId);
-        await salvarEscalaDia(colaboradorId);
+export async function salvarEscalaDia(colaboradorId) {
+    const state = getCurrentScaleState();
+    const currentRecord = (state.items || []).find((item) => Number(item.colaboradorId) === Number(colaboradorId)) || {};
+    const payload = {
+        horaInicio: document.getElementById(`escalaHoraInicio-${colaboradorId}`)?.value || currentRecord.horaInicio || null,
+        horaFim: document.getElementById(`escalaHoraFim-${colaboradorId}`)?.value || currentRecord.horaFim || null,
+        almocoInicio: document.getElementById(`escalaAlmocoInicio-${colaboradorId}`)?.value || currentRecord.almocoInicio || null,
+        almocoFim: document.getElementById(`escalaAlmocoFim-${colaboradorId}`)?.value || currentRecord.almocoFim || null,
+        observacao: document.getElementById(`escalaObservacao-${colaboradorId}`)?.value ?? currentRecord.observacao ?? null
     };
 
-    window.renderEscalaDia = renderEscalaDia = async function renderEscalaDiaAtualizada() {
-        const appContent = document.getElementById('appContent');
+    try {
+        await API.salvarEscalaDia(state.dataISO, colaboradorId, payload);
+        await atualizarTudo({ silent: true, source: 'escala' });
+        abrirEditorNaEscala(colaboradorId);
 
-        if (!appContent) {
-            return;
-        }
+        mostrarToast('Escala do dia atualizada com sucesso!', 'success');
+    } catch (error) {
+        mostrarToast(`Erro ao salvar escala: ${error.message}`, 'error');
+    }
+}
 
-        const todayISO = toISODateEscala(window.dataEscalaSelecionada || new Date());
+export async function aplicarAlmocoPeriodoEscala(colaboradorId) {
+    const state = getCurrentScaleState();
+    const payload = {
+        colaboradorId,
+        dataInicio: document.getElementById(`escalaPeriodoInicio-${colaboradorId}`)?.value,
+        dataFim: document.getElementById(`escalaPeriodoFim-${colaboradorId}`)?.value,
+        almocoInicio: document.getElementById(`escalaPeriodoAlmocoInicio-${colaboradorId}`)?.value,
+        almocoFim: document.getElementById(`escalaPeriodoAlmocoFim-${colaboradorId}`)?.value
+    };
 
-        await Promise.allSettled([
-            typeof carregarColaboradores === 'function' ? carregarColaboradores() : Promise.resolve([]),
-            typeof carregarSetores === 'function' ? carregarSetores() : Promise.resolve([]),
-            typeof carregarAusencias === 'function' ? carregarAusencias() : Promise.resolve([]),
-            typeof carregarPlantoes === 'function' ? carregarPlantoes() : Promise.resolve([])
-        ]);
+    if (!payload.dataInicio || !payload.dataFim || !payload.almocoInicio || !payload.almocoFim) {
+        mostrarToast('Preencha inicio, fim e periodo antes de aplicar o almoco em lote.', 'warning');
+        return;
+    }
 
-        appContent.innerHTML = `
+    try {
+        await API.aplicarAlmocoPeriodo(payload);
+        await atualizarTudo({ silent: true, source: 'escala' });
+        abrirEditorNaEscala(colaboradorId);
+        // Aplicacao em lote muda varios dias: refaz a previa da semana.
+        estado.escalaWeekCache = null;
+        renderWeekStripEscala(state.dataISO, { force: true });
+
+        mostrarToast('Almoco aplicado no periodo com sucesso!', 'success');
+    } catch (error) {
+        mostrarToast(`Erro ao aplicar almoco: ${error.message}`, 'error');
+    }
+}
+
+export async function renderEscalaDia() {
+    const appContent = document.getElementById('appContent');
+
+    if (!appContent) {
+        return;
+    }
+
+    const todayISO = toISODateEscala(estado.dataEscalaSelecionada || new Date());
+
+    await Promise.allSettled([
+        carregarColaboradores(),
+        carregarSetores(),
+        carregarAusencias(),
+        carregarPlantoes()
+    ]);
+
+    appContent.innerHTML = `
             <div class="escala-page">
                 <div class="escala-sticky-panel">
                 <div class="escala-toolbar">
@@ -299,90 +275,87 @@
             </div>
         `;
 
-        ensureScaleSidebarToggleEscala();
-        bindScaleOutsideSelectionEscala();
-        atualizarAcoesCabecalhoEscala();
-        bindScrollHeightAutoEscala();
+    ensureScaleSidebarToggleEscala();
+    bindScaleOutsideSelectionEscala();
+    atualizarAcoesCabecalhoEscala();
+    bindScrollHeightAutoEscala();
 
-        document.getElementById('btnDiaAnteriorEscala')?.addEventListener('click', async () => {
-            const nextDate = shiftIsoDateEscala(obterDataSelecionadaEscala(), -1);
-            await carregarEscalaSelecionadaEscala(nextDate);
-        });
+    document.getElementById('btnDiaAnteriorEscala')?.addEventListener('click', async () => {
+        const nextDate = shiftIsoDateEscala(obterDataSelecionadaEscala(), -1);
+        await carregarEscalaSelecionadaEscala(nextDate);
+    });
 
-        document.getElementById('btnDiaProximoEscala')?.addEventListener('click', async () => {
-            const nextDate = shiftIsoDateEscala(obterDataSelecionadaEscala(), 1);
-            await carregarEscalaSelecionadaEscala(nextDate);
-        });
+    document.getElementById('btnDiaProximoEscala')?.addEventListener('click', async () => {
+        const nextDate = shiftIsoDateEscala(obterDataSelecionadaEscala(), 1);
+        await carregarEscalaSelecionadaEscala(nextDate);
+    });
 
-        document.getElementById('seletorDataEscala')?.addEventListener('change', async (event) => {
-            await carregarEscalaSelecionadaEscala(event.target.value);
-        });
+    document.getElementById('seletorDataEscala')?.addEventListener('change', async (event) => {
+        await carregarEscalaSelecionadaEscala(event.target.value);
+    });
 
-        // "Tentar novamente" do estado de erro. Delegado no body da timeline
-        // porque o botao e recriado a cada render.
-        document.getElementById('timelineBody')?.addEventListener('click', (event) => {
-            const repetir = event.target.closest('[data-repetir-escala]');
+    // "Tentar novamente" do estado de erro. Delegado no body da timeline
+    // porque o botao e recriado a cada render.
+    document.getElementById('timelineBody')?.addEventListener('click', (event) => {
+        const repetir = event.target.closest('[data-repetir-escala]');
 
-            if (repetir) {
-                carregarEscalaSelecionadaEscala(repetir.dataset.repetirEscala);
-                return;
-            }
-
-            // Saida do estado "filtro escondeu todo mundo".
-            if (event.target.closest('[data-limpar-setor-escala]')) {
-                getScaleSectorSelectionEscala().clear();
-                const state = getCurrentScaleState();
-                renderScaleSectorTabsEscala(state.items || []);
-                renderScaleRowsEscala(state);
-            }
-        });
-
-        document.getElementById('btnNovoLancamentoEscala')?.addEventListener('click', abrirLancamentoPessoalEscala);
-        document.getElementById('btnCriarColaboradorEscala')?.addEventListener('click', () => {
-            // O editor de colaborador vive na tela Colaboradores. Navega para
-            // la (clicando no item do menu) e, quando a tela montar, abre o
-            // cadastro de novo colaborador clicando no proprio botao dela.
-            const navColaboradores = document.querySelector('.sidebar-btn[data-page="colaboradores"]');
-            if (navColaboradores) {
-                navColaboradores.click();
-            }
-
-            let tentativas = 0;
-            const aguardarEditor = setInterval(() => {
-                tentativas += 1;
-                const btnNovo = document.getElementById('btnNovoColaborador');
-                if (btnNovo) {
-                    clearInterval(aguardarEditor);
-                    btnNovo.click();
-                } else if (tentativas > 40) {
-                    clearInterval(aguardarEditor); // desiste apos ~2s; ficou na tela Colaboradores
-                }
-            }, 50);
-        });
-        document.getElementById('btnAbrirPlantaoEscala')?.addEventListener('click', abrirPlantaoDaEscala);
-        document.getElementById('btnRestaurarAlmocosCadastroEscala')?.addEventListener('click', restaurarAlmocosCadastroDiaEscala);
-        document.getElementById('escalaSortMode')?.addEventListener('change', (event) => {
-            setScaleSortModeEscala(event.target.value);
-            renderScaleRowsEscala(getCurrentScaleState());
-        });
-        setScaleSortModeEscala(getScaleSortModeEscala());
-
-        aplicarDensidadeEscala(lerDensidadeEscalaSalva());
-
-        document.querySelectorAll('.escala-densidade-btn').forEach((botao) => {
-            botao.addEventListener('click', () => {
-                aplicarDensidadeEscala(botao.dataset.densidade);
-            });
-        });
-
-        try {
-            await carregarEscalaSelecionadaEscala(todayISO);
-        } catch (error) {
-            renderScaleHeaderEscala();
-            renderScaleEmptyMessageEscala(todayISO);
-            if (typeof mostrarToast === 'function') {
-                mostrarToast(`Erro ao carregar escala: ${error.message}`, 'error');
-            }
+        if (repetir) {
+            carregarEscalaSelecionadaEscala(repetir.dataset.repetirEscala);
+            return;
         }
-    };
 
+        // Saida do estado "filtro escondeu todo mundo".
+        if (event.target.closest('[data-limpar-setor-escala]')) {
+            getScaleSectorSelectionEscala().clear();
+            const state = getCurrentScaleState();
+            renderScaleSectorTabsEscala(state.items || []);
+            renderScaleRowsEscala(state);
+        }
+    });
+
+    document.getElementById('btnNovoLancamentoEscala')?.addEventListener('click', abrirLancamentoPessoalEscala);
+    document.getElementById('btnCriarColaboradorEscala')?.addEventListener('click', () => {
+        // O editor de colaborador vive na tela Colaboradores. Navega para
+        // la (clicando no item do menu) e, quando a tela montar, abre o
+        // cadastro de novo colaborador clicando no proprio botao dela.
+        const navColaboradores = document.querySelector('.sidebar-btn[data-page="colaboradores"]');
+        if (navColaboradores) {
+            navColaboradores.click();
+        }
+
+        let tentativas = 0;
+        const aguardarEditor = setInterval(() => {
+            tentativas += 1;
+            const btnNovo = document.getElementById('btnNovoColaborador');
+            if (btnNovo) {
+                clearInterval(aguardarEditor);
+                btnNovo.click();
+            } else if (tentativas > 40) {
+                clearInterval(aguardarEditor); // desiste apos ~2s; ficou na tela Colaboradores
+            }
+        }, 50);
+    });
+    document.getElementById('btnAbrirPlantaoEscala')?.addEventListener('click', abrirPlantaoDaEscala);
+    document.getElementById('btnRestaurarAlmocosCadastroEscala')?.addEventListener('click', restaurarAlmocosCadastroDiaEscala);
+    document.getElementById('escalaSortMode')?.addEventListener('change', (event) => {
+        setScaleSortModeEscala(event.target.value);
+        renderScaleRowsEscala(getCurrentScaleState());
+    });
+    setScaleSortModeEscala(getScaleSortModeEscala());
+
+    aplicarDensidadeEscala(lerDensidadeEscalaSalva());
+
+    document.querySelectorAll('.escala-densidade-btn').forEach((botao) => {
+        botao.addEventListener('click', () => {
+            aplicarDensidadeEscala(botao.dataset.densidade);
+        });
+    });
+
+    try {
+        await carregarEscalaSelecionadaEscala(todayISO);
+    } catch (error) {
+        renderScaleHeaderEscala();
+        renderScaleEmptyMessageEscala(todayISO);
+        mostrarToast(`Erro ao carregar escala: ${error.message}`, 'error');
+    }
+}

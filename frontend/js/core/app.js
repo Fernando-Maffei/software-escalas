@@ -1,25 +1,14 @@
-let ausencias = [];
-let colaboradores = [];
-let setores = [];
-let editandoId = null;
-let editandoAusenciaId = null;
-let plantoesLancados = [];
-let feriadosLocais = []
-let editandoFeriadoId = null;
-let exclusaoPendenteId = null;
-let exclusaoTipo = 'ausencia';
+import { API } from './api.js';
+import { aplicarCoresEscala } from './app/api-e-cores.js';
+import { getPaginaFromURL } from './app/calendario-e-legenda.js';
+import { aplicarPreferenciasImportadas } from './app/configuracoes-tela.js';
+import { mostrarToast } from './app/horas-e-resumo.js';
+import { inicializarAplicacaoUmaVez } from './app/inicializacao.js';
+import { carregarPagina, paginaCarregadaAtual } from './app/modais-e-navegacao.js';
+import { estado } from './estado.js';
 
-// EXPOR FUNÇÕES GLOBAIS (já está correto)
-window.carregarPagina = carregarPagina;
-window.ausencias = ausencias;
-window.colaboradores = colaboradores;
-window.setores = setores;
-window.feriadosLocais = feriadosLocais;
-window.excluirFeriado = excluirFeriado;
-window.gerarRelatorioCompleto = gerarRelatorioCompleto;
-
-const ESCALA_CORES_STORAGE_KEY = 'escalaCoresPersonalizadas';
-const ESCALA_CORES_PADRAO = [
+export const ESCALA_CORES_STORAGE_KEY = 'escalaCoresPersonalizadas';
+export const ESCALA_CORES_PADRAO = [
     {
         key: 'trabalhando',
         label: 'Trabalhando',
@@ -85,24 +74,16 @@ const ESCALA_CORES_PADRAO = [
     }
 ];
 
-window.ESCALA_CORES_PADRAO = ESCALA_CORES_PADRAO;
-window.aplicarCoresEscala = aplicarCoresEscala;
-
-window.abrirModalFeriado = function(dataISO) {
-    window.abrirModalLancamento('feriados', dataISO);
-};
-
 // Elemento principal onde o conteúdo será renderizado
-const appContent = document.getElementById("appContent");
-window.__appBootstrapPromise = window.__appBootstrapPromise || null;
+export const appContent = document.getElementById("appContent");
+estado.appBootstrapPromise = estado.appBootstrapPromise || null;
 aplicarCoresEscala();
-window.testarComunicacaoRede = testarComunicacaoRede;
 
 document.addEventListener("DOMContentLoaded", async () => {
     inicializarAplicacaoUmaVez();
 });
-window.adicionarSetorRapido = adicionarSetorRapido;
-window.importarDados = function importarDados() {
+
+export function importarDados() {
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = '.json';
@@ -135,7 +116,7 @@ window.importarDados = function importarDados() {
 
                 mostrarToast('Importando backup...', 'warning');
 
-                const response = await window.API.restaurarBackupSistema({
+                const response = await API.restaurarBackupSistema({
                     fileName: file.name,
                     backupData: dados
                 });
@@ -167,7 +148,7 @@ window.importarDados = function importarDados() {
     document.body.appendChild(input);
     input.click();
     document.body.removeChild(input);
-};
+}
 window.addEventListener('popstate', () => {
     const pagina = getPaginaFromURL();
 

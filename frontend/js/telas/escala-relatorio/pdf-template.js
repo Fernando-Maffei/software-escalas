@@ -1,33 +1,37 @@
-    function gerarHtmlPdfRelatorioEscala(snapshot) {
-        const isMonthlyExport = snapshot.mode === RELATORIO_ESCALA_MODOS.QUADRO_MENSAL;
-        const pageMetrics = isMonthlyExport
-            ? {
-                bodyWidth: 1660,
-                pageWidth: 1660,
-                pageHeight: 1160,
-                pagePadding: 6,
-                gridMinHeight: 1010,
-                titleSize: 28,
-                sectorHeaderSize: 18,
-                dayHeaderSize: 18,
-                tableFontSize: 14
-            }
-            : {
-                bodyWidth: 1480,
-                pageWidth: 1444,
-                pageHeight: 980,
-                pagePadding: 10,
-                gridMinHeight: 900,
-                titleSize: 28,
-                sectorHeaderSize: 13,
-                dayHeaderSize: 12,
-                tableFontSize: 10
-            };
-        const bodyHtml = snapshot.mode === RELATORIO_ESCALA_MODOS.QUADRO_MENSAL
-            ? renderMonthlyEscalaExportPages(snapshot)
-            : renderDetailedEscalaExportPages(snapshot);
+import { escapeHtml } from '../../lib/html-seguro.js';
+import { RELATORIO_ESCALA_MODOS } from '../escala-dia-shared.js';
+import { renderDetailedEscalaExportPages, renderMonthlyEscalaExportPages } from './paginas-export.js';
 
-        return `
+export function gerarHtmlPdfRelatorioEscala(snapshot) {
+    const isMonthlyExport = snapshot.mode === RELATORIO_ESCALA_MODOS.QUADRO_MENSAL;
+    const pageMetrics = isMonthlyExport
+        ? {
+            bodyWidth: 1660,
+            pageWidth: 1660,
+            pageHeight: 1160,
+            pagePadding: 6,
+            gridMinHeight: 1010,
+            titleSize: 28,
+            sectorHeaderSize: 18,
+            dayHeaderSize: 18,
+            tableFontSize: 14
+        }
+        : {
+            bodyWidth: 1480,
+            pageWidth: 1444,
+            pageHeight: 980,
+            pagePadding: 10,
+            gridMinHeight: 900,
+            titleSize: 28,
+            sectorHeaderSize: 13,
+            dayHeaderSize: 12,
+            tableFontSize: 10
+        };
+    const bodyHtml = snapshot.mode === RELATORIO_ESCALA_MODOS.QUADRO_MENSAL
+        ? renderMonthlyEscalaExportPages(snapshot)
+        : renderDetailedEscalaExportPages(snapshot);
+
+    return `
             <!DOCTYPE html>
             <html>
             <head>
@@ -559,5 +563,4 @@
             <body>${bodyHtml}</body>
             </html>
         `;
-    }
-
+}

@@ -5,32 +5,16 @@
 // simples, e varias telas antigas interpolavam nome de colaborador direto no
 // innerHTML — um nome com HTML executava no navegador de todo mundo.
 //
-// UMD: no navegador vira o global escapeHtml; no Node (testes) e um modulo.
-/**
- * @param {Record<string, unknown>} raiz
- * @param {() => { escapeHtml: (valor: unknown) => string }} fabrica
- */
-(function criarHtmlSeguro(raiz, fabrica) {
-    const modulo = fabrica();
+// Modulo ES: o navegador importa, e os testes no Node tambem (require de ESM).
 
-    if (typeof module === 'object' && module.exports) {
-        module.exports = modulo;
-        return;
-    }
+const ENTIDADES = {
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;'
+};
 
-    raiz.escapeHtml = modulo.escapeHtml;
-})(globalThis, function montarHtmlSeguro() {
-    const ENTIDADES = {
-        '&': '&amp;',
-        '<': '&lt;',
-        '>': '&gt;',
-        '"': '&quot;',
-        "'": '&#39;'
-    };
-
-    function escapeHtml(valor) {
-        return String(valor ?? '').replace(/[&<>"']/g, (caractere) => ENTIDADES[caractere]);
-    }
-
-    return { escapeHtml };
-});
+export function escapeHtml(valor) {
+    return String(valor ?? '').replace(/[&<>"']/g, (caractere) => ENTIDADES[caractere]);
+}

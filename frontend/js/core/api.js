@@ -1,3 +1,5 @@
+let vigiaDeSessaoInstalado;
+
 function getRuntimeApiBaseUrl() {
     if (window.__API_BASE_URL) {
         const explicitBase = String(window.__API_BASE_URL).replace(/\/$/, '');
@@ -36,10 +38,10 @@ function notifyIfSessionExpired(response, requestUrl) {
 }
 
 // Qualquer 401 de rota de dados (inclusive de fetch feito direto pelas telas,
-// fora de window.API) avisa o login para reabrir a tela de entrada. O fetch
+// fora do objeto API) avisa o login para reabrir a tela de entrada. O fetch
 // nativo e embrulhado so para isso — ele nao reescreve URL nenhuma.
 function installSessionExpiryWatcher() {
-    if (window.__SESSION_EXPIRY_WATCHER_INSTALLED__ || typeof window.fetch !== 'function') {
+    if (vigiaDeSessaoInstalado || typeof window.fetch !== 'function') {
         return;
     }
 
@@ -52,16 +54,15 @@ function installSessionExpiryWatcher() {
         });
     };
 
-    window.__SESSION_EXPIRY_WATCHER_INSTALLED__ = true;
+    vigiaDeSessaoInstalado = true;
 }
 
 installSessionExpiryWatcher();
 
-const API = {
+export const API = {
     get baseURL() {
         return getRuntimeApiBaseUrl();
     },
-
 
     toQuery(params = {}) {
         const searchParams = new URLSearchParams();
@@ -213,8 +214,6 @@ const API = {
     restaurarBackupSistema: (data) => API.post('/configuracao-banco/backup/restaurar', data)
 };
 
-window.API = API;
-
 // Feriados nacionais: quem calcula e o servidor (GET /feriados/nacionais/:ano),
 // a mesma lista que ele usa para dizer se um plantao e de feriado. Antes cada
 // tela buscava na BrasilAPI, o que dependia de internet e podia divergir do
@@ -222,7 +221,7 @@ window.API = API;
 // para servidor ainda sem o endpoint.
 const cacheFeriadosNacionaisPorAno = new Map();
 
-async function buscarFeriadosNacionais(ano) {
+export async function buscarFeriadosNacionais(ano) {
     const anoNumero = Number(ano);
 
     if (!Number.isInteger(anoNumero)) {
@@ -268,5 +267,3 @@ async function carregarFeriadosNacionaisDaOrigem(ano) {
 
     return [];
 }
-
-window.buscarFeriadosNacionais = buscarFeriadosNacionais;

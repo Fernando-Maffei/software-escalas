@@ -1,25 +1,30 @@
-function gerarLegendaMensal() {
+import { inicializarCalendario } from '../../telas/calendar.js';
+import { appContent } from '../app.js';
+import { estado } from '../estado.js';
+import { usuarioEhAdmin } from '../permissoes.js';
+
+export function gerarLegendaMensal() {
     const container = document.getElementById("legendaMensalContent");
     if (!container) {
         return;
     }
 
     // Verificar se os dados existem
-    if (!colaboradores) {
-        colaboradores = [];
+    if (!estado.colaboradores) {
+        estado.colaboradores = [];
     }
-    if (!ausencias) {
-        ausencias = [];
+    if (!estado.ausencias) {
+        estado.ausencias = [];
     }
-    if (!feriados) {
-        feriados = [];
+    if (!estado.feriados) {
+        estado.feriados = [];
     }
-    if (!feriadosLocais) {
-        feriadosLocais = [];
+    if (!estado.feriadosLocais) {
+        estado.feriadosLocais = [];
     }
 
-    const mes = mesAtual;
-    const ano = anoAtual;
+    const mes = estado.mesAtual;
+    const ano = estado.anoAtual;
     const diasNoMes = new Date(ano, mes + 1, 0).getDate();
 
     // Contadores
@@ -27,7 +32,7 @@ function gerarLegendaMensal() {
     let totalAusencias = 0;
     let totalFolgas = 0;
     let totalFerias = 0;
-    let eventosPorDia = {};
+    const eventosPorDia = {};
 
     // Inicializar eventos por dia
     for (let dia = 1; dia <= diasNoMes; dia++) {
@@ -40,8 +45,8 @@ function gerarLegendaMensal() {
     }
 
     // Processar feriados da API
-    if (feriados && feriados.length > 0) {
-        feriados.forEach(f => {
+    if (estado.feriados && estado.feriados.length > 0) {
+        estado.feriados.forEach(f => {
             if (f.date) {
                 const [anoF, mesF, diaF] = f.date.split('-').map(Number);
                 if (mesF === mes + 1 && anoF === ano) {
@@ -53,8 +58,8 @@ function gerarLegendaMensal() {
     }
 
     // Processar feriados locais
-    if (feriadosLocais && feriadosLocais.length > 0) {
-        feriadosLocais.forEach(f => {
+    if (estado.feriadosLocais && estado.feriadosLocais.length > 0) {
+        estado.feriadosLocais.forEach(f => {
             if (f.Data) {
                 const data = new Date(f.Data);
                 if (data.getMonth() === mes && data.getFullYear() === ano) {
@@ -67,13 +72,13 @@ function gerarLegendaMensal() {
     }
 
     // 🔥 CORREÇÃO: Processar ausências com os tipos corretos
-    if (ausencias && ausencias.length > 0 && colaboradores.length > 0) {
-        ausencias.forEach(a => {
+    if (estado.ausencias && estado.ausencias.length > 0 && estado.colaboradores.length > 0) {
+        estado.ausencias.forEach(a => {
             if (a.DataInicio && a.DataFim) {
                 const dataInicio = new Date(a.DataInicio);
                 const dataFim = new Date(a.DataFim);
-                const colaborador = colaboradores.find(c => c.Id === (a.colaboradorId || a.ColaboradorId));
-                
+                const colaborador = estado.colaboradores.find(c => c.Id === (a.colaboradorId || a.ColaboradorId));
+
                 if (!colaborador) {
                     return;
                 }
@@ -81,12 +86,12 @@ function gerarLegendaMensal() {
                 // Verificar se o período cruza com o mês atual
                 const primeiroDiaMes = new Date(ano, mes, 1);
                 const ultimoDiaMes = new Date(ano, mes + 1, 0);
-                
+
                 if (dataFim >= primeiroDiaMes && dataInicio <= ultimoDiaMes) {
-                    
+
                     // 🔥 CORREÇÃO: Identificar o tipo corretamente
                     const tipo = (a.tipo || a.Tipo || '').toLowerCase();
-                    
+
                     // Incrementar contadores por tipo
                     if (tipo === 'folga') {
                         totalFolgas++;
@@ -95,14 +100,14 @@ function gerarLegendaMensal() {
                     } else if (tipo === 'ausencia') {
                         totalAusencias++;
                     }
-                    
+
                     // Adicionar aos dias específicos do mês
                     const diaInicio = Math.max(1, dataInicio.getDate());
                     const diaFim = Math.min(diasNoMes, dataFim.getDate());
-                    
+
                     for (let dia = diaInicio; dia <= diaFim; dia++) {
                         const dataDia = new Date(ano, mes, dia);
-                        
+
                         // Verificar se o dia está dentro do período
                         if (dataDia >= dataInicio && dataDia <= dataFim) {
                             if (tipo === 'folga') {
@@ -175,23 +180,23 @@ function gerarLegendaMensal() {
             html += `<div class="legenda-dia-card">`;
             html += `<div class="legenda-dia-numero">${dia}</div>`;
             html += `<div class="legenda-dia-eventos">`;
-            
+
             eventos.feriados.forEach(f => {
                 html += `<span class="legenda-evento feriado-tag">📅 ${f}</span>`;
             });
-            
+
             eventos.ferias.forEach(f => {
                 html += `<span class="legenda-evento ferias-tag">🏖️ ${f}</span>`;
             });
-            
+
             eventos.folgas.forEach(f => {
                 html += `<span class="legenda-evento folga-tag">🌸 ${f}</span>`;
             });
-            
+
             eventos.ausencias.forEach(a => {
                 html += `<span class="legenda-evento ausencia-tag">⚠️ ${a}</span>`;
             });
-            
+
             html += `</div></div>`;
         });
 
@@ -214,16 +219,16 @@ function gerarLegendaMensal() {
 
 }
 
-function renderCalendario() {
-    
+export function renderCalendario() {
+
     if (!appContent) {
         console.error("appContent não encontrado!");
         return;
     }
-    
+
     // Usuario comum abre esta tela apenas para consultar folgas e ferias da
     // equipe; o botao de lancamento resultaria em 403 no back-end.
-    const podeLancar = typeof window.usuarioEhAdmin !== 'function' || window.usuarioEhAdmin();
+    const podeLancar = usuarioEhAdmin();
 
     appContent.innerHTML = `
         <div class="page-header">
@@ -258,20 +263,20 @@ function renderCalendario() {
     // innerHTML e sincrono: o #calendar ja existe aqui. O antigo atraso de
     // 200 ms "para o DOM atualizar" so abria uma corrida — trocar de tela
     // nesse intervalo registrava "Elemento calendar nao foi criado!".
-    window.inicializarCalendario();
+    inicializarCalendario();
 }
 
-function getPaginaFromURL() {
+export function getPaginaFromURL() {
     // Pega o hash da URL, ex: #dashboard, #calendario
     const hash = window.location.hash.substring(1); // Remove o #
-    
+
     // Se não tiver hash ou for inválido, retorna dashboard
     const paginasValidas = ['dashboard', 'calendario', 'colaboradores', 'escala', 'lancamentoPlantao', 'bancoHoras', 'relatorios', 'configuracoes', 'usuarios'];
-    
+
     if (hash && paginasValidas.includes(hash)) {
         return hash;
     }
-    
+
     return 'dashboard';
 }
 

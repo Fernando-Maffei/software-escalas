@@ -4,7 +4,7 @@
   "description": "Sistema web para gestao de escalas de trabalho.",
   "productName": "App de Escalas",
   "engines": {
-    "node": ">=20"
+    "node": ">=20.19"
   },
   "scripts": {
     "start": "node backend/server.js",
@@ -18,7 +18,7 @@
     "typecheck": "tsc -p tsconfig.json",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "verificar": "npm run smoke && npm run lint && npm run typecheck && npm run format:check && npm test",
+    "verificar": "npm run smoke && npm run lint && npm run analisar:codigo-morto && npm run typecheck && npm run format:check && npm test",
     "e2e": "playwright test",
     "e2e:demo": "playwright test --project=demo",
     "e2e:teste": "playwright test --project=teste",
