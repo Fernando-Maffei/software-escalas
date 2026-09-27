@@ -71,7 +71,7 @@ docker compose down
 
 ### Sem Docker
 
-Requer Node 20+ e um SQL Server acessível:
+Requer Node 20.19+ e um SQL Server acessível:
 
 ```bash
 npm install
@@ -94,7 +94,7 @@ Ela executa, em ordem:
 | Comando | O que faz |
 |---|---|
 | `npm run smoke` | Checagem de sintaxe de todos os `.js` |
-| `npm run lint` | ESLint. No frontend (sem bundler) os globais são calculados do próprio código, então chamar uma função que não existe é erro |
+| `npm run lint` | ESLint. O frontend é analisado como módulos ES sem nenhum global do projeto: nome que não é import, local ou API do navegador é erro, e função sem uso também |
 | `npm run typecheck` | TypeScript em modo `checkJs` sobre backend, scripts e testes |
 | `npm run format:check` | Prettier (por enquanto só nos arquivos novos — ver `.prettierignore`) |
 | `npm test` | Testes unitários das regras de negócio, sem banco |
@@ -154,8 +154,17 @@ instância com banco, use `npm run teste:subir` e `npm run e2e:teste` (detalhes 
 npm run analisar:codigo-morto
 ```
 
-Monta o grafo de chamadas das funções globais do frontend a partir do que
-executa e acusa as que nada alcança ou que estão declaradas em dois arquivos.
+Junta os imports de todos os módulos do frontend e acusa exports que nenhum
+módulo importa (o ESLint já pega o que nem é exportado) e imports de algo que
+o módulo de destino não exporta — que no navegador impediria a página de
+carregar. Roda dentro do `npm run verificar`.
+
+### Comparação A/B do frontend
+
+Antes de refatorar uma tela, [`tests/e2e/comparar-ab/`](tests/e2e/comparar-ab/roteiro.js)
+roda o mesmo roteiro (todas as telas, editar, excluir, relatórios) na demo de um
+commit anterior e na atual e compara texto, formulários e erros passo a passo.
+O passo a passo está no cabeçalho do `roteiro.js`.
 
 ## Estrutura do código
 
@@ -171,7 +180,10 @@ backend/
   db/                  conexão, transação, bootstrap do schema
   lib/                 validação, domínio, erros, CORS, IP, cabeçalhos
 database/migrations/   scripts SQL idempotentes, aplicados a cada boot
-frontend/              HTML/CSS/JS sem bundler (scripts clássicos, escopo global)
+frontend/              HTML/CSS/JS sem bundler, em módulos ES nativos
+  js/main.js           ponto de entrada (<script type="module">)
+  js/core/estado.js    estado compartilhado entre as telas
+  js/core/acoes-html.js funções chamadas por onclick="..." (as únicas em window)
 demo/                  modo demonstração (mock da API) usado pelo robô
 tests/unit|integracao|e2e
 ```

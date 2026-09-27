@@ -38,7 +38,7 @@ Com Docker (sobe o app e o banco juntos):
 docker compose up -d --build
 ```
 
-Sem Docker (requer Node 20+ e um SQL Server acessivel):
+Sem Docker (requer Node 20.19+ e um SQL Server acessivel):
 
 ```bash
 npm install
@@ -52,7 +52,7 @@ apenas o `frontend/`.
 ## Testes
 
 ```bash
-npm run verificar          # sintaxe, lint, tipos, formatacao e testes unitarios
+npm run verificar          # sintaxe, lint, imports do frontend, tipos, formatacao e testes unitarios
 ```
 
 ```bash

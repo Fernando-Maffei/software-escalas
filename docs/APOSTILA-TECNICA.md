@@ -169,7 +169,7 @@ App de escalas/
 │       ├── telas/              ← uma pasta ou arquivo por tela
 │       │   ├── escala-dia/ + escala-dia-editor.js, escala-dia-shared.js
 │       │   ├── escala-relatorio/ + escala-relatorio.js
-│       │   ├── dashboard/ + dashboard.js
+│       │   ├── dashboard/
 │       │   ├── banco-horas.js, lancamentos.js, calendar.js
 │       │   └── configuracoes-backup.js / configuracoes-usuarios.js
 │       └── lib/                ← utilitários sem tela
@@ -197,7 +197,7 @@ App de escalas/
 ### A lógica por trás dessa organização
 
 - **`backend/routes/` x `backend/services/`:** as *rotas* só cuidam de HTTP (ler o pedido, validar, responder). A *regra de negócio* fica em `services/`, isolada — assim ela pode ser **testada sem subir servidor** (é o que os `tests/unit/` fazem). O acesso ao banco fica em `db/`, a segurança em `auth/` e os utilitários gerais em `lib/`.
-- **`frontend/js/` um arquivo por tela:** o front-end é grande (~18 mil linhas); separar por tela evita um arquivo único impossível de manter. Em `core/` fica o que toda tela usa, em `telas/` um arquivo por tela e em `lib/` os utilitários sem interface. Não há `import`: os scripts se enxergam por variáveis globais, então a **ordem das tags `<script>` no `index.html` importa**. O `api.js` centraliza **todo** acesso à API, então trocar algo na comunicação mexe em um lugar só.
+- **`frontend/js/` um arquivo por tela:** o front-end é grande (~18 mil linhas); separar por tela evita um arquivo único impossível de manter. Em `core/` fica o que toda tela usa, em `telas/` um arquivo por tela e em `lib/` os utilitários sem interface. Cada arquivo é um **módulo ES** e importa o que usa (`import { ... } from`), então as dependências estão escritas no próprio código e a ordem das tags deixou de importar: o `index.html` carrega só `js/main.js`. O `api.js` centraliza **todo** acesso à API, então trocar algo na comunicação mexe em um lugar só.
 - **`database/migrations/`:** o esquema não é criado "na mão"; cada mudança é um arquivo SQL datado, aplicado em ordem. Isso deixa o banco **reproduzível** e versionado junto do código.
 
 ---
@@ -459,7 +459,7 @@ Um script **opcional** e **idempotente** para um banco novo não começar vazio.
 
 #### A arquitetura em uma frase
 
-Uma **única página** (`index.html`) que carrega vários **módulos JavaScript**, cada um responsável por uma tela. Não há framework nem etapa de build: os arquivos `.js` são servidos direto e se registram em `window`, e um orquestrador (`app.js`) decide qual tela montar.
+Uma **única página** (`index.html`) que carrega vários **módulos JavaScript**, cada um responsável por uma tela. Não há framework nem etapa de build: os arquivos `.js` são **módulos ES nativos** servidos direto (o navegador resolve os `import`), a entrada é `js/main.js`, e `carregarPagina` (em `core/app/modais-e-navegacao.js`) decide qual tela montar.
 
 **Por que sem framework?** É uma escolha de simplicidade: qualquer navegador roda direto, não precisa de Node/npm no cliente, e o deploy é só copiar arquivos. O custo é que a organização fica por conta da disciplina do código (um arquivo por tela, `api.js` central).
 
@@ -487,20 +487,24 @@ Caminhos relativos a `frontend/js/`.
 | `telas/escala-dia-editor.js` (~1.826 linhas) | A **Escala do Dia**: monta a grade de horários (timeline), o arrasta-e-solta do almoço, o painel lateral de edição, a navegação por dia. |
 | `telas/escala-dia-shared.js` | Funções compartilhadas da Escala do Dia (conversões de horário, helpers usados pelo editor e por outros). |
 | `telas/lancamentos.js` (~1.754 linhas) | O cadastro/edição de lançamentos (colaboradores, jornada, etc.) via modais. |
-| `telas/dashboard.js` | A tela inicial / painel com indicadores. |
+| `telas/dashboard/` | A tela inicial / painel com indicadores. |
 | `telas/calendar.js` | Componente de calendário (seleção de datas, feriados). |
 | `telas/escala-relatorio.js` (~1.822 linhas) + `lib/escala-report-utils.js` | Geração dos relatórios de escala (mensal, por escala). |
 | `lib/pdf-utils.js` | Helpers de PDF (jsPDF/canvas) usados pelos relatórios. |
 | `telas/configuracoes-backup.js` | A tela de configuração de **banco e backup** (testar/salvar conexão, gerar/restaurar backup, carregar exemplos). |
 | `telas/configuracoes-usuarios.js` | A tela de gestão de **usuários** (admin). |
 | `core/permissoes.js` | Aplica no front-end o que o perfil pode ver/fazer (esconde botões que o usuário comum não usa). |
-| `core/runtime/` | O antigo `runtime-fixes.js`. Apesar do nome antigo, contém **funcionalidades de verdade**, não só ajustes: caches e modais (`dados-e-modais.js`), relatório do calendário (`relatorio-mensal.js`), escala e relatórios de plantão (`escala-e-relatorios.js`) e a pasta `plantao-colaboradores/` com a tela de plantão, o editor de colaborador e a jornada semanal. |
+| `core/estado.js` | O **estado compartilhado** entre telas (listas carregadas da API, seleções, caches usados por mais de um módulo). Estado de um módulo só fica dentro dele. |
+| `core/acoes-html.js` | As funções chamadas por atributos `onclick="..."` dos templates — as únicas publicadas em `window`, porque um atributo `on*` só enxerga o escopo global. |
+| `core/layout-pagina.js` | Barra lateral (navegação, botão ativo, recolher) e indicador de carregamento. |
+| `core/runtime/` | O antigo `runtime-fixes.js`. Apesar do nome antigo, contém **funcionalidades de verdade** (e, desde a migração para módulos, nenhum ajuste por cima de outro arquivo): caches e modais (`dados-e-modais.js`), relatório do calendário (`relatorio-mensal.js`), escala e relatórios de plantão (`escala-e-relatorios.js`) e a pasta `plantao-colaboradores/` com a tela de plantão, o editor de colaborador e a jornada semanal. |
 
-> **Nota de manutenção:** o front não tem bundler — são `<script>` clássicos em escopo global, **com ordem de carga fixa listada em dois lugares que precisam andar juntos**: `frontend/index.html` e `demo/index.html`.
+> **Nota de manutenção:** o front não tem bundler — são **módulos ES** (desde 2026-09; antes eram `<script>` clássicos num escopo global, com ordem de carga fixa e arquivos que sobrescreviam funções de outros via `window.X = X = function...`).
 >
-> Ao dividir um arquivo, duas armadilhas: (1) `app.js` fazia `window.X = X` no topo referenciando funções declaradas centenas de linhas abaixo, o que só funciona por *hoisting dentro do mesmo arquivo* — por isso todo código executável de topo ficou no arquivo residual, carregado **por último** entre as partes; (2) os arquivos de `core/runtime/` fazem monkey-patch dos globais (`window.X = X = function...`) e precisam continuar carregando **depois** de quem declara `X`.
->
-> Arquivos ainda envolvidos num IIFE (`lancamentos.js`, `banco-horas.js`, `relatorio-mensal.js`, `escala-e-relatorios.js`, `configuracoes-*.js`) compartilham um escopo privado: cortá-los exige antes renomear os helpers que colidem com globais já existentes (`escapeHtml`, `obterDataISO`, `withInFlight`, `fecharModalSeguro`, `inflight`, `mapPlantao`).
+> - Tela ou arquivo novo: exporte o que outros usam e importe onde for usar; se o módulo só registra listeners e ninguém o importa, adicione-o em `js/main.js`. Os dois `index.html` (`frontend/` e `demo/`) não mudam.
+> - Estado compartilhado entre telas vai em `core/estado.js` (`estado.colaboradores`, ...). Um `export let` não serve para isso: quem importa não pode reatribuir.
+> - Função chamada por `onclick="..."` num template precisa estar em `core/acoes-html.js`; o resto não vai para `window`.
+> - `npm run lint` acusa nome não importado e função sem uso; `npm run analisar:codigo-morto` acusa export que ninguém importa e import de algo que não existe.
 
 #### PWA
 
@@ -594,7 +598,7 @@ Pré-requisitos: **Node.js** (LTS) e **SQL Server** (Express serve) instalados; 
 | `npm run smoke` | Checagem rápida de sintaxe (`node --check`) em todos os arquivos-chave. |
 | `npm run verificar` | Sintaxe, lint, tipos, formatação e testes unitários (o mesmo que o CI roda). |
 | `npm run test:integracao` | Testes das rotas contra um SQL Server descartável (`npm run integracao:banco:subir` antes). |
-| `npm run analisar:codigo-morto` | Acusa funções globais do frontend que nada chama. |
+| `npm run analisar:codigo-morto` | Acusa exports do frontend que nenhum módulo importa e imports quebrados. |
 
 ### Acesso pelo time (rede)
 

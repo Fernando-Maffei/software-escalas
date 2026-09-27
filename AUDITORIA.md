@@ -316,7 +316,8 @@ SAMEORIGIN`, `frame-ancestors 'self'`, `Referrer-Policy: same-origin`) em toda
 resposta; corpo JSON limitado a 1 MB, com 25 MB so em
 `/backup/restaurar`. Testes de integracao dos cabecalhos e do 413. **Fica de
 fora:** CSP de script — as telas usam `onclick` inline em muitos pontos; exigiria
-`'unsafe-inline'`, que anula a protecao (ver M15).
+`'unsafe-inline'`, que anula a protecao. Com os modulos (M15) sobram 26 funcoes
+em `onclick` (`core/acoes-html.js`); trocar essas por `addEventListener` libera a CSP.
 
 **M7 — Controle de acesso por setor so no cadastro de colaboradores** · `RESOLVIDO`
 `getSetoresPermitidosRequest` e aplicado em colaboradores, escala e banco semanal,
@@ -407,13 +408,57 @@ caminho de falha do bootstrap (banco fora: 503 e retentativa) conferido a mao.
 **Aceito:** no frontend as maiores funcoes (`renderConfiguracoes`,
 `gerarHtmlPdfRelatorioEscala`, relatorio mensal) sao quase so template HTML;
 parti-las em pedacos nao melhora a leitura e seria refatoracao de risco sem
-teste de tela — fica para quando o frontend virar modulos (M15).
+teste de tela. Com o frontend em modulos (M15) e o roteiro A/B, fica viavel.
 
-**M15 — Arquitetura do frontend por monkey-patch** · `PROPOSTA`
+**M15 — Arquitetura do frontend por monkey-patch** · `RESOLVIDO`
 `frontend/js/core/runtime/*` redefine globais de `core/app/*` com
 `window.X = X = function ...` (heranca do antigo `runtime-fixes.js`). Ha versoes
 "mortas" das funcoes originais que ninguem chama. Resolver de verdade e migrar
 para modulos ES — mudanca estrutural grande → pergunta P6.
+**Feito (P6 respondida: sim):** os 63 `<script>` classicos viraram modulos ES
+nativos, sem bundler; os dois `index.html` carregam so `js/main.js`. Cada
+arquivo importa o que usa (~460 imports), os IIFEs e as guardas "carregar uma
+vez" sairam. Como foi feito, para ser verificavel:
+- **Resolucao identica a do navegador antigo.** Um resolvedor por AST imitou as
+  regras do escopo global classico (`let` de topo e `window.X` sao variaveis
+  diferentes; `window.X = ...` num arquivo posterior sobrescreve a funcao; ganha
+  o ultimo na ordem de carga) e gerou cada import apontando para a definicao que
+  de fato rodava. Onde havia duas definicoes, a perdedora (nunca executada) saiu:
+  `gerarRelatorioCompleto`, `abrirModalFeriado`, `carregarListaFeriados`,
+  `formatarDataBR` do dashboard (o dashboard ja exibia o formato do relatorio).
+- **Decoradores recompostos como chamadas explicitas:** `carregarPagina` aplica
+  a permissao de perfil direto (era um embrulho instalado por `permissoes.js`);
+  `carregarColaboradores` (cache) chama `buscarColaboradoresComDiretorio`;
+  `atualizarTudo` chama `atualizarDadosCompartilhados` e depois o banco de
+  horas; `editarLancamento`/`cancelarEdicaoLancamento` fazem a parte de banco
+  de horas dentro de `lancamentos.js`.
+- **Estado:** o que mais de um modulo le ou escreve foi para `core/estado.js`
+  (27 campos — antes espalhados entre `window.X` e `let` globais, as vezes os
+  dois com valores diferentes; os `let` duplicados eram so escritos, todos liam
+  `window`). Estado de um modulo so virou variavel dele.
+- **`window`** fica so com as 26 funcoes chamadas por `onclick="..."` nos
+  templates, num lugar so (`core/acoes-html.js`), e com `__API_BASE_URL`
+  (configuracao externa opcional). Os tres `<script>` inline do HTML viraram
+  `core/layout-pagina.js`.
+- **Limpeza que o modulo tornou possivel:** 180 guardas
+  `typeof X === 'function'` (sempre verdadeiras com import) removidas por
+  dobra de constantes; 15 funcoes/constantes que so existiam penduradas em
+  `window` sem ninguem chamar, e o modal `modalHorario` do HTML (nada o abria
+  e o botao chamava `salvarHorarioModal`, que nunca existiu).
+- **Provas:** ESLint em modo modulo **sem nenhum global do projeto** (zero
+  `no-undef`: todo nome e import, local ou API do navegador); verificador de
+  links import/export (`npm run analisar:codigo-morto`, agora no
+  `verificar`); verificador de que todo `estado.<campo>` resolve para o import
+  (pegou uma colisao real em `meus-setores.js`, corrigida); **teste A/B**: o
+  mesmo roteiro de 34 passos (todas as telas, editar/cancelar ferias e feriado,
+  excluir lancamento, relatorios, barra lateral) na demo antiga e na nova, com
+  relogio fixo, comparando texto das telas, modais, valores de formulario e
+  erros de console — **zero diferencas** (fora os campos do modal morto
+  removido); robo 9/9 na demo e 12/12 no backend real em varias sementes;
+  permissao do usuario comum conferida no navegador (hash, clique e botao
+  oculto caem no calendario).
+- Os testes do Node importam `lib/html-seguro.js` e `lib/escala-report-utils.js`
+  (agora ESM) via `require` de modulo ES: Node minimo passou a 20.19.
 
 **M16 — `npm audit`: body-parser e qs** · `RESOLVIDO`.
 **Feito:** `npm audit fix` (body-parser 2.3.0, qs 6.16.0); `npm audit` zerado.
@@ -527,7 +572,8 @@ Tabelas pequenas; o collation padrao ja e case-insensitive. Nao vale o risco ago
 **Respondidas:** P1 sim (M7 resolvido), P2 sim (A5 resolvido), P4 sim, com
 derrubada das outras sessoes (A7 resolvido), P7 "nao agora" (o `.prettierignore`
 exclui o legado; codigo novo ja segue o formato). P3 foi decidida pelo menor
-risco: contas continuam fora do backup (A3). P5, P6, P8 e P9 seguem abertas.
+risco: contas continuam fora do backup (A3). P6 sim (M15 resolvido). P5, P8 e P9
+seguem abertas.
 
 ---
 
@@ -628,6 +674,10 @@ uma com recarga da pagina — nao e bug.
   removidos (as colunas sempre existem depois das migrations); listas de dominio
   num lugar so; ~3.000 linhas de codigo morto removidas, com analisador proprio
   (`npm run analisar:codigo-morto`).
+- **Frontend em modulos ES (M15):** fim do escopo global compartilhado, da ordem
+  de carga fixa e dos monkey-patches; dependencias explicitas em import,
+  estado compartilhado num modulo so, `window` so para os `onclick`. Provado
+  por ESLint sem globais e por teste A/B antigo x novo (zero diferencas).
 - **Rede de seguranca:** 128 testes unitarios, 34 de integracao contra SQL Server
   descartavel, golden master de 87 passos + 14 tabelas (usado para provar
   equivalencia das refatoracoes), ESLint, checagem de tipos (`checkJs`),
@@ -635,15 +685,13 @@ uma com recarga da pagina — nao e bug.
 
 ### Resolvidos
 
-C1, C2; A1–A13; M1–M8, M11, M12, M14, M16; B1–B7, B9, B10; S1–S8.
+C1, C2; A1–A13; M1–M8, M11, M12, M14, M15, M16; B1–B7, B9, B10; S1–S8.
 Aceitos com justificativa: B8, B11 e a parte de frontend do M14.
 
 ### Pendente (propostas, dependem de decisao)
 
 - **M9 / M17 (P5):** tabela de controle de migrations e tabela de ligacao
   plantao↔colaborador — mudam o banco da producao.
-- **M15 (P6):** frontend em modulos ES, acabando com os monkey-patches de
-  `core/runtime/` (e abrindo caminho para quebrar as funcoes-template gigantes).
 - **M10 (P8):** retencao de backups automaticos.
 - **M13 (P9):** container sem root.
 - **P7:** formatacao em massa do legado (adiada a seu pedido).
@@ -657,4 +705,9 @@ Aceitos com justificativa: B8, B11 e a parte de frontend do M14.
    antes de qualquer refatoracao grande do backend.
 3. Avisar os usuarios: a troca de senha agora pede a senha atual, e o arquivo de
    "Exportar Dados" mudou de formato (os arquivos antigos continuam importaveis).
-4. Decidir P5, P6, P8 e P9; a proxima maior melhoria de qualidade e o M15.
+4. Decidir P5, P8 e P9.
+5. Frontend: trocar os 26 `onclick` de `core/acoes-html.js` por
+   `addEventListener` (libera uma CSP de script sem `'unsafe-inline'`);
+   renomear `core/runtime/` (o nome vem do antigo `runtime-fixes.js`, que ja
+   nao descreve o conteudo); quebrar as funcoes-template gigantes com o roteiro
+   A/B como rede.
