@@ -419,7 +419,8 @@ Três princípios se repetem:
 
 O esquema do banco **não** é criado à mão. Cada evolução é um arquivo `.sql` **datado** em `database/migrations/`, aplicado em ordem por `ensureApplicationSchema` (seção 4.2). Duas características importantes:
 
-- **Idempotentes:** cada arquivo pode rodar várias vezes sem estragar nada. Usam guardas como `IF OBJECT_ID('dbo.Setores') IS NULL` (só cria a tabela se ela não existe) e `IF COL_LENGTH(...) IS NULL` (só adiciona a coluna se falta). Isso permite rodar as migrations em todo boot, com segurança.
+- **Aplicadas uma vez por banco:** `backend/db/migracoes.js` registra cada script em `dbo.SchemaMigrations` (nome e checksum) e, a cada boot, só roda os que ainda não foram aplicados. Script já aplicado cujo arquivo mudou **não** roda de novo — só gera um aviso no log: correção de schema é sempre um arquivo novo, acrescentado ao fim da lista.
+- **Idempotentes:** mesmo assim, cada arquivo pode rodar várias vezes sem estragar nada (guardas como `IF OBJECT_ID('dbo.Setores') IS NULL` e `IF COL_LENGTH(...) IS NULL`). Isso cobre um banco antigo, sem registros, que roda tudo uma vez, e um script que falhe no meio e seja repetido na subida seguinte.
 - **Batches com `GO`:** o SQL é dividido por `GO` (separador de lote do SQL Server), executado um bloco por vez.
 
 Ordem dos arquivos:
@@ -433,6 +434,8 @@ Ordem dos arquivos:
 | `2026-05-28-colaborador-jornada-semanal.sql` | `ColaboradorJornadaSemanal`. |
 | `2026-07-08-usuarios.sql` | `Usuarios` (contas de acesso). |
 | `2026-07-09-usuarios-admin.sql` | Coluna/ajuste de admin em `Usuarios`. |
+| … | (a lista completa, na ordem de aplicação, está em `SCHEMA_SCRIPT_PATHS`, `backend/db/database-schema.js`) |
+| `2026-09-28-plantao-colaborador.sql` | `PlantaoColaborador`: a equipe do plantão sai do JSON `plantoes.colaboradores_ids` para uma tabela de ligação com FK. |
 
 #### As tabelas principais
 
@@ -444,6 +447,8 @@ Ordem dos arquivos:
 | `Ausencias` | Faltas/afastamentos | período, tipo |
 | `Feriados` | Datas especiais | `Nome`, `Data`, `Tipo` (nacional/estadual/municipal) |
 | `plantoes` | Trabalho de fim de semana | `data_plantao`, `tipo_plantao` (sabado/domingo) |
+| `PlantaoColaborador` | Quem faz cada plantão | `PlantaoId`, `ColaboradorId` (FK para os dois lados) |
+| `SchemaMigrations` | Migrations já aplicadas | `Nome`, `Checksum`, `AplicadaEm` |
 | `BancoHorasMovimentos` | Créditos/débitos de horas | colaborador, valor, data |
 | `escala_dia` | A escala materializada por dia | colaborador, data, horários |
 | `AlmocosPersonalizados` | Almoço específico num dia | colaborador, data, início/fim |

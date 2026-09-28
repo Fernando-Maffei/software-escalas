@@ -186,7 +186,8 @@ backend/
   auth/                sessões, permissões, limite de setores, rate limit
   db/                  conexão, transação, bootstrap do schema
   lib/                 validação, domínio, erros, CORS, IP, cabeçalhos
-database/migrations/   scripts SQL idempotentes, aplicados a cada boot
+database/migrations/   scripts SQL, cada um aplicado uma vez por banco
+                       (registro em dbo.SchemaMigrations)
 frontend/              HTML/CSS/JS sem bundler, em módulos ES nativos
   js/main.js           ponto de entrada (<script type="module">)
   js/core/estado.js    estado compartilhado entre as telas

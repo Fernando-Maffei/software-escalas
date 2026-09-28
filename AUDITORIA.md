@@ -349,13 +349,21 @@ leitura do JSON da equipe do plantao em `parseEquipePlantao`; e os handlers
 identicos de `POST`/`PUT /colaboradores/:id/jornada-semanal` num so (as duas
 rotas continuam). Golden master identico.
 
-**M9 — Migrations rodam todas em todo boot, sem controle de versao** · `PROPOSTA`
+**M9 — Migrations rodam todas em todo boot, sem controle de versao** · `RESOLVIDO`
 `backend/db/database-schema.js:163`. Funciona porque todas sao idempotentes
 (verificado), mas uma migration nao idempotente derrubaria o sistema em 503, e
 o `ALTER COLUMN`/`DROP+ADD CONSTRAINT` sem guarda em
 `2026-09-04-plantao-lancamentos.sql` revalida a tabela inteira a cada boot.
 Proposta: tabela `SchemaMigrations` registrando o que ja rodou. Mexe no fluxo de
 atualizacao da producao → pergunta P5.
+**Feito (P5 respondida: sim):** `backend/db/migracoes.js` registra cada script
+em `dbo.SchemaMigrations` (nome + checksum SHA-256, com CRLF/BOM normalizados) e
+so roda o que o banco ainda nao aplicou; o registro so e gravado depois do
+script inteiro rodar. Banco que ja existia (sem registro) roda tudo uma vez,
+como antes, e passa a ser controlado. Migration aplicada cujo arquivo mudou nao
+roda de novo: vira aviso no log (a correcao e um script novo). Testes: unitarios
+(checksum, lotes) e de integracao (segunda subida nao executa nada; arquivo
+alterado so avisa; banco sem registro roda tudo uma vez e preserva os dados).
 
 **M10 — Backups nunca sao apagados** · `RESOLVIDO`
 Backup automatico a cada 180 min (padrao) mais um por desligamento, sem
@@ -480,10 +488,25 @@ vez" sairam. Como foi feito, para ser verificavel:
 **Feito:** `npm audit fix` (body-parser 2.3.0, qs 6.16.0); `npm audit` zerado.
 Testes unitarios e de integracao passando com as versoes novas.
 
-**M17 — Plantao guarda colaboradores como JSON em texto** · `PROPOSTA`
+**M17 — Plantao guarda colaboradores como JSON em texto** · `RESOLVIDO`
 `plantoes.colaboradores_ids` (NVARCHAR com array JSON): sem FK, exige ler a
 tabela inteira para achar um colaborador (ver C1). O certo seria tabela de
 ligacao `PlantaoColaborador`. Mudanca de banco → pergunta P5.
+**Feito (P5 respondida: sim):** tabela `PlantaoColaborador` (PK composta, FK para
+`plantoes` com exclusao em cascata e para `Colaboradores`, indice por
+colaborador). A migration `2026-09-28-plantao-colaborador.sql` copia a equipe
+dos JSONs numa transacao (descartando id invalido, repetido ou de colaborador
+inexistente) e remove a coluna. Leituras usam um fragmento SQL unico
+(`services/equipe-plantao.js`); o extrato de horas extras e a exclusao de
+colaborador filtram na tabela, sem o `LIKE` + parse em JS. Backup: a tabela
+entra na especificacao, e arquivos antigos (equipe em JSON) sao convertidos na
+leitura — os 5 backups reais da pasta de producao convertem 49 vinculos sem
+aviso. Provas: golden master de 87 passos gerado antes da mudanca identico
+depois (a foto de `plantoes` monta a equipe da tabela de ligacao); testes de
+integracao da migracao (JSON com orfao, invalido e repetido), da restauracao de
+backup no formato antigo e do filtro por colaborador; **ensaio na copia dos
+dados reais de producao** (16 tabelas identicas linha a linha, 49 de 49
+vinculos preservados, segunda subida sem executar nada); robo 12/12.
 
 ### BAIXO
 
@@ -589,7 +612,8 @@ Tabelas pequenas; o collation padrao ja e case-insensitive. Nao vale o risco ago
 derrubada das outras sessoes (A7 resolvido), P7 "nao agora" (o `.prettierignore`
 exclui o legado; codigo novo ja segue o formato). P3 foi decidida pelo menor
 risco: contas continuam fora do backup (A3). P6 sim (M15 resolvido). P8 sim (M10
-resolvido). P9 sim (M13 resolvido). P5 segue aberta.
+resolvido). P9 sim (M13 resolvido). P5 sim (M9 e M17 resolvidos). Resta so a
+P7, adiada.
 
 ---
 
@@ -701,14 +725,13 @@ uma com recarga da pagina — nao e bug.
 
 ### Resolvidos
 
-C1, C2; A1–A13; M1–M8, M10–M16; B1–B7, B9, B10; S1–S8.
+C1, C2; A1–A13; M1–M17; B1–B7, B9, B10; S1–S8.
 Aceitos com justificativa: B8, B11 e a parte de frontend do M14.
 
 ### Pendente (propostas, dependem de decisao)
 
-- **M9 / M17 (P5):** tabela de controle de migrations e tabela de ligacao
-  plantao↔colaborador — mudam o banco da producao.
-- **P7:** formatacao em massa do legado (adiada a seu pedido).
+- **P7:** formatacao em massa do legado (adiada a seu pedido). Nenhum item
+  da auditoria esta aberto.
 
 ### Recomendacoes futuras
 
@@ -719,7 +742,9 @@ Aceitos com justificativa: B8, B11 e a parte de frontend do M14.
    antes de qualquer refatoracao grande do backend.
 3. Avisar os usuarios: a troca de senha agora pede a senha atual, e o arquivo de
    "Exportar Dados" mudou de formato (os arquivos antigos continuam importaveis).
-4. Decidir P5.
+4. Migrations: nunca editar um script ja aplicado — o controle do M9 nao o roda
+   de novo (so avisa). Correcao ou mudanca de schema e sempre um script novo,
+   acrescentado ao fim da lista em `backend/db/database-schema.js`.
 5. Frontend: trocar os 26 `onclick` de `core/acoes-html.js` por
    `addEventListener` (libera uma CSP de script sem `'unsafe-inline'`);
    renomear `core/runtime/` (o nome vem do antigo `runtime-fixes.js`, que ja
