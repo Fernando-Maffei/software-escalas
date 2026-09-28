@@ -17,6 +17,7 @@ const {
 } = require('../services/escala');
 const { withTransaction } = require('../db/transactions');
 const { colaboradoresVisiveis } = require('../auth/acesso-setores');
+const { SQL_EQUIPE_PLANTAO, gravarEquipePlantao } = require('../services/equipe-plantao');
 const {
     extractDateString,
     normalizeIsoDate,
@@ -35,7 +36,7 @@ const {
 const PLANTAO_COLUNAS = `
             id,
             data_plantao,
-            colaboradores_ids,
+            ${SQL_EQUIPE_PLANTAO},
             criado_em,
             atualizado_em,
             hora_inicio,
@@ -356,7 +357,6 @@ router.post('/', async (req, res) => {
         for (const grupo of grupos) {
             const insertResult = await tx.request()
                 .input('data_plantao', sql.Date, payload.dataISO)
-                .input('colaboradores_ids', sql.NVarChar(sql.MAX), JSON.stringify(grupo.colaboradores))
                 .input('tipoPlantao', sql.NVarChar(30), payload.tipoPlantao)
                 .input('tipoCredito', sql.NVarChar(20), grupo.tipoCredito)
                 .input('horaInicio', sql.Time, toSqlTime(grupo.horaInicio, 'Hora inicial do plantao'))
@@ -364,14 +364,16 @@ router.post('/', async (req, res) => {
                 .input('observacao', sql.NVarChar(500), payload.observacao)
                 .query(`
                     INSERT INTO plantoes (
-                        data_plantao, colaboradores_ids, hora_inicio, hora_fim, observacao, tipo_plantao, tipo_credito
+                        data_plantao, hora_inicio, hora_fim, observacao, tipo_plantao, tipo_credito
                     )
                     OUTPUT INSERTED.*
-                    VALUES (@data_plantao, @colaboradores_ids, @horaInicio, @horaFim, @observacao, @tipoPlantao, @tipoCredito)
+                    VALUES (@data_plantao, @horaInicio, @horaFim, @observacao, @tipoPlantao, @tipoCredito)
                 `);
 
             const saved = insertResult.recordset[0];
 
+            await gravarEquipePlantao(tx, saved.id, grupo.colaboradores);
+            saved.equipe = grupo.colaboradores;
             saved.duracaoMinutos = grupo.duracaoMinutos;
             salvos.push(saved);
         }

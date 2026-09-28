@@ -181,10 +181,13 @@ async function restoreSystemBackup(pool, rawPayload, options = {}) {
         }
     });
 
+    snapshot.avisos.forEach((aviso) => console.warn(`[backup] ${aviso}`));
+
     return {
         restoredAt: new Date().toISOString(),
         fileName: options.fileName || '',
         format: snapshot.format,
+        avisos: snapshot.avisos,
         metadata: snapshot.metadata,
         preferences: snapshot.preferences,
         tableCounts,

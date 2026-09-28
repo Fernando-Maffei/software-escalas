@@ -3,6 +3,7 @@ const { AppError } = require('../lib/errors');
 const { isFeriadoNacional } = require('./feriados-nacionais');
 const { listJornadaSemanal } = require('./jornada-semanal');
 const { serializePlantaoRecord } = require('./plantoes');
+const { SQL_EQUIPE_PLANTAO } = require('./equipe-plantao');
 const {
     buildDateRange,
     compareTimes,
@@ -1084,7 +1085,7 @@ const HISTORICO_AUSENCIA_COLUNAS = `
 const HISTORICO_PLANTAO_COLUNAS = `
                 id,
                 data_plantao,
-                colaboradores_ids,
+                ${SQL_EQUIPE_PLANTAO},
                 hora_inicio,
                 hora_fim,
                 observacao`;

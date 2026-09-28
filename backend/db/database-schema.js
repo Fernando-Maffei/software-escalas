@@ -1,8 +1,8 @@
-const fs = require('fs');
 const path = require('path');
 
 const { AppError } = require('../lib/errors');
 const { ensureDefaultAdmin } = require('../auth/auth');
+const { aplicarMigracoes, executeSqlScriptFile } = require('./migracoes');
 
 const REQUIRED_TABLES = Object.freeze([
     'Colaboradores',
@@ -14,6 +14,7 @@ const REQUIRED_TABLES = Object.freeze([
     'Ausencias',
     'Feriados',
     'plantoes',
+    'PlantaoColaborador',
     'BancoHorasMovimentos',
     'BancoHorasSemanal',
     'BancoHorasSemanalNota',
@@ -39,32 +40,11 @@ const SCHEMA_SCRIPT_PATHS = Object.freeze([
     path.join(__dirname, '..', '..', 'database', 'migrations', '2026-09-04-plantao-lancamentos.sql'),
     path.join(__dirname, '..', '..', 'database', 'migrations', '2026-09-21-tipos-escala.sql'),
     path.join(__dirname, '..', '..', 'database', 'migrations', '2026-09-22-escala-dia-tipos-plantonista.sql'),
-    path.join(__dirname, '..', '..', 'database', 'migrations', '2026-09-23-folgas-domingo.sql')
+    path.join(__dirname, '..', '..', 'database', 'migrations', '2026-09-23-folgas-domingo.sql'),
+    path.join(__dirname, '..', '..', 'database', 'migrations', '2026-09-28-plantao-colaborador.sql')
 ]);
 
 const EXAMPLE_SEED_SCRIPT_PATH = path.join(__dirname, '..', '..', 'database', 'seeds', 'dados-exemplo.sql');
-
-function splitSqlBatches(script) {
-    return String(script || '')
-        .split(/^\s*GO\s*$/gim)
-        .map((batch) => batch.trim())
-        .filter(Boolean);
-}
-
-async function executeSqlScriptFile(pool, filePath) {
-    const script = await fs.promises.readFile(filePath, 'utf8');
-    const batches = splitSqlBatches(script);
-
-    for (let index = 0; index < batches.length; index += 1) {
-        try {
-            await pool.request().batch(batches[index]);
-        } catch (error) {
-            const fileName = path.basename(filePath);
-            error.message = `[schema] Falha ao executar ${fileName} (lote ${index + 1}/${batches.length}): ${error.message || error}`;
-            throw error;
-        }
-    }
-}
 
 async function listExistingRequiredTables(pool) {
     const result = await pool.request().query(`
@@ -126,9 +106,8 @@ async function ensureApplicationSchema(pool) {
     const before = await listExistingRequiredTables(pool);
     const schemaBefore = await getSchemaSnapshot(pool);
 
-    for (const filePath of SCHEMA_SCRIPT_PATHS) {
-        await executeSqlScriptFile(pool, filePath);
-    }
+    // So roda o que este banco ainda nao aplicou (ver db/migracoes.js).
+    const { executadas } = await aplicarMigracoes(pool, SCHEMA_SCRIPT_PATHS);
 
     const after = await listExistingRequiredTables(pool);
     const schemaAfter = await getSchemaSnapshot(pool);
@@ -174,7 +153,7 @@ async function ensureApplicationSchema(pool) {
         createdTables,
         existingTables: REQUIRED_TABLES.filter((table) => before.includes(table)),
         addedColumns,
-        scriptsExecuted: SCHEMA_SCRIPT_PATHS.map((filePath) => path.basename(filePath)),
+        scriptsExecuted: executadas,
         // So expoe a senha quando ela foi gerada aleatoriamente agora (o
         // destinatario e quem esta instalando o sistema); senha vinda do
         // .env nunca e ecoada de volta.

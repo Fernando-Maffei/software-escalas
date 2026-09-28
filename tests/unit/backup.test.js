@@ -139,6 +139,84 @@ module.exports = [
             assert.equal(colaborador.Ativo, false);
             assert.equal(colaborador.DataDesligamento, '2026-08-31');
             assert.equal(payload.data.plantoes[0].tipo_credito, 'extra');
+            assert.deepEqual(payload.data.PlantaoColaborador, [{ PlantaoId: 9, ColaboradorId: 1 }]);
+        }
+    },
+    {
+        // M17: arquivos anteriores a 2026-09-28 guardavam a equipe no JSON
+        // plantoes.colaboradores_ids; eles continuam restauraveis.
+        name: 'backup antigo: a equipe em JSON vira vinculos de PlantaoColaborador',
+        run() {
+            const payload = coerceBackupPayload({
+                data: {
+                    Colaboradores: [
+                        { Id: 1, Nome: 'Ana' },
+                        { Id: 2, Nome: 'Bia' }
+                    ],
+                    plantoes: [
+                        { id: 7, data_plantao: '2027-01-02', colaboradores_ids: '[2,1,2]' },
+                        { id: 8, data_plantao: '2027-01-09', colaboradores_ids: '[]' }
+                    ]
+                }
+            });
+
+            assert.deepEqual(payload.data.PlantaoColaborador, [
+                { PlantaoId: 7, ColaboradorId: 1 },
+                { PlantaoId: 7, ColaboradorId: 2 }
+            ]);
+            assert.equal('colaboradores_ids' in payload.data.plantoes[0], false);
+            assert.deepEqual(payload.avisos, []);
+        }
+    },
+    {
+        name: 'backup antigo sem id de plantao: os plantoes recebem ids para ligar a equipe',
+        run() {
+            const payload = coerceBackupPayload({
+                data: {
+                    Colaboradores: [{ Id: 3, Nome: 'Caio' }],
+                    plantoes: [
+                        { data_plantao: '2027-01-02', colaboradores: [3] },
+                        { data_plantao: '2027-01-09', colaboradores: [3] }
+                    ]
+                }
+            });
+
+            assert.deepEqual(payload.data.plantoes.map((linha) => linha.id), [1, 2]);
+            assert.deepEqual(payload.data.PlantaoColaborador, [
+                { PlantaoId: 1, ColaboradorId: 3 },
+                { PlantaoId: 2, ColaboradorId: 3 }
+            ]);
+        }
+    },
+    {
+        // A FK abortaria a restauracao inteira por causa de um vinculo orfao.
+        name: 'vinculo de equipe com colaborador ou plantao ausente do arquivo e ignorado com aviso',
+        run() {
+            const payload = coerceBackupPayload({
+                data: {
+                    Colaboradores: [{ Id: 1, Nome: 'Ana' }],
+                    plantoes: [{ id: 5, data_plantao: '2027-01-02' }],
+                    PlantaoColaborador: [
+                        { PlantaoId: 5, ColaboradorId: 1 },
+                        { PlantaoId: 5, ColaboradorId: 99 },
+                        { PlantaoId: 6, ColaboradorId: 1 },
+                        { PlantaoId: 5, ColaboradorId: 1 }
+                    ]
+                }
+            });
+
+            assert.deepEqual(payload.data.PlantaoColaborador, [{ PlantaoId: 5, ColaboradorId: 1 }]);
+            assert.equal(payload.avisos.length, 1);
+            assert.match(payload.avisos[0], /^3 vinculo/);
+        }
+    },
+    {
+        name: 'backup antigo com equipe que nao e JSON e recusado',
+        run() {
+            assert.throws(
+                () => coerceBackupPayload({ data: { plantoes: [{ id: 1, data_plantao: '2027-01-02', colaboradores_ids: '[1,' }] } }),
+                /colaboradores_ids .* esta invalido/
+            );
         }
     },
     {

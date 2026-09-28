@@ -37,7 +37,7 @@ module.exports = [
             const serialized = serializePlantaoRecord({
                 id: 10,
                 data_plantao: new Date('2026-04-25T12:00:00'),
-                colaboradores_ids: '[5,2,5]',
+                equipe: '[5,2,5]',
                 tipo_plantao: 'sabado'
             });
 

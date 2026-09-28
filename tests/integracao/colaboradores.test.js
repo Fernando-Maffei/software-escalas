@@ -146,12 +146,13 @@ module.exports = [
                 coberturas: 0
             });
 
-            const plantoes = await consultar(
-                `SELECT colaboradores_ids FROM plantoes WHERE data_plantao = '${DATAS.sabado}'`
+            // Sai da equipe; o plantao do dia continua.
+            const naEquipe = await consultar(
+                `SELECT COUNT(*) AS total FROM PlantaoColaborador WHERE ColaboradorId = ${colaborador.Id}`
             );
-            plantoes.forEach((linha) => {
-                assert.equal(JSON.parse(linha.colaboradores_ids).includes(colaborador.Id), false);
-            });
+            assert.equal(naEquipe[0].total, 0);
+            const plantoesDoDia = await consultar(`SELECT id FROM plantoes WHERE data_plantao = '${DATAS.sabado}'`);
+            assert.ok(plantoesDoDia.length > 0, 'o plantao do dia nao deveria ter sido apagado');
         }
     },
     {

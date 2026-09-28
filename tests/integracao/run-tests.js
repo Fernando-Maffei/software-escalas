@@ -10,7 +10,8 @@ const suites = [
     ...require('./lancamentos.test.js'),
     ...require('./folgas-domingo.test.js'),
     ...require('./acesso-setores.test.js'),
-    ...require('./backup.test.js')
+    ...require('./backup.test.js'),
+    ...require('./migracoes.test.js')
 ];
 
 (async () => {

@@ -31,6 +31,7 @@ const TABELAS_DE_NEGOCIO = Object.freeze([
     'Feriados',
     'Ausencias',
     'plantoes',
+    'PlantaoColaborador',
     'BancoHorasMovimentos',
     'BancoHorasSemanal',
     'BancoHorasSemanalNota',
@@ -109,7 +110,7 @@ module.exports = [
                 FROM INFORMATION_SCHEMA.COLUMNS c
                 JOIN INFORMATION_SCHEMA.TABLES t
                   ON t.TABLE_NAME = c.TABLE_NAME AND t.TABLE_TYPE = 'BASE TABLE'
-                WHERE c.TABLE_NAME NOT IN ('Usuarios', 'Sessoes')
+                WHERE c.TABLE_NAME NOT IN ('Usuarios', 'Sessoes', 'SchemaMigrations')
             `);
             const noBanco = colunasDoBanco.map((linha) => `${linha.tabela}.${linha.coluna}`).sort();
             const naEspecificacao = TABELAS_BACKUP.flatMap((item) =>
@@ -202,6 +203,48 @@ module.exports = [
                 }),
                 'restaurar backup baixado'
             );
+
+            const depois = await fotografarBanco();
+            TABELAS_DE_NEGOCIO.forEach((tabela) => {
+                assert.deepEqual(depois[tabela], antes[tabela], `tabela ${tabela} mudou na ida e volta`);
+            });
+        }
+    },
+    {
+        // M17: backups gravados antes de 2026-09-28 (como os que ja estao na
+        // pasta de backup) guardam a equipe no JSON plantoes.colaboradores_ids e
+        // nao tem PlantaoColaborador. Restaurar um deles devolve a mesma equipe.
+        name: 'backup no formato antigo (equipe em JSON) restaura a mesma equipe',
+        async run() {
+            const cliente = criarCliente();
+            await cliente.entrar();
+
+            const antes = await fotografarBanco();
+            assert.ok(antes.PlantaoColaborador.length > 0, 'o cenario deveria ter equipe de plantao');
+
+            const baixado = await cliente.get('/api/configuracao-banco/backup/baixar');
+            const { PlantaoColaborador: vinculos, ...dadosSemLigacao } = baixado.body.data;
+            const formatoAntigo = {
+                ...baixado.body,
+                data: {
+                    ...dadosSemLigacao,
+                    plantoes: dadosSemLigacao.plantoes.map((plantao) => ({
+                        ...plantao,
+                        colaboradores_ids: JSON.stringify(
+                            vinculos.filter((v) => v.PlantaoId === plantao.id).map((v) => v.ColaboradorId)
+                        )
+                    }))
+                }
+            };
+
+            const restaurado = esperarSucesso(
+                await cliente.post('/api/configuracao-banco/backup/restaurar', {
+                    backupData: formatoAntigo,
+                    fileName: 'formato-antigo.json'
+                }),
+                'restaurar backup no formato antigo'
+            );
+            assert.deepEqual(restaurado.result.avisos, []);
 
             const depois = await fotografarBanco();
             TABELAS_DE_NEGOCIO.forEach((tabela) => {

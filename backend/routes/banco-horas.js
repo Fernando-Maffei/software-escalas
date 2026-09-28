@@ -16,6 +16,7 @@ const { withTransaction } = require('../db/transactions');
 const { colaboradoresVisiveis, exigirColaboradorVisivel } = require('../auth/acesso-setores');
 const { ensurePositiveInt, extractDateString, normalizeOptionalText } = require('../lib/validation');
 const { serializePlantaoRecord } = require('../services/plantoes');
+const { SQL_EQUIPE_PLANTAO, SQL_PLANTAO_COM_COLABORADOR } = require('../services/equipe-plantao');
 
 function mapResumoRow(row) {
     return {
@@ -47,7 +48,7 @@ const AUSENCIA_COLUNAS = `
 const PLANTAO_COLUNAS = `
                 id,
                 data_plantao,
-                colaboradores_ids,
+                ${SQL_EQUIPE_PLANTAO},
                 criado_em,
                 atualizado_em,
                 hora_inicio,
@@ -179,20 +180,21 @@ router.get('/resumo', async (req, res) => {
 });
 
 // Plantoes do colaborador marcados como hora extra, do mais novo para o mais
-// velho. O filtro por colaborador e feito em JS porque colaboradores_ids e um
-// JSON em texto: um LIKE '%2%' casaria tambem com 12 e 21.
+// velho.
 async function listarHorasExtrasDoColaborador(pool, colaboradorId, limit) {
-    const result = await pool.request().query(`
-        SELECT id, data_plantao, colaboradores_ids, hora_inicio, hora_fim, observacao, tipo_plantao, tipo_credito
-        FROM plantoes
-        WHERE LOWER(tipo_credito) = 'extra'
-        ORDER BY data_plantao DESC, id DESC
-    `);
+    const result = await pool.request()
+        .input('colaboradorId', sql.Int, colaboradorId)
+        .input('limite', sql.Int, limit)
+        .query(`
+            SELECT TOP (@limite) id, data_plantao, ${SQL_EQUIPE_PLANTAO}, hora_inicio, hora_fim, observacao, tipo_plantao, tipo_credito
+            FROM plantoes
+            WHERE LOWER(tipo_credito) = 'extra'
+              AND ${SQL_PLANTAO_COM_COLABORADOR}
+            ORDER BY data_plantao DESC, id DESC
+        `);
 
     return result.recordset
         .map((row) => serializePlantaoRecord(row))
-        .filter((plantao) => plantao.colaboradores.includes(colaboradorId))
-        .slice(0, limit)
         .map((plantao) => {
             const minutos = plantao.horaInicio && plantao.horaFim
                 ? calculateIntervalMinutes(plantao.horaInicio, plantao.horaFim)

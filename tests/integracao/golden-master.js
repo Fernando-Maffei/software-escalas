@@ -59,6 +59,24 @@ const TABELAS = [
     'AlmocosPersonalizados'
 ];
 
+// A foto compara o DADO, nao o formato de armazenamento. Desde o M17 a equipe
+// do plantao mora em PlantaoColaborador; aqui ela volta a aparecer como o array
+// JSON de sempre (mesma coluna, mesma ordem), para golden masters gerados antes
+// e depois da mudanca serem comparaveis.
+const CONSULTAS_ESPECIAIS = {
+    plantoes: `
+        SELECT id, data_plantao,
+            COALESCE((
+                SELECT '[' + STRING_AGG(CAST(pc.ColaboradorId AS VARCHAR(12)), ',')
+                    WITHIN GROUP (ORDER BY pc.ColaboradorId) + ']'
+                FROM dbo.PlantaoColaborador pc
+                WHERE pc.PlantaoId = p.id
+            ), '[]') AS colaboradores_ids,
+            criado_em, atualizado_em, hora_inicio, hora_fim, observacao, tipo_plantao, tipo_credito
+        FROM dbo.plantoes p
+        ORDER BY 1`
+};
+
 const JORNADA = { trabalhoInicio: '08:00', trabalhoFim: '17:00', almocoInicio: '12:00', almocoFim: '13:00' };
 const diasUteis = [1, 2, 3, 4, 5].map((diaSemana) => ({ diaSemana, ...JORNADA }));
 
@@ -299,7 +317,9 @@ async function roteiro(cliente, registro) {
 
         const tabelas = {};
         for (const tabela of TABELAS) {
-            tabelas[tabela] = await consultar(`SELECT * FROM dbo.[${tabela}] ORDER BY 1`);
+            tabelas[tabela] = await consultar(
+                CONSULTAS_ESPECIAIS[tabela] || `SELECT * FROM dbo.[${tabela}] ORDER BY 1`
+            );
         }
 
         const foto = normalizar({ respostas: registro, tabelas });

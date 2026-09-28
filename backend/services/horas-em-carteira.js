@@ -14,9 +14,10 @@ const {
     resolveDefaultDescontaBancoHoras
 } = require('./bancoHoras');
 const { serializePlantaoRecord } = require('./plantoes');
+const { SQL_EQUIPE_PLANTAO } = require('./equipe-plantao');
 const { extractDateString } = require('../lib/validation');
 
-const PLANTAO_COLUNAS_CREDITO = 'id, data_plantao, colaboradores_ids, hora_inicio, hora_fim, tipo_credito';
+const PLANTAO_COLUNAS_CREDITO = `id, data_plantao, ${SQL_EQUIPE_PLANTAO}, hora_inicio, hora_fim, tipo_credito`;
 
 // Formata minutos como relogio HH:MM com sinal apenas quando negativo.
 // Aceita totais grandes (ex: 163:37), como na planilha.

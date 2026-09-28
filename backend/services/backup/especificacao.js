@@ -25,8 +25,7 @@ const TIPO = Object.freeze({
     DATA: 'data', // YYYY-MM-DD
     DATA_HORA: 'data_hora',
     HORA: 'hora',
-    TEXTO: 'texto',
-    EQUIPE_PLANTAO: 'equipe_plantao' // array JSON de ids de colaborador
+    TEXTO: 'texto'
 });
 
 // col('Nome', TIPO.TEXTO, { max: 300, obrigatorio: true, apelidos: ['nome'] })
@@ -189,9 +188,6 @@ const TABELAS_BACKUP = Object.freeze([
                 obrigatorio: true,
                 apelidos: ['dataISO', 'DataPlantao', 'dataPlantao']
             }),
-            col('colaboradores_ids', TIPO.EQUIPE_PLANTAO, {
-                apelidos: ['colaboradores', 'ColaboradoresIds', 'Colaboradores']
-            }),
             col('criado_em', TIPO.DATA_HORA, { apelidos: ['CriadoEm'] }),
             col('atualizado_em', TIPO.DATA_HORA, { apelidos: ['AtualizadoEm'] }),
             col('hora_inicio', TIPO.HORA, { apelidos: ['HoraInicio', 'horaInicio'] }),
@@ -207,6 +203,16 @@ const TABELAS_BACKUP = Object.freeze([
                 apelidos: ['tipoCredito', 'TipoCredito'],
                 enumeracao: PLANTAO_CREDITOS
             })
+        ]
+    },
+    {
+        // Equipe do plantao (desde 2026-09-28). Arquivos anteriores guardavam
+        // a equipe no JSON plantoes.colaboradores_ids; normalizacao.js converte.
+        tabela: 'PlantaoColaborador',
+        identidade: null,
+        colunas: [
+            col('PlantaoId', TIPO.ID, { obrigatorio: true }),
+            col('ColaboradorId', TIPO.ID, { obrigatorio: true })
         ]
     },
     {

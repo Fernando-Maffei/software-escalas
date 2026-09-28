@@ -25,9 +25,11 @@ function normalizeColaboradores(values) {
     return normalizeNumericArray(values, 'Colaborador');
 }
 
-// A equipe do plantao fica em plantoes.colaboradores_ids como texto JSON
-// ("[3,7]"). Texto que nao e JSON valido vira equipe vazia: e dado legado, e
-// derrubar a leitura do dia inteiro por causa dele seria pior.
+// Equipe do plantao como array de ids. Aceita o array ou o texto JSON que as
+// consultas montam a partir de PlantaoColaborador (ver equipe-plantao.js) e o
+// que os backups antigos guardavam em plantoes.colaboradores_ids ("[3,7]").
+// Texto que nao e JSON valido vira equipe vazia: derrubar a leitura do dia
+// inteiro por causa dele seria pior.
 function parseEquipePlantao(raw) {
     let valor = raw ?? [];
 
@@ -154,7 +156,7 @@ function serializePlantaoRecord(row) {
     }
 
     const colaboradores = parseEquipePlantao(
-        row.colaboradores ?? row.Colaboradores ?? row.colaboradores_ids ?? row.ColaboradoresIds
+        row.equipe ?? row.colaboradores ?? row.Colaboradores
     );
 
     return {
@@ -394,9 +396,9 @@ function montarRelatorioHorasExtras(plantoes, colaboradores, filtros = {}) {
 }
 
 // Quem compartilha exatamente o mesmo horario E o mesmo destino das horas vira
-// UMA linha, com os colaboradores juntos. Preserva o formato de sempre da
-// tabela (um registro com colaboradores_ids) e evita inflar o banco quando
-// cinco pessoas fazem o mesmo turno. O tipo_credito entra na chave porque e
+// UMA linha, com os colaboradores juntos (a equipe vai para PlantaoColaborador),
+// o que evita inflar o banco quando cinco pessoas fazem o mesmo turno. O
+// tipo_credito entra na chave porque e
 // gravado por linha: agrupar banco com extra perderia a distincao.
 function agruparLancamentosPorHorario(lancamentos) {
     const grupos = new Map();

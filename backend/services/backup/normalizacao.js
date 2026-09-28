@@ -81,6 +81,7 @@ function normalizarInteiro(valor, rotulo) {
     return numero;
 }
 
+// Equipe no formato antigo: array (ou texto JSON) de ids de colaborador.
 function normalizarEquipe(valor, rotulo) {
     let lista = valor;
 
@@ -92,15 +93,11 @@ function normalizarEquipe(valor, rotulo) {
         }
     }
 
-    return JSON.stringify(normalizeColaboradores(lista));
+    return normalizeColaboradores(lista);
 }
 
 function normalizarValor(coluna, bruto, rotulo) {
     if (estaVazio(bruto)) {
-        if (coluna.tipo === TIPO.EQUIPE_PLANTAO) {
-            return '[]';
-        }
-
         return null;
     }
 
@@ -119,8 +116,6 @@ function normalizarValor(coluna, bruto, rotulo) {
             return normalizarDataHora(bruto, rotulo);
         case TIPO.HORA:
             return normalizarHora(bruto, rotulo);
-        case TIPO.EQUIPE_PLANTAO:
-            return normalizarEquipe(bruto, rotulo);
         case TIPO.TEXTO:
             return coluna.enumeracao
                 ? normalizeEnum(bruto, rotulo, coluna.enumeracao)
@@ -145,8 +140,6 @@ function tipoSql(coluna) {
             return sql.DateTime;
         case TIPO.HORA:
             return sql.Time;
-        case TIPO.EQUIPE_PLANTAO:
-            return sql.NVarChar(sql.MAX);
         default:
             return sql.NVarChar(coluna.max || 255);
     }
@@ -275,6 +268,59 @@ function detectarFormato(payload) {
     throw new AppError(400, 'Arquivo invalido. Use um JSON gerado pelo sistema de backup ou pela exportacao antiga.');
 }
 
+// Onde os arquivos anteriores a 2026-09-28 guardavam a equipe de cada plantao.
+const APELIDOS_EQUIPE_LEGADA = Object.freeze(['colaboradores_ids', 'colaboradores', 'ColaboradoresIds', 'Colaboradores']);
+
+// Arquivo sem a tabela PlantaoColaborador: a equipe vem do JSON de cada linha
+// de plantoes. Se nenhum plantao do arquivo traz id, eles recebem ids em
+// sequencia — a equipe precisa de um id para se ligar.
+function vinculosDaEquipeLegada(plantoesBrutos, plantoes) {
+    const vinculos = [];
+
+    plantoesBrutos.forEach((bruto, indice) => {
+        const valor = lerBruto(bruto, { apelidos: APELIDOS_EQUIPE_LEGADA });
+
+        if (valor === AUSENTE || estaVazio(valor)) {
+            return;
+        }
+
+        const equipe = normalizarEquipe(valor, `plantoes.colaboradores_ids (registro ${indice + 1})`);
+
+        if (equipe.length && plantoes.every((plantao) => plantao.id == null)) {
+            plantoes.forEach((plantao, posicao) => {
+                plantao.id = posicao + 1;
+            });
+        }
+
+        equipe.forEach((colaboradorId) => {
+            vinculos.push({ PlantaoId: plantoes[indice].id, ColaboradorId: colaboradorId });
+        });
+    });
+
+    return vinculos;
+}
+
+// A tabela tem FK para os dois lados: um vinculo com plantao ou colaborador
+// que nao esta no arquivo abortaria a restauracao inteira. Esses (e os
+// repetidos) sao descartados e contados.
+function filtrarVinculosEquipe(data) {
+    const plantoes = new Set(data.plantoes.map((linha) => linha.id));
+    const colaboradores = new Set(data.Colaboradores.map((linha) => linha.Id));
+    const vistos = new Set();
+    let descartados = 0;
+
+    data.PlantaoColaborador = data.PlantaoColaborador.filter((vinculo) => {
+        const chave = `${vinculo.PlantaoId}:${vinculo.ColaboradorId}`;
+        const valido = plantoes.has(vinculo.PlantaoId) && colaboradores.has(vinculo.ColaboradorId) && !vistos.has(chave);
+
+        vistos.add(chave);
+        descartados += valido ? 0 : 1;
+        return valido;
+    });
+
+    return descartados;
+}
+
 function coerceBackupPayload(rawPayload = {}) {
     if (!isPlainObject(rawPayload)) {
         throw new AppError(400, 'O arquivo de backup esta invalido.');
@@ -282,6 +328,7 @@ function coerceBackupPayload(rawPayload = {}) {
 
     const { formato, origem } = detectarFormato(rawPayload);
     const data = {};
+    const brutas = {};
 
     for (const especificacao of TABELAS_BACKUP) {
         // A exportacao antiga so tinha algumas colecoes, com nome em minusculo.
@@ -289,14 +336,27 @@ function coerceBackupPayload(rawPayload = {}) {
             formato === 'legacy' ? [...especificacao.legado, especificacao.tabela] : [especificacao.tabela];
         const linhas = formato === 'legacy' && !especificacao.legado.length ? [] : lerArray(origem, chaves);
 
+        brutas[especificacao.tabela] = linhas;
         data[especificacao.tabela] = linhas.map((linha, indice) => normalizarLinha(especificacao, linha, indice + 1));
+    }
+
+    if (!Array.isArray(origem.PlantaoColaborador)) {
+        data.PlantaoColaborador = vinculosDaEquipeLegada(brutas.plantoes, data.plantoes);
+    }
+
+    const avisos = [];
+    const descartados = filtrarVinculosEquipe(data);
+
+    if (descartados > 0) {
+        avisos.push(`${descartados} vinculo(s) de equipe de plantao com colaborador ou plantao inexistente no arquivo foram ignorados.`);
     }
 
     return {
         format: formato,
         metadata: isPlainObject(rawPayload.metadata) ? rawPayload.metadata : {},
         preferences: isPlainObject(rawPayload.preferencias) ? rawPayload.preferencias : {},
-        data
+        data,
+        avisos
     };
 }
 

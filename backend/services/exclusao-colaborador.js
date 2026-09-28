@@ -8,7 +8,7 @@
 const { sql } = require('../db');
 const { AppError } = require('../lib/errors');
 const { extractDateString } = require('../lib/validation');
-const { parseEquipePlantao } = require('./plantoes');
+const { removerColaboradorDasEquipes } = require('./equipe-plantao');
 
 // Toda tabela com FK para Colaboradores(Id), e a coluna da FK. Uma tabela nova
 // que referencie Colaboradores precisa entrar aqui — o teste de integracao
@@ -39,30 +39,6 @@ function assertPodeExcluirDefinitivamente(colaborador, hojeISO) {
     }
 }
 
-// O plantao guarda a equipe como array JSON em texto, sem FK. Tira o
-// colaborador de cada dia em que ele aparece; o registro do dia continua.
-async function removerDosPlantoes(tx, colaboradorId) {
-    // O LIKE so pre-filtra (o id 1 tambem casa "[12]"); a decisao e do parse.
-    const candidatos = await tx
-        .request()
-        .input('padrao', sql.NVarChar(50), `%${colaboradorId}%`)
-        .query('SELECT id, colaboradores_ids FROM plantoes WHERE colaboradores_ids LIKE @padrao');
-
-    for (const plantao of candidatos.recordset) {
-        const equipe = parseEquipePlantao(plantao.colaboradores_ids);
-
-        if (!equipe.includes(colaboradorId)) {
-            continue;
-        }
-
-        await tx
-            .request()
-            .input('id', sql.Int, plantao.id)
-            .input('colaboradores_ids', sql.NVarChar(sql.MAX), JSON.stringify(equipe.filter((id) => id !== colaboradorId)))
-            .query('UPDATE plantoes SET colaboradores_ids = @colaboradores_ids, atualizado_em = GETDATE() WHERE id = @id');
-    }
-}
-
 async function excluirColaboradorDefinitivamente(tx, colaboradorId, options = {}) {
     const hojeISO = options.hojeISO || extractDateString(new Date());
     const resultado = await tx
@@ -76,7 +52,9 @@ async function excluirColaboradorDefinitivamente(tx, colaboradorId, options = {}
     }
 
     assertPodeExcluirDefinitivamente(colaborador, hojeISO);
-    await removerDosPlantoes(tx, colaboradorId);
+    // Sai das equipes de plantao; os plantoes continuam (a FK impediria
+    // apagar o cadastro com a pessoa ainda escalada).
+    await removerColaboradorDasEquipes(tx, colaboradorId);
 
     // A folga de OUTRA pessoa pode apontar este colaborador como quem cobriu
     // (coluna legada, a tela nao preenche mais). O registro da folga continua
