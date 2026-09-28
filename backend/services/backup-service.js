@@ -12,6 +12,7 @@ const { AppError } = require('../lib/errors');
 const { normalizeBackupDirectory } = require('./backup-config');
 const { NOMES_TABELAS_BACKUP, TABELAS_BACKUP } = require('./backup/especificacao');
 const { coerceBackupPayload, tipoSql } = require('./backup/normalizacao');
+const { nomeArquivoBackup } = require('./backup/retencao');
 const { version: VERSAO_SISTEMA } = require('../../package.json');
 
 function formatBackupTimestamp(date = new Date()) {
@@ -91,7 +92,7 @@ async function montarBackup(pool, options = {}) {
 async function createSystemBackup(pool, options = {}) {
     const directory = await ensureBackupDirectory(options.directory);
     const generatedAt = new Date();
-    const fileName = `backup-escalas-${formatBackupTimestamp(generatedAt)}.json`;
+    const fileName = nomeArquivoBackup(formatBackupTimestamp(generatedAt), { automatico: Boolean(options.automatico) });
     const filePath = path.join(directory, fileName);
     const payload = await montarBackup(pool, { ...options, generatedAt });
     const { tableCounts, totalRows } = payload.metadata;

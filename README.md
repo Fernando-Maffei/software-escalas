@@ -251,7 +251,10 @@ Em **Configurações → Banco de dados** é possível gerar backups na pasta do
 agendar backups automáticos e restaurar um arquivo. **Exportar Dados** baixa o
 mesmo backup completo; **Importar Dados** restaura o sistema a partir dele. Antes
 de restaurar, um backup de segurança do estado atual é salvo automaticamente. O
-arquivo de backup não contém contas nem sessões.
+arquivo de backup não contém contas nem sessões. Em **Manter os últimos backups
+automáticos** dá para limitar quantos backups automáticos ficam na pasta (0 =
+todos); só os automáticos (`backup-escalas-auto-*.json`) são apagados, nunca os
+manuais nem os de segurança.
 
 ## Atualização
 

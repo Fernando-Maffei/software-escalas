@@ -7,6 +7,7 @@ const {
 const { getPublicDatabaseSettings } = require('../db/database-config');
 const { AppError } = require('../lib/errors');
 const { createSystemBackup } = require('./backup-service');
+const { aplicarRetencao } = require('./backup/retencao');
 
 let autoBackupTimer = null;
 let autoBackupRunning = false;
@@ -60,6 +61,7 @@ async function executeAutomaticBackup(trigger = 'auto-schedule', options = {}) {
         const result = await createSystemBackup(pool, {
             directory: settings.directory,
             generatedBy: trigger,
+            automatico: true,
             databaseInfo: {
                 host: databaseSettings.host,
                 instanceName: databaseSettings.instanceName,
@@ -70,13 +72,40 @@ async function executeAutomaticBackup(trigger = 'auto-schedule', options = {}) {
 
         saveBackupSettings(buildBackupExecutionSettings(settings, result, { trigger }));
 
+        const retencao = await limparBackupsAntigos(settings);
+
         return {
             success: true,
             trigger,
-            ...result
+            ...result,
+            retencao
         };
     } finally {
         autoBackupRunning = false;
+    }
+}
+
+// O backup ja foi gravado: um problema na limpeza vira log, nunca falha do backup.
+async function limparBackupsAntigos(settings) {
+    if (!(settings.autoBackupRetencao > 0)) {
+        return null;
+    }
+
+    try {
+        const resultado = await aplicarRetencao(settings.directory, settings.autoBackupRetencao);
+
+        if (resultado.removidos.length) {
+            console.log(`Retencao de backups: ${resultado.removidos.length} backup(s) automatico(s) antigo(s) removido(s).`);
+        }
+
+        resultado.falhas.forEach((falha) => {
+            console.error(`Retencao de backups: nao foi possivel apagar ${falha.nome} (${falha.erro}).`);
+        });
+
+        return resultado;
+    } catch (error) {
+        console.error('Retencao de backups: falha ao listar a pasta:', error.message);
+        return null;
     }
 }
 

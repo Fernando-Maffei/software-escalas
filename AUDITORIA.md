@@ -357,7 +357,7 @@ o `ALTER COLUMN`/`DROP+ADD CONSTRAINT` sem guarda em
 Proposta: tabela `SchemaMigrations` registrando o que ja rodou. Mexe no fluxo de
 atualizacao da producao → pergunta P5.
 
-**M10 — Backups nunca sao apagados** · `PROPOSTA`
+**M10 — Backups nunca sao apagados** · `RESOLVIDO`
 Backup automatico a cada 180 min (padrao) mais um por desligamento, sem
 retencao: ~8 arquivos/dia para sempre. Proposta: manter os N mais recentes (configuravel).
 **Nao implementado:** a correcao apaga arquivos na pasta de backup da producao,
@@ -365,6 +365,15 @@ que pode conter copias que o usuario guarda de proposito (manuais, pre-restaurac
 Proposta concreta: campo "manter os ultimos N backups automaticos" na tela de
 backup (padrao desligado), apagando so arquivos `generatedBy: 'automatico'` com o
 prefixo do sistema, nunca os manuais nem os de pre-restauracao. Precisa do seu ok (P8).
+**Feito (P8 respondida: sim):** campo "Manter os ultimos backups automaticos"
+em Configuracoes -> Backup (`autoBackupRetencao`, 0 = todos, padrao). Backups
+automaticos (agendado e de encerramento) passam a se chamar
+`backup-escalas-auto-<data>.json`; so arquivos com esse nome exato entram na
+limpeza (`backend/services/backup/retencao.js`), feita logo apos cada backup
+automatico bem-sucedido. Manual, pre-restauracao, pastas e arquivos alheios
+nunca sao tocados; falha ao apagar vira log, nao derruba o backup. Testes
+unitarios (o que e e o que nao e apagado, limites do campo) e de integracao
+(3 automaticos reais com retencao 2 + 1 manual na mesma pasta).
 
 **M11 — `/trocar-senha` e `deveTrocarSenha` so no front** · `RESOLVIDO`
 O servidor nao impede uma conta com `deveTrocarSenha = 1` de usar a API.
@@ -572,7 +581,8 @@ Tabelas pequenas; o collation padrao ja e case-insensitive. Nao vale o risco ago
 **Respondidas:** P1 sim (M7 resolvido), P2 sim (A5 resolvido), P4 sim, com
 derrubada das outras sessoes (A7 resolvido), P7 "nao agora" (o `.prettierignore`
 exclui o legado; codigo novo ja segue o formato). P3 foi decidida pelo menor
-risco: contas continuam fora do backup (A3). P6 sim (M15 resolvido). P5, P8 e P9
+risco: contas continuam fora do backup (A3). P6 sim (M15 resolvido). P8 sim (M10
+resolvido). P5 e P9
 seguem abertas.
 
 ---
@@ -685,14 +695,13 @@ uma com recarga da pagina — nao e bug.
 
 ### Resolvidos
 
-C1, C2; A1–A13; M1–M8, M11, M12, M14, M15, M16; B1–B7, B9, B10; S1–S8.
+C1, C2; A1–A13; M1–M8, M10, M11, M12, M14, M15, M16; B1–B7, B9, B10; S1–S8.
 Aceitos com justificativa: B8, B11 e a parte de frontend do M14.
 
 ### Pendente (propostas, dependem de decisao)
 
 - **M9 / M17 (P5):** tabela de controle de migrations e tabela de ligacao
   plantao↔colaborador — mudam o banco da producao.
-- **M10 (P8):** retencao de backups automaticos.
 - **M13 (P9):** container sem root.
 - **P7:** formatacao em massa do legado (adiada a seu pedido).
 
@@ -705,7 +714,7 @@ Aceitos com justificativa: B8, B11 e a parte de frontend do M14.
    antes de qualquer refatoracao grande do backend.
 3. Avisar os usuarios: a troca de senha agora pede a senha atual, e o arquivo de
    "Exportar Dados" mudou de formato (os arquivos antigos continuam importaveis).
-4. Decidir P5, P8 e P9.
+4. Decidir P5 e P9.
 5. Frontend: trocar os 26 `onclick` de `core/acoes-html.js` por
    `addEventListener` (libera uma CSP de script sem `'unsafe-inline'`);
    renomear `core/runtime/` (o nome vem do antigo `runtime-fixes.js`, que ja

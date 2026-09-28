@@ -278,6 +278,10 @@ function montarDetalheConfiguracaoBackup(data) {
         parts.push('Backup ao encerrar: ativo');
     }
 
+    if (Number(data.autoBackupRetencao) > 0) {
+        parts.push(`Retencao: ultimos ${Number(data.autoBackupRetencao)} automaticos`);
+    }
+
     if (data.lastRestoreAt) {
         parts.push(`Ultima importacao: ${formatarDataHoraBackup(data.lastRestoreAt)}`);
     }
@@ -315,6 +319,7 @@ function preencherFormularioConfiguracaoBackup(data) {
     const autoBackupEnabledInput = document.getElementById('autoBackupEnabled');
     const autoBackupIntervalInput = document.getElementById('autoBackupIntervalMinutes');
     const autoBackupOnShutdownInput = document.getElementById('autoBackupOnShutdown');
+    const autoBackupRetencaoInput = document.getElementById('autoBackupRetencao');
 
     if (directoryInput) {
         directoryInput.value = data.directory || '';
@@ -332,6 +337,10 @@ function preencherFormularioConfiguracaoBackup(data) {
 
     if (autoBackupOnShutdownInput) {
         autoBackupOnShutdownInput.checked = Boolean(data.autoBackupOnShutdown);
+    }
+
+    if (autoBackupRetencaoInput) {
+        autoBackupRetencaoInput.value = String(Number(data.autoBackupRetencao) || 0);
     }
 }
 
@@ -363,7 +372,8 @@ function construirPayloadConfiguracaoBackup() {
         directory: document.getElementById('backupDirectory')?.value || '',
         autoBackupEnabled: Boolean(document.getElementById('autoBackupEnabled')?.checked),
         autoBackupIntervalMinutes: document.getElementById('autoBackupIntervalMinutes')?.value || '180',
-        autoBackupOnShutdown: Boolean(document.getElementById('autoBackupOnShutdown')?.checked)
+        autoBackupOnShutdown: Boolean(document.getElementById('autoBackupOnShutdown')?.checked),
+        autoBackupRetencao: document.getElementById('autoBackupRetencao')?.value || '0'
     };
 }
 

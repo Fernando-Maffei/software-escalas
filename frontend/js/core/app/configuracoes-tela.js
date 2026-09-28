@@ -411,6 +411,21 @@ export function renderConfiguracoes() {
                                 <small class="helper-text">
                                     Quando o servidor for fechado normalmente, ele tenta gerar um backup extra na pasta configurada.
                                 </small>
+                                <div class="config-backup-interval">
+                                    <label for="autoBackupRetencao">Manter os ultimos backups automaticos</label>
+                                    <input
+                                        type="number"
+                                        id="autoBackupRetencao"
+                                        class="form-control"
+                                        min="0"
+                                        max="1000"
+                                        step="1"
+                                        value="0"
+                                    >
+                                    <small class="helper-text">
+                                        0 mantem todos. Com um numero, os automaticos mais antigos sao apagados; backups manuais e os gerados antes de uma importacao nunca sao apagados.
+                                    </small>
+                                </div>
                             </div>
                             <small class="helper-text">
                                 Use um caminho absoluto. Se a pasta não existir, o sistema tentará criá-la automaticamente.

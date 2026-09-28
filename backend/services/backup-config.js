@@ -4,6 +4,7 @@ const path = require('path');
 const { AppError } = require('../lib/errors');
 const { normalizeBoolean } = require('../lib/validation');
 const { ensureDataDirectory, resolveDataPath } = require('../lib/app-paths');
+const { RETENCAO_MAXIMA } = require('./backup/retencao');
 
 const CONFIG_PATH = resolveDataPath('backup.local.json');
 
@@ -73,12 +74,28 @@ function normalizeAutoBackupIntervalMinutes(value, fallback = 180) {
     return parsed;
 }
 
+// Quantos backups automaticos manter na pasta (0 = todos). Ver backup/retencao.js.
+function normalizeAutoBackupRetencao(value, fallback = 0) {
+    if (value === undefined || value === null || String(value).trim() === '') {
+        return fallback;
+    }
+
+    const parsed = Number(String(value).trim());
+
+    if (!Number.isInteger(parsed) || parsed < 0 || parsed > RETENCAO_MAXIMA) {
+        throw new AppError(400, `Informe quantos backups automaticos manter: um numero inteiro de 0 (todos) a ${RETENCAO_MAXIMA}.`);
+    }
+
+    return parsed;
+}
+
 function getDefaultBackupSettings() {
     return {
         directory: '',
         autoBackupEnabled: false,
         autoBackupIntervalMinutes: 180,
         autoBackupOnShutdown: false,
+        autoBackupRetencao: 0,
         lastBackupAt: null,
         lastBackupFile: '',
         lastBackupPath: '',
@@ -122,6 +139,7 @@ function coerceBackupSettings(input = {}) {
         autoBackupOnShutdown: normalizeBoolean(input.autoBackupOnShutdown, 'Backup ao desligar', {
             defaultValue: defaults.autoBackupOnShutdown
         }),
+        autoBackupRetencao: normalizeAutoBackupRetencao(input.autoBackupRetencao, defaults.autoBackupRetencao),
         lastBackupAt: normalizeTrimmedString(input.lastBackupAt) || defaults.lastBackupAt,
         lastBackupFile: normalizeTrimmedString(input.lastBackupFile) || defaults.lastBackupFile,
         lastBackupPath: normalizeTrimmedString(input.lastBackupPath) ? path.normalize(stripWrappingQuotes(input.lastBackupPath)) : defaults.lastBackupPath,
@@ -201,6 +219,7 @@ module.exports = {
     buildBackupExecutionSettings,
     buildBackupRestoreSettings,
     normalizeAutoBackupIntervalMinutes,
+    normalizeAutoBackupRetencao,
     normalizeBackupDirectory,
     saveBackupSettings
 };

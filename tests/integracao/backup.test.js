@@ -4,6 +4,7 @@ const path = require('path');
 
 const { PASTA_DADOS, consultar, criarCliente, esperarSucesso } = require('./apoio');
 const { TABELAS_BACKUP } = require('../../backend/services/backup/especificacao');
+const { executeAutomaticBackup } = require('../../backend/services/backup-scheduler');
 const {
     DATAS,
     anotarSemana,
@@ -234,6 +235,55 @@ module.exports = [
 
             assert.equal(resposta.status, 400);
             assert.match(resposta.body.error, /Nome deve ter no maximo 200/);
+        }
+    },
+    {
+        // M10 da auditoria: backups automaticos se acumulavam para sempre. Com
+        // retencao N, ficam so os N mais recentes — e o backup manual da mesma
+        // pasta nunca e apagado.
+        name: 'retencao mantem os N ultimos backups automaticos e preserva o manual',
+        async run() {
+            const cliente = criarCliente();
+            await cliente.entrar();
+            const pasta = path.join(PASTA_DADOS, 'backups-retencao');
+            const config = { directory: pasta, autoBackupEnabled: false, autoBackupOnShutdown: false };
+
+            const invalida = await cliente.post('/api/configuracao-banco/backup/salvar', {
+                ...config,
+                autoBackupRetencao: -3
+            });
+            assert.equal(invalida.status, 400);
+
+            esperarSucesso(
+                await cliente.post('/api/configuracao-banco/backup/salvar', { ...config, autoBackupRetencao: 2 }),
+                'salvar retencao'
+            );
+
+            try {
+                const manual = esperarSucesso(
+                    await cliente.post('/api/configuracao-banco/backup/gerar', { directory: pasta }),
+                    'backup manual'
+                );
+
+                const automaticos = [];
+                for (let i = 0; i < 3; i++) {
+                    // o nome tem resolucao de segundo
+                    await new Promise((resolver) => setTimeout(resolver, 1100));
+                    const resultado = await executeAutomaticBackup('auto-schedule', { force: true });
+                    if (!('fileName' in resultado)) {
+                        throw new Error(`backup automatico nao gerou arquivo: ${resultado.reason}`);
+                    }
+                    automaticos.push(resultado.fileName);
+                }
+
+                const naPasta = fs.readdirSync(pasta).sort();
+                assert.deepEqual(naPasta, [manual.result.fileName, ...automaticos.slice(1)].sort());
+            } finally {
+                esperarSucesso(
+                    await cliente.post('/api/configuracao-banco/backup/salvar', { ...config, autoBackupRetencao: 0 }),
+                    'desligar retencao'
+                );
+            }
         }
     }
 ];
