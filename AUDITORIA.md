@@ -393,13 +393,20 @@ preferencias deste navegador"); a funcao continua.
 diz o que acontece de verdade (e que os dados do sistema nao sao apagados). O
 "digite RESET" saiu: a acao nao destroi nada.
 
-**M13 — Container roda como root** · `PROPOSTA`
+**M13 — Container roda como root** · `RESOLVIDO`
 `Dockerfile`: sem `USER node`.
 **Nao implementado:** o volume de dados e de backups da producao ja pertence ao
 root; trocar o usuario sem migrar as permissoes faria o servidor perder escrita
 nos backups e na configuracao. Proposta concreta: `USER node` no Dockerfile mais
 um passo unico de `chown -R node:node` nos volumes, feito na janela de
 atualizacao, depois de backup (P9).
+**Feito (P9 respondida: sim):** `USER node` no Dockerfile (codigo continua do
+root: o app le mas nao altera o proprio codigo); `/data` pertence ao `node`. Novo
+servico `app-permissoes` nos dois composes: roda como root so para
+`chown -R node:node /data` e sai; o app so sobe depois dele, o que migra
+volumes antigos sem passo manual. Ensaiado na instancia de teste com volume da
+era root (arquivo do root migrado, app como uid 1000, gravacao de configuracao
+e backups, backup de encerramento, robo 12/12) antes de ir para a producao.
 
 **M14 — Funcoes gigantes** · `RESOLVIDO`
 Maiores: `renderConfiguracoes` (593 linhas), `gerarHtmlPdfRelatorioEscala` (562),
@@ -582,8 +589,7 @@ Tabelas pequenas; o collation padrao ja e case-insensitive. Nao vale o risco ago
 derrubada das outras sessoes (A7 resolvido), P7 "nao agora" (o `.prettierignore`
 exclui o legado; codigo novo ja segue o formato). P3 foi decidida pelo menor
 risco: contas continuam fora do backup (A3). P6 sim (M15 resolvido). P8 sim (M10
-resolvido). P5 e P9
-seguem abertas.
+resolvido). P9 sim (M13 resolvido). P5 segue aberta.
 
 ---
 
@@ -695,14 +701,13 @@ uma com recarga da pagina — nao e bug.
 
 ### Resolvidos
 
-C1, C2; A1–A13; M1–M8, M10, M11, M12, M14, M15, M16; B1–B7, B9, B10; S1–S8.
+C1, C2; A1–A13; M1–M8, M10–M16; B1–B7, B9, B10; S1–S8.
 Aceitos com justificativa: B8, B11 e a parte de frontend do M14.
 
 ### Pendente (propostas, dependem de decisao)
 
 - **M9 / M17 (P5):** tabela de controle de migrations e tabela de ligacao
   plantao↔colaborador — mudam o banco da producao.
-- **M13 (P9):** container sem root.
 - **P7:** formatacao em massa do legado (adiada a seu pedido).
 
 ### Recomendacoes futuras
@@ -714,7 +719,7 @@ Aceitos com justificativa: B8, B11 e a parte de frontend do M14.
    antes de qualquer refatoracao grande do backend.
 3. Avisar os usuarios: a troca de senha agora pede a senha atual, e o arquivo de
    "Exportar Dados" mudou de formato (os arquivos antigos continuam importaveis).
-4. Decidir P5 e P9.
+4. Decidir P5.
 5. Frontend: trocar os 26 `onclick` de `core/acoes-html.js` por
    `addEventListener` (libera uma CSP de script sem `'unsafe-inline'`);
    renomear `core/runtime/` (o nome vem do antigo `runtime-fixes.js`, que ja

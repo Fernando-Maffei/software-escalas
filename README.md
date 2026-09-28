@@ -65,6 +65,13 @@ ficar vazio, a senha aparece uma única vez em `docker compose logs app`. Os dad
 ficam em volumes e sobrevivem a reinícios; com `restart: always` os containers
 voltam sozinhos quando a máquina liga.
 
+O app roda **sem root** (usuário `node` da imagem). Ele só grava em `/data` (volume
+`app-data`) e na pasta de backup — que deve ficar dentro de `/data` (ex.:
+`/data/backups`) ou num volume montado. Um passo curto do compose
+(`app-permissoes`) acerta o dono de `/data` antes de o app subir, o que também
+migra volumes criados por versões antigas. Se atualizar só o app com
+`docker compose up -d --no-deps app`, rode antes `docker compose run --rm app-permissoes`.
+
 ```bash
 docker compose down
 ```

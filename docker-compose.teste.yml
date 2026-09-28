@@ -36,11 +36,28 @@ services:
       - ./docker/init-db.sh:/init-db.sh:ro
     entrypoint: ["/bin/bash", "/init-db.sh"]
 
+  # ---- Ajusta o dono da pasta de dados e sai -------------------------------
+  # O app roda como o usuario "node", sem root (ver Dockerfile). Volumes criados
+  # quando o app rodava como root tem arquivos do root que o app nao conseguiria
+  # mais gravar; este passo passa a pasta para o "node" antes do app subir. E o
+  # unico momento em que algo roda como root, e o container sai em seguida.
+  app-permissoes:
+    build: .
+    image: app-de-escalas-teste-app
+    user: "0:0"
+    entrypoint: ["chown", "-R", "node:node", "/data"]
+    volumes:
+      - app-data:/data
+    restart: "no"
+
   app:
     build: .
+    image: app-de-escalas-teste-app
     container_name: escalas-teste-app
     depends_on:
       db-init:
+        condition: service_completed_successfully
+      app-permissoes:
         condition: service_completed_successfully
     environment:
       PORT: "4450"

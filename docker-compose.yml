@@ -39,13 +39,30 @@ services:
     entrypoint: ["/bin/bash", "/init-db.sh"]
     restart: "no"
 
+  # ---- Ajusta o dono da pasta de dados e sai -------------------------------
+  # O app roda como o usuario "node", sem root (ver Dockerfile). Volumes criados
+  # quando o app rodava como root tem arquivos do root que o app nao conseguiria
+  # mais gravar; este passo passa a pasta para o "node" antes do app subir. E o
+  # unico momento em que algo roda como root, e o container sai em seguida.
+  app-permissoes:
+    build: .
+    image: app-de-escalas-app
+    user: "0:0"
+    entrypoint: ["chown", "-R", "node:node", "/data"]
+    volumes:
+      - app-data:/data
+    restart: "no"
+
   # ---- O app (Node/Express) ------------------------------------------------
   app:
     build: .
+    image: app-de-escalas-app
     container_name: escalas-app
     depends_on:
       db-init:
         condition: service_completed_successfully   # so sobe apos o banco existir
+      app-permissoes:
+        condition: service_completed_successfully
     environment:
       PORT: "4450"
       DB_HOST: "db"            # nome do servico do banco acima
