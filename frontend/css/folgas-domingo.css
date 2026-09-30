@@ -91,6 +91,15 @@
     align-items: center;
 }
 
+/* O campo de hora do navegador precisa de ~90px para HH:MM + o relogio. Com o
+   padding padrao do .form-control (12px de cada lado) sobravam ~50px e os
+   minutos ficavam cortados; por isso o par ocupa a linha inteira do formulario
+   (--largo) e o padding lateral aqui e menor. */
+.folga-domingo-par input[type="time"] {
+    min-width: 0;
+    padding-inline: 8px;
+}
+
 .folga-domingo-par span {
     color: var(--text-light);
     font-size: 11px;

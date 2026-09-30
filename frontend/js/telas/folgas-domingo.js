@@ -89,7 +89,7 @@ export function renderPainelFolgasDomingo(dataISO) {
                         <small>Repoe em (opcional)</small>
                         <input type="date" id="folgaDomingoDataReposicao" class="form-control">
                     </div>
-                    <div class="folga-domingo-campo">
+                    <div class="folga-domingo-campo folga-domingo-campo--largo">
                         <small>Horario da reposicao</small>
                         <div class="folga-domingo-par">
                             <input type="time" id="folgaDomingoHoraInicio" class="form-control">
@@ -97,7 +97,7 @@ export function renderPainelFolgasDomingo(dataISO) {
                             <input type="time" id="folgaDomingoHoraFim" class="form-control">
                         </div>
                     </div>
-                    <div class="folga-domingo-campo">
+                    <div class="folga-domingo-campo folga-domingo-campo--largo">
                         <small>Almoco da reposicao</small>
                         <div class="folga-domingo-par">
                             <input type="time" id="folgaDomingoAlmocoInicio" class="form-control">
