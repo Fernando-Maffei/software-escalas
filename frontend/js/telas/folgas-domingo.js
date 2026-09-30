@@ -122,10 +122,34 @@ export function textoQuando(dataISO) {
     return dias > 0 ? `ha ${total} ${unidade}` : `em ${total} ${unidade}`;
 }
 
+// Plantonista = colaborador cujo tipo de escala tem a regra de folga de domingo
+// (DomingosFolgaCada). Vai pela regra, e nao pelo nome do tipo, para valer
+// para qualquer molde que o usuario criar com essa regra.
+function ehPlantonista(colaborador) {
+    const tipo = (estado.tiposEscala || []).find((item) => Number(item.id) === Number(colaborador.TipoEscalaId));
+
+    return Boolean(tipo) && tipo.domingosFolgaCada !== null && tipo.domingosFolgaCada !== undefined;
+}
+
+// Sem nenhum tipo de escala cadastrado (ou se a lista nao carregou) o filtro
+// nao tem como funcionar: ai oferece todos, como antes.
+function filtrandoPorPlantonista() {
+    return Array.isArray(estado.tiposEscala) && estado.tiposEscala.length > 0;
+}
+
+function colaboradoresParaFolga() {
+    const todos = estado.colaboradores || [];
+
+    return filtrandoPorPlantonista() ? todos.filter(ehPlantonista) : todos;
+}
+
 function opcoesColaborador(selecionado) {
+    const lista = colaboradoresParaFolga();
+    const vazio = filtrandoPorPlantonista() && lista.length === 0;
+
     return [
-        '<option value="">Selecione...</option>',
-        ...(estado.colaboradores || [])
+        `<option value="">${vazio ? 'Nenhum plantonista cadastrado' : 'Selecione...'}</option>`,
+        ...lista
             .map((c) => `<option value="${c.Id}" ${Number(selecionado) === Number(c.Id) ? 'selected' : ''}>${escapeHtml(c.Nome)}</option>`)
     ].join('');
 }
@@ -201,6 +225,7 @@ export function renderPainelFolgasDomingo(dataISO) {
                     <div class="folga-domingo-campo folga-domingo-campo--largo">
                         <small>Quem folgou</small>
                         <select id="folgaDomingoColaborador" class="form-control">${opcoesColaborador(rascunho.colaboradorId)}</select>
+                        ${filtrandoPorPlantonista() ? '<p class="folga-domingo-dica">So aparecem colaboradores com tipo de escala de plantonista. O tipo se define no cadastro do colaborador.</p>' : ''}
                     </div>
 
                     <div class="folga-domingo-campo folga-domingo-campo--largo">

@@ -31,6 +31,7 @@ Todas as alteracoes relevantes deste projeto serao documentadas neste arquivo.
 - Migration `2026-09-04-plantao-lancamentos.sql`: troca o indice unico `UX_plantoes_data` por um indice comum, cria a coluna `tipo_credito` ('banco'/'extra', padrao 'banco') e libera 'feriado' no CHECK de `tipo_plantao`.
 
 ### Alterado
+- Folga de domingo: o seletor "Quem folgou" lista so colaboradores **plantonistas**, isto e, cujo tipo de escala tem a regra de folga de domingo (`DomingosFolgaCada`) — pela regra, nao pelo nome do tipo. Se nao ha nenhum tipo de escala cadastrado, continua listando todos. Quem ainda nao tem tipo de escala definido precisa te-lo no cadastro do colaborador para aparecer; folgas ja registradas nao mudam.
 - O que se digita no painel de folga de domingo (colaborador, modo, datas e horarios) agora sobrevive aos redesenhos do painel do plantao, que antes zeravam o formulario a cada alteracao no plantao.
 - `resolvePlantaoTypeByDate` reconhece feriado nacional sem consultar o banco: um 07/09 numa segunda-feira ja resolve como `feriado` mesmo sem nenhuma linha na tabela `Feriados`. A tabela continua sendo consultada, agora so para feriado municipal/estadual — o que o sistema nao tem como calcular.
 - Cadastrar feriado em data de feriado nacional passa a ser recusado com o motivo ("07/09/2026 ja e feriado nacional..."), em `POST` e `PUT /api/feriados`. Era assim que a duplicata voltava para o banco.
