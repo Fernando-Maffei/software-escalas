@@ -70,7 +70,19 @@ async function lancarPlantao(cliente, dataISO, lancamentos, observacao = null) {
     return corpo.data;
 }
 
+// Folga de domingo e so de plantonista de final de semana (cadastro do
+// colaborador): marca a pessoa antes de registrar, como o usuario faria.
+async function tornarPlantonista(cliente, colaboradorId, tipoPlantonista = 'FINAL_SEMANA') {
+    const corpo = esperarSucesso(
+        await cliente.put(`/api/colaboradores/${colaboradorId}`, { isPlantonista: true, tipoPlantonista }),
+        'marcar colaborador como plantonista'
+    );
+    return corpo.data;
+}
+
 async function registrarFolgaDomingo(cliente, colaboradorId, extras = {}) {
+    await tornarPlantonista(cliente, colaboradorId);
+
     const corpo = esperarSucesso(
         await cliente.post('/api/folgas-domingo', {
             colaboradorId,
@@ -126,5 +138,6 @@ module.exports = {
     lancarAusencia,
     lancarPlantao,
     lancarSaldoSemanal,
-    registrarFolgaDomingo
+    registrarFolgaDomingo,
+    tornarPlantonista
 };

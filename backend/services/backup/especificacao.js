@@ -44,7 +44,8 @@ const {
     AUSENCIA_PERIODOS,
     AUSENCIA_TIPOS,
     PLANTAO_TIPOS,
-    PLANTAO_TIPOS_CREDITO: PLANTAO_CREDITOS
+    PLANTAO_TIPOS_CREDITO: PLANTAO_CREDITOS,
+    TIPOS_PLANTONISTA_VALORES
 } = require('../../lib/dominio');
 const SEMANAL_STATUS = Object.freeze(['auto', 'confirmado']);
 
@@ -106,7 +107,13 @@ const TABELAS_BACKUP = Object.freeze([
             col('SetorId', TIPO.ID, { apelidos: ['setorId'] }),
             col('Ativo', TIPO.BIT, { apelidos: ['ativo'] }),
             col('DataDesligamento', TIPO.DATA, { apelidos: ['dataDesligamento'] }),
-            col('TipoEscalaId', TIPO.ID, { apelidos: ['tipoEscalaId'] })
+            col('TipoEscalaId', TIPO.ID, { apelidos: ['tipoEscalaId'] }),
+            col('IsPlantonista', TIPO.BIT, { apelidos: ['isPlantonista'] }),
+            col('TipoPlantonista', TIPO.TEXTO, {
+                max: 20,
+                apelidos: ['tipoPlantonista'],
+                enumeracao: TIPOS_PLANTONISTA_VALORES
+            })
         ],
         jornada: true
     },

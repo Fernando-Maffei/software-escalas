@@ -194,6 +194,22 @@ const AJUSTES_POR_TABELA = Object.freeze({
     },
     Feriados(linha) {
         linha.Tipo = linha.Tipo || 'municipal';
+    },
+    Colaboradores(linha) {
+        // O CHECK do banco exige tipo NULL para quem nao e plantonista, e tipo
+        // valido para quem e. Arquivo inconsistente e recusado aqui, com mensagem,
+        // em vez de estourar a constraint no meio da restauracao.
+        if (linha.IsPlantonista === undefined) {
+            return; // backup anterior aos campos: o restore deriva (backup-service)
+        }
+
+        linha.IsPlantonista = Boolean(linha.IsPlantonista);
+
+        if (!linha.IsPlantonista) {
+            linha.TipoPlantonista = null;
+        } else if (!linha.TipoPlantonista) {
+            throw new AppError(400, 'Colaborador marcado como plantonista sem tipo de plantonista no backup.');
+        }
     }
 });
 

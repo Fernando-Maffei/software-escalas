@@ -1,7 +1,7 @@
 const assert = require('node:assert/strict');
 
 const { consultar, criarCliente, esperarSucesso } = require('./apoio');
-const { DATAS, criarColaborador, lancarAusencia, registrarFolgaDomingo } = require('./fabrica');
+const { DATAS, criarColaborador, lancarAusencia, registrarFolgaDomingo, tornarPlantonista } = require('./fabrica');
 
 async function escalaDoColaborador(colaboradorId) {
     return consultar(`
@@ -100,6 +100,7 @@ module.exports = [
             await cliente.entrar();
 
             const colaborador = await criarColaborador(cliente);
+            await tornarPlantonista(cliente, colaborador.Id);
             await lancarAusencia(cliente, colaborador.Id, { dataInicio: DATAS.quinta, dataFim: DATAS.quinta });
 
             const resposta = await cliente.post('/api/folgas-domingo', {
@@ -157,6 +158,32 @@ module.exports = [
                 (await escalaDoColaborador(colaborador.Id)).map((linha) => linha.data),
                 [DATAS.domingo, DATAS.quinta]
             );
+        }
+    },
+    {
+        name: 'folga de domingo e recusada para colaborador normal e para plantonista de semana',
+        async run() {
+            const cliente = criarCliente();
+            await cliente.entrar();
+
+            const corpo = (colaboradorId) => ({
+                colaboradorId,
+                dataDomingo: DATAS.domingo,
+                dataReposicao: null
+            });
+
+            const normal = await criarColaborador(cliente);
+            const respostaNormal = await cliente.post('/api/folgas-domingo', corpo(normal.Id));
+            assert.equal(respostaNormal.status, 400);
+            assert.match(respostaNormal.body.error, /plantonista de final de semana/);
+
+            const semana = await criarColaborador(cliente);
+            await tornarPlantonista(cliente, semana.Id, 'SEMANA');
+            const respostaSemana = await cliente.post('/api/folgas-domingo', corpo(semana.Id));
+            assert.equal(respostaSemana.status, 400);
+
+            const lista = esperarSucesso(await cliente.get('/api/folgas-domingo'), 'listar folgas');
+            assert.equal(lista.items.filter((item) => [normal.Id, semana.Id].includes(item.colaboradorId)).length, 0);
         }
     }
 ];

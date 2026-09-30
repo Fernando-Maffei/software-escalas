@@ -14,6 +14,7 @@ const { sql } = require('../db');
 const { AppError } = require('../lib/errors');
 const { isSunday } = require('./escala');
 const { exigirReposicaoSemConflito } = require('./folgas-domingo-conflitos');
+const { temFolgaDeDomingo } = require('./plantonista');
 const {
     buildDateRange,
     ensurePositiveInt,
@@ -223,6 +224,26 @@ async function ensureColaboradorExiste(poolOrTx, colaboradorId, rotulo) {
     }
 }
 
+// Folga de domingo e so de plantonista de FINAL DE SEMANA (cadastro do
+// colaborador). O de semana nao tem folga no domingo e o colaborador normal nao
+// e plantonista. A tela ja so oferece esses, mas a API nao pode depender disso.
+async function ensureColaboradorPodeFolgarNoDomingo(poolOrTx, colaboradorId) {
+    const result = await poolOrTx.request()
+        .input('id', sql.Int, colaboradorId)
+        .query('SELECT Id, IsPlantonista, TipoPlantonista FROM Colaboradores WHERE Id = @id');
+
+    if (result.recordset.length === 0) {
+        throw new AppError(404, 'Colaborador nao encontrado.');
+    }
+
+    if (!temFolgaDeDomingo(result.recordset[0])) {
+        throw new AppError(
+            400,
+            'Folga de domingo e so para plantonista de final de semana. Defina o tipo no cadastro do colaborador.'
+        );
+    }
+}
+
 // Os horarios chegam normalizados como texto "HH:mm:ss"; o driver (tedious)
 // so aceita Date num parametro TIME e recusava o texto com "Invalid time".
 function aplicarInputs(request, payload) {
@@ -252,6 +273,7 @@ function traduzirErroDeDuplicidade(erro) {
 async function createFolgaDomingo(poolOrTx, body) {
     const payload = normalizeFolgaDomingoPayload(body);
     await ensureColaboradorExiste(poolOrTx, payload.colaboradorId, 'Colaborador');
+    await ensureColaboradorPodeFolgarNoDomingo(poolOrTx, payload.colaboradorId);
 
     if (payload.dataReposicao) {
         await exigirReposicaoSemConflito(poolOrTx, {
@@ -284,6 +306,13 @@ async function updateFolgaDomingo(poolOrTx, id, body) {
     const payload = normalizeFolgaDomingoPayload(body, atual);
 
     await ensureColaboradorExiste(poolOrTx, payload.colaboradorId, 'Colaborador');
+
+    // Trocar a folga para OUTRA pessoa exige que ela possa folgar; editar a de
+    // quem ja e dono do registro nao reconfere (o cadastro ja barra a mudanca de
+    // tipo enquanto houver folga registrada).
+    if (payload.colaboradorId !== atual.colaboradorId) {
+        await ensureColaboradorPodeFolgarNoDomingo(poolOrTx, payload.colaboradorId);
+    }
 
     // So confere quando a data (ou a pessoa) mudou: editar apenas a observacao
     // de uma folga antiga nao pode falhar por uma ausencia lancada depois.

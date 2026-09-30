@@ -4,7 +4,7 @@ import { API, buscarFeriadosNacionais } from '../../api.js';
 import { mostrarToast } from '../../app/horas-e-resumo.js';
 import { aguardarUsuarioAutenticado } from '../../auth.js';
 import { estado } from '../../estado.js';
-import { atualizarDadosCompartilhados, carregarAusencias, carregarColaboradores, carregarFeriadosLocais, carregarPlantoes, carregarTiposEscala } from '../dados-e-modais.js';
+import { atualizarDadosCompartilhados, carregarAusencias, carregarColaboradores, carregarFeriadosLocais, carregarPlantoes } from '../dados-e-modais.js';
 import { aplicarDefaultsBancoHorasLancamento } from './banco-horas-lancamento.js';
 import { renderColaboradoresPlantao } from './colaboradores-e-jornada.js';
 import { fecharModalSeguro, formatarDataPtBr, formatarHoraInput, getPlantaoEditorState, isColaboradoresScreenVisible, minutosParaTexto, obterDataISO, setPlantaoEditorState } from './helpers.js';
@@ -603,7 +603,6 @@ export async function renderLancamentoPlantao() {
 
     await Promise.allSettled([
         carregarColaboradores(),
-        carregarTiposEscala(),
         carregarAusencias(),
         carregarPlantoes(),
         carregarBancoHorasResumo(),

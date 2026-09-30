@@ -10,7 +10,8 @@ const {
     lancarAusencia,
     lancarPlantao,
     lancarSaldoSemanal,
-    registrarFolgaDomingo
+    registrarFolgaDomingo,
+    tornarPlantonista
 } = require('./fabrica');
 
 // Tabelas que apontam para Colaboradores (por FK ou pelo JSON de plantoes).
@@ -182,6 +183,93 @@ module.exports = [
             } finally {
                 await consultar('DROP TABLE dbo.TesteVinculoIntegracao');
             }
+        }
+    },
+    {
+        name: 'cadastro de plantonista: tipo e obrigatorio, valido e descartado quando deixa de ser plantonista',
+        async run() {
+            const cliente = criarCliente();
+            await cliente.entrar();
+
+            const semTipo = await cliente.post('/api/colaboradores', { nome: 'Sem Tipo', isPlantonista: true });
+            assert.equal(semTipo.status, 400);
+            assert.match(semTipo.body.error, /tipo de plantonista/i);
+
+            const invalido = await cliente.post('/api/colaboradores', {
+                nome: 'Tipo Invalido',
+                isPlantonista: true,
+                tipoPlantonista: 'NOITE'
+            });
+            assert.equal(invalido.status, 400);
+
+            const colaborador = await criarColaborador(cliente, {
+                isPlantonista: true,
+                tipoPlantonista: 'FINAL_SEMANA'
+            });
+            const lido = esperarSucesso(await cliente.get(`/api/colaboradores/${colaborador.Id}`), 'ler plantonista');
+            assert.equal(lido.IsPlantonista, true);
+            assert.equal(lido.TipoPlantonista, 'FINAL_SEMANA');
+
+            // Deixar de ser plantonista apaga o tipo, mesmo que o cliente o reenvie.
+            const normal = esperarSucesso(
+                await cliente.put(`/api/colaboradores/${colaborador.Id}`, {
+                    isPlantonista: false,
+                    tipoPlantonista: 'FINAL_SEMANA'
+                }),
+                'deixar de ser plantonista'
+            );
+            assert.equal(normal.data.IsPlantonista, false);
+            assert.equal(normal.data.TipoPlantonista, null);
+        }
+    },
+    {
+        name: 'plantonista de semana sem horario proprio recebe 11:00-22:00; com horario, mantem o dele',
+        async run() {
+            const cliente = criarCliente();
+            await cliente.entrar();
+
+            const padrao = await criarColaborador(cliente, {
+                trabalhoInicio: null,
+                trabalhoFim: null,
+                almocoInicio: null,
+                almocoFim: null,
+                isPlantonista: true,
+                tipoPlantonista: 'SEMANA'
+            });
+            const lido = esperarSucesso(
+                await cliente.get(`/api/colaboradores/${padrao.Id}`),
+                'ler plantonista de semana'
+            );
+            assert.match(String(lido.TrabalhoInicio), /11:00/);
+            assert.match(String(lido.TrabalhoFim), /22:00/);
+
+            const proprio = await criarColaborador(cliente, { isPlantonista: true, tipoPlantonista: 'SEMANA' });
+            const lidoProprio = esperarSucesso(
+                await cliente.get(`/api/colaboradores/${proprio.Id}`),
+                'ler horario proprio'
+            );
+            assert.match(String(lidoProprio.TrabalhoInicio), /08:00/);
+        }
+    },
+    {
+        name: 'plantonista de final de semana com folga de domingo nao muda de tipo ate remover as folgas',
+        async run() {
+            const cliente = criarCliente();
+            await cliente.entrar();
+
+            const colaborador = await criarColaborador(cliente);
+            const folga = await registrarFolgaDomingo(cliente, colaborador.Id);
+
+            const bloqueado = await cliente.put(`/api/colaboradores/${colaborador.Id}`, { isPlantonista: false });
+            assert.equal(bloqueado.status, 409);
+
+            esperarSucesso(await cliente.delete(`/api/folgas-domingo/${folga.id}`), 'remover folga');
+
+            const liberado = await cliente.put(`/api/colaboradores/${colaborador.Id}`, { isPlantonista: false });
+            assert.equal(liberado.status, 200);
+            assert.equal(liberado.body.data.TipoPlantonista, null);
+
+            await tornarPlantonista(cliente, colaborador.Id, 'SEMANA');
         }
     }
 ];

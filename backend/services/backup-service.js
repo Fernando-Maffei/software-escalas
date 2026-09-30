@@ -13,6 +13,7 @@ const { normalizeBackupDirectory } = require('./backup-config');
 const { NOMES_TABELAS_BACKUP, TABELAS_BACKUP } = require('./backup/especificacao');
 const { coerceBackupPayload, tipoSql } = require('./backup/normalizacao');
 const { nomeArquivoBackup } = require('./backup/retencao');
+const { SQL_DERIVAR_PLANTONISTA_DE_BACKUP_ANTIGO } = require('./plantonista');
 const { version: VERSAO_SISTEMA } = require('../../package.json');
 
 function formatBackupTimestamp(date = new Date()) {
@@ -162,6 +163,15 @@ async function insertTableRows(transaction, especificacao, rows) {
     }
 }
 
+// Backup anterior a 2026-09-30 nao traz IsPlantonista: o banco assume 0 para todo
+// mundo. Nesse caso (e so nele) deriva os plantonistas dos sinais que o arquivo
+// ja tem, como a migration faz com os dados existentes.
+function backupSemCampoPlantonista(snapshot) {
+    const colaboradores = snapshot.data.Colaboradores || [];
+
+    return colaboradores.length > 0 && colaboradores.every((linha) => linha.IsPlantonista === undefined);
+}
+
 async function restoreSystemBackup(pool, rawPayload, options = {}) {
     const snapshot = coerceBackupPayload(rawPayload);
     const tableCounts = {};
@@ -178,6 +188,10 @@ async function restoreSystemBackup(pool, rawPayload, options = {}) {
             tableCounts[especificacao.tabela] = rows.length;
             totalRows += rows.length;
             await insertTableRows(transaction, especificacao, rows);
+        }
+
+        if (backupSemCampoPlantonista(snapshot)) {
+            await transaction.request().query(SQL_DERIVAR_PLANTONISTA_DE_BACKUP_ANTIGO);
         }
     });
 

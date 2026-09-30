@@ -4,6 +4,7 @@ const { isFeriadoNacional } = require('./feriados-nacionais');
 const { listJornadaSemanal } = require('./jornada-semanal');
 const { serializePlantaoRecord } = require('./plantoes');
 const { SQL_EQUIPE_PLANTAO } = require('./equipe-plantao');
+const { temFolgaDeDomingo } = require('./plantonista');
 const {
     buildDateRange,
     compareTimes,
@@ -1256,7 +1257,9 @@ async function hydrateFolgasDomingoIntoEscala(poolOrTx, existingMap, colaborador
     for (const folga of result.recordset) {
         const colaborador = colaboradoresMap.get(Number(folga.ColaboradorId));
 
-        if (!colaborador) {
+        // A regra de folga de domingo vem do CADASTRO: quem nao e mais plantonista
+        // de final de semana nao tem o domingo folgado nem a reposicao aplicados.
+        if (!colaborador || !temFolgaDeDomingo(colaborador)) {
             continue;
         }
 

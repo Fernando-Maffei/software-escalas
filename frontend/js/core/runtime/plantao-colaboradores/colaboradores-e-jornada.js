@@ -3,7 +3,7 @@ import { API } from '../../api.js';
 import { fecharColaboradorEditor, solicitarSenhaModal } from '../../app/colaboradores.js';
 import { formatarHora, mostrarToast } from '../../app/horas-e-resumo.js';
 import { estado } from '../../estado.js';
-import { carregarColaboradores, carregarSetores, carregarTiposEscala } from '../dados-e-modais.js';
+import { carregarColaboradores, carregarSetores } from '../dados-e-modais.js';
 import { getBancoHorasResumoByColaborador, obterDataISO } from './helpers.js';
 import { carregarBancoHorasResumo, renderListaColaboradores } from './plantao-editor.js';
 import { formatarDataPlantaoCard } from './plantao-regua-e-relatorios.js';
@@ -19,108 +19,76 @@ function buildSetorEditorOptions(selectedId = '') {
     ].join('');
 }
 
-// Tipo de Escala e so um MOLDE: escolher no select grava o vinculo, mas
-// nao mexe sozinho nos dias. Quem preenche a grade e o botao "Aplicar
-// padrao do tipo", e so depois de o usuario salvar. Assim o tipo nunca
-// sobrescreve em silencio uma jornada ajustada a mao.
-function buildTipoEscalaEditorOptions(selectedId = '') {
-    return [
-        '<option value="">Sem tipo definido</option>',
-        ...((estado.tiposEscala || []).map((tipo) => `
-                <option value="${tipo.id}" ${Number(selectedId) === Number(tipo.id) ? 'selected' : ''}>${escapeHtml(tipo.nome)}</option>
-            `))
-    ].join('');
-}
+// Plantonista: definido AQUI, no cadastro. "Nao" esconde o tipo e o colaborador
+// segue como normal; "Sim" mostra o tipo na hora. O backend repete a validacao.
+const TIPOS_PLANTONISTA = Object.freeze([
+    { valor: 'SEMANA', rotulo: 'Plantonista de Semana', dica: 'Trabalha durante a semana, horario padrao 11:00 as 22:00. Nao tem folga aos domingos.' },
+    { valor: 'FINAL_SEMANA', rotulo: 'Plantonista de Final de Semana', dica: 'Atua nos plantoes de sabado e domingo. Tem folga de domingo, com reposicao.' }
+]);
+const HORARIO_PADRAO_SEMANA = Object.freeze({ inicio: '11:00', fim: '22:00' });
 
-function buildTipoEscalaEditorMarkup(selectedId = '') {
-    // Sem nenhum tipo de escala cadastrado o bloco inteiro some, em vez de
-    // mostrar um select que nao tem o que oferecer.
-    if (!(estado.tiposEscala || []).length) {
-        return '';
-    }
+function buildPlantonistaEditorMarkup(colaborador) {
+    const ehPlantonista = Boolean(colaborador?.IsPlantonista);
+    const tipo = ehPlantonista ? colaborador?.TipoPlantonista || '' : '';
 
     return `
             <div class="editor-form-group">
-                <label><i class="fas fa-calendar-check"></i> Tipo de escala</label>
-                <div class="setor-inputs">
-                    <select id="editorTipoEscalaId" class="form-control">
-                        ${buildTipoEscalaEditorOptions(selectedId)}
-                    </select>
-                    <button type="button" class="btn-secondary btn-setor-rapido" id="btnAplicarTipoEscala">
-                        <i class="fas fa-wand-magic-sparkles"></i> Aplicar padrao do tipo
-                    </button>
-                </div>
-                <div class="helper-text" id="tipoEscalaHint"></div>
+                <label><i class="fas fa-user-clock"></i> E plantonista?</label>
+                <select id="editorIsPlantonista" class="form-control">
+                    <option value="nao" ${ehPlantonista ? '' : 'selected'}>Nao</option>
+                    <option value="sim" ${ehPlantonista ? 'selected' : ''}>Sim</option>
+                </select>
+            </div>
+
+            <div class="editor-form-group" id="editorTipoPlantonistaGrupo" ${ehPlantonista ? '' : 'hidden'}>
+                <label><i class="fas fa-calendar-check"></i> Tipo de plantonista</label>
+                <select id="editorTipoPlantonista" class="form-control">
+                    <option value="">Selecione...</option>
+                    ${TIPOS_PLANTONISTA.map((item) => `<option value="${item.valor}" ${item.valor === tipo ? 'selected' : ''}>${escapeHtml(item.rotulo)}</option>`).join('')}
+                </select>
+                <div class="helper-text" id="tipoPlantonistaHint"></div>
             </div>
         `;
 }
 
-// Preenche a grade da jornada com os dias do tipo escolhido, SEM salvar —
-// mesmo comportamento do "Sugerir jornada com base no horario padrao".
-function aplicarTipoEscalaNaGrade() {
-    const select = document.getElementById('editorTipoEscalaId');
-    const tipo = (estado.tiposEscala || []).find((item) => Number(item.id) === Number(select?.value));
+function lerPlantonistaDoEditor() {
+    const isPlantonista = document.getElementById('editorIsPlantonista')?.value === 'sim';
 
-    if (!tipo) {
-        mostrarToast('Escolha um tipo de escala antes de aplicar o padrao.', 'warning');
-        return;
-    }
-
-    const diasTrabalhados = (tipo.dias || []).filter((dia) => dia.trabalha);
-    setJornadaSemanalDays(diasTrabalhados.map((dia) => dia.diaSemana));
-
-    diasTrabalhados.forEach((dia) => {
-        const entrada = document.querySelector(`[data-jornada-entrada="${dia.diaSemana}"]`);
-        const saida = document.querySelector(`[data-jornada-saida="${dia.diaSemana}"]`);
-        const almocoInicio = document.querySelector(`[data-jornada-almoco-inicio="${dia.diaSemana}"]`);
-        const almocoFim = document.querySelector(`[data-jornada-almoco-fim="${dia.diaSemana}"]`);
-
-        if (entrada) {
-            entrada.value = formatarHora(dia.trabalhoInicio) || '';
-        }
-        if (saida) {
-            saida.value = formatarHora(dia.trabalhoFim) || '';
-        }
-        if (almocoInicio) {
-            almocoInicio.value = formatarHora(dia.almocoInicio) || '';
-        }
-        if (almocoFim) {
-            almocoFim.value = formatarHora(dia.almocoFim) || '';
-        }
-    });
-
-    atualizarHintTipoEscala();
-    mostrarToast(`Padrao de "${tipo.nome}" aplicado na grade. Revise e clique em Salvar.`, 'success');
+    return {
+        isPlantonista,
+        // Sem marcar "Sim" o tipo nao vale e nao e enviado: o backend grava NULL.
+        tipoPlantonista: isPlantonista ? document.getElementById('editorTipoPlantonista')?.value || null : null
+    };
 }
 
-function atualizarHintTipoEscala() {
-    const hint = document.getElementById('tipoEscalaHint');
-    const select = document.getElementById('editorTipoEscalaId');
+function atualizarPlantonistaEditor() {
+    const { isPlantonista, tipoPlantonista } = lerPlantonistaDoEditor();
+    const grupo = document.getElementById('editorTipoPlantonistaGrupo');
+    const hint = document.getElementById('tipoPlantonistaHint');
 
-    if (!hint) {
+    if (grupo) {
+        grupo.hidden = !isPlantonista;
+    }
+
+    if (hint) {
+        hint.innerText = TIPOS_PLANTONISTA.find((item) => item.valor === tipoPlantonista)?.dica || '';
+    }
+}
+
+// Plantonista de semana sem horario definido recebe o padrao 11:00-22:00 no
+// formulario (o backend aplica o mesmo padrao se vier sem horario). Nunca
+// sobrescreve um horario que a pessoa ja digitou.
+function sugerirHorarioPadraoSemana() {
+    const { tipoPlantonista } = lerPlantonistaDoEditor();
+    const entrada = document.getElementById('editorTrabInicio');
+    const saida = document.getElementById('editorTrabFim');
+
+    if (tipoPlantonista !== 'SEMANA' || !entrada || !saida || entrada.value || saida.value) {
         return;
     }
 
-    const tipo = (estado.tiposEscala || []).find((item) => Number(item.id) === Number(select?.value));
-
-    if (!tipo) {
-        hint.innerText = 'Sem tipo: a jornada semanal abaixo vale sozinha.';
-        return;
-    }
-
-    const partes = [];
-
-    if (tipo.domingosFolgaCada) {
-        partes.push(`folga um domingo a cada ${tipo.domingosFolgaCada}`);
-    }
-
-    if (tipo.exigeReposicao) {
-        partes.push('repoe o domingo folgado num dia de folga');
-    }
-
-    hint.innerText = partes.length
-        ? `Regra do tipo: ${partes.join('; ')}. O sistema apenas registra — ainda nao gera essas datas.`
-        : 'O tipo e um ponto de partida: aplicar preenche a grade abaixo, que voce pode ajustar antes de salvar.';
+    entrada.value = HORARIO_PADRAO_SEMANA.inicio;
+    saida.value = HORARIO_PADRAO_SEMANA.fim;
 }
 
 const JORNADA_SEMANAL_DIAS = [
@@ -445,12 +413,6 @@ export async function abrirEditorColaboradores(id) {
         await carregarSetores();
     }
 
-    if (
-        !Array.isArray(estado.tiposEscala)
-    ) {
-        await carregarTiposEscala();
-    }
-
     const colaborador = id ? (estado.colaboradores || []).find((item) => Number(item.Id) === Number(id)) : null;
     const editorPanel = document.getElementById('colaboradorEditor');
     const editorTitle = document.getElementById('editorTitle');
@@ -488,7 +450,7 @@ export async function abrirEditorColaboradores(id) {
                     </div>
                 </div>
 
-                ${buildTipoEscalaEditorMarkup(colaborador?.TipoEscalaId || '')}
+                ${buildPlantonistaEditorMarkup(colaborador)}
 
                 <div class="editor-form-group">
                     <label><i class="fas fa-briefcase"></i> Horario de entrada e saida</label>
@@ -531,9 +493,12 @@ export async function abrirEditorColaboradores(id) {
             </div>
         `;
 
-    document.getElementById('btnAplicarTipoEscala')?.addEventListener('click', aplicarTipoEscalaNaGrade);
-    document.getElementById('editorTipoEscalaId')?.addEventListener('change', atualizarHintTipoEscala);
-    atualizarHintTipoEscala();
+    document.getElementById('editorIsPlantonista')?.addEventListener('change', atualizarPlantonistaEditor);
+    document.getElementById('editorTipoPlantonista')?.addEventListener('change', () => {
+        atualizarPlantonistaEditor();
+        sugerirHorarioPadraoSemana();
+    });
+    atualizarPlantonistaEditor();
 
     if (colaborador?.Id) {
         hydrateJornadaSemanalEditor(colaborador.Id);
@@ -599,14 +564,16 @@ export async function salvarColaboradorEditor(id) {
             almocoFim
         };
 
-        // O select so aparece quando o banco ja tem os tipos de escala.
-        // Sem ele, nao mandamos o campo — evita apagar o vinculo de quem
-        // salvou por uma tela antiga.
-        const selectTipoEscala = document.getElementById('editorTipoEscalaId');
+        // Plantonista vem do cadastro. Validado aqui e de novo no backend.
+        const plantonista = lerPlantonistaDoEditor();
 
-        if (selectTipoEscala) {
-            body.tipoEscalaId = selectTipoEscala.value || null;
+        if (plantonista.isPlantonista && !plantonista.tipoPlantonista) {
+            mostrarToast('Escolha o tipo de plantonista.', 'warning');
+            return;
         }
+
+        body.isPlantonista = plantonista.isPlantonista;
+        body.tipoPlantonista = plantonista.tipoPlantonista;
 
         if (invalidJornadaDia) {
             const dayInfo = JORNADA_SEMANAL_DIAS.find((day) => Number(day.diaSemana) === Number(invalidJornadaDia.diaSemana));

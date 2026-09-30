@@ -17,7 +17,18 @@ const PLANTAO_TIPOS = Object.freeze(['sabado', 'domingo', 'feriado']);
 // (CK_plantoes_tipo_credito).
 const PLANTAO_TIPOS_CREDITO = Object.freeze(['banco', 'extra']);
 
+// Tipo de plantonista do colaborador (Colaboradores.TipoPlantonista). So vale
+// com IsPlantonista = 1; fora disso o banco exige NULL
+// (CK_Colaboradores_TipoPlantonista).
+const TIPOS_PLANTONISTA = Object.freeze({
+    SEMANA: 'SEMANA',
+    FINAL_SEMANA: 'FINAL_SEMANA'
+});
+const TIPOS_PLANTONISTA_VALORES = Object.freeze(Object.values(TIPOS_PLANTONISTA));
+
 module.exports = {
+    TIPOS_PLANTONISTA,
+    TIPOS_PLANTONISTA_VALORES,
     AUSENCIA_PERIODOS,
     AUSENCIA_TIPOS,
     PLANTAO_TIPOS,

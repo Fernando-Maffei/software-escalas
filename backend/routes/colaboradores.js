@@ -16,6 +16,7 @@ const {
     replaceColaboradorJornadaSemanal
 } = require('../services/jornada-semanal');
 const { excluirColaboradorDefinitivamente } = require('../services/exclusao-colaborador');
+const { aplicarHorarioPadrao, normalizarPlantonista, temFolgaDeDomingo } = require('../services/plantonista');
 const { ensureSetorExists, normalizeNullableSetorId } = require('../services/setores');
 const { withTransaction } = require('../db/transactions');
 const {
@@ -38,11 +39,11 @@ function buildColaboradorPayload(body, fallback = {}) {
         throw new AppError(400, 'Nome e obrigatorio.');
     }
 
-    const trabalhoInicio = body.trabalhoInicio !== undefined
+    let trabalhoInicio = body.trabalhoInicio !== undefined
         ? normalizeNullableTime(body.trabalhoInicio, 'Inicio do trabalho')
         : extractTimeString(fallback.TrabalhoInicio || fallback.trabalhoInicio);
 
-    const trabalhoFim = body.trabalhoFim !== undefined
+    let trabalhoFim = body.trabalhoFim !== undefined
         ? normalizeNullableTime(body.trabalhoFim, 'Fim do trabalho')
         : extractTimeString(fallback.TrabalhoFim || fallback.trabalhoFim);
 
@@ -57,6 +58,12 @@ function buildColaboradorPayload(body, fallback = {}) {
     const setorId = body.setorId !== undefined
         ? normalizeNullableSetorId(body.setorId, 'Setor')
         : normalizeNullableSetorId(fallback.SetorId || fallback.setorId, 'Setor');
+
+    // Plantonista vem do cadastro: sem marcar, o tipo e descartado; marcado, o
+    // tipo e obrigatorio. Plantonista de semana sem horario proprio recebe o
+    // padrao 11:00-22:00 ANTES da validacao da jornada.
+    const plantonista = normalizarPlantonista(body, fallback);
+    ({ trabalhoInicio, trabalhoFim } = aplicarHorarioPadrao(plantonista.tipoPlantonista, { trabalhoInicio, trabalhoFim }));
 
     validateWorkSchedule({
         trabalhoInicio,
@@ -78,6 +85,8 @@ function buildColaboradorPayload(body, fallback = {}) {
         nome,
         setorId,
         tipoEscalaId,
+        isPlantonista: plantonista.isPlantonista,
+        tipoPlantonista: plantonista.tipoPlantonista,
         trabalhoInicio,
         trabalhoFim,
         almocoInicio,
@@ -248,6 +257,26 @@ function salvarJornadaSemanal(mensagem) {
 router.post('/:id/jornada-semanal', salvarJornadaSemanal('Jornada semanal salva com sucesso!'));
 router.put('/:id/jornada-semanal', salvarJornadaSemanal('Jornada semanal atualizada com sucesso!'));
 
+// Folga de domingo existe so para plantonista de final de semana. Quem tem
+// folga registrada nao pode mudar de tipo sem antes remove-las: elas ficariam
+// orfas, apontando para alguem que a regra nao reconhece mais.
+async function exigirSemFolgasAoPerderFinalDeSemana(tx, existente, payload) {
+    if (!temFolgaDeDomingo(existente) || temFolgaDeDomingo(payload)) {
+        return;
+    }
+
+    const result = await tx.request()
+        .input('colaboradorId', sql.Int, existente.Id)
+        .query('SELECT COUNT(*) AS total FROM FolgasDomingo WHERE ColaboradorId = @colaboradorId');
+
+    if (result.recordset[0].total > 0) {
+        throw new AppError(
+            409,
+            'Este colaborador tem folgas de domingo registradas. Remova-as (Plantoes > Folga de domingo) antes de mudar o tipo de plantonista.'
+        );
+    }
+}
+
 router.post('/', async (req, res) => {
     const pool = await conectar();
     const payload = buildColaboradorPayload(req.body);
@@ -266,10 +295,12 @@ router.post('/', async (req, res) => {
             .input('almocoInicio', sql.Time, toSqlTime(payload.almocoInicio, 'Inicio do almoco'))
             .input('almocoFim', sql.Time, toSqlTime(payload.almocoFim, 'Fim do almoco'))
             .input('tipoEscalaId', sql.Int, payload.tipoEscalaId)
+            .input('isPlantonista', sql.Bit, payload.isPlantonista)
+            .input('tipoPlantonista', sql.NVarChar(20), payload.tipoPlantonista)
             .query(`
-                INSERT INTO Colaboradores (Nome, SetorId, TrabalhoInicio, TrabalhoFim, AlmocoInicio, AlmocoFim, TipoEscalaId)
+                INSERT INTO Colaboradores (Nome, SetorId, TrabalhoInicio, TrabalhoFim, AlmocoInicio, AlmocoFim, TipoEscalaId, IsPlantonista, TipoPlantonista)
                 OUTPUT INSERTED.*
-                VALUES (@nome, @setorId, @trabalhoInicio, @trabalhoFim, @almocoInicio, @almocoFim, @tipoEscalaId)
+                VALUES (@nome, @setorId, @trabalhoInicio, @trabalhoFim, @almocoInicio, @almocoFim, @tipoEscalaId, @isPlantonista, @tipoPlantonista)
             `);
         const colaboradorSalvo = result.recordset[0];
 
@@ -302,6 +333,7 @@ router.put('/:id', async (req, res) => {
     const payload = buildColaboradorPayload(req.body, existing);
     const saved = await withTransaction(sql, pool, async (tx) => {
         await ensureSetorExists(tx, payload.setorId);
+        await exigirSemFolgasAoPerderFinalDeSemana(tx, existing, payload);
 
         const result = await tx.request()
             .input('id', sql.Int, id)
@@ -312,6 +344,8 @@ router.put('/:id', async (req, res) => {
             .input('almocoInicio', sql.Time, toSqlTime(payload.almocoInicio, 'Inicio do almoco'))
             .input('almocoFim', sql.Time, toSqlTime(payload.almocoFim, 'Fim do almoco'))
             .input('tipoEscalaId', sql.Int, payload.tipoEscalaId)
+            .input('isPlantonista', sql.Bit, payload.isPlantonista)
+            .input('tipoPlantonista', sql.NVarChar(20), payload.tipoPlantonista)
             .query(`
                 UPDATE Colaboradores
                 SET Nome = @nome,
@@ -320,7 +354,9 @@ router.put('/:id', async (req, res) => {
                     TrabalhoFim = @trabalhoFim,
                     AlmocoInicio = @almocoInicio,
                     AlmocoFim = @almocoFim,
-                    TipoEscalaId = @tipoEscalaId
+                    TipoEscalaId = @tipoEscalaId,
+                    IsPlantonista = @isPlantonista,
+                    TipoPlantonista = @tipoPlantonista
                 OUTPUT INSERTED.*
                 WHERE Id = @id
             `);
