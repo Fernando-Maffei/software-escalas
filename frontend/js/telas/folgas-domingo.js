@@ -10,11 +10,19 @@ Nao ha campo "quem cobriu": quem esta lancado no plantao daquele domingo
 JA e quem cobriu, entao o campo duplicaria a informacao. A escala marca
 esses lancamentos como cobertura sozinha.
 
+A folga tem duas metades — o domingo folgado e o dia da reposicao — e a
+segunda pode vir depois. Por isso o registro aceita "Deixar pendente" e
+cada cartao da lista tem a acao certa para o estado dele ("Marcar
+reposicao" ou "Alterar"). As pendentes de todos os domingos tambem sao
+listadas na aba "Plantoes lancados" (renderPendenciasFolgasDomingo).
+
 O painel do plantao se redesenha a cada tecla digitada no formulario
-(renderPlantaoEditor e chamado de varios lugares). Por isso a lista de
-folgas NAO e montada dentro do innerHTML dele: o HTML sai com um
-container vazio e esta funcao preenche depois, em cima do container.
-Assim digitar no plantao nao dispara uma requisicao por tecla.
+(renderPlantaoEditor e chamado de varios lugares). Por isso:
+- a lista de folgas NAO e montada dentro do innerHTML dele: o HTML sai com
+  um container vazio e esta funcao preenche depois, em cima do container.
+  Assim digitar no plantao nao dispara uma requisicao por tecla;
+- o que a pessoa digitou no formulario fica no `rascunho` (e a edicao de um
+  cartao em `edicao`), senao cada redesenho apagaria os campos.
 ===================================================================== */
 
 import { API } from '../core/api.js';
@@ -23,10 +31,36 @@ import { estado } from '../core/estado.js';
 import { escapeHtml } from '../lib/html-seguro.js';
 
 const DIAS_CURTOS = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sab'];
+const MODO_AGORA = 'agora';
+const MODO_PENDENTE = 'pendente';
 
 // Cache por data: evita refazer a chamada a cada redesenho do painel.
 // Invalidado na mao depois de gravar ou remover.
 const cachePorData = new Map();
+
+// O que esta digitado no formulario de nova folga. `preenchidoAuto` diz se os
+// horarios ainda sao os sugeridos pela jornada do colaborador (e podem ser
+// trocados quando ele muda) ou se a pessoa ja mexeu neles.
+let rascunho = novoRascunho(null);
+let edicao = null;
+// Vem da lista de pendencias: ao abrir o domingo, ja abre este cartao em edicao.
+let abrirEdicaoDaFolgaId = null;
+
+function novoRascunho(dataISO) {
+    return {
+        dataISO,
+        colaboradorId: '',
+        modo: MODO_AGORA,
+        dataReposicao: '',
+        horaInicio: '',
+        horaFim: '',
+        almocoInicio: '',
+        almocoFim: '',
+        observacao: '',
+        preenchidoAuto: false,
+        dica: ''
+    };
+}
 
 function ehDomingo(dataISO) {
     const partes = String(dataISO || '').split('-').map(Number);
@@ -49,9 +83,43 @@ function rotuloData(dataISO) {
     return `${DIAS_CURTOS[dia]} ${partes[2]}/${partes[1]}`;
 }
 
+function dataCompleta(dataISO) {
+    const partes = String(dataISO || '').split('-');
+    return partes.length === 3 ? `${partes[2]}/${partes[1]}/${partes[0]}` : '--';
+}
+
+// Aceita "08:00", "08:00:00" e o ISO que o driver as vezes devolve para TIME.
 function hora(valor) {
-    const bruto = String(valor || '').trim();
-    return bruto.includes(':') ? bruto.slice(0, 5) : '';
+    const achado = String(valor || '').match(/(\d{2}):(\d{2})/);
+    return achado ? `${achado[1]}:${achado[2]}` : '';
+}
+
+// Dias entre hoje e a data (positivo = passado). Meio-dia local nos dois lados
+// para o horario de verao nao virar um dia a mais ou a menos.
+function diasDesde(dataISO) {
+    const partes = String(dataISO || '').split('-').map(Number);
+
+    if (partes.length !== 3 || partes.some(Number.isNaN)) {
+        return 0;
+    }
+
+    const agora = new Date();
+    const hoje = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate(), 12);
+    const alvo = new Date(partes[0], partes[1] - 1, partes[2], 12);
+
+    return Math.round((hoje - alvo) / 86400000);
+}
+
+function textoQuando(dataISO) {
+    const dias = diasDesde(dataISO);
+
+    if (dias === 0) {
+        return 'hoje';
+    }
+
+    const total = Math.abs(dias);
+    const unidade = total === 1 ? 'dia' : 'dias';
+    return dias > 0 ? `ha ${total} ${unidade}` : `em ${total} ${unidade}`;
 }
 
 function opcoesColaborador(selecionado) {
@@ -62,11 +130,60 @@ function opcoesColaborador(selecionado) {
     ].join('');
 }
 
+// Jornada de cadastro do colaborador: o dia da reposicao e folga na jornada
+// semanal, entao nao ha horario "do dia" de onde puxar — o horario padrao da
+// ficha e a melhor sugestao.
+function jornadaDoColaborador(colaboradorId) {
+    const colaborador = (estado.colaboradores || []).find((c) => Number(c.Id) === Number(colaboradorId));
+
+    if (!colaborador) {
+        return null;
+    }
+
+    const jornada = {
+        nome: colaborador.Nome,
+        horaInicio: hora(colaborador.TrabalhoInicio),
+        horaFim: hora(colaborador.TrabalhoFim),
+        almocoInicio: hora(colaborador.AlmocoInicio),
+        almocoFim: hora(colaborador.AlmocoFim)
+    };
+
+    return jornada.horaInicio && jornada.horaFim ? jornada : null;
+}
+
+function camposDeHora(idBase, valores) {
+    return `
+                        <div class="folga-domingo-par">
+                            <input type="time" id="${idBase}Inicio" data-campo="horaInicio" class="form-control" value="${escapeHtml(valores.horaInicio)}" aria-label="Inicio do horario">
+                            <span>ate</span>
+                            <input type="time" id="${idBase}Fim" data-campo="horaFim" class="form-control" value="${escapeHtml(valores.horaFim)}" aria-label="Fim do horario">
+                        </div>`;
+}
+
+function camposDeAlmoco(idBase, valores) {
+    return `
+                        <div class="folga-domingo-par">
+                            <input type="time" id="${idBase}Inicio" data-campo="almocoInicio" class="form-control" value="${escapeHtml(valores.almocoInicio)}" aria-label="Inicio do almoco">
+                            <span>ate</span>
+                            <input type="time" id="${idBase}Fim" data-campo="almocoFim" class="form-control" value="${escapeHtml(valores.almocoFim)}" aria-label="Fim do almoco">
+                        </div>`;
+}
+
 // O HTML do painel. Sem a lista: ela chega depois, por carregarLista().
 export function renderPainelFolgasDomingo(dataISO) {
     if (!ehDomingo(dataISO)) {
         return '';
     }
+
+    if (rascunho.dataISO !== dataISO) {
+        rascunho = novoRascunho(dataISO);
+    }
+
+    if (edicao && edicao.dataISO !== dataISO) {
+        edicao = null;
+    }
+
+    const agora = rascunho.modo === MODO_AGORA;
 
     return `
             <div class="editor-form-group folga-domingo-bloco" data-folga-domingo-data="${escapeHtml(dataISO)}">
@@ -80,41 +197,134 @@ export function renderPainelFolgasDomingo(dataISO) {
                     <div class="folga-domingo-vazio">Carregando...</div>
                 </div>
 
-                <div class="folga-domingo-form">
-                    <div class="folga-domingo-campo">
+                <div class="folga-domingo-form" id="folgaDomingoForm">
+                    <div class="folga-domingo-campo folga-domingo-campo--largo">
                         <small>Quem folgou</small>
-                        <select id="folgaDomingoColaborador" class="form-control">${opcoesColaborador('')}</select>
+                        <select id="folgaDomingoColaborador" class="form-control">${opcoesColaborador(rascunho.colaboradorId)}</select>
                     </div>
-                    <div class="folga-domingo-campo">
-                        <small>Repoe em (opcional)</small>
-                        <input type="date" id="folgaDomingoDataReposicao" class="form-control">
-                    </div>
+
                     <div class="folga-domingo-campo folga-domingo-campo--largo">
-                        <small>Horario da reposicao</small>
-                        <div class="folga-domingo-par">
-                            <input type="time" id="folgaDomingoHoraInicio" class="form-control">
-                            <span>ate</span>
-                            <input type="time" id="folgaDomingoHoraFim" class="form-control">
+                        <small>Reposicao</small>
+                        <div class="folga-domingo-opcoes" role="radiogroup" aria-label="Reposicao">
+                            <label class="folga-domingo-opcao${agora ? ' is-ativa' : ''}">
+                                <input type="radio" name="folgaDomingoModo" value="${MODO_AGORA}" ${agora ? 'checked' : ''}>
+                                Marcar agora
+                            </label>
+                            <label class="folga-domingo-opcao${agora ? '' : ' is-ativa'}">
+                                <input type="radio" name="folgaDomingoModo" value="${MODO_PENDENTE}" ${agora ? '' : 'checked'}>
+                                Deixar pendente
+                            </label>
                         </div>
                     </div>
-                    <div class="folga-domingo-campo folga-domingo-campo--largo">
-                        <small>Almoco da reposicao</small>
-                        <div class="folga-domingo-par">
-                            <input type="time" id="folgaDomingoAlmocoInicio" class="form-control">
-                            <span>ate</span>
-                            <input type="time" id="folgaDomingoAlmocoFim" class="form-control">
+
+                    <div id="folgaDomingoReposicao" class="folga-domingo-reposicao" ${agora ? '' : 'hidden'}>
+                        <div class="folga-domingo-campo folga-domingo-campo--largo">
+                            <small>Dia da reposicao</small>
+                            <input type="date" id="folgaDomingoDataReposicao" data-campo="dataReposicao" class="form-control" value="${escapeHtml(rascunho.dataReposicao)}">
                         </div>
+                        <div class="folga-domingo-campo folga-domingo-campo--largo">
+                            <small>Horario da reposicao</small>${camposDeHora('folgaDomingoHora', rascunho)}
+                        </div>
+                        <div class="folga-domingo-campo folga-domingo-campo--largo">
+                            <small>Almoco da reposicao</small>${camposDeAlmoco('folgaDomingoAlmoco', rascunho)}
+                        </div>
+                        <p class="folga-domingo-dica" id="folgaDomingoDica" ${rascunho.dica ? '' : 'hidden'}>${escapeHtml(rascunho.dica)}</p>
                     </div>
+
                     <div class="folga-domingo-campo folga-domingo-campo--largo">
                         <small>Observacao</small>
-                        <input type="text" id="folgaDomingoObservacao" class="form-control" maxlength="500">
+                        <input type="text" id="folgaDomingoObservacao" data-campo="observacao" class="form-control" maxlength="500" value="${escapeHtml(rascunho.observacao)}">
                     </div>
+
+                    <div id="folgaDomingoAviso" class="folga-domingo-aviso" role="alert" hidden></div>
+
                     <button type="button" class="btn-primary" id="btnRegistrarFolgaDomingo">
                         <i class="fas fa-plus"></i> Registrar folga
                     </button>
                 </div>
             </div>
         `;
+}
+
+function resumoReposicao(folga) {
+    if (!folga.dataReposicao) {
+        return `Domingo ${dataCompleta(folga.dataDomingo)} · sem dia de reposicao`;
+    }
+
+    const almoco = folga.reposicaoAlmocoInicio && folga.reposicaoAlmocoFim
+        ? ` · almoco ${hora(folga.reposicaoAlmocoInicio)}–${hora(folga.reposicaoAlmocoFim)}`
+        : '';
+
+    return `Repoe ${rotuloData(folga.dataReposicao)}, ${hora(folga.reposicaoHoraInicio)}–${hora(folga.reposicaoHoraFim)}${almoco}`;
+}
+
+function renderFormularioEdicao(folga) {
+    return `
+                    <div class="folga-domingo-edicao" data-edicao-folga="${folga.id}">
+                        <div class="folga-domingo-campo folga-domingo-campo--largo">
+                            <small>Dia da reposicao</small>
+                            <input type="date" data-campo="dataReposicao" class="form-control" value="${escapeHtml(edicao.dataReposicao)}">
+                        </div>
+                        <div class="folga-domingo-campo folga-domingo-campo--largo">
+                            <small>Horario da reposicao</small>${camposDeHora(`folgaEdicaoHora${folga.id}`, edicao)}
+                        </div>
+                        <div class="folga-domingo-campo folga-domingo-campo--largo">
+                            <small>Almoco da reposicao</small>${camposDeAlmoco(`folgaEdicaoAlmoco${folga.id}`, edicao)}
+                        </div>
+                        ${edicao.dica ? `<p class="folga-domingo-dica">${escapeHtml(edicao.dica)}</p>` : ''}
+                        <div class="folga-domingo-aviso" role="alert" ${edicao.aviso ? '' : 'hidden'}>${escapeHtml(edicao.aviso || '')}</div>
+                        <div class="folga-domingo-acoes">
+                            <button type="button" class="btn-primary folga-domingo-btn" data-salvar-folga="${folga.id}">Salvar</button>
+                            <button type="button" class="btn-secondary folga-domingo-btn" data-cancelar-folga="${folga.id}">Cancelar</button>
+                        </div>
+                    </div>`;
+}
+
+function renderCartao(folga) {
+    const pendente = !folga.dataReposicao;
+    const emEdicao = edicao && edicao.id === folga.id;
+    const chip = pendente
+        ? '<span class="folga-domingo-chip folga-domingo-chip--pendente">Reposicao pendente</span>'
+        : '<span class="folga-domingo-chip folga-domingo-chip--marcada">Reposicao marcada</span>';
+
+    return `
+                <div class="folga-domingo-item${emEdicao ? ' is-editando' : ''}">
+                    <div class="folga-domingo-item-topo">
+                        <div>
+                            <strong>${escapeHtml(folga.colaboradorNome)}</strong>
+                            <p>${escapeHtml(resumoReposicao(folga))}</p>
+                            ${folga.observacao ? `<p class="folga-domingo-obs">${escapeHtml(folga.observacao)}</p>` : ''}
+                            ${chip}
+                        </div>
+                        <div class="folga-domingo-item-acoes">
+                            ${emEdicao ? '' : `<button type="button" class="${pendente ? 'btn-primary' : 'btn-secondary'} folga-domingo-btn" data-editar-folga="${folga.id}">
+                                ${pendente ? '<i class="fas fa-calendar-plus"></i> Marcar reposicao' : '<i class="fas fa-pen"></i> Alterar'}
+                            </button>`}
+                            <button type="button" class="btn-danger-ghost" data-remover-folga="${folga.id}" title="Remover registro" aria-label="Remover registro de ${escapeHtml(folga.colaboradorNome)}">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                    ${emEdicao ? renderFormularioEdicao(folga) : ''}
+                </div>
+            `;
+}
+
+function iniciarEdicao(folga) {
+    const jornada = folga.dataReposicao ? null : jornadaDoColaborador(folga.colaboradorId);
+
+    edicao = {
+        id: folga.id,
+        dataISO: folga.dataDomingo,
+        dataReposicao: folga.dataReposicao || '',
+        horaInicio: hora(folga.reposicaoHoraInicio) || jornada?.horaInicio || '',
+        horaFim: hora(folga.reposicaoHoraFim) || jornada?.horaFim || '',
+        almocoInicio: hora(folga.reposicaoAlmocoInicio) || jornada?.almocoInicio || '',
+        almocoFim: hora(folga.reposicaoAlmocoFim) || jornada?.almocoFim || '',
+        preenchidoAuto: Boolean(jornada),
+        dica: jornada ? `Horario preenchido com a jornada de ${jornada.nome}. Ajuste se for diferente.` : '',
+        aviso: ''
+    };
 }
 
 function renderLista(folgas) {
@@ -124,32 +334,21 @@ function renderLista(folgas) {
         return;
     }
 
+    if (abrirEdicaoDaFolgaId !== null) {
+        const pedida = folgas.find((folga) => Number(folga.id) === Number(abrirEdicaoDaFolgaId));
+        abrirEdicaoDaFolgaId = null;
+
+        if (pedida) {
+            iniciarEdicao(pedida);
+        }
+    }
+
     if (!folgas.length) {
         alvo.innerHTML = '<div class="folga-domingo-vazio">Nenhuma folga registrada neste domingo.</div>';
         return;
     }
 
-    alvo.innerHTML = folgas.map((folga) => {
-        const almoco = folga.reposicaoAlmocoInicio && folga.reposicaoAlmocoFim
-            ? ` · almoco ${hora(folga.reposicaoAlmocoInicio)}–${hora(folga.reposicaoAlmocoFim)}`
-            : '';
-        const reposicao = folga.dataReposicao
-            ? `repoe ${rotuloData(folga.dataReposicao)} ${hora(folga.reposicaoHoraInicio)}–${hora(folga.reposicaoHoraFim)}${almoco}`
-            : '<span class="folga-domingo-pendente">reposicao nao marcada</span>';
-
-        return `
-                <div class="folga-domingo-item">
-                    <div>
-                        <strong>${escapeHtml(folga.colaboradorNome)}</strong>
-                        <p>${reposicao}</p>
-                        ${folga.observacao ? `<p class="folga-domingo-obs">${escapeHtml(folga.observacao)}</p>` : ''}
-                    </div>
-                    <button type="button" class="btn-danger-ghost" data-remover-folga="${folga.id}" title="Remover registro">
-                        <i class="fas fa-trash"></i>
-                    </button>
-                </div>
-            `;
-    }).join('');
+    alvo.innerHTML = folgas.map(renderCartao).join('');
 }
 
 async function carregarLista(dataISO, { forcar = false } = {}) {
@@ -183,29 +382,53 @@ async function carregarLista(dataISO, { forcar = false } = {}) {
     renderLista(folgas);
 }
 
+function mostrarAviso(elemento, mensagem) {
+    if (!elemento) {
+        return;
+    }
+
+    elemento.textContent = mensagem || '';
+    elemento.hidden = !mensagem;
+}
+
+// Qualquer gravacao muda o que a lista de pendencias mostra.
+async function depoisDeGravar(dataISO) {
+    cachePorData.clear();
+    await carregarLista(dataISO, { forcar: true });
+    await carregarPendenciasFolgasDomingo();
+}
+
 async function registrar(dataISO) {
     const botao = document.getElementById('btnRegistrarFolgaDomingo');
+    const aviso = document.getElementById('folgaDomingoAviso');
 
     if (botao?.disabled) {
         return;
     }
 
-    const colaboradorId = document.getElementById('folgaDomingoColaborador')?.value;
+    mostrarAviso(aviso, '');
 
-    if (!colaboradorId) {
-        mostrarToast('Escolha quem folgou neste domingo.', 'warning');
+    if (!rascunho.colaboradorId) {
+        mostrarAviso(aviso, 'Escolha quem folgou neste domingo.');
+        return;
+    }
+
+    const marcarAgora = rascunho.modo === MODO_AGORA;
+
+    if (marcarAgora && !rascunho.dataReposicao) {
+        mostrarAviso(aviso, 'Informe o dia da reposicao ou escolha "Deixar pendente".');
         return;
     }
 
     const payload = {
-        colaboradorId,
+        colaboradorId: rascunho.colaboradorId,
         dataDomingo: dataISO,
-        dataReposicao: document.getElementById('folgaDomingoDataReposicao')?.value || null,
-        reposicaoHoraInicio: document.getElementById('folgaDomingoHoraInicio')?.value || null,
-        reposicaoHoraFim: document.getElementById('folgaDomingoHoraFim')?.value || null,
-        reposicaoAlmocoInicio: document.getElementById('folgaDomingoAlmocoInicio')?.value || null,
-        reposicaoAlmocoFim: document.getElementById('folgaDomingoAlmocoFim')?.value || null,
-        observacao: document.getElementById('folgaDomingoObservacao')?.value.trim() || null
+        dataReposicao: marcarAgora ? rascunho.dataReposicao || null : null,
+        reposicaoHoraInicio: marcarAgora ? rascunho.horaInicio || null : null,
+        reposicaoHoraFim: marcarAgora ? rascunho.horaFim || null : null,
+        reposicaoAlmocoInicio: marcarAgora ? rascunho.almocoInicio || null : null,
+        reposicaoAlmocoFim: marcarAgora ? rascunho.almocoFim || null : null,
+        observacao: rascunho.observacao.trim() || null
     };
 
     if (botao) {
@@ -215,28 +438,39 @@ async function registrar(dataISO) {
     try {
         const dados = await API.post('/folgas-domingo', payload);
         mostrarToast(dados?.message || 'Folga registrada!', 'success');
-        await carregarLista(dataISO, { forcar: true });
-        limparFormulario();
+        rascunho = novoRascunho(dataISO);
+        await depoisDeGravar(dataISO);
+        redesenharFormulario(dataISO);
     } catch (erro) {
-        mostrarToast(erro.message, 'error');
+        // Conflito (ferias, ajuste manual...) aparece aqui, junto do botao,
+        // e o formulario continua preenchido para a pessoa so trocar a data.
+        mostrarAviso(document.getElementById('folgaDomingoAviso'), erro.message);
     } finally {
-        if (botao) {
-            botao.disabled = false;
+        const atual = document.getElementById('btnRegistrarFolgaDomingo');
+
+        if (atual) {
+            atual.disabled = false;
         }
     }
 }
 
-function limparFormulario() {
-    ['folgaDomingoColaborador', 'folgaDomingoDataReposicao', 'folgaDomingoHoraInicio',
-        'folgaDomingoHoraFim', 'folgaDomingoAlmocoInicio', 'folgaDomingoAlmocoFim',
-        'folgaDomingoObservacao']
-        .forEach((id) => {
-            const campo = document.getElementById(id);
+// Refaz so o formulario (a lista e mantida) depois de limpar o rascunho.
+function redesenharFormulario(dataISO) {
+    const bloco = document.querySelector('[data-folga-domingo-data]');
 
-            if (campo) {
-                campo.value = '';
-            }
-        });
+    if (!bloco) {
+        return;
+    }
+
+    const molde = document.createElement('div');
+    molde.innerHTML = renderPainelFolgasDomingo(dataISO);
+    const novoForm = molde.querySelector('#folgaDomingoForm');
+    const formAtual = document.getElementById('folgaDomingoForm');
+
+    if (novoForm && formAtual) {
+        formAtual.replaceWith(novoForm);
+        ligarFormulario(dataISO);
+    }
 }
 
 async function remover(dataISO, folgaId) {
@@ -247,10 +481,197 @@ async function remover(dataISO, folgaId) {
     try {
         const dados = await API.delete(`/folgas-domingo/${folgaId}`);
         mostrarToast(dados?.message || 'Folga removida.', 'success');
-        await carregarLista(dataISO, { forcar: true });
+
+        if (edicao && edicao.id === Number(folgaId)) {
+            edicao = null;
+        }
+
+        await depoisDeGravar(dataISO);
     } catch (erro) {
         mostrarToast(erro.message, 'error');
     }
+}
+
+async function salvarEdicao(dataISO) {
+    if (!edicao) {
+        return;
+    }
+
+    if (!edicao.dataReposicao) {
+        edicao.aviso = 'Informe o dia da reposicao.';
+        renderLista(cachePorData.get(dataISO) || []);
+        return;
+    }
+
+    try {
+        const dados = await API.put(`/folgas-domingo/${edicao.id}`, {
+            dataReposicao: edicao.dataReposicao,
+            reposicaoHoraInicio: edicao.horaInicio || null,
+            reposicaoHoraFim: edicao.horaFim || null,
+            reposicaoAlmocoInicio: edicao.almocoInicio || null,
+            reposicaoAlmocoFim: edicao.almocoFim || null
+        });
+        mostrarToast(dados?.message || 'Reposicao salva.', 'success');
+        edicao = null;
+        await depoisDeGravar(dataISO);
+    } catch (erro) {
+        edicao.aviso = erro.message;
+        renderLista(cachePorData.get(dataISO) || []);
+    }
+}
+
+// Sugere horario e almoco da ficha do colaborador enquanto a pessoa ainda nao
+// mexeu neles. Depois que ela edita qualquer horario, a sugestao para de
+// sobrescrever.
+function sugerirJornada() {
+    if (rascunho.preenchidoAuto === false && (rascunho.horaInicio || rascunho.horaFim)) {
+        return;
+    }
+
+    const jornada = jornadaDoColaborador(rascunho.colaboradorId);
+
+    rascunho.horaInicio = jornada?.horaInicio || '';
+    rascunho.horaFim = jornada?.horaFim || '';
+    rascunho.almocoInicio = jornada?.almocoInicio || '';
+    rascunho.almocoFim = jornada?.almocoFim || '';
+    rascunho.preenchidoAuto = Boolean(jornada);
+    rascunho.dica = jornada ? `Preenchido com a jornada de ${jornada.nome}. Ajuste se for diferente.` : '';
+
+    const mapa = {
+        folgaDomingoHoraInicio: rascunho.horaInicio,
+        folgaDomingoHoraFim: rascunho.horaFim,
+        folgaDomingoAlmocoInicio: rascunho.almocoInicio,
+        folgaDomingoAlmocoFim: rascunho.almocoFim
+    };
+
+    Object.entries(mapa).forEach(([id, valor]) => {
+        const campo = document.getElementById(id);
+
+        if (campo) {
+            campo.value = valor;
+        }
+    });
+
+    const dica = document.getElementById('folgaDomingoDica');
+
+    if (dica) {
+        dica.textContent = rascunho.dica;
+        dica.hidden = !rascunho.dica;
+    }
+
+}
+
+// Liga os campos do formulario de nova folga ao rascunho.
+function ligarFormulario(dataISO) {
+    const form = document.getElementById('folgaDomingoForm');
+
+    if (!form) {
+        return;
+    }
+
+    const aviso = document.getElementById('folgaDomingoAviso');
+
+    form.addEventListener('input', (evento) => {
+        const campo = evento.target.closest('[data-campo]');
+
+        if (!campo) {
+            return;
+        }
+
+        rascunho[campo.getAttribute('data-campo')] = campo.value;
+
+        // Mexer em horario ou almoco tira a sugestao da jornada de cena.
+        if (['horaInicio', 'horaFim', 'almocoInicio', 'almocoFim'].includes(campo.getAttribute('data-campo'))) {
+            rascunho.preenchidoAuto = false;
+            rascunho.dica = '';
+            const dica = document.getElementById('folgaDomingoDica');
+
+            if (dica) {
+                dica.hidden = true;
+            }
+        }
+
+        mostrarAviso(aviso, '');
+    });
+
+    form.addEventListener('change', (evento) => {
+        const alvo = evento.target;
+
+        if (alvo.id === 'folgaDomingoColaborador') {
+            rascunho.colaboradorId = alvo.value;
+            sugerirJornada();
+            mostrarAviso(aviso, '');
+            return;
+        }
+
+        if (alvo.name === 'folgaDomingoModo') {
+            rascunho.modo = alvo.value;
+            document.getElementById('folgaDomingoReposicao').hidden = rascunho.modo !== MODO_AGORA;
+            form.querySelectorAll('.folga-domingo-opcao').forEach((rotulo) => {
+                rotulo.classList.toggle('is-ativa', rotulo.querySelector('input').checked);
+            });
+            mostrarAviso(aviso, '');
+        }
+    });
+
+    document.getElementById('btnRegistrarFolgaDomingo')?.addEventListener('click', () => registrar(dataISO));
+}
+
+// Cliques e digitacao dentro dos cartoes (delegados: a lista e reescrita).
+function ligarLista(dataISO) {
+    const lista = document.getElementById('folgaDomingoLista');
+
+    if (!lista) {
+        return;
+    }
+
+    lista.addEventListener('input', (evento) => {
+        const campo = evento.target.closest('[data-campo]');
+
+        if (!campo || !edicao) {
+            return;
+        }
+
+        const nome = campo.getAttribute('data-campo');
+        edicao[nome] = campo.value;
+        edicao.aviso = '';
+
+        if (['horaInicio', 'horaFim', 'almocoInicio', 'almocoFim'].includes(nome)) {
+            edicao.preenchidoAuto = false;
+        }
+    });
+
+    lista.addEventListener('click', (evento) => {
+        const remove = evento.target.closest('[data-remover-folga]');
+
+        if (remove) {
+            remover(dataISO, remove.getAttribute('data-remover-folga'));
+            return;
+        }
+
+        const edita = evento.target.closest('[data-editar-folga]');
+
+        if (edita) {
+            const folga = (cachePorData.get(dataISO) || []).find((item) => Number(item.id) === Number(edita.getAttribute('data-editar-folga')));
+
+            if (folga) {
+                iniciarEdicao(folga);
+                renderLista(cachePorData.get(dataISO));
+            }
+
+            return;
+        }
+
+        if (evento.target.closest('[data-salvar-folga]')) {
+            salvarEdicao(dataISO);
+            return;
+        }
+
+        if (evento.target.closest('[data-cancelar-folga]')) {
+            edicao = null;
+            renderLista(cachePorData.get(dataISO) || []);
+        }
+    });
 }
 
 // Liga os eventos depois que o painel do plantao trocou o innerHTML.
@@ -261,15 +682,83 @@ export function bindPainelFolgasDomingo(dataISO) {
         return;
     }
 
-    document.getElementById('btnRegistrarFolgaDomingo')?.addEventListener('click', () => registrar(dataISO));
-
-    document.getElementById('folgaDomingoLista')?.addEventListener('click', (evento) => {
-        const botao = evento.target.closest('[data-remover-folga]');
-
-        if (botao) {
-            remover(dataISO, botao.getAttribute('data-remover-folga'));
-        }
-    });
-
+    ligarFormulario(dataISO);
+    ligarLista(dataISO);
     carregarLista(dataISO);
+}
+
+/* ---------------------------------------------------------------------
+LISTA DE PENDENCIAS (aba "Plantoes lancados")
+Folgas de qualquer domingo que ainda nao tem dia de reposicao. Sem ela a
+pendencia so seria vista abrindo cada domingo, um por um.
+--------------------------------------------------------------------- */
+
+export function renderPendenciasFolgasDomingo() {
+    return '<div id="folgasPendentes" class="folgas-pendentes" hidden></div>';
+}
+
+function renderLinhaPendencia(folga) {
+    return `
+                <div class="folgas-pendentes-item">
+                    <div>
+                        <strong>${escapeHtml(folga.colaboradorNome)}</strong>
+                        <p>Domingo ${escapeHtml(dataCompleta(folga.dataDomingo))} · ${escapeHtml(textoQuando(folga.dataDomingo))}</p>
+                    </div>
+                    <button type="button" class="btn-primary folga-domingo-btn" data-abrir-pendencia="${folga.id}" data-domingo="${escapeHtml(folga.dataDomingo)}">
+                        <i class="fas fa-calendar-plus"></i> Marcar reposicao
+                    </button>
+                </div>`;
+}
+
+export async function carregarPendenciasFolgasDomingo() {
+    const alvo = document.getElementById('folgasPendentes');
+
+    if (!alvo) {
+        return;
+    }
+
+    let folgas = [];
+
+    try {
+        const dados = await API.getFolgasDomingo({ pendentes: '1' });
+        folgas = Array.isArray(dados?.items) ? dados.items : [];
+    } catch (erro) {
+        // Sem a migracao ou sem rede: a aba segue funcionando sem o bloco.
+        alvo.hidden = true;
+        return;
+    }
+
+    if (!folgas.length) {
+        alvo.hidden = true;
+        alvo.innerHTML = '';
+        return;
+    }
+
+    // Mais antigas primeiro: a que esta esperando ha mais tempo e a mais urgente.
+    folgas.sort((a, b) => String(a.dataDomingo).localeCompare(String(b.dataDomingo)));
+
+    alvo.innerHTML = `
+                <div class="folgas-pendentes-titulo">
+                    <h4><i class="fas fa-scale-balanced"></i> Folgas aguardando reposicao</h4>
+                    <span class="folgas-pendentes-contagem">${folgas.length}</span>
+                </div>
+                ${folgas.map(renderLinhaPendencia).join('')}
+            `;
+    alvo.hidden = false;
+}
+
+// `abrirDia(dataISO)` abre o domingo no painel lateral (quem sabe fazer isso e
+// a tela de plantoes). O cartao da folga ja chega em modo de edicao.
+export function ligarPendenciasFolgasDomingo(abrirDia) {
+    document.getElementById('folgasPendentes')?.addEventListener('click', async (evento) => {
+        const botao = evento.target.closest('[data-abrir-pendencia]');
+
+        if (!botao) {
+            return;
+        }
+
+        edicao = null;
+        abrirEdicaoDaFolgaId = Number(botao.getAttribute('data-abrir-pendencia'));
+        await abrirDia(botao.getAttribute('data-domingo'));
+    });
 }

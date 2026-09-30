@@ -28,14 +28,28 @@
 }
 
 .folga-domingo-item {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 10px;
     padding: 10px 12px;
     border: 1px solid var(--border);
     border-radius: 10px;
     background: var(--surface-raised);
+}
+
+.folga-domingo-item.is-editando {
+    border-color: var(--primary);
+}
+
+.folga-domingo-item-topo {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.folga-domingo-item-acoes {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
 }
 
 .folga-domingo-item strong {
@@ -53,11 +67,159 @@
     font-style: italic;
 }
 
-/* Reposicao ou cobertura ainda em aberto: o registro vale, mas esta
-   incompleto. Sinaliza sem alarmar — nao e erro, e pendencia. */
-.folga-domingo-pendente {
-    color: var(--warning, #b45309);
+/* Estado da reposicao no cartao. Pendente e ambar (falta fazer), marcada e
+   verde (resolvida) — nenhum dos dois e erro. */
+.folga-domingo-chip {
+    display: inline-block;
+    margin-top: 6px;
+    padding: 2px 8px;
+    border-radius: 8px;
+    font-size: 11px;
     font-weight: 600;
+}
+
+.folga-domingo-chip--pendente {
+    background: var(--warning-soft, #fef3c7);
+    color: var(--warning-text, #92500e);
+}
+
+.folga-domingo-chip--marcada {
+    background: var(--success-soft, #dcfce7);
+    color: var(--success-text, #14532d);
+}
+
+/* Botoes menores que o padrao: cabem no cartao sem quebrar a linha. */
+.folga-domingo-btn {
+    padding: 6px 10px;
+    font-size: 12px;
+    white-space: nowrap;
+}
+
+.folga-domingo-acoes {
+    display: flex;
+    gap: 6px;
+}
+
+.folga-domingo-edicao {
+    display: grid;
+    gap: 10px;
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px dashed var(--border);
+}
+
+.folga-domingo-reposicao {
+    grid-column: 1 / -1;
+    display: grid;
+    gap: 10px;
+}
+
+.folga-domingo-dica {
+    margin: 0;
+    font-size: 11px;
+    color: var(--text-light);
+}
+
+/* Recusa do servidor (ferias, ajuste manual...): fica junto do botao, com o
+   motivo, e o formulario segue preenchido. */
+.folga-domingo-aviso {
+    grid-column: 1 / -1;
+    padding: 8px 10px;
+    border-radius: 8px;
+    background: var(--warning-soft, #fef3c7);
+    color: var(--warning-text, #92500e);
+    font-size: 12px;
+}
+
+.folga-domingo-aviso[hidden],
+.folga-domingo-reposicao[hidden],
+.folga-domingo-dica[hidden],
+.folgas-pendentes[hidden] {
+    display: none;
+}
+
+.folga-domingo-opcoes {
+    display: flex;
+    gap: 6px;
+}
+
+.folga-domingo-opcao {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 9px 10px;
+    border: 1.5px solid var(--border);
+    border-radius: 10px;
+    font-size: 13px;
+    cursor: pointer;
+    background: var(--surface-raised);
+    color: var(--text);
+}
+
+.folga-domingo-opcao input {
+    accent-color: var(--primary);
+}
+
+.folga-domingo-opcao.is-ativa {
+    border-color: var(--primary);
+    background: var(--primary-soft);
+}
+
+/* Lista de pendencias no topo da aba "Plantoes lancados". */
+.folgas-pendentes {
+    margin-bottom: 16px;
+    padding: 12px 14px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--surface-raised);
+}
+
+.folgas-pendentes-titulo {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 4px;
+}
+
+.folgas-pendentes-titulo h4 {
+    margin: 0;
+    font-size: 14px;
+    color: var(--text);
+}
+
+.folgas-pendentes-contagem {
+    padding: 1px 8px;
+    border-radius: 8px;
+    background: var(--warning-soft, #fef3c7);
+    color: var(--warning-text, #92500e);
+    font-size: 11px;
+    font-weight: 700;
+}
+
+.folgas-pendentes-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 8px 0;
+    border-top: 1px solid var(--border);
+}
+
+.folgas-pendentes-item:first-of-type {
+    border-top: 0;
+}
+
+.folgas-pendentes-item strong {
+    font-size: 13px;
+    color: var(--text);
+}
+
+.folgas-pendentes-item p {
+    margin: 2px 0 0;
+    font-size: 12px;
+    color: var(--text-light);
 }
 
 .folga-domingo-form {

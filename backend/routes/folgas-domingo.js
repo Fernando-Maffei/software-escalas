@@ -49,7 +49,8 @@ router.get('/', async (req, res) => {
     const items = await listFolgasDomingo(pool, {
         dataInicio: req.query.dataInicio,
         dataFim: req.query.dataFim,
-        colaboradorId: req.query.colaboradorId
+        colaboradorId: req.query.colaboradorId,
+        pendentes: ['1', 'true'].includes(String(req.query.pendentes || '').toLowerCase())
     });
 
     const visiveis = await colaboradoresVisiveis(pool, req);

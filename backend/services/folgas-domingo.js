@@ -13,6 +13,7 @@
 const { sql } = require('../db');
 const { AppError } = require('../lib/errors');
 const { isSunday } = require('./escala');
+const { exigirReposicaoSemConflito } = require('./folgas-domingo-conflitos');
 const {
     buildDateRange,
     ensurePositiveInt,
@@ -185,6 +186,11 @@ async function listFolgasDomingo(poolOrTx, filtros = {}) {
         clauses.push('f.ColaboradorId = @colaboradorId');
     }
 
+    // Folgas ainda sem dia de reposicao: alimenta a lista de pendencias.
+    if (filtros.pendentes) {
+        clauses.push('f.DataReposicao IS NULL');
+    }
+
     const result = await request.query(`
         ${buildSelect()}
         ${clauses.length ? `WHERE ${clauses.join(' AND ')}` : ''}
@@ -247,6 +253,13 @@ async function createFolgaDomingo(poolOrTx, body) {
     const payload = normalizeFolgaDomingoPayload(body);
     await ensureColaboradorExiste(poolOrTx, payload.colaboradorId, 'Colaborador');
 
+    if (payload.dataReposicao) {
+        await exigirReposicaoSemConflito(poolOrTx, {
+            colaboradorId: payload.colaboradorId,
+            dataReposicao: payload.dataReposicao
+        });
+    }
+
     try {
         const inserido = await aplicarInputs(poolOrTx.request(), payload).query(`
             INSERT INTO FolgasDomingo (
@@ -271,6 +284,17 @@ async function updateFolgaDomingo(poolOrTx, id, body) {
     const payload = normalizeFolgaDomingoPayload(body, atual);
 
     await ensureColaboradorExiste(poolOrTx, payload.colaboradorId, 'Colaborador');
+
+    // So confere quando a data (ou a pessoa) mudou: editar apenas a observacao
+    // de uma folga antiga nao pode falhar por uma ausencia lancada depois.
+    if (payload.dataReposicao
+        && (payload.dataReposicao !== atual.dataReposicao || payload.colaboradorId !== atual.colaboradorId)) {
+        await exigirReposicaoSemConflito(poolOrTx, {
+            colaboradorId: payload.colaboradorId,
+            dataReposicao: payload.dataReposicao,
+            folgaId: atual.id
+        });
+    }
 
     try {
         await aplicarInputs(poolOrTx.request(), payload)

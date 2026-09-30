@@ -1,4 +1,5 @@
 import { escapeHtml } from '../../../lib/html-seguro.js';
+import { carregarPendenciasFolgasDomingo, ligarPendenciasFolgasDomingo, renderPendenciasFolgasDomingo } from '../../../telas/folgas-domingo.js';
 import { API, buscarFeriadosNacionais } from '../../api.js';
 import { mostrarToast } from '../../app/horas-e-resumo.js';
 import { aguardarUsuarioAutenticado } from '../../auth.js';
@@ -670,6 +671,7 @@ export async function renderLancamentoPlantao() {
                             </div>
                             <span class="plantoes-lancados-resumo" id="plantoesLancadosResumo"></span>
                         </div>
+                        ${renderPendenciasFolgasDomingo()}
                         ${renderFiltrosPlantoesLancados()}
                         <div id="listaPlantoesLancados" class="plantoes-grid">
                             ${renderPlantoesLancados()}
@@ -724,6 +726,14 @@ export async function renderLancamentoPlantao() {
     selecionarAbaPlantao(plantaoAbaAtiva);
     ligarFiltrosPlantoesLancados();
     atualizarContagemPlantoesLancados();
+
+    // Folgas de domingo sem dia de reposicao: "Marcar reposicao" abre o domingo
+    // no mesmo painel lateral, ja com o cartao da folga em edicao.
+    ligarPendenciasFolgasDomingo(async (dataISO) => {
+        await openPlantaoEditorFromGrid(dataISO);
+        document.getElementById('plantaoEditor')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    });
+    carregarPendenciasFolgasDomingo();
 
     // Editar pela lista abre o mesmo painel lateral da regua. O painel e
     // sticky, mas numa tela estreita ele cai abaixo da lista: sem o scroll

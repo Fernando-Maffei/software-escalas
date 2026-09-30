@@ -1,7 +1,7 @@
 const assert = require('node:assert/strict');
 
 const { consultar, criarCliente, esperarSucesso } = require('./apoio');
-const { DATAS, criarColaborador, registrarFolgaDomingo } = require('./fabrica');
+const { DATAS, criarColaborador, lancarAusencia, registrarFolgaDomingo } = require('./fabrica');
 
 async function escalaDoColaborador(colaboradorId) {
     return consultar(`
@@ -91,6 +91,72 @@ module.exports = [
             });
 
             assert.equal(resposta.status, 400);
+        }
+    },
+    {
+        name: 'reposicao em dia de ausencia e recusada com 409 e nada e gravado',
+        async run() {
+            const cliente = criarCliente();
+            await cliente.entrar();
+
+            const colaborador = await criarColaborador(cliente);
+            await lancarAusencia(cliente, colaborador.Id, { dataInicio: DATAS.quinta, dataFim: DATAS.quinta });
+
+            const resposta = await cliente.post('/api/folgas-domingo', {
+                colaboradorId: colaborador.Id,
+                dataDomingo: DATAS.domingo,
+                dataReposicao: DATAS.quinta,
+                reposicaoHoraInicio: '08:00',
+                reposicaoHoraFim: '17:00'
+            });
+
+            assert.equal(resposta.status, 409);
+            assert.match(resposta.body.error, /ausencia/);
+
+            const lista = esperarSucesso(
+                await cliente.get(`/api/folgas-domingo?colaboradorId=${colaborador.Id}`),
+                'listar folgas do colaborador'
+            );
+            assert.equal(lista.total, 0);
+        }
+    },
+    {
+        name: 'folga sem reposicao aparece nas pendentes e sai delas quando a reposicao e marcada',
+        async run() {
+            const cliente = criarCliente();
+            await cliente.entrar();
+
+            const colaborador = await criarColaborador(cliente);
+            const folga = await registrarFolgaDomingo(cliente, colaborador.Id, {
+                dataReposicao: null,
+                reposicaoHoraInicio: null,
+                reposicaoHoraFim: null
+            });
+            const pendentes = async () =>
+                esperarSucesso(
+                    await cliente.get(`/api/folgas-domingo?pendentes=1&colaboradorId=${colaborador.Id}`),
+                    'listar pendentes'
+                );
+
+            assert.deepEqual(
+                (await pendentes()).items.map((item) => item.id),
+                [folga.id]
+            );
+
+            esperarSucesso(
+                await cliente.put(`/api/folgas-domingo/${folga.id}`, {
+                    dataReposicao: DATAS.quinta,
+                    reposicaoHoraInicio: '08:00',
+                    reposicaoHoraFim: '17:00'
+                }),
+                'marcar a reposicao'
+            );
+
+            assert.equal((await pendentes()).total, 0);
+            assert.deepEqual(
+                (await escalaDoColaborador(colaborador.Id)).map((linha) => linha.data),
+                [DATAS.domingo, DATAS.quinta]
+            );
         }
     }
 ];
