@@ -8,6 +8,7 @@ import { abrirModalLancamento } from '../lancamentos.js';
 import { carregarEscalaDiaEscala, getScaleEditorRecordEscala } from './editor-lateral.js';
 import { getCurrentScaleState } from './estado-e-layout.js';
 import { buildScaleSectorFiltersEscala, filterScaleItemsBySectorEscala, getScaleSectorSelectionEscala } from './filtros-setor.js';
+import { abrirReporDomingoEscala, atualizarBotaoReporDomingoEscala } from './repor-domingo.js';
 
 export function obterDataSelecionadaEscala() {
     return document.getElementById('seletorDataEscala')?.value || getCurrentScaleState()?.dataISO || toISODateEscala(new Date());
@@ -33,6 +34,8 @@ export function atualizarAcoesCabecalhoEscala() {
     const dataISO = obterDataSelecionadaEscala();
     const isSaturday = getIsoDayOfWeekEscala(dataISO) === 6;
 
+    atualizarBotaoReporDomingoEscala(dataISO);
+
     if (!botaoPlantao) {
         return;
     }
@@ -42,6 +45,14 @@ export function atualizarAcoesCabecalhoEscala() {
         ? 'Abrir o plantao do sabado selecionado'
         : 'Selecione um sabado para abrir o plantao';
     botaoPlantao.classList.toggle('is-disabled', !isSaturday);
+}
+
+// "Repor domingo": grava o dia aberto como o dia da reposicao de uma folga de
+// domingo pendente e recarrega o dia para a linha aparecer.
+export function reporDomingoDaEscala() {
+    const dataISO = obterDataSelecionadaEscala();
+
+    return abrirReporDomingoEscala(dataISO, { aoGravar: () => carregarEscalaSelecionadaEscala(dataISO) });
 }
 
 export function atualizarBotaoRestaurarAlmocosEscala() {

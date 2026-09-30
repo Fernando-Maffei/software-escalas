@@ -72,7 +72,7 @@ function ehDomingo(dataISO) {
     return new Date(Date.UTC(partes[0], partes[1] - 1, partes[2], 12)).getUTCDay() === 0;
 }
 
-function rotuloData(dataISO) {
+export function rotuloData(dataISO) {
     const partes = String(dataISO || '').split('-');
 
     if (partes.length !== 3) {
@@ -83,7 +83,7 @@ function rotuloData(dataISO) {
     return `${DIAS_CURTOS[dia]} ${partes[2]}/${partes[1]}`;
 }
 
-function dataCompleta(dataISO) {
+export function dataCompleta(dataISO) {
     const partes = String(dataISO || '').split('-');
     return partes.length === 3 ? `${partes[2]}/${partes[1]}/${partes[0]}` : '--';
 }
@@ -110,7 +110,7 @@ function diasDesde(dataISO) {
     return Math.round((hoje - alvo) / 86400000);
 }
 
-function textoQuando(dataISO) {
+export function textoQuando(dataISO) {
     const dias = diasDesde(dataISO);
 
     if (dias === 0) {
@@ -133,7 +133,7 @@ function opcoesColaborador(selecionado) {
 // Jornada de cadastro do colaborador: o dia da reposicao e folga na jornada
 // semanal, entao nao ha horario "do dia" de onde puxar — o horario padrao da
 // ficha e a melhor sugestao.
-function jornadaDoColaborador(colaboradorId) {
+export function jornadaDoColaborador(colaboradorId) {
     const colaborador = (estado.colaboradores || []).find((c) => Number(c.Id) === Number(colaboradorId));
 
     if (!colaborador) {

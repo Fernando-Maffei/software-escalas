@@ -5,7 +5,7 @@ import { carregarAusencias, carregarColaboradores, carregarPlantoes, carregarSet
 import { atualizarTudo } from '../core/runtime/plantao-colaboradores/plantao-regua-e-relatorios.js';
 import { escapeHtml } from '../lib/html-seguro.js';
 import { toISODateEscala } from './escala-dia-shared.js';
-import { abrirLancamentoPessoalEscala, abrirPlantaoDaEscala, atualizarAcoesCabecalhoEscala, carregarEscalaSelecionadaEscala, obterDataSelecionadaEscala, restaurarAlmocosCadastroDiaEscala, shiftIsoDateEscala } from './escala-dia/acoes-do-dia.js';
+import { abrirLancamentoPessoalEscala, abrirPlantaoDaEscala, atualizarAcoesCabecalhoEscala, carregarEscalaSelecionadaEscala, obterDataSelecionadaEscala, reporDomingoDaEscala, restaurarAlmocosCadastroDiaEscala, shiftIsoDateEscala } from './escala-dia/acoes-do-dia.js';
 import { bindScrollHeightAutoEscala, renderScaleHeaderEscala } from './escala-dia/cabecalho-e-cobertura.js';
 import { renderScaleEditorEscala } from './escala-dia/editor-lateral.js';
 import { aplicarDensidadeEscala, getCurrentScaleState, getScaleSortModeEscala, lerDensidadeEscalaSalva, setScaleSortModeEscala } from './escala-dia/estado-e-layout.js';
@@ -189,6 +189,9 @@ export async function renderEscalaDia() {
                         <button id="btnNovoLancamentoEscala" class="btn-secondary escala-acao-icone" type="button" title="Novo lancamento (ausencia/folga)" aria-label="Novo lancamento (ausencia/folga)">
                             <i class="fas fa-calendar-plus"></i>
                         </button>
+                        <button id="btnReporDomingoEscala" class="btn-secondary escala-acao-icone escala-acao-com-badge" type="button" title="Repor domingo" aria-label="Repor domingo" hidden>
+                            <i class="fas fa-repeat"></i><span class="escala-acao-badge">0</span>
+                        </button>
                         <button id="btnCriarColaboradorEscala" class="btn-primary escala-acao-principal" type="button">
                             <i class="fas fa-user-plus"></i> Criar colaborador
                         </button>
@@ -337,6 +340,7 @@ export async function renderEscalaDia() {
     });
     document.getElementById('btnAbrirPlantaoEscala')?.addEventListener('click', abrirPlantaoDaEscala);
     document.getElementById('btnRestaurarAlmocosCadastroEscala')?.addEventListener('click', restaurarAlmocosCadastroDiaEscala);
+    document.getElementById('btnReporDomingoEscala')?.addEventListener('click', reporDomingoDaEscala);
     document.getElementById('escalaSortMode')?.addEventListener('change', (event) => {
         setScaleSortModeEscala(event.target.value);
         renderScaleRowsEscala(getCurrentScaleState());
