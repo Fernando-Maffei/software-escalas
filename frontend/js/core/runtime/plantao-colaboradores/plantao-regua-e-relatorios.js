@@ -1,5 +1,5 @@
 import { escapeHtml } from '../../../lib/html-seguro.js';
-import { carregarPendenciasFolgasDomingo, ligarPendenciasFolgasDomingo, renderPendenciasFolgasDomingo } from '../../../telas/folgas-domingo.js';
+import { carregarPendenciasPlantao, ligarPendenciasPlantao, renderAbaPendenciasPlantao } from '../../../telas/pendencias-plantao.js';
 import { API, buscarFeriadosNacionais } from '../../api.js';
 import { mostrarToast } from '../../app/horas-e-resumo.js';
 import { aguardarUsuarioAutenticado } from '../../auth.js';
@@ -256,7 +256,7 @@ let plantaoAbaAtiva = 'lancar';
 let filtrosPlantoesLancados = { ...PLANTAO_FILTROS_VAZIOS };
 
 function selecionarAbaPlantao(aba) {
-    plantaoAbaAtiva = aba === 'lancados' ? 'lancados' : 'lancar';
+    plantaoAbaAtiva = ['lancados', 'pendencias'].includes(aba) ? aba : 'lancar';
 
     document.querySelectorAll('[data-plantao-aba]').forEach((botao) => {
         const ativa = botao.getAttribute('data-plantao-aba') === plantaoAbaAtiva;
@@ -635,6 +635,10 @@ export async function renderLancamentoPlantao() {
                     <i class="fas fa-list"></i> Plantoes lancados
                     <span class="plantao-aba-contagem" id="plantaoAbaContagem">0</span>
                 </button>
+                <button type="button" class="plantao-aba" data-plantao-aba="pendencias" role="tab" aria-selected="false">
+                    <i class="fas fa-bell"></i> Pendencias
+                    <span class="plantao-aba-contagem plantao-aba-contagem--alerta" id="plantaoAbaPendenciasContagem" hidden>0</span>
+                </button>
             </div>
 
             <div class="plantao-layout">
@@ -671,11 +675,14 @@ export async function renderLancamentoPlantao() {
                             </div>
                             <span class="plantoes-lancados-resumo" id="plantoesLancadosResumo"></span>
                         </div>
-                        ${renderPendenciasFolgasDomingo()}
                         ${renderFiltrosPlantoesLancados()}
                         <div id="listaPlantoesLancados" class="plantoes-grid">
                             ${renderPlantoesLancados()}
                         </div>
+                    </div>
+
+                    <div class="pendencias-plantao-container" data-plantao-painel="pendencias" hidden>
+                        ${renderAbaPendenciasPlantao()}
                     </div>
                 </div>
 
@@ -727,13 +734,14 @@ export async function renderLancamentoPlantao() {
     ligarFiltrosPlantoesLancados();
     atualizarContagemPlantoesLancados();
 
-    // Folgas de domingo sem dia de reposicao: "Marcar reposicao" abre o domingo
-    // no mesmo painel lateral, ja com o cartao da folga em edicao.
-    ligarPendenciasFolgasDomingo(async (dataISO) => {
+    // Aba Pendencias: folgas de domingo sem reposicao e plantoes sem equipe.
+    // "Marcar reposicao" e "Abrir plantao" abrem o dia no mesmo painel lateral
+    // (a folga ja chega com o cartao em edicao).
+    ligarPendenciasPlantao(async (dataISO) => {
         await openPlantaoEditorFromGrid(dataISO);
         document.getElementById('plantaoEditor')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     });
-    carregarPendenciasFolgasDomingo();
+    carregarPendenciasPlantao();
 
     // Editar pela lista abre o mesmo painel lateral da regua. O painel e
     // sticky, mas numa tela estreita ele cai abaixo da lista: sem o scroll

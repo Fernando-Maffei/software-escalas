@@ -133,8 +133,7 @@
 
 .folga-domingo-aviso[hidden],
 .folga-domingo-reposicao[hidden],
-.folga-domingo-dica[hidden],
-.folgas-pendentes[hidden] {
+.folga-domingo-dica[hidden] {
     display: none;
 }
 
@@ -167,29 +166,31 @@
     background: var(--primary-soft);
 }
 
-/* Lista de pendencias no topo da aba "Plantoes lancados". */
-.folgas-pendentes {
+/* ---------------------------------------------------------------------
+Aba "Pendencias" da tela de plantoes: uma secao por tipo de pendencia, cada
+linha com a etiqueta de espera e o botao que resolve.
+--------------------------------------------------------------------- */
+.pendencias-secao {
     margin-bottom: 16px;
-    padding: 12px 14px;
+    padding: 14px 16px;
     border: 1px solid var(--border);
     border-radius: 12px;
     background: var(--surface-raised);
 }
 
-.folgas-pendentes-titulo {
+.pendencias-titulo {
     display: flex;
     align-items: center;
     gap: 8px;
-    margin-bottom: 4px;
 }
 
-.folgas-pendentes-titulo h4 {
+.pendencias-titulo h4 {
     margin: 0;
     font-size: 14px;
     color: var(--text);
 }
 
-.folgas-pendentes-contagem {
+.pendencias-contagem {
     padding: 1px 8px;
     border-radius: 8px;
     background: var(--warning-soft, #fef3c7);
@@ -198,80 +199,78 @@
     font-weight: 700;
 }
 
-.folgas-pendentes-item {
+.pendencias-contagem.is-zero {
+    background: var(--success-soft, #dcfce7);
+    color: var(--success-text, #14532d);
+}
+
+.pendencias-sub {
+    margin: 4px 0 6px;
+    font-size: 12px;
+    color: var(--text-light);
+}
+
+.pendencias-vazio {
+    margin: 0;
+    padding: 12px 0 4px;
+    font-size: 12px;
+    color: var(--text-light);
+}
+
+.pendencias-item {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 10px;
-    padding: 8px 0;
+    padding: 9px 0;
     border-top: 1px solid var(--border);
 }
 
-.folgas-pendentes-item:first-of-type {
-    border-top: 0;
-}
-
-.folgas-pendentes-item strong {
+.pendencias-item strong {
     font-size: 13px;
     color: var(--text);
 }
 
-.folgas-pendentes-item p {
+.pendencias-item p {
     margin: 2px 0 0;
     font-size: 12px;
     color: var(--text-light);
 }
 
-.folga-domingo-form {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-    gap: 10px;
-    align-items: end;
-}
-
-.folga-domingo-campo {
-    display: grid;
-    gap: 4px;
-    min-width: 0;
-}
-
-.folga-domingo-campo--largo {
-    grid-column: 1 / -1;
-}
-
-.folga-domingo-campo small {
-    color: var(--text-light);
-    font-size: 10px;
-    font-weight: 800;
-    text-transform: uppercase;
-}
-
-.folga-domingo-par {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) 24px minmax(0, 1fr);
-    gap: 6px;
-    align-items: center;
-}
-
-/* O campo de hora do navegador precisa de ~90px para HH:MM + o relogio. Com o
-   padding padrao do .form-control (12px de cada lado) sobravam ~50px e os
-   minutos ficavam cortados; por isso o par ocupa a linha inteira do formulario
-   (--largo) e o padding lateral aqui e menor. */
-.folga-domingo-par input[type="time"] {
-    min-width: 0;
-    padding-inline: 8px;
-}
-
-.folga-domingo-par span {
-    color: var(--text-light);
+.pendencias-tag {
+    display: inline-block;
+    margin-left: 6px;
+    padding: 2px 8px;
+    border-radius: 8px;
     font-size: 11px;
-    font-weight: 700;
-    text-align: center;
+    font-weight: 600;
+    vertical-align: 1px;
 }
 
-.folga-domingo-form .btn-primary {
-    grid-column: 1 / -1;
-    justify-self: start;
+.pendencias-tag--espera {
+    background: var(--warning-soft, #fef3c7);
+    color: var(--warning-text, #92500e);
+}
+
+.pendencias-tag--atraso {
+    background: var(--danger-soft, #fee2e2);
+    color: var(--danger, #b91c1c);
+}
+
+.pendencias-tag--neutra {
+    background: var(--bg-soft, #f1f5f9);
+    color: var(--text-light);
+}
+
+/* Selo da aba Pendencias: ambar, tambem com a aba ativa (senao sumiria no azul). */
+.plantao-aba .plantao-aba-contagem--alerta,
+.plantao-aba.is-ativa .plantao-aba-contagem--alerta {
+    background: var(--warning, #e0973a);
+    color: #fff;
+}
+
+.plantao-aba-contagem[hidden] {
+    display: none;
 }
 
 /* ---------------------------------------------------------------------

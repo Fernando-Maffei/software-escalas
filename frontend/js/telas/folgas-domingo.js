@@ -29,6 +29,7 @@ import { API } from '../core/api.js';
 import { mostrarToast } from '../core/app/horas-e-resumo.js';
 import { estado } from '../core/estado.js';
 import { escapeHtml } from '../lib/html-seguro.js';
+import { PRAZO_ATRASO_DIAS, classificarEsperaFolga, diasEntre, hojeISO, textoQuando as textoQuandoDias } from '../lib/pendencias-plantao.js';
 
 const DIAS_CURTOS = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sab'];
 const MODO_AGORA = 'agora';
@@ -94,32 +95,9 @@ function hora(valor) {
     return achado ? `${achado[1]}:${achado[2]}` : '';
 }
 
-// Dias entre hoje e a data (positivo = passado). Meio-dia local nos dois lados
-// para o horario de verao nao virar um dia a mais ou a menos.
-function diasDesde(dataISO) {
-    const partes = String(dataISO || '').split('-').map(Number);
-
-    if (partes.length !== 3 || partes.some(Number.isNaN)) {
-        return 0;
-    }
-
-    const agora = new Date();
-    const hoje = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate(), 12);
-    const alvo = new Date(partes[0], partes[1] - 1, partes[2], 12);
-
-    return Math.round((hoje - alvo) / 86400000);
-}
-
+// "ha 5 dias" / "hoje" / "em 3 dias" para uma data ISO, em relacao a hoje.
 export function textoQuando(dataISO) {
-    const dias = diasDesde(dataISO);
-
-    if (dias === 0) {
-        return 'hoje';
-    }
-
-    const total = Math.abs(dias);
-    const unidade = total === 1 ? 'dia' : 'dias';
-    return dias > 0 ? `ha ${total} ${unidade}` : `em ${total} ${unidade}`;
+    return textoQuandoDias(diasEntre(dataISO, hojeISO()));
 }
 
 // Folga de domingo e so de plantonista de FINAL DE SEMANA, definido no cadastro
@@ -698,21 +676,40 @@ export function bindPainelFolgasDomingo(dataISO) {
 }
 
 /* ---------------------------------------------------------------------
-LISTA DE PENDENCIAS (aba "Plantoes lancados")
-Folgas de qualquer domingo que ainda nao tem dia de reposicao. Sem ela a
+FOLGAS AGUARDANDO REPOSICAO (aba "Pendencias" da tela de plantoes)
+Folgas de qualquer domingo que ainda nao tem dia de reposicao. Sem a lista a
 pendencia so seria vista abrindo cada domingo, um por um.
 --------------------------------------------------------------------- */
 
 export function renderPendenciasFolgasDomingo() {
-    return '<div id="folgasPendentes" class="folgas-pendentes" hidden></div>';
+    return `
+            <section class="pendencias-secao" id="folgasPendentes">
+                <div class="pendencias-titulo">
+                    <h4><i class="fas fa-scale-balanced"></i> Folgas de domingo aguardando reposicao</h4>
+                    <span class="pendencias-contagem" id="folgasPendentesContagem">0</span>
+                </div>
+                <p class="pendencias-sub">Mais antigas primeiro; a etiqueta fica vermelha a partir de ${PRAZO_ATRASO_DIAS} dias. Marcar a reposicao abre o domingo no painel ao lado.</p>
+                <div class="pendencias-lista" id="folgasPendentesLista">
+                    <p class="pendencias-vazio">Carregando...</p>
+                </div>
+            </section>`;
 }
 
+const ROTULO_ESPERA = Object.freeze({
+    atraso: 'pendencias-tag--atraso',
+    espera: 'pendencias-tag--espera',
+    futura: 'pendencias-tag--neutra'
+});
+
 function renderLinhaPendencia(folga) {
+    const dias = diasEntre(folga.dataDomingo, hojeISO());
+
     return `
-                <div class="folgas-pendentes-item">
+                <div class="pendencias-item">
                     <div>
                         <strong>${escapeHtml(folga.colaboradorNome)}</strong>
-                        <p>Domingo ${escapeHtml(dataCompleta(folga.dataDomingo))} · ${escapeHtml(textoQuando(folga.dataDomingo))}</p>
+                        <span class="pendencias-tag ${ROTULO_ESPERA[classificarEsperaFolga(dias)]}">${escapeHtml(textoQuandoDias(dias))}</span>
+                        <p>Domingo ${escapeHtml(dataCompleta(folga.dataDomingo))}</p>
                     </div>
                     <button type="button" class="btn-primary folga-domingo-btn" data-abrir-pendencia="${folga.id}" data-domingo="${escapeHtml(folga.dataDomingo)}">
                         <i class="fas fa-calendar-plus"></i> Marcar reposicao
@@ -720,11 +717,15 @@ function renderLinhaPendencia(folga) {
                 </div>`;
 }
 
+// Preenche a secao e devolve quantas folgas estao pendentes (o total vira o
+// selo da aba). Avisa o resto da tela por evento, porque gravar pelo painel do
+// domingo tambem muda esta lista.
 export async function carregarPendenciasFolgasDomingo() {
-    const alvo = document.getElementById('folgasPendentes');
+    const lista = document.getElementById('folgasPendentesLista');
+    const contagem = document.getElementById('folgasPendentesContagem');
 
-    if (!alvo) {
-        return;
+    if (!lista) {
+        return 0;
     }
 
     let folgas = [];
@@ -733,28 +734,25 @@ export async function carregarPendenciasFolgasDomingo() {
         const dados = await API.getFolgasDomingo({ pendentes: '1' });
         folgas = Array.isArray(dados?.items) ? dados.items : [];
     } catch (erro) {
-        // Sem a migracao ou sem rede: a aba segue funcionando sem o bloco.
-        alvo.hidden = true;
-        return;
-    }
-
-    if (!folgas.length) {
-        alvo.hidden = true;
-        alvo.innerHTML = '';
-        return;
+        // Sem a migracao ou sem rede: a aba segue funcionando sem este bloco.
+        lista.innerHTML = `<p class="pendencias-vazio">Nao foi possivel carregar: ${escapeHtml(erro.message)}</p>`;
+        return 0;
     }
 
     // Mais antigas primeiro: a que esta esperando ha mais tempo e a mais urgente.
     folgas.sort((a, b) => String(a.dataDomingo).localeCompare(String(b.dataDomingo)));
 
-    alvo.innerHTML = `
-                <div class="folgas-pendentes-titulo">
-                    <h4><i class="fas fa-scale-balanced"></i> Folgas aguardando reposicao</h4>
-                    <span class="folgas-pendentes-contagem">${folgas.length}</span>
-                </div>
-                ${folgas.map(renderLinhaPendencia).join('')}
-            `;
-    alvo.hidden = false;
+    lista.innerHTML = folgas.length
+        ? folgas.map(renderLinhaPendencia).join('')
+        : '<p class="pendencias-vazio">Nada pendente aqui.</p>';
+
+    if (contagem) {
+        contagem.textContent = String(folgas.length);
+        contagem.classList.toggle('is-zero', folgas.length === 0);
+    }
+
+    window.dispatchEvent(new CustomEvent('pendencias-plantao:atualizadas', { detail: { folgas: folgas.length } }));
+    return folgas.length;
 }
 
 // `abrirDia(dataISO)` abre o domingo no painel lateral (quem sabe fazer isso e
