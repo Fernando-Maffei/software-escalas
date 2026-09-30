@@ -9,29 +9,114 @@ A ideia: **uma máquina** roda o sistema o tempo todo, e todo o time acessa pela
 
 ## O que a máquina do servidor precisa ter
 
-1. **Node.js 20 ou superior** — https://nodejs.org/ (baixe a versão "LTS").
-2. **SQL Server** acessível (o banco `SoftwareEscalas`). Pode ser o SQL Server Express
-   na própria máquina, ou outro servidor SQL da rede.
-3. A **pasta do projeto** copiada para a máquina (ex.: `C:\App de escalas`).
+1. **Node.js 20.19 ou superior** — https://nodejs.org/ (baixe a versão "LTS").
+2. **SQL Server** instalado na própria máquina (o **SQL Server Express**, gratuito,
+   serve). Na instalação, guarde o **nome da instância**.
+3. A **pasta do projeto** copiada para a máquina (ex.: `C:App de escalas`) — fora
+   de pastas sincronizadas (OneDrive, Google Drive). Dentro dela, rode uma vez:
+
+   ```bash
+   npm ci --omit=dev
+   ```
+
+O Docker **não** é necessário neste modelo.
 
 ---
 
-## Passo 1 — Configurar o acesso ao banco (.env)
+## Passo 1 — Preparar o SQL Server e conectar o app
 
-Na pasta do projeto, faça uma cópia de `.env.example` chamada `.env` e preencha os dados
-do banco. Exemplo:
+### 1.1 Preparar o SQL Server (uma vez)
+
+O app só conversa com o SQL Server por **TCP/IP**, e o SQL Server Express vem com
+o TCP/IP **desabilitado**. Enquanto isso não for ligado, a tela de configuração
+responde *"A instância do SQL Server não respondeu por TCP/IP"*.
+
+Abra o **PowerShell como Administrador**, entre na pasta do projeto e rode:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scriptspreparar-sql-server.ps1
+```
+
+O script pode ser repetido sem estragar nada e faz, nesta ordem:
+
+1. habilita o TCP/IP da instância na porta fixa **1433** (troque com `-PortaSql`);
+2. liga a autenticação mista (Windows + SQL Server);
+3. reinicia o serviço do SQL Server, se mudou algo;
+4. cria o banco `SoftwareEscalas` e o login `escalas_app`, dono **só desse
+   banco** — ele pede para você criar a senha (o app não usa o `sa`);
+5. libera a porta **4450** do app no firewall do Windows.
+
+Havendo mais de uma instância, informe qual: `-Instancia NOME`. Outros nomes:
+`-Banco`, `-Login`, `-PortaApp`.
+
+> A porta do SQL Server **não** é liberada no firewall, de propósito: app e banco
+> ficam na mesma máquina, e o time só precisa alcançar o app (porta 4450).
+
+<details>
+<summary>Fazer na mão, sem o script</summary>
+
+1. **SQL Server Configuration Manager** → *Configuração de Rede do SQL Server* →
+   *Protocolos de &lt;instância&gt;* → **TCP/IP** → *Habilitar*. Na aba *Endereços IP*,
+   em **IPAll**, apague *Portas TCP Dinâmicas* e ponha `1433` em *Porta TCP*.
+2. Reinicie o serviço *SQL Server (&lt;instância&gt;)*.
+3. No SSMS (ou `sqlcmd`), crie o banco e o login do app:
+
+   ```sql
+   CREATE DATABASE SoftwareEscalas;
+   CREATE LOGIN escalas_app WITH PASSWORD = 'troque-esta-senha', CHECK_POLICY = ON;
+   USE SoftwareEscalas;
+   CREATE USER escalas_app FOR LOGIN escalas_app;
+   ALTER ROLE db_owner ADD MEMBER escalas_app;
+   ```
+
+</details>
+
+### 1.2 Subir o app e informar a conexão
+
+Na pasta do projeto:
+
+```bash
+npm start
+```
+
+Abra `http://localhost:4450`. Numa máquina ainda sem banco configurado aparece a
+tela **Configuração inicial**. Preencha com o que o script mostrou no final:
+
+| Campo | Valor |
+|---|---|
+| Servidor / host | `localhost` |
+| Porta | `1433` |
+| Instância | *(vazio — com porta fixa não precisa)* |
+| Nome do banco | `SoftwareEscalas` |
+| Usuário SQL | `escalas_app` |
+| Senha | a que você criou no passo 1.1 |
+
+**Testar** e depois **Salvar**. O app cria as tabelas e o administrador na hora. A
+conexão fica gravada em `backend/config/database.local.json` (só nessa máquina,
+fora do Git).
+
+### 1.3 Opcional — arquivo `.env`
+
+Para fixar a senha do primeiro administrador (em vez da aleatória) ou trocar a
+porta do app, copie `.env.example` para `.env` na raiz do projeto **antes** de
+subir pela primeira vez:
 
 ```
 PORT=4450
-DB_USER=admin
-DB_PASSWORD=suaSenhaAqui
-DB_SERVER=localhost\SQLEXPRESS
-DB_DATABASE=SoftwareEscalas
-DB_ENCRYPT=true
-DB_TRUST_CERT=true
+ADMIN_PASSWORD=umaSenhaForte
 ```
 
-> O `.env` **não** vai para o Git (fica só nessa máquina). Guarde a senha em local seguro.
+O servidor lê o `.env` ao iniciar. Ele **não** vai para o Git.
+
+### 1.4 Trazer os dados de outra instalação (ex.: do Docker)
+
+Em **Configurações → Banco de dados → Importar Dados**, escolha o arquivo de
+backup mais recente (`backup-escalas-....json`). Atenção: o backup **não leva
+contas de usuário** — os logins (e os setores permitidos de cada um) precisam ser
+recriados em **Configurações → Usuários**.
+
+Depois de importar, confira em **Configurações → Banco de dados** a **pasta de
+backup** e o backup automático: eles são configurados por máquina.
 
 ---
 
@@ -63,10 +148,11 @@ Ex.: `http://192.168.0.50:4450`
 
 ## Passo 3 — Liberar a porta no firewall do Windows
 
-Abra o **PowerShell como Administrador** e rode (uma única vez):
+O script do passo 1.1 já faz isso. Se você preparou o SQL Server na mão, abra o
+**PowerShell como Administrador** e rode (uma única vez):
 
 ```powershell
-New-NetFirewallRule -DisplayName "Central de Escalas 4450" -Direction Inbound -Protocol TCP -LocalPort 4450 -Action Allow
+New-NetFirewallRule -DisplayName "App de Escalas 4450" -Direction Inbound -Protocol TCP -LocalPort 4450 -Action Allow
 ```
 
 Sem isso, o servidor sobe mas ninguém da rede consegue abrir.
@@ -116,8 +202,10 @@ dois, está tudo certo — é só repassar o endereço para o time.
 ## Primeiro acesso (senha do admin)
 
 Na primeira vez que o banco estiver vazio, o sistema cria o usuário **admin** e gera uma
-senha aleatória, impressa **uma única vez** no log do servidor (ou defina `ADMIN_PASSWORD`
-no `.env` antes de subir). Anote e troque no primeiro login.
+senha aleatória, mostrada **uma única vez** na tela de configuração inicial (ou no log do
+servidor). Para escolher a senha, defina `ADMIN_PASSWORD` no `.env` antes de subir (passo
+1.3) — rodando como serviço não há console para ler a senha gerada. Anote e troque no
+primeiro login.
 
 ---
 

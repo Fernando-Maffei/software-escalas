@@ -1,9 +1,14 @@
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
 
 const { AppError } = require('../../backend/lib/errors');
 const { getClientIp, parseTrustProxy } = require('../../backend/lib/ip-cliente');
 const { MENSAGEM_ERRO_INTERNO, montarRespostaDeErro } = require('../../backend/lib/tratador-erros');
 const { createRateLimiter } = require('../../backend/auth/rate-limit');
+const { carregarEnvLocal } = require('../../backend/lib/env-local');
+const { mapDatabaseConnectionError } = require('../../backend/db/database-connection-error');
 
 module.exports = [
     {
@@ -79,6 +84,41 @@ module.exports = [
             limiter.registerFailure('d');
 
             assert.equal(limiter.size(), 1);
+        }
+    },
+    {
+        name: 'carregarEnvLocal le o .env sem sobrescrever o ambiente',
+        run() {
+            const pasta = fs.mkdtempSync(path.join(os.tmpdir(), 'escalas-env-'));
+            const arquivo = path.join(pasta, '.env');
+
+            try {
+                assert.equal(carregarEnvLocal(arquivo), false);
+
+                fs.writeFileSync(arquivo, 'ESCALAS_TESTE_ENV_A=do-arquivo\nESCALAS_TESTE_ENV_B=do-arquivo\n');
+                process.env.ESCALAS_TESTE_ENV_B = 'do-ambiente';
+
+                assert.equal(carregarEnvLocal(arquivo), true);
+                assert.equal(process.env.ESCALAS_TESTE_ENV_A, 'do-arquivo');
+                assert.equal(process.env.ESCALAS_TESTE_ENV_B, 'do-ambiente');
+            } finally {
+                delete process.env.ESCALAS_TESTE_ENV_A;
+                delete process.env.ESCALAS_TESTE_ENV_B;
+                fs.rmSync(pasta, { recursive: true, force: true });
+            }
+        }
+    },
+    {
+        // SQL Server Express instalado do zero vem com o TCP/IP desabilitado.
+        name: 'erro de conexao aponta o TCP/IP quando a instancia nao informa a porta',
+        run() {
+            const erroDoDriver = Object.assign(new Error('Port for SQLEXPRESS not found in localhost'), {
+                code: 'EINSTLOOKUP'
+            });
+            const erro = mapDatabaseConnectionError(erroDoDriver, 'Erro generico.');
+
+            assert.equal(erro.statusCode, 400);
+            assert.match(erro.message, /TCP\/IP/);
         }
     }
 ];

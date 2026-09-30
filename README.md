@@ -48,9 +48,10 @@ Uma máquina roda o servidor; qualquer dispositivo da rede acessa pelo navegador
 
 ## Início rápido (desenvolvimento)
 
-### Com Docker (recomendado)
+### Com Docker
 
-Sobe o servidor **e** o banco juntos, sem instalar Node nem SQL Server na máquina:
+Sobe o servidor **e** o banco juntos, sem instalar Node nem SQL Server na máquina
+(exige o Docker Desktop e a máquina virtual do WSL 2, que ocupa alguns GB de RAM):
 
 ```bash
 cp .env.docker.example .env
@@ -78,7 +79,14 @@ docker compose down
 
 ### Sem Docker
 
-Requer Node 20.19+ e um SQL Server acessível:
+Requer Node 20.19+ e um SQL Server na máquina (o Express serve). O app conecta
+por **TCP/IP**, que o SQL Server Express traz desabilitado; o script abaixo, rodado
+uma vez no PowerShell **como Administrador**, habilita o TCP/IP numa porta fixa,
+cria o banco e um login próprio do app e libera a porta 4450 no firewall:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scriptspreparar-sql-server.ps1
+```
 
 ```bash
 npm install
@@ -87,6 +95,9 @@ npm start
 
 Acesse `http://localhost:4450`. Configure a conexão com o SQL Server pela própria
 tela de configuração inicial (veja [Configuração inicial do banco](#configuração-inicial-do-banco)).
+Um arquivo `.env` na raiz do projeto (modelo em [`.env.example`](.env.example)) é
+lido na subida — útil para `PORT` e `ADMIN_PASSWORD`. O passo a passo completo
+está em [`docs/SERVIDOR-COMO-INSTALAR.md`](docs/SERVIDOR-COMO-INSTALAR.md).
 
 ## Testes e qualidade
 
@@ -202,16 +213,18 @@ está em [`AUDITORIA.md`](AUDITORIA.md).
 ## Implantação
 
 O modelo recomendado é **um servidor central na rede**; o time acessa pelo navegador.
-A forma mais simples de manter esse servidor no ar é o Docker: `restart: always`
-faz app e banco subirem sozinhos quando a máquina liga, sem ninguém precisar logar.
+Ele roda direto no Windows, como serviço, ao lado de um SQL Server Express — sobe
+sozinho quando a máquina liga, sem ninguém precisar logar. O Docker
+([`docs/DOCKER.md`](docs/DOCKER.md)) é a alternativa: `restart: always` faz o mesmo
+papel, ao custo da máquina virtual do WSL 2.
 
-- **Montar o servidor** (serviço do Windows, firewall, IP fixo):
+- **Montar o servidor** (SQL Server, serviço do Windows, firewall, IP fixo):
   [`docs/SERVIDOR-COMO-INSTALAR.md`](docs/SERVIDOR-COMO-INSTALAR.md)
 - **Acessar e instalar o app** (para o time, Chrome/Edge):
   [`docs/README-TIME.md`](docs/README-TIME.md)
 
-Para parar o servidor, use `docker compose down` (ou pare o serviço, se
-configurado sem Docker).
+Para parar o servidor, pare o serviço do Windows (ou `docker compose down`, se
+estiver no Docker).
 
 ## Login e primeiro acesso
 

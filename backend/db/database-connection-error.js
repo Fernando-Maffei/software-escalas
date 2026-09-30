@@ -42,6 +42,20 @@ function mapDatabaseConnectionError(error, fallbackMessage) {
         );
     }
 
+    // O driver so fala TCP/IP. Instancia nomeada (ex.: MAQUINA\SQLEXPRESS) e
+    // achada pelo servico SQL Server Browser, que so informa a porta se o
+    // TCP/IP da instancia estiver habilitado — e o SQL Server Express vem com
+    // ele desabilitado. E o tropeco mais comum numa instalacao nova.
+    if (errorCode === 'EINSTLOOKUP' || /port for .* not found/i.test(rawMessage)) {
+        return new AppError(
+            400,
+            'A instancia do SQL Server nao respondeu por TCP/IP. Habilite o protocolo TCP/IP da instancia '
+            + '(SQL Server Configuration Manager), reinicie o servico do SQL Server e confira o nome da '
+            + 'instancia e se o servico SQL Server Browser esta em execucao.',
+            details
+        );
+    }
+
     if (
         ['ESOCKET', 'ENOTFOUND', 'ETIMEOUT'].includes(errorCode)
         || /server was not found/i.test(rawMessage)

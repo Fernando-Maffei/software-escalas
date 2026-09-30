@@ -1,5 +1,13 @@
 // Sobe e derruba o servidor HTTP. A aplicacao (rotas, middlewares) esta em
 // app.js; o bootstrap do banco em lib/bootstrap-banco.js.
+
+// Antes de qualquer outro require: varios modulos leem process.env ao serem
+// carregados (CORS, proxy confiavel). So quando este arquivo e o ponto de
+// entrada — os testes sobem o servidor por start() com o ambiente deles.
+if (require.main === module) {
+    require('./lib/env-local').carregarEnvLocal();
+}
+
 const { fecharConexao } = require('./db');
 const { clearAutoBackupScheduler, executeAutomaticBackup } = require('./services/backup-scheduler');
 const { DEFAULT_HOST, DEFAULT_PORT, getServerAccessUrls, normalizePort } = require('./lib/rede');
