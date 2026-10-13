@@ -1,7 +1,7 @@
 import { escapeHtml } from '../../lib/html-seguro.js';
+import { API, buscarFeriadosNacionais } from '../api.js';
 import { aguardarLayoutRelatorioPdf, baixarPdfSemPreview, criarContainerTemporarioRelatorioPdf, criarPdfMultipaginasComCanvas, lockPdfViewportOverflow, renderizarPaginaPdfEmCanvas } from '../../lib/pdf-utils.js';
 import { mostrarToast } from '../app/horas-e-resumo.js';
-import { carregarFeriadosAPI } from '../app/utilitarios.js';
 import { estado } from '../estado.js';
 import { carregarAusencias, carregarColaboradores, carregarFeriadosLocais } from './dados-e-modais.js';
 
@@ -45,6 +45,64 @@ function formatarDataRelatorio(dataISO) {
     return `${dia}/${mes}/${ano}`;
 }
 
+// Rotulos iguais aos da tela de lancamentos (SUBTIPOS em telas/lancamentos.js).
+// 'comum' e os subtipos derivados do tipo ('folga'/'ferias') nao informam nada.
+const ROTULOS_SUBTIPO = {
+    medico: 'Atestado',
+    particular: 'Particular',
+    compensacao: 'Compensacao',
+    outro: 'Outro'
+};
+
+function extrairHoraRelatorio(valor) {
+    const texto = String(valor || '');
+    const encontrado = texto.match(/(\d{2}:\d{2})/);
+    return encontrado ? encontrado[1] : '';
+}
+
+function montarHorarioRelatorio(inicio, fim) {
+    const horaInicio = extrairHoraRelatorio(inicio);
+    const horaFim = extrairHoraRelatorio(fim);
+
+    if (horaInicio && horaFim) {
+        return `${horaInicio}-${horaFim}`;
+    }
+
+    return horaInicio || horaFim || '';
+}
+
+function montarDetalheAusenciaRelatorio(item) {
+    const subtipo = String(item.Subtipo || item.subtipo || '').trim().toLowerCase();
+    const parcial = String(item.PeriodoTipo || item.periodoTipo || '').trim().toLowerCase() === 'horas';
+    const horario = parcial
+        ? montarHorarioRelatorio(item.HoraInicio || item.horaInicio, item.HoraFim || item.horaFim)
+        : '';
+
+    return {
+        subtipo: ROTULOS_SUBTIPO[subtipo] || '',
+        parcial,
+        horario
+    };
+}
+
+function textoDetalheRelatorio(detalhe) {
+    const partes = [];
+
+    if (detalhe.subtipo) {
+        partes.push(detalhe.subtipo);
+    }
+
+    if (detalhe.parcial) {
+        partes.push(detalhe.horario ? `Parcial ${detalhe.horario}` : 'Parcial');
+    }
+
+    return partes.join(' - ');
+}
+
+function rotuloCreditoPlantao(tipoCredito) {
+    return String(tipoCredito || '').toLowerCase() === 'extra' ? 'Hora extra' : 'Banco de horas';
+}
+
 function montarPeriodoRelatorio(dataInicioISO, dataFimISO) {
     if (!dataInicioISO && !dataFimISO) {
         return '--';
@@ -65,7 +123,8 @@ function criarMapaEventosPorData(mes, ano) {
         const dataISO = `${ano}-${String(mes + 1).padStart(2, '0')}-${String(dia).padStart(2, '0')}`;
         eventosPorData[dataISO] = {
             feriado: null,
-            colaboradores: []
+            colaboradores: [],
+            plantoes: []
         };
     }
 
@@ -100,6 +159,7 @@ async function construirDadosRelatorioMensal(mes, ano) {
     const ferias = [];
     const folgas = [];
     const ausenciasLista = [];
+    const plantoesLista = [];
     const feriadosLista = [];
     const primeiroDiaMesISO = `${ano}-${String(mes + 1).padStart(2, '0')}-01`;
     const ultimoDiaMesISO = `${ano}-${String(mes + 1).padStart(2, '0')}-${String(diasNoMes).padStart(2, '0')}`;
@@ -123,9 +183,15 @@ async function construirDadosRelatorioMensal(mes, ano) {
         });
     }
 
-    // carregarFeriadosAPI trata a propria falha (devolve lista vazia e loga).
-    if (!estado.feriadosAPI || !Array.isArray(estado.feriadosAPI) || estado.feriadosAPI.length === 0) {
-        await carregarFeriadosAPI(ano);
+    // Feriados nacionais do ANO DO RELATORIO, lidos direto (a funcao tem cache
+    // por ano). Antes o relatorio usava estado.feriadosAPI, que guarda so o
+    // ano carregado por ultimo: exportar o PDF de outro ano saia sem feriados.
+    let feriadosNacionais = [];
+
+    try {
+        feriadosNacionais = await buscarFeriadosNacionais(ano);
+    } catch (error) {
+        console.error('Erro ao carregar feriados nacionais do relatorio:', error);
     }
 
     // Mesmo cuidado que ja existia para feriados, agora para colaboradores
@@ -150,7 +216,7 @@ async function construirDadosRelatorioMensal(mes, ano) {
         mostrarToast('Nao foi possivel carregar os colaboradores. O relatorio pode sair incompleto.', 'error');
     }
 
-    (Array.isArray(estado.feriadosAPI) ? estado.feriadosAPI : []).forEach((item) => {
+    (Array.isArray(feriadosNacionais) ? feriadosNacionais : []).forEach((item) => {
         const dataISO = obterDataIsoRelatorio(item.date);
 
         if (dataISO && dataISO.startsWith(`${ano}-${String(mes + 1).padStart(2, '0')}-`)) {
@@ -197,6 +263,7 @@ async function construirDadosRelatorioMensal(mes, ano) {
         const nomeColaborador = colaborador
             ? (colaborador.Nome || 'Desconhecido')
             : `Colaborador #${colaboradorId} (removido)`;
+        const detalheAusencia = montarDetalheAusenciaRelatorio(item);
         const inicioNoMes = dataInicioISO < primeiroDiaMesISO ? primeiroDiaMesISO : dataInicioISO;
         const fimNoMes = dataFimISO > ultimoDiaMesISO ? ultimoDiaMesISO : dataFimISO;
 
@@ -207,7 +274,8 @@ async function construirDadosRelatorioMensal(mes, ano) {
 
             eventosPorData[dataISO].colaboradores.push({
                 nome: nomeColaborador,
-                tipo
+                tipo,
+                detalhe: textoDetalheRelatorio(detalheAusencia)
             });
         });
 
@@ -229,7 +297,8 @@ async function construirDadosRelatorioMensal(mes, ano) {
                 colaborador: nomeColaborador,
                 data: dataISO,
                 dataFormatada: formatarDataRelatorio(dataISO),
-                tipo
+                tipo,
+                detalhe: textoDetalheRelatorio(detalheAusencia)
             };
 
             if (tipo === 'folga') {
@@ -237,6 +306,46 @@ async function construirDadosRelatorioMensal(mes, ano) {
             } else if (tipo === 'ausencia') {
                 ausenciasLista.push(eventoInfo);
             }
+        });
+    });
+
+    // Plantoes lancados no mes. Lidos direto do servidor, filtrados pelo mes:
+    // o estado global pode estar desatualizado ou ter outra janela.
+    let plantoesDoMes = [];
+
+    try {
+        const dados = await API.getPlantoes({ from: primeiroDiaMesISO, to: ultimoDiaMesISO });
+        plantoesDoMes = Array.isArray(dados) ? dados : [];
+    } catch (error) {
+        console.error('Erro ao carregar plantoes do relatorio:', error);
+        mostrarToast('Nao foi possivel carregar os plantoes. O relatorio pode sair sem eles.', 'error');
+    }
+
+    plantoesDoMes.forEach((plantao) => {
+        const dataISO = obterDataIsoRelatorio(plantao.dataISO || plantao.data_plantao);
+
+        if (!dataISO || !eventosPorData[dataISO]) {
+            return;
+        }
+
+        const horario = montarHorarioRelatorio(plantao.horaInicio || plantao.hora_inicio, plantao.horaFim || plantao.hora_fim);
+        const credito = rotuloCreditoPlantao(plantao.tipoCredito || plantao.tipo_credito);
+
+        (Array.isArray(plantao.colaboradores) ? plantao.colaboradores : []).forEach((idEquipe) => {
+            const colaboradorEquipe = (estado.colaboradores || []).find((entry) => Number(entry.Id) === Number(idEquipe));
+            const nome = colaboradorEquipe
+                ? (colaboradorEquipe.Nome || 'Desconhecido')
+                : `Colaborador #${idEquipe} (removido)`;
+            const item = {
+                colaborador: nome,
+                data: dataISO,
+                dataFormatada: formatarDataRelatorio(dataISO),
+                horario,
+                credito
+            };
+
+            plantoesLista.push(item);
+            eventosPorData[dataISO].plantoes.push({ nome, horario, credito });
         });
     });
 
@@ -249,6 +358,7 @@ async function construirDadosRelatorioMensal(mes, ano) {
         ferias: ordenarPorDataCampo(ferias, 'dataInicio'),
         folgas: ordenarPorDataCampo(folgas, 'data'),
         ausencias: ordenarPorDataCampo(ausenciasLista, 'data'),
+        plantoes: ordenarPorDataCampo(plantoesLista, 'data'),
         feriados: ordenarPorDataCampo(feriadosLista, 'data'),
         mes
     };
@@ -277,8 +387,9 @@ function renderResumoTabelaRelatorio(config) {
 
 function gerarHtmlVisualizacaoRelatorioMensal(dados) {
     const { mesNome, ano, primeiroDia, diasNoMes, eventosPorData, ferias, folgas, ausencias, feriados, mes } = dados;
+    const plantoes = dados.plantoes || [];
     const diasSemana = ['DOM', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SAB'];
-    const totalEventos = ferias.length + folgas.length + ausencias.length + feriados.length;
+    const totalEventos = ferias.length + folgas.length + ausencias.length + feriados.length + plantoes.length;
 
     let html = `
             <div class="relatorio-calendario">
@@ -306,9 +417,13 @@ function gerarHtmlVisualizacaoRelatorioMensal(dados) {
         const eventos = eventosPorData[dataISO];
         const isFeriado = eventos?.feriado;
         const colaboradoresDia = eventos?.colaboradores || [];
-        const folgasDia = colaboradoresDia.filter((item) => item.tipo === 'folga').map((item) => item.nome);
-        const feriasDia = colaboradoresDia.filter((item) => item.tipo === 'ferias').map((item) => item.nome);
-        const ausenciasDia = colaboradoresDia.filter((item) => item.tipo === 'ausencia').map((item) => item.nome);
+        const rotuloComDetalhe = (item) => (item.detalhe ? `${item.nome} (${item.detalhe})` : item.nome);
+        const folgasDia = colaboradoresDia.filter((item) => item.tipo === 'folga').map(rotuloComDetalhe);
+        const feriasDia = colaboradoresDia.filter((item) => item.tipo === 'ferias').map(rotuloComDetalhe);
+        const ausenciasDia = colaboradoresDia.filter((item) => item.tipo === 'ausencia').map(rotuloComDetalhe);
+        const plantoesDia = (eventos?.plantoes || []).map((item) => (
+            `${item.nome}${item.horario ? ` ${item.horario}` : ''}`
+        ));
 
         html += `<td class="${isFeriado ? 'feriado' : ''}">`;
         html += `<div class="dia-numero">${dia}</div>`;
@@ -349,6 +464,18 @@ function gerarHtmlVisualizacaoRelatorioMensal(dados) {
             });
             if (ausenciasDia.length > 3) {
                 html += `<span class="mais-tag">+${ausenciasDia.length - 3}</span>`;
+            }
+            html += '</div>';
+        }
+
+        if (plantoesDia.length > 0) {
+            html += '<div class="dia-plantoes">';
+            plantoesDia.slice(0, 3).forEach((nome) => {
+                const nomeCurto = nome.length > 24 ? `${nome.substring(0, 21)}...` : nome;
+                html += `<span class="plantao-tag" title="${escapeHtml(nome)}">🕒 ${escapeHtml(nomeCurto)}</span>`;
+            });
+            if (plantoesDia.length > 3) {
+                html += `<span class="mais-tag">+${plantoesDia.length - 3}</span>`;
             }
             html += '</div>';
         }
@@ -406,7 +533,7 @@ function gerarHtmlVisualizacaoRelatorioMensal(dados) {
                     rowRenderer: (item) => `
                             <tr>
                                 <td><strong>${escapeHtml(item.colaborador)}</strong></td>
-                                <td>${escapeHtml(item.dataFormatada)}</td>
+                                <td>${escapeHtml(item.dataFormatada)}${item.detalhe ? ` <small>(${escapeHtml(item.detalhe)})</small>` : ''}</td>
                             </tr>
                         `
                 })}
@@ -418,14 +545,27 @@ function gerarHtmlVisualizacaoRelatorioMensal(dados) {
                     rowRenderer: (item) => `
                             <tr>
                                 <td><strong>${escapeHtml(item.colaborador)}</strong></td>
+                                <td>${escapeHtml(item.dataFormatada)}${item.detalhe ? ` <small>(${escapeHtml(item.detalhe)})</small>` : ''}</td>
+                            </tr>
+                        `
+                })}
+                    ${renderResumoTabelaRelatorio({
+                    titulo: '🕒 Plantoes',
+                    items: plantoes,
+                    headers: ['Colaborador', 'Data', 'Horario'],
+                    emptyLabel: 'Nenhum plantao no periodo',
+                    rowRenderer: (item) => `
+                            <tr>
+                                <td><strong>${escapeHtml(item.colaborador)}</strong></td>
                                 <td>${escapeHtml(item.dataFormatada)}</td>
+                                <td>${escapeHtml(item.horario || '--')} <small>(${escapeHtml(item.credito)})</small></td>
                             </tr>
                         `
                 })}
                 </div>
 
                     <strong>Total de lancamentos no mes: ${totalEventos}</strong><br>
-                    <small>${feriados.length} feriados, ${ferias.length} ferias, ${folgas.length} folgas, ${ausencias.length} ausencias</small>
+                    <small>${feriados.length} feriados, ${ferias.length} ferias, ${folgas.length} folgas, ${ausencias.length} ausencias, ${plantoes.length} plantoes</small>
             </div>
         `;
 
@@ -434,8 +574,9 @@ function gerarHtmlVisualizacaoRelatorioMensal(dados) {
 
 function gerarHtmlPdfRelatorioMensalExpandido(dados) {
     const { mesNome, ano, primeiroDia, diasNoMes, eventosPorData, mes, ferias, folgas, ausencias, feriados } = dados;
+    const plantoes = dados.plantoes || [];
     const diasSemana = ['DOM', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SAB'];
-    const totalEventos = ferias.length + folgas.length + ausencias.length + feriados.length;
+    const totalEventos = ferias.length + folgas.length + ausencias.length + feriados.length + plantoes.length;
 
     let html = `
             <!DOCTYPE html>
@@ -485,7 +626,7 @@ function gerarHtmlPdfRelatorioMensalExpandido(dados) {
                     }
                     .resumo-metricas {
                         display: grid;
-                        grid-template-columns: repeat(4, minmax(0, 1fr));
+                        grid-template-columns: repeat(5, minmax(0, 1fr));
                         gap: 12px;
                     }
                     .metrica-card {
@@ -586,6 +727,11 @@ function gerarHtmlPdfRelatorioMensalExpandido(dados) {
                         background: #fee2e2;
                         color: #b91c1c;
                         border-left: 3px solid #ef4444;
+                    }
+                    .plantao-tag {
+                        background: #fef3c7;
+                        color: #92400e;
+                        border-left: 3px solid #d97706;
                     }
                     .mais-eventos {
                         font-size: 12px;
@@ -725,7 +871,10 @@ function gerarHtmlPdfRelatorioMensalExpandido(dados) {
         const folgasVisiveis = folgasDia.slice(0, 3);
         const feriasVisiveis = feriasDia.slice(0, 3);
         const ausenciasVisiveis = ausenciasDia.slice(0, 3);
-        const itensExibidos = folgasVisiveis.length + feriasVisiveis.length + ausenciasVisiveis.length;
+        const plantoesVisiveis = (eventos?.plantoes || []).slice(0, 3);
+        const itensExibidos = folgasVisiveis.length + feriasVisiveis.length + ausenciasVisiveis.length + plantoesVisiveis.length;
+        const totalRegistrosDia = colaboradoresDia.length + (eventos?.plantoes || []).length;
+        const rotuloDetalhe = (item) => (item.detalhe ? ` (${item.detalhe})` : '');
         const classesCelula = [];
 
         if (isDomingo) {
@@ -748,21 +897,27 @@ function gerarHtmlPdfRelatorioMensalExpandido(dados) {
 
         folgasVisiveis.forEach((item) => {
             const nome = item.nome.length > 20 ? `${item.nome.substring(0, 17)}...` : item.nome;
-            linhaAtual += `<div class="evento-tag folga-tag" title="${escapeHtml(item.nome)}">Folga: ${escapeHtml(nome)}</div>`;
+            linhaAtual += `<div class="evento-tag folga-tag" title="${escapeHtml(item.nome + rotuloDetalhe(item))}">Folga: ${escapeHtml(nome)}${escapeHtml(rotuloDetalhe(item))}</div>`;
         });
 
         feriasVisiveis.forEach((item) => {
             const nome = item.nome.length > 20 ? `${item.nome.substring(0, 17)}...` : item.nome;
-            linhaAtual += `<div class="evento-tag ferias-tag" title="${escapeHtml(item.nome)}">Ferias: ${escapeHtml(nome)}</div>`;
+            linhaAtual += `<div class="evento-tag ferias-tag" title="${escapeHtml(item.nome + rotuloDetalhe(item))}">Ferias: ${escapeHtml(nome)}${escapeHtml(rotuloDetalhe(item))}</div>`;
         });
 
         ausenciasVisiveis.forEach((item) => {
             const nome = item.nome.length > 20 ? `${item.nome.substring(0, 17)}...` : item.nome;
-            linhaAtual += `<div class="evento-tag ausencia-tag" title="${escapeHtml(item.nome)}">Ausencia: ${escapeHtml(nome)}</div>`;
+            linhaAtual += `<div class="evento-tag ausencia-tag" title="${escapeHtml(item.nome + rotuloDetalhe(item))}">Ausencia: ${escapeHtml(nome)}${escapeHtml(rotuloDetalhe(item))}</div>`;
         });
 
-        if (colaboradoresDia.length > itensExibidos) {
-            linhaAtual += `<div class="mais-eventos">+${colaboradoresDia.length - itensExibidos} registro(s)</div>`;
+        plantoesVisiveis.forEach((item) => {
+            const texto = `${item.nome}${item.horario ? ` ${item.horario}` : ''}`;
+            const curto = texto.length > 26 ? `${texto.substring(0, 23)}...` : texto;
+            linhaAtual += `<div class="evento-tag plantao-tag" title="${escapeHtml(`${texto} - ${item.credito}`)}">Plantao: ${escapeHtml(curto)}</div>`;
+        });
+
+        if (totalRegistrosDia > itensExibidos) {
+            linhaAtual += `<div class="mais-eventos">+${totalRegistrosDia - itensExibidos} registro(s)</div>`;
         }
 
         linhaAtual += '</div>';
@@ -804,6 +959,7 @@ function gerarHtmlPdfRelatorioMensalExpandido(dados) {
                             <div class="metrica-card"><strong>${ferias.length}</strong><span>Ferias</span></div>
                             <div class="metrica-card"><strong>${folgas.length}</strong><span>Folgas</span></div>
                             <div class="metrica-card"><strong>${ausencias.length}</strong><span>Ausencias</span></div>
+                            <div class="metrica-card"><strong>${plantoes.length}</strong><span>Plantoes</span></div>
                         </div>
                     </div>
 
@@ -860,7 +1016,7 @@ function gerarHtmlPdfRelatorioMensalExpandido(dados) {
                                         ${folgas.slice(0, 10).map((item) => `
                                             <tr>
                                                 <td>${escapeHtml(item.colaborador)}</td>
-                                                <td>${escapeHtml(item.dataFormatada)}</td>
+                                                <td>${escapeHtml(item.dataFormatada)}${item.detalhe ? ` (${escapeHtml(item.detalhe)})` : ''}</td>
                                             </tr>
                                         `).join('')}
                                         ${folgas.length > 10 ? `<tr><td colspan="2" style="text-align: center; color: #64748b;">... e mais ${folgas.length - 10}</td></tr>` : ''}
@@ -880,7 +1036,7 @@ function gerarHtmlPdfRelatorioMensalExpandido(dados) {
                                         ${ausencias.slice(0, 10).map((item) => `
                                             <tr>
                                                 <td>${escapeHtml(item.colaborador)}</td>
-                                                <td>${escapeHtml(item.dataFormatada)}</td>
+                                                <td>${escapeHtml(item.dataFormatada)}${item.detalhe ? ` (${escapeHtml(item.detalhe)})` : ''}</td>
                                             </tr>
                                         `).join('')}
                                         ${ausencias.length > 10 ? `<tr><td colspan="2" style="text-align: center; color: #64748b;">... e mais ${ausencias.length - 10}</td></tr>` : ''}
@@ -888,11 +1044,32 @@ function gerarHtmlPdfRelatorioMensalExpandido(dados) {
                                 </table>
                             ` : '<div class="empty-message">Nenhuma ausencia no periodo</div>'}
                         </div>
+
+                        <div class="lista-card">
+                            <h3>Plantoes</h3>
+                            ${plantoes.length > 0 ? `
+                                <table>
+                                    <thead>
+                                        <tr><th style="width: 40%">Colaborador</th><th style="width: 22%">Data</th><th style="width: 38%">Horario</th></tr>
+                                    </thead>
+                                    <tbody>
+                                        ${plantoes.slice(0, 10).map((item) => `
+                                            <tr>
+                                                <td>${escapeHtml(item.colaborador)}</td>
+                                                <td>${escapeHtml(item.dataFormatada)}</td>
+                                                <td>${escapeHtml(item.horario || '--')} (${escapeHtml(item.credito)})</td>
+                                            </tr>
+                                        `).join('')}
+                                        ${plantoes.length > 10 ? `<tr><td colspan="3" style="text-align: center; color: #64748b;">... e mais ${plantoes.length - 10}</td></tr>` : ''}
+                                    </tbody>
+                                </table>
+                            ` : '<div class="empty-message">Nenhum plantao no periodo</div>'}
+                        </div>
                     </div>
 
                     <div class="resumo-rodape">
                         <strong>Total de lancamentos no mes: ${totalEventos}</strong><br>
-                        <small>${feriados.length} feriados, ${ferias.length} ferias, ${folgas.length} folgas, ${ausencias.length} ausencias</small>
+                        <small>${feriados.length} feriados, ${ferias.length} ferias, ${folgas.length} folgas, ${ausencias.length} ausencias, ${plantoes.length} plantoes</small>
                     </div>
                 </section>
             </body>
@@ -914,11 +1091,12 @@ async function gerarRelatorioCalendarioCompleto(mes, ano) {
         dados.folgas,
         dados.ausencias,
         dados.feriados,
-        dados.mes
+        dados.mes,
+        dados.plantoes
     );
 }
 
-function mostrarRelatorioCalendarioCompleto(mesNome, ano, primeiroDia, diasNoMes, eventosPorData, ferias, folgas, ausencias, feriados, mes) {
+function mostrarRelatorioCalendarioCompleto(mesNome, ano, primeiroDia, diasNoMes, eventosPorData, ferias, folgas, ausencias, feriados, mes, plantoes = []) {
     const dados = {
         mesNome,
         ano,
@@ -929,7 +1107,8 @@ function mostrarRelatorioCalendarioCompleto(mesNome, ano, primeiroDia, diasNoMes
         folgas,
         ausencias,
         feriados,
-        mes
+        mes,
+        plantoes
     };
 
     document.getElementById('relatorioTitulo').innerText = `Relatorio de ${mesNome} ${ano}`;
@@ -956,8 +1135,7 @@ export async function gerarRelatorioCompleto() {
     await Promise.all([
         carregarColaboradores(),
         carregarAusencias(),
-        carregarFeriadosLocais(),
-        carregarFeriadosAPI(ano)
+        carregarFeriadosLocais()
     ]);
 
     await gerarRelatorioCalendarioCompleto(mes, ano);
