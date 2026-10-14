@@ -119,6 +119,10 @@ async function roteiro(cliente, registro) {
             nome: 'Beto',
             setorId: setorB.Id,
             tipoEscalaId: tipo.id,
+            // Folga de domingo (mais abaixo) e so de plantonista de final de
+            // semana desde e96f6a7; sem isto o roteiro quebrava na folga.
+            isPlantonista: true,
+            tipoPlantonista: 'FINAL_SEMANA',
             ...JORNADA
         })
     ).data;

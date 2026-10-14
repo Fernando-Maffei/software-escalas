@@ -283,9 +283,12 @@ module.exports = [
 
             const colaborador = await criarColaborador(cliente);
             esperarSucesso(
+                // Sem almoco: o 12:00-13:00 do cadastro cairia fora do 06:00-10:00.
                 await cliente.put(`/api/escala/dia/2043-03-02/colaborador/${colaborador.Id}`, {
                     horaInicio: '06:00',
-                    horaFim: '10:00'
+                    horaFim: '10:00',
+                    almocoInicio: null,
+                    almocoFim: null
                 }),
                 'ajuste manual'
             );
