@@ -158,7 +158,7 @@ module.exports = [
         async run() {
             const admin = criarCliente();
             await admin.entrar();
-            const username = nomeUnico('chefe').replace(/s+/g, '-');
+            const username = nomeUnico('chefe').replace(/\s+/g, '-');
             const senha = 'Chefe!Integracao1';
             esperarSucesso(await admin.post('/api/usuarios', { username, senha, isAdmin: true }), 'criar admin');
 
@@ -190,7 +190,7 @@ module.exports = [
         async run() {
             const admin = criarCliente();
             await admin.entrar();
-            const username = nomeUnico('novoadmin').replace(/s+/g, '-');
+            const username = nomeUnico('novoadmin').replace(/\s+/g, '-');
             const senha = 'Provisoria!2026';
             esperarSucesso(await admin.post('/api/usuarios', { username, senha, isAdmin: true }), 'criar admin');
 
