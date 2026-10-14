@@ -108,7 +108,19 @@ próprio:
    para `escalas_app` e a senha nova **depois** do passo 4 — ou apague o arquivo
    para valer o compose.
 4. Suba de novo: `docker compose up -d --build`. O `db-init` cria o login
-   `escalas_app` e o torna dono do banco; o app passa a usá-lo.
+   `escalas_app` e o torna dono do banco; o app passa a usá-lo. O container
+   `db` é recriado (a porta mudou): o banco reinicia, os dados ficam no volume.
+
+   Se você atualiza **só o app** (`docker compose up -d --no-deps app`), o
+   `--no-deps` pula o `db-init` e o login não seria criado — o app subiria sem
+   conseguir conectar. Nesse caso rode antes:
+
+   ```bash
+   docker compose run --rm db-init
+   ```
+
+   e, para fechar a porta 1433 para a rede, recrie o banco quando puder:
+   `docker compose up -d --no-deps db`.
 5. Confira em `docker compose logs db-init` a linha `Banco e login prontos`
    e entre no app normalmente.
 
