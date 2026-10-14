@@ -9,7 +9,7 @@ A ideia: **uma máquina** roda o sistema o tempo todo, e todo o time acessa pela
 
 ## O que a máquina do servidor precisa ter
 
-1. **Node.js 20.19 ou superior** — https://nodejs.org/ (baixe a versão "LTS").
+1. **Node.js 22.12 ou superior** — https://nodejs.org/ (baixe a versão "LTS").
 2. **SQL Server** instalado na própria máquina (o **SQL Server Express**, gratuito,
    serve). Na instalação, guarde o **nome da instância**.
 3. A **pasta do projeto** copiada para a máquina (ex.: `C:App de escalas`) — fora

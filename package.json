@@ -4,7 +4,7 @@
   "description": "Sistema web para gestao de escalas de trabalho.",
   "productName": "App de Escalas",
   "engines": {
-    "node": ">=20.19"
+    "node": ">=22.12"
   },
   "scripts": {
     "start": "node backend/server.js",

@@ -25,10 +25,10 @@ jobs:
       - name: Baixar o codigo
         uses: actions/checkout@v4
 
-      - name: Preparar Node 20
+      - name: Preparar Node 22
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           cache: npm
 
       # npm ci (e nao npm install): instala exatamente o que esta no
@@ -78,10 +78,10 @@ jobs:
       - name: Baixar o codigo
         uses: actions/checkout@v4
 
-      - name: Preparar Node 20
+      - name: Preparar Node 22
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           cache: npm
 
       - name: Instalar dependencias
@@ -103,10 +103,10 @@ jobs:
       - name: Baixar o codigo
         uses: actions/checkout@v4
 
-      - name: Preparar Node 20
+      - name: Preparar Node 22
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           cache: npm
 
       - name: Instalar dependencias

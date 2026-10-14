@@ -1,7 +1,7 @@
 # Central de Escalas
 
 ![Versão](https://img.shields.io/badge/versão-1.6.3-6366f1)
-![Node](https://img.shields.io/badge/Node-20%2B-3c873a)
+![Node](https://img.shields.io/badge/Node-22%2B-3c873a)
 ![Licença](https://img.shields.io/badge/licença-proprietária-lightgrey)
 [![CI](https://github.com/Fernando-Maffei/software-escalas/actions/workflows/ci.yml/badge.svg)](https://github.com/Fernando-Maffei/software-escalas/actions/workflows/ci.yml)
 
@@ -43,7 +43,7 @@ Uma máquina roda o servidor; qualquer dispositivo da rede acessa pelo navegador
 | Camada | Stack |
 |--------|-------|
 | Frontend | HTML, CSS e JavaScript |
-| Backend | Node.js 20+ e Express |
+| Backend | Node.js 22+ e Express |
 | Banco de dados | SQL Server |
 
 ## Início rápido (desenvolvimento)
@@ -85,7 +85,7 @@ docker compose down
 
 ### Sem Docker
 
-Requer Node 20.19+ e um SQL Server na máquina (o Express serve). O app conecta
+Requer Node 22.12+ e um SQL Server na máquina (o Express serve). O app conecta
 por **TCP/IP**, que o SQL Server Express traz desabilitado; o script abaixo, rodado
 uma vez no PowerShell **como Administrador**, habilita o TCP/IP numa porta fixa,
 cria o banco e um login próprio do app e libera a porta 4450 no firewall:

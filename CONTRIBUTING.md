@@ -38,7 +38,7 @@ Com Docker (sobe o app e o banco juntos):
 docker compose up -d --build
 ```
 
-Sem Docker (requer Node 20.19+ e um SQL Server acessivel):
+Sem Docker (requer Node 22.12+ e um SQL Server acessivel):
 
 ```bash
 npm install

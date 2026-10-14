@@ -1,7 +1,9 @@
 # Imagem do App de Escalas (servidor Node/Express).
 # O banco NAO fica aqui — roda no seu proprio container (ver docker-compose.yml).
 
-FROM node:20-slim
+# Node 22: o driver do banco (tedious 20) exige Node >= 22; o 20 ficou sem
+# suporte em abril/2026.
+FROM node:22-slim
 
 WORKDIR /app
 
