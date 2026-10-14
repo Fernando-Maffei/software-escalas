@@ -750,3 +750,108 @@ Aceitos com justificativa: B8, B11 e a parte de frontend do M14.
    renomear `core/runtime/` (o nome vem do antigo `runtime-fixes.js`, que ja
    nao descreve o conteudo); quebrar as funcoes-template gigantes com o roteiro
    A/B como rede.
+
+---
+
+## 6. Terceira passada (2026-10-13)
+
+Revisao do codigo que entrou depois da auditoria (plantonista no cadastro,
+folga de domingo com reposicao, aba Pendencias) e nova varredura do backend.
+Base: `f10c9dc`, branch `claude/project-code-audit-190b80`.
+
+**Execucao:** `npm run verificar` verde (smoke 177/177, lint, codigo morto,
+tipos, Prettier, 167 testes unitarios — eram 163). Robo na demo: 9/9 telas.
+`npm run test:integracao` **nao rodou**: o Docker esta parado desde 30/09 e o
+SQL Server nativo esta com TCP desligado. A `main` local esta 91 commits a
+frente do `origin`, entao esses commits tambem nunca passaram pelo CI.
+
+### ALTO
+
+**T1 — Relatorio de escala sem teto de periodo, numa leitura que grava** · `RESOLVIDO`
+`backend/routes/escala.js` (`GET /relatorio`). A leitura materializa a escala do
+periodo inteiro (`ensureEscalaDiaForPeriod`: uma linha por colaborador por dia)
+numa transacao, e qualquer conta — ate a de visualizacao — chama a rota. Um
+periodo digitado errado no relatorio detalhado (2020 a 2030) geraria centenas
+de milhares de linhas com `escala_dia` travada.
+**Feito:** `buildDateRange(..., { maxDias })` em `lib/validation.js`; a rota
+aceita no maximo 366 dias (quadro mensal, semana e relatorio detalhado cabem).
+Testes: unitario (contagem das pontas, ano bissexto) e de integracao
+(`limites.test.js`: 367 dias da 400 sem criar linha; 366 passa).
+
+**T2 — Commits sem CI e sem integracao** · `ABERTO`
+91 commits da `main` local nunca subiram; a feature de folga de domingo e o
+driver `mssql` atualizado (T4) nao foram exercitados contra SQL Server real.
+**Proximo passo:** subir o banco de integracao, rodar `npm run test:integracao`
+e dar push antes do proximo deploy.
+
+### MEDIO
+
+**T3 — Limite de login driblado por requisicoes simultaneas** · `RESOLVIDO`
+`backend/routes/auth.js`: `check()` no inicio, `await scrypt`, e so entao
+`registerFailure()`. Requisicoes em paralelo passavam todas pelo portao antes de
+a primeira falha contar — reproduzido: 12 simultaneas, 12 atendidas (limite 5).
+Valia para login, troca de senha e verify-password.
+**Feito:** `consume()` em `auth/rate-limit.js` confere e conta num passo so,
+antes de qualquer await; acerto chama `reset()`. Mesma contagem de antes (5
+tentativas, a 6a bloqueia). Testes unitario e de integracao.
+
+**T4 — Dependencias vulneraveis** · `RESOLVIDO`
+`npm audit`: `proxy-addr` critica (spoofing de IP com `TRUST_PROXY` em sub-rede;
+padrao desligado) e `sprintf-js`/`tedious`/`mssql` moderadas.
+**Feito:** `npm audit fix` (so o lockfile) → 0 vulnerabilidades. Sobe o `mssql`
+para 12.7.6: depende do T2 antes de ir para producao.
+
+**T5 — "Hoje" em UTC no banco de horas semanal** · `RESOLVIDO`
+`backend/routes/banco-horas-semanal.js` (4 pontos) usava
+`new Date().toISOString()`. No Brasil, das 21h a meia-noite ja e o dia seguinte:
+no ultimo dia do mes o relatorio de horas extras abria no mes seguinte (vazio) e
+no domingo a noite a grade pulava de semana.
+**Feito:** `hojeISO()` local em `lib/validation.js`. Teste unitario.
+
+**T6 — Container sem fuso** · `PROPOSTA`
+`Dockerfile`/`docker-compose.yml` sem `TZ`: no Docker toda logica de "hoje"
+(inclusive o T5) roda em UTC. Proposta: `TZ: "America/Sao_Paulo"` no servico `app`.
+
+**T7 — App usa `sa` e a porta 1433 fica aberta para a rede** · `PROPOSTA`
+`docker-compose.yml`. Proposta: login proprio do app (o
+`scripts/preparar-sql-server.ps1` ja cria um) e `"127.0.0.1:1433:1433"`.
+
+**T8 — GET da escala grava** · `PROPOSTA`
+`GET /api/escala/dia` e `/relatorio` fazem MERGE/DELETE: conta somente-leitura
+gera escrita e locks. Medio prazo: materializar na escrita (ausencia, plantao,
+folga, cadastro) e deixar o GET so ler — o que tambem resolve o T13.
+
+**T9 — CSP sem `script-src`** · `ABERTO`
+Ja era a recomendacao 5 da secao 5 (tirar os 26 `onclick`).
+
+### BAIXO
+
+**T10 — Sessao usa o papel gravado no login** · `PROPOSTA`
+`auth/auth.js` (`getSession`) devolve `s.IsAdmin` e nao confere `u.Ativo`;
+depende de toda rota chamar `revokeUserSessions`. Proposta: `u.IsAdmin` e
+`AND u.Ativo = 1`.
+
+**T11 — Checagem do ultimo admin fora da transacao** · `PROPOSTA`
+`routes/usuarios.js`: dois admins rebaixando um ao outro ao mesmo tempo deixam
+o sistema sem admin. Proposta: contar dentro da transacao com `UPDLOCK`.
+
+**T12 — Parametros sem uso na grade semanal** · `ABERTO`
+`GET /api/banco-horas-semanal` passa `@inicio`/`@fim`, mas le a tabela toda (de
+proposito, para mostrar semanas historicas). Remover os inputs ou comentar.
+
+**T13 — Um MERGE por dia x colaborador ao gerar a escala** · `ABERTO`
+`services/escala.js` (`ensureEscalaBaseForPeriod`): primeiro acesso a um mes
+com 30 pessoas ~ 660 idas ao banco. Insercao em lote resolve.
+
+**T14 — `spawnSync` dentro de rota** · `ABERTO`
+`lib/background-service.js`: trava o servidor enquanto o `schtasks` roda (so
+admin). Trocar por `execFile` assincrono.
+
+**T15 — CI nao roda `analisar:codigo-morto`** · `ABERTO`
+O README diz que o CI roda o mesmo que `npm run verificar`.
+
+**T16 — Comando quebrado no README** · `ABERTO`
+`scriptspreparar-sql-server.ps1` (falta a barra).
+
+**T17 — Imagens Docker em `:latest`** · `ABERTO`
+`mssql/server:2022-latest` e `mssql-tools:latest`: build nao reproduzivel.
