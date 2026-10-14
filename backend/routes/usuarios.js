@@ -15,6 +15,7 @@ const {
     normalizeUsername,
     requireAdmin,
     revokeUserSessions,
+    travarAdministradores,
     updateUserFlags,
     updateUserPassword,
     updateUserSetoresPermitidos
@@ -25,6 +26,23 @@ const router = express.Router();
 // Toda a gestao de contas e exclusiva de administradores. O requireAuth
 // global (server.js) ja rodou antes deste router.
 router.use(requireAdmin);
+
+// Recusa tirar o ultimo administrador ativo. Roda DENTRO da transacao que vai
+// gravar, depois da trava: o papel do alvo e relido ali, porque outra
+// requisicao pode ter mudado entre a leitura inicial da rota e este ponto.
+async function exigirOutroAdminAtivo(tx, alvoId, orientacao) {
+    await travarAdministradores(tx);
+
+    const alvo = await findUserById(tx, alvoId);
+
+    if (!alvo?.isAdmin || !alvo.ativo) {
+        return;
+    }
+
+    if ((await countOtherActiveAdmins(tx, alvoId)) === 0) {
+        throw new AppError(400, `Este e o unico administrador ativo. ${orientacao}`);
+    }
+}
 
 function toPublicUser(user) {
     return {
@@ -118,14 +136,6 @@ router.put('/:id', async (req, res, next) => {
             throw new AppError(400, 'Voce nao pode desativar ou remover a administracao da propria conta.');
         }
 
-        if ((querDesativar || querRemoverAdmin) && alvo.isAdmin) {
-            const outrosAdmins = await countOtherActiveAdmins(pool, alvo.id);
-
-            if (outrosAdmins === 0) {
-                throw new AppError(400, 'Este e o unico administrador ativo. Promova outro usuario antes.');
-            }
-        }
-
         /** @type {{ ativo?: boolean, isAdmin?: boolean }} */
         const flags = {};
 
@@ -146,6 +156,10 @@ router.put('/:id', async (req, res, next) => {
         let senhaTemporaria = null;
 
         await withTransaction(sql, pool, async (tx) => {
+            if (querDesativar || querRemoverAdmin) {
+                await exigirOutroAdminAtivo(tx, alvo.id, 'Promova outro usuario antes.');
+            }
+
             await updateUserFlags(tx, alvo.id, flags);
 
             // Setores permitidos (teto de acesso imposto). So aplica quando o
@@ -212,17 +226,12 @@ router.delete('/:id', async (req, res, next) => {
         }
 
         // Mesma protecao do desativar: nunca deixar o sistema sem administrador.
-        if (alvo.isAdmin) {
-            const outrosAdmins = await countOtherActiveAdmins(pool, alvo.id);
-
-            if (outrosAdmins === 0) {
-                throw new AppError(400, 'Este e o unico administrador ativo. Promova outro usuario antes de excluir.');
-            }
-        }
-
         // deleteUser apaga a linha em Usuarios; a FK ON DELETE CASCADE da tabela
         // Sessoes remove junto qualquer sessao aberta da conta, sem passo extra.
-        await deleteUser(pool, alvo.id);
+        await withTransaction(sql, pool, async (tx) => {
+            await exigirOutroAdminAtivo(tx, alvo.id, 'Promova outro usuario antes de excluir.');
+            await deleteUser(tx, alvo.id);
+        });
 
         res.json({
             success: true,

@@ -830,14 +830,23 @@ Ja era a recomendacao 5 da secao 5 (tirar os 26 `onclick`).
 
 ### BAIXO
 
-**T10 — Sessao usa o papel gravado no login** · `PROPOSTA`
-`auth/auth.js` (`getSession`) devolve `s.IsAdmin` e nao confere `u.Ativo`;
-depende de toda rota chamar `revokeUserSessions`. Proposta: `u.IsAdmin` e
-`AND u.Ativo = 1`.
+**T10 — Sessao usa o papel gravado no login** · `RESOLVIDO`
+`auth/auth.js` (`getSession`) devolvia `s.IsAdmin` e nao conferia `u.Ativo`;
+dependia de toda rota chamar `revokeUserSessions`.
+**Feito:** papel e situacao vem de `Usuarios` a cada request (`u.IsAdmin`,
+`AND u.Ativo = 1`). Promover passa a valer sem novo login. A coluna
+`Sessoes.IsAdmin` continua sendo gravada, mas nao e mais lida. Testes de
+integracao em `usuarios.test.js`.
 
-**T11 — Checagem do ultimo admin fora da transacao** · `PROPOSTA`
-`routes/usuarios.js`: dois admins rebaixando um ao outro ao mesmo tempo deixam
-o sistema sem admin. Proposta: contar dentro da transacao com `UPDLOCK`.
+**T11 — Checagem do ultimo admin fora da transacao** · `RESOLVIDO`
+`routes/usuarios.js`: dois admins rebaixando um ao outro ao mesmo tempo deixavam
+o sistema sem admin.
+**Feito:** `exigirOutroAdminAtivo` roda dentro da transacao que grava, depois de
+`travarAdministradores` (`sp_getapplock` exclusivo ate o fim da transacao), e
+rele o papel do alvo ali. Vale para desativar, rebaixar e excluir (a exclusao
+passou a ser transacional). Trava de aplicacao em vez de `UPDLOCK` nas linhas
+para nao abrir deadlock pela ordem das linhas. Teste de integracao com os dois
+pedidos simultaneos.
 
 **T12 — Parametros sem uso na grade semanal** · `ABERTO`
 `GET /api/banco-horas-semanal` passa `@inicio`/`@fim`, mas le a tabela toda (de

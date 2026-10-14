@@ -239,6 +239,37 @@ async function countOtherActiveAdmins(pool, excludedUserId) {
     return result.recordset[0]?.total || 0;
 }
 
+// Serializa as mudancas que podem tirar o ultimo administrador (desativar,
+// rebaixar, excluir). Sem isto, dois admins rebaixando um ao outro ao mesmo
+// tempo contavam "ha outro admin" antes de qualquer um gravar e o sistema
+// ficava sem admin. Trava de aplicacao (sp_getapplock) em vez de UPDLOCK nas
+// linhas: um recurso so, sem risco de deadlock pela ordem das linhas. Vale ate
+// o fim da transacao, entao a contagem e a gravacao seguintes ficam juntas.
+const TRAVA_ADMINISTRADORES = 'escalas:usuarios-administradores';
+
+/**
+ * @param {import('mssql').Transaction} tx
+ */
+async function travarAdministradores(tx) {
+    const result = await tx.request()
+        .input('recurso', sql.NVarChar(255), TRAVA_ADMINISTRADORES)
+        .query(`
+            DECLARE @status INT;
+            EXEC @status = sp_getapplock
+                @Resource = @recurso,
+                @LockMode = 'Exclusive',
+                @LockOwner = 'Transaction',
+                @LockTimeout = 10000;
+            SELECT @status AS status;
+        `);
+
+    // 0 = concedida, 1 = concedida apos esperar; negativo = tempo esgotado,
+    // cancelada ou deadlock.
+    if ((result.recordset[0]?.status ?? -1) < 0) {
+        throw new AppError(503, 'Outra alteracao de administradores esta em andamento. Tente de novo.');
+    }
+}
+
 /**
  * @param {import('mssql').ConnectionPool | import('mssql').Transaction} pool
  * @param {number} userId
@@ -412,6 +443,10 @@ async function revokeOtherUserSessions(pool, userId, tokenAtual) {
 // Valida a sessao e, na mesma ida ao banco, renova o ExpiresAt (validade
 // deslizante) e devolve os dados. Uma sessao expirada nao casa no WHERE e
 // retorna null — a linha vencida sera varrida por purgeExpiredSessions.
+//
+// Papel e situacao vem da conta (Usuarios), nao da copia gravada na sessao no
+// login: desativar ou rebaixar vale no proximo request mesmo que alguma rota
+// esqueca de chamar revokeUserSessions, e promover vale sem novo login.
 async function getSession(pool, token) {
     if (!token) {
         return null;
@@ -423,10 +458,10 @@ async function getSession(pool, token) {
         .query(`
             UPDATE s
             SET ExpiresAt = DATEADD(SECOND, @ttl, SYSUTCDATETIME())
-            OUTPUT inserted.UserId, inserted.Username, inserted.IsAdmin, u.DeveTrocarSenha
+            OUTPUT inserted.UserId, inserted.Username, u.IsAdmin, u.DeveTrocarSenha
             FROM Sessoes s
             JOIN Usuarios u ON u.Id = s.UserId
-            WHERE s.Token = @token AND s.ExpiresAt > SYSUTCDATETIME()
+            WHERE s.Token = @token AND s.ExpiresAt > SYSUTCDATETIME() AND u.Ativo = 1
         `);
 
     const row = result.recordset[0];
@@ -574,6 +609,7 @@ module.exports = {
     revokeUserSessions,
     setSessionCookie,
     touchLastLogin,
+    travarAdministradores,
     updateUserFlags,
     updateUserPassword,
     updateUserSetoresPermitidos,
