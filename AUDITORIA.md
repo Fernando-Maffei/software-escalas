@@ -817,14 +817,18 @@ pode ter folga de domingo; o Beto do roteiro nao era, a API recusava a folga e
 o roteiro parava no passo dela — em qualquer versao.
 **Feito:** o roteiro cria o Beto como plantonista de final de semana.
 
-**T22 — Containers antigos disputam a porta 1433 com o SQL nativo no boot** · `PROPOSTA`
+**T22 — Containers antigos disputam a porta 1433 com o SQL nativo no boot** · `RESOLVIDO`
 Com o Docker ligado, `escalas-app`/`escalas-db` (`restart: always`) sobem
 sozinhos no boot. Em 13/10 o `escalas-db` pegou a 1433 antes do
 `MSSQL$SERVIDOR_SQL`, que ficou parado; e o `escalas-app` antigo, com o banco
 antigo de pe, aplicou nele a migration `2026-09-30-plantonista-colaborador.sql`
 (so acrescenta colunas). Nenhum backup foi escrito: foram parados com `kill`.
-Proposta (decisao do Fernando): se a producao agora e o SQL nativo,
-`docker update --restart=no escalas-app escalas-db`.
+**Feito (2026-10-13, na maquina, nao no codigo):** `docker update --restart=no
+escalas-app escalas-db`; os dois parados (o app com `kill`, sem backup de
+encerramento — a pasta seguiu com os 13 arquivos). Ligar o Docker nao sobe mais
+os antigos. Um `docker compose up` com o `docker-compose.yml` recria os
+containers com `restart: always` de novo — quem voltar a usar a instancia Docker
+deve saber disso.
 
 ### MEDIO
 
