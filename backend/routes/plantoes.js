@@ -2,81 +2,68 @@ const express = require('express');
 const router = express.Router();
 
 const { sql, conectar } = require('../db');
-const { AppError } = require('../utils/errors');
+const { AppError } = require('../lib/errors');
+const { PLANTAO_TIPOS } = require('../lib/dominio');
 const {
     buildDisponibilidadeColaborador,
     calculateIntervalMinutes,
     describePlantaoMovement,
     minutesToDurationLabel
-} = require('../utils/bancoHoras');
-const { getBancoHorasCapabilities, getSchemaInfo, hasColumn, hasTable } = require('../utils/schema');
+} = require('../services/bancoHoras');
 const {
     deleteEscalaDiaByOrigin,
     restoreEscalaDefaultsForPeriod,
-    syncPlantaoToEscalaDia
-} = require('../utils/escala');
-const { withTransaction } = require('../utils/transactions');
+    syncPlantaoDiaToEscalaDia
+} = require('../services/escala');
+const { withTransaction } = require('../db/transactions');
+const { colaboradoresVisiveis } = require('../auth/acesso-setores');
+const { SQL_EQUIPE_PLANTAO, gravarEquipePlantao } = require('../services/equipe-plantao');
 const {
-    ensurePositiveInt,
     extractDateString,
-    extractTimeString,
     normalizeIsoDate,
     normalizeNullableTime,
-    normalizeOptionalText,
     toSqlTime
-} = require('../utils/validation');
+} = require('../lib/validation');
 const {
+    agruparLancamentosPorHorario,
+    buildPlantaoDiaPayload,
     generateUpcomingSaturdays,
-    normalizeColaboradores,
     normalizePlantaoType,
     resolvePlantaoTypeByDate,
     serializePlantaoRecord
-} = require('../utils/plantoes');
+} = require('../services/plantoes');
 
-function buildPlantaoSelect(schema) {
-    const capabilities = getBancoHorasCapabilities(schema);
-    const columns = [
-        'id',
-        'data_plantao',
-        'colaboradores_ids',
-        'criado_em',
-        'atualizado_em'
-    ];
+const PLANTAO_COLUNAS = `
+            id,
+            data_plantao,
+            ${SQL_EQUIPE_PLANTAO},
+            criado_em,
+            atualizado_em,
+            hora_inicio,
+            hora_fim,
+            observacao,
+            tipo_plantao,
+            tipo_credito`;
 
-    if (capabilities.hasPlantaoHoraInicio) {
-        columns.push('hora_inicio');
-    }
-
-    if (capabilities.hasPlantaoHoraFim) {
-        columns.push('hora_fim');
-    }
-
-    if (capabilities.hasPlantaoObservacao) {
-        columns.push('observacao');
-    }
-
-    if (capabilities.hasPlantaoTipo) {
-        columns.push('tipo_plantao');
-    }
-
-    return columns.join(',\n            ');
-}
-
-async function findPlantaoByDate(poolOrTx, dataISO, schema) {
+// O dia pode ter MAIS DE UM lancamento (turnos com horarios, pessoas e destinos
+// diferentes), entao a busca por data devolve lista.
+async function findPlantoesByDate(poolOrTx, dataISO) {
     const result = await poolOrTx.request()
         .input('data_plantao', sql.Date, dataISO)
         .query(`
-            SELECT
-                ${buildPlantaoSelect(schema)}
+            SELECT ${PLANTAO_COLUNAS}
             FROM plantoes
             WHERE data_plantao = @data_plantao
+            ORDER BY hora_inicio, id
         `);
 
-    return result.recordset[0] || null;
+    return result.recordset;
 }
 
 // Datas de feriado (ISO) cadastradas, como Set — para o tipo do plantao poder
-// ser 'feriado' (inclusive em dia util). A tabela Feriados e obrigatoria.
+// ser 'feriado' (inclusive em dia util). Aqui vem so o feriado municipal/
+// estadual: os nacionais resolvePlantaoTypeByDate calcula sozinho, entao um
+// 07/09 continua sendo feriado mesmo sem nenhuma linha na tabela Feriados.
 async function loadFeriadosSet(poolOrTx) {
     const result = await poolOrTx.request().query('SELECT Data FROM Feriados');
     const set = new Set();
@@ -103,83 +90,13 @@ async function ensureColaboradoresExist(poolOrTx, colaboradoresIds) {
     }
 }
 
-function buildPlantaoPayload(body, fallback = {}, feriados = null) {
-    const dataISO = body.dataISO !== undefined
-        ? normalizeIsoDate(body.dataISO, 'Data do plantao')
-        : normalizeIsoDate(
-            extractDateString(fallback.dataISO || fallback.data_plantao || fallback.DataPlantao),
-            'Data do plantao'
-        );
-
-    const colaboradores = body.colaboradores !== undefined
-        ? normalizeColaboradores(body.colaboradores)
-        : normalizeColaboradores(fallback.colaboradores || fallback.colaboradores_ids || []);
-
-    const horaInicio = body.horaInicio !== undefined
-        ? normalizeNullableTime(body.horaInicio, 'Hora inicial do plantao')
-        : extractTimeString(fallback.hora_inicio || fallback.HoraInicio || fallback.horaInicio);
-
-    const horaFim = body.horaFim !== undefined
-        ? normalizeNullableTime(body.horaFim, 'Hora final do plantao')
-        : extractTimeString(fallback.hora_fim || fallback.HoraFim || fallback.horaFim);
-
-    if (!horaInicio || !horaFim) {
-        throw new AppError(400, 'Hora inicial e hora final do plantao sao obrigatorias.');
-    }
-
-    const duracaoMinutos = calculateIntervalMinutes(horaInicio, horaFim, {
-        startLabel: 'Hora inicial do plantao',
-        endLabel: 'Hora final do plantao'
-    });
-
-    const observacao = body.observacao !== undefined
-        ? normalizeOptionalText(body.observacao, 'Observacao', { maxLength: 500 })
-        : normalizeOptionalText(fallback.observacao || fallback.Observacao, 'Observacao', { maxLength: 500 });
-
-    const tipoPlantao = body.tipoPlantao !== undefined
-        ? normalizePlantaoType(body.tipoPlantao, dataISO, feriados)
-        : normalizePlantaoType(fallback.tipo_plantao || fallback.TipoPlantao || fallback.tipoPlantao, dataISO, feriados);
-
-    return {
-        dataISO,
-        tipoPlantao,
-        colaboradores,
-        horaInicio,
-        horaFim,
-        observacao,
-        duracaoMinutos
-    };
-}
-
-function buildDisponibilidadeSelect(schema) {
-    const capabilities = getBancoHorasCapabilities(schema);
-    const columns = [
-        'Id',
-        'ColaboradorId',
-        'Tipo',
-        'DataInicio',
-        'DataFim',
-        'PeriodoTipo',
-        'HoraInicio',
-        'HoraFim'
-    ];
-
-    if (capabilities.hasAusenciaSubtipo) {
-        columns.push('Subtipo');
-    }
-
-    return columns.join(',\n                ');
-}
-
-async function listDisponibilidade(poolOrTx, schema, plantao) {
+async function listDisponibilidade(poolOrTx, plantao) {
     // Colaborador desligado (Ativo = 0) nao aparece como disponivel para plantao.
-    const filtroAtivo = hasColumn(schema, 'Colaboradores', 'Ativo') ? 'WHERE Ativo = 1' : '';
-    const colaboradoresResult = await poolOrTx.request().query(`SELECT * FROM Colaboradores ${filtroAtivo} ORDER BY Nome`);
+    const colaboradoresResult = await poolOrTx.request().query('SELECT * FROM Colaboradores WHERE Ativo = 1 ORDER BY Nome');
     const ausenciasResult = await poolOrTx.request()
         .input('dataPlantao', sql.Date, plantao.dataISO)
         .query(`
-            SELECT
-                ${buildDisponibilidadeSelect(schema)}
+            SELECT Id, ColaboradorId, Tipo, DataInicio, DataFim, PeriodoTipo, HoraInicio, HoraFim, Subtipo
             FROM Ausencias
             WHERE @dataPlantao BETWEEN DataInicio AND DataFim
         `);
@@ -203,8 +120,23 @@ async function listDisponibilidade(poolOrTx, schema, plantao) {
     ));
 }
 
-async function assertColaboradoresDisponiveis(poolOrTx, schema, payload) {
-    const disponibilidade = await listDisponibilidade(poolOrTx, schema, payload);
+// Cada lancamento mostra so a parte da equipe que a conta pode ver; lancamento
+// sem ninguem visivel sai da resposta.
+function filtrarEquipesVisiveis(lancamentos, visiveis) {
+    if (!visiveis) {
+        return lancamentos;
+    }
+
+    return lancamentos
+        .map((lancamento) => ({
+            ...lancamento,
+            colaboradores: lancamento.colaboradores.filter((id) => visiveis.has(Number(id)))
+        }))
+        .filter((lancamento) => lancamento.colaboradores.length > 0);
+}
+
+async function assertColaboradoresDisponiveis(poolOrTx, payload) {
+    const disponibilidade = await listDisponibilidade(poolOrTx, payload);
     const indisponiveis = disponibilidade.filter((item) => payload.colaboradores.includes(item.id) && !item.disponivel);
 
     if (indisponiveis.length === 0) {
@@ -213,6 +145,15 @@ async function assertColaboradoresDisponiveis(poolOrTx, schema, payload) {
 
     const detalhes = indisponiveis.map((item) => `${item.nome} (${item.motivoLabel})`).join(', ');
     throw new AppError(400, `Nao foi possivel salvar o plantao. Colaboradores indisponiveis: ${detalhes}.`);
+}
+
+function hydratePlantaoDuration(serialized) {
+    if (!serialized.duracaoFormatada && serialized.horaInicio && serialized.horaFim) {
+        serialized.duracaoMinutos = calculateIntervalMinutes(serialized.horaInicio, serialized.horaFim);
+        serialized.duracaoFormatada = minutesToDurationLabel(serialized.duracaoMinutos);
+    }
+
+    return serialized;
 }
 
 async function deletePlantaoMovements(poolOrTx, plantaoId) {
@@ -226,15 +167,17 @@ async function deletePlantaoMovements(poolOrTx, plantaoId) {
         `);
 }
 
-async function syncPlantaoMovements(poolOrTx, schema, row) {
-    const capabilities = getBancoHorasCapabilities(schema);
-
-    if (!capabilities.hasMovimentosTable) {
-        return { synced: false, skippedReason: 'movimentos_table_missing' };
-    }
-
+async function syncPlantaoMovements(poolOrTx, row) {
     const plantao = serializePlantaoRecord(row);
     await deletePlantaoMovements(poolOrTx, plantao.id);
+
+    // Hora extra e paga em folha: o plantao fica registrado e entra na escala do
+    // dia, mas nao vira credito no banco de horas. O DELETE acima roda antes
+    // deste corte de proposito — se o lancamento era 'banco' e virou 'extra',
+    // o movimento antigo precisa sumir.
+    if (plantao.tipoCredito === 'extra') {
+        return { synced: false, skippedReason: 'hora_extra' };
+    }
 
     if (!plantao.horaInicio || !plantao.horaFim || plantao.colaboradores.length === 0) {
         return { synced: false, skippedReason: 'missing_required_data' };
@@ -283,8 +226,6 @@ async function syncPlantaoMovements(poolOrTx, schema, row) {
 
 router.get('/', async (req, res) => {
     const pool = await conectar();
-    const schema = await getSchemaInfo(pool);
-    const capabilities = getBancoHorasCapabilities(schema);
     const request = pool.request();
     const clauses = [];
 
@@ -299,34 +240,22 @@ router.get('/', async (req, res) => {
     }
 
     if (req.query.tipoPlantao) {
-        const tipoPlantao = normalizePlantaoType(req.query.tipoPlantao);
-
-        if (capabilities.hasPlantaoTipo) {
-            request.input('tipoPlantao', sql.NVarChar(30), tipoPlantao);
-            clauses.push('LOWER(tipo_plantao) = @tipoPlantao');
-        }
+        request.input('tipoPlantao', sql.NVarChar(30), normalizePlantaoType(req.query.tipoPlantao));
+        clauses.push('LOWER(tipo_plantao) = @tipoPlantao');
     }
 
     const result = await request.query(`
-        SELECT
-            ${buildPlantaoSelect(schema)}
+        SELECT ${PLANTAO_COLUNAS}
         FROM plantoes
         ${clauses.length > 0 ? `WHERE ${clauses.join(' AND ')}` : ''}
-        ORDER BY data_plantao DESC
+        ORDER BY data_plantao DESC, hora_inicio, id
     `);
 
-    const records = result.recordset.map((row) => {
-        const serialized = serializePlantaoRecord(row);
+    const records = result.recordset
+        .map((row) => hydratePlantaoDuration(serializePlantaoRecord(row)))
+        .filter((plantao) => PLANTAO_TIPOS.includes(plantao.tipoPlantao));
 
-        if (!serialized.duracaoFormatada && serialized.horaInicio && serialized.horaFim) {
-            serialized.duracaoMinutos = calculateIntervalMinutes(serialized.horaInicio, serialized.horaFim);
-            serialized.duracaoFormatada = minutesToDurationLabel(serialized.duracaoMinutos);
-        }
-
-        return serialized;
-    }).filter((plantao) => ['sabado', 'domingo', 'feriado'].includes(plantao.tipoPlantao));
-
-    res.json(records);
+    res.json(filtrarEquipesVisiveis(records, await colaboradoresVisiveis(pool, req)));
 });
 
 router.get('/proximos/:quantidade', async (req, res) => {
@@ -336,7 +265,6 @@ router.get('/proximos/:quantidade', async (req, res) => {
 
 router.get('/disponibilidade/:dataISO', async (req, res) => {
     const pool = await conectar();
-    const schema = await getSchemaInfo(pool);
     const dataISO = normalizeIsoDate(req.params.dataISO, 'Data do plantao');
     resolvePlantaoTypeByDate(dataISO, await loadFeriadosSet(pool));
     const horaInicio = req.query.horaInicio ? normalizeNullableTime(req.query.horaInicio, 'Hora inicial do plantao') : null;
@@ -346,170 +274,120 @@ router.get('/disponibilidade/:dataISO', async (req, res) => {
         throw new AppError(400, 'Informe hora inicial e hora final para validar disponibilidade por horario.');
     }
 
-    const disponibilidade = await listDisponibilidade(pool, schema, {
+    const disponibilidade = await listDisponibilidade(pool, {
         dataISO,
         horaInicio,
         horaFim
     });
 
+    const visiveis = await colaboradoresVisiveis(pool, req);
+
     res.json({
         dataISO,
         horaInicio,
         horaFim,
-        colaboradores: disponibilidade
+        colaboradores: visiveis ? disponibilidade.filter((item) => visiveis.has(Number(item.id))) : disponibilidade
     });
 });
 
 router.get('/:dataISO', async (req, res) => {
     const pool = await conectar();
-    const schema = await getSchemaInfo(pool);
     const dataISO = normalizeIsoDate(req.params.dataISO, 'Data do plantao');
-    resolvePlantaoTypeByDate(dataISO, await loadFeriadosSet(pool));
-    const plantao = await findPlantaoByDate(pool, dataISO, schema);
+    const tipoPlantao = resolvePlantaoTypeByDate(dataISO, await loadFeriadosSet(pool));
+    const rows = await findPlantoesByDate(pool, dataISO);
 
-    if (!plantao) {
+    if (rows.length === 0) {
         throw new AppError(404, 'Plantao nao encontrado.');
     }
 
-    const serialized = serializePlantaoRecord(plantao);
+    const lancamentos = filtrarEquipesVisiveis(
+        rows.map((row) => hydratePlantaoDuration(serializePlantaoRecord(row))),
+        await colaboradoresVisiveis(pool, req)
+    );
 
-    if (!serialized.duracaoFormatada && serialized.horaInicio && serialized.horaFim) {
-        serialized.duracaoMinutos = calculateIntervalMinutes(serialized.horaInicio, serialized.horaFim);
-        serialized.duracaoFormatada = minutesToDurationLabel(serialized.duracaoMinutos);
+    if (lancamentos.length === 0) {
+        throw new AppError(404, 'Plantao nao encontrado.');
     }
 
-    res.json(serialized);
+    res.json({
+        dataISO,
+        tipoPlantao,
+        // A observacao e do dia: todas as linhas gravam o mesmo texto.
+        observacao: lancamentos.find((item) => item.observacao)?.observacao || null,
+        lancamentos
+    });
 });
 
 router.post('/', async (req, res) => {
     const pool = await conectar();
-    const schema = await getSchemaInfo(pool);
     const feriados = await loadFeriadosSet(pool);
-    const payload = buildPlantaoPayload(req.body, {}, feriados);
-
-    if (payload.colaboradores.length === 0) {
-        throw new AppError(400, 'Selecione pelo menos um colaborador para o plantao.');
-    }
+    const payload = buildPlantaoDiaPayload(req.body, feriados);
+    const grupos = agruparLancamentosPorHorario(payload.lancamentos);
+    const colaboradoresDoDia = [...new Set(grupos.flatMap((grupo) => grupo.colaboradores))];
 
     const result = await withTransaction(sql, pool, async (tx) => {
-        await ensureColaboradoresExist(tx, payload.colaboradores);
-        await assertColaboradoresDisponiveis(tx, schema, payload);
+        await ensureColaboradoresExist(tx, colaboradoresDoDia);
 
-        const existing = await findPlantaoByDate(tx, payload.dataISO, schema);
-        const capabilities = getBancoHorasCapabilities(schema);
-        let saved;
-        let action;
+        for (const grupo of grupos) {
+            await assertColaboradoresDisponiveis(tx, {
+                dataISO: payload.dataISO,
+                horaInicio: grupo.horaInicio,
+                horaFim: grupo.horaFim,
+                colaboradores: grupo.colaboradores
+            });
+        }
 
-        if (existing) {
-            action = 'updated';
+        const anteriores = await findPlantoesByDate(tx, payload.dataISO);
+        const action = anteriores.length > 0 ? 'updated' : 'created';
 
-            const setParts = [
-                'colaboradores_ids = @colaboradores_ids',
-                'atualizado_em = GETDATE()'
-            ];
+        // O dia e reescrito inteiro a cada gravacao: casar linha por linha com o
+        // que ja existia daria o mesmo resultado por muito mais codigo, e a tela
+        // sempre manda o dia completo.
+        for (const anterior of anteriores) {
+            await deletePlantaoMovements(tx, anterior.id);
+            await deleteEscalaDiaByOrigin(tx, 'plantao', anterior.id);
+        }
 
-            if (capabilities.hasPlantaoHoraInicio) {
-                setParts.push('hora_inicio = @horaInicio');
-            }
+        await tx.request()
+            .input('data_plantao', sql.Date, payload.dataISO)
+            .query('DELETE FROM plantoes WHERE data_plantao = @data_plantao');
 
-            if (capabilities.hasPlantaoHoraFim) {
-                setParts.push('hora_fim = @horaFim');
-            }
+        const salvos = [];
 
-            if (capabilities.hasPlantaoObservacao) {
-                setParts.push('observacao = @observacao');
-            }
-
-            if (capabilities.hasPlantaoTipo) {
-                setParts.push('tipo_plantao = @tipoPlantao');
-            }
-
-            const updateResult = await tx.request()
-                .input('data_plantao', sql.Date, payload.dataISO)
-                .input('colaboradores_ids', sql.NVarChar(sql.MAX), JSON.stringify(payload.colaboradores))
-                .input('tipoPlantao', sql.NVarChar(30), payload.tipoPlantao)
-                .input('horaInicio', sql.Time, toSqlTime(payload.horaInicio, 'Hora inicial do plantao'))
-                .input('horaFim', sql.Time, toSqlTime(payload.horaFim, 'Hora final do plantao'))
-                .input('observacao', sql.NVarChar(500), payload.observacao)
-                .query(`
-                    UPDATE plantoes
-                    SET ${setParts.join(', ')}
-                    OUTPUT INSERTED.*
-                    WHERE data_plantao = @data_plantao
-                `);
-
-            saved = updateResult.recordset[0];
-        } else {
-            action = 'created';
-
-            const fields = ['data_plantao', 'colaboradores_ids'];
-            const values = ['@data_plantao', '@colaboradores_ids'];
-
-            if (capabilities.hasPlantaoHoraInicio) {
-                fields.push('hora_inicio');
-                values.push('@horaInicio');
-            }
-
-            if (capabilities.hasPlantaoHoraFim) {
-                fields.push('hora_fim');
-                values.push('@horaFim');
-            }
-
-            if (capabilities.hasPlantaoObservacao) {
-                fields.push('observacao');
-                values.push('@observacao');
-            }
-
-            if (capabilities.hasPlantaoTipo) {
-                fields.push('tipo_plantao');
-                values.push('@tipoPlantao');
-            }
-
+        for (const grupo of grupos) {
             const insertResult = await tx.request()
                 .input('data_plantao', sql.Date, payload.dataISO)
-                .input('colaboradores_ids', sql.NVarChar(sql.MAX), JSON.stringify(payload.colaboradores))
                 .input('tipoPlantao', sql.NVarChar(30), payload.tipoPlantao)
-                .input('horaInicio', sql.Time, toSqlTime(payload.horaInicio, 'Hora inicial do plantao'))
-                .input('horaFim', sql.Time, toSqlTime(payload.horaFim, 'Hora final do plantao'))
+                .input('tipoCredito', sql.NVarChar(20), grupo.tipoCredito)
+                .input('horaInicio', sql.Time, toSqlTime(grupo.horaInicio, 'Hora inicial do plantao'))
+                .input('horaFim', sql.Time, toSqlTime(grupo.horaFim, 'Hora final do plantao'))
                 .input('observacao', sql.NVarChar(500), payload.observacao)
                 .query(`
-                    INSERT INTO plantoes (${fields.join(', ')})
+                    INSERT INTO plantoes (
+                        data_plantao, hora_inicio, hora_fim, observacao, tipo_plantao, tipo_credito
+                    )
                     OUTPUT INSERTED.*
-                    VALUES (${values.join(', ')})
+                    VALUES (@data_plantao, @horaInicio, @horaFim, @observacao, @tipoPlantao, @tipoCredito)
                 `);
 
-            saved = insertResult.recordset[0];
+            const saved = insertResult.recordset[0];
+
+            await gravarEquipePlantao(tx, saved.id, grupo.colaboradores);
+            saved.equipe = grupo.colaboradores;
+            saved.duracaoMinutos = grupo.duracaoMinutos;
+            salvos.push(saved);
         }
 
-        if (saved.hora_inicio === undefined && capabilities.hasPlantaoHoraInicio) {
-            saved.hora_inicio = toSqlTime(payload.horaInicio, 'Hora inicial do plantao');
+        for (const saved of salvos) {
+            await syncPlantaoMovements(tx, saved);
         }
 
-        if (saved.hora_fim === undefined && capabilities.hasPlantaoHoraFim) {
-            saved.hora_fim = toSqlTime(payload.horaFim, 'Hora final do plantao');
-        }
-
-        if (saved.observacao === undefined && capabilities.hasPlantaoObservacao) {
-            saved.observacao = payload.observacao;
-        }
-
-        if (saved.tipo_plantao === undefined && capabilities.hasPlantaoTipo) {
-            saved.tipo_plantao = payload.tipoPlantao;
-        }
-
-        await syncPlantaoMovements(tx, schema, saved);
-
-        if (hasTable(schema, 'escala_dia')) {
-            const colaboradoresResult = await tx.request().query('SELECT * FROM Colaboradores');
-            await syncPlantaoToEscalaDia(tx, schema, saved, colaboradoresResult.recordset);
-        }
+        const colaboradoresResult = await tx.request().query('SELECT * FROM Colaboradores');
+        await syncPlantaoDiaToEscalaDia(tx, payload.dataISO, salvos, colaboradoresResult.recordset);
 
         return {
             action,
-            plantao: serializePlantaoRecord({
-                ...saved,
-                duracaoMinutos: payload.duracaoMinutos
-            })
+            lancamentos: salvos.map((saved) => hydratePlantaoDuration(serializePlantaoRecord(saved)))
         };
     });
 
@@ -519,37 +397,37 @@ router.post('/', async (req, res) => {
             : 'Plantao atualizado com sucesso!',
         success: true,
         action: result.action,
-        data: result.plantao
+        data: {
+            dataISO: payload.dataISO,
+            tipoPlantao: payload.tipoPlantao,
+            observacao: payload.observacao,
+            lancamentos: result.lancamentos
+        }
     });
 });
 
 router.delete('/:dataISO', async (req, res) => {
     const pool = await conectar();
-    const schema = await getSchemaInfo(pool);
     const dataISO = normalizeIsoDate(req.params.dataISO, 'Data do plantao');
 
     await withTransaction(sql, pool, async (tx) => {
-        const existing = await findPlantaoByDate(tx, dataISO, schema);
+        const existentes = await findPlantoesByDate(tx, dataISO);
 
-        if (!existing) {
+        if (existentes.length === 0) {
             throw new AppError(404, 'Plantao nao encontrado.');
         }
 
-        if (getBancoHorasCapabilities(schema).hasMovimentosTable) {
-            await deletePlantaoMovements(tx, existing.id);
-        }
-
-        if (hasTable(schema, 'escala_dia')) {
-            await deleteEscalaDiaByOrigin(tx, 'plantao', existing.id);
+        // Excluir o dia derruba TODOS os turnos daquela data.
+        for (const existente of existentes) {
+            await deletePlantaoMovements(tx, existente.id);
+            await deleteEscalaDiaByOrigin(tx, 'plantao', existente.id);
         }
 
         await tx.request()
             .input('data_plantao', sql.Date, dataISO)
             .query('DELETE FROM plantoes WHERE data_plantao = @data_plantao');
 
-        if (hasTable(schema, 'escala_dia')) {
-            await restoreEscalaDefaultsForPeriod(tx, schema, dataISO, dataISO);
-        }
+        await restoreEscalaDefaultsForPeriod(tx, dataISO, dataISO);
     });
 
     res.json({

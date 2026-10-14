@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 
 const { sql, conectar } = require('../db');
-const { AppError } = require('../utils/errors');
+const { AppError } = require('../lib/errors');
 const {
     calculateAusenciaDebitMinutes,
     calculateIntervalMinutes,
@@ -11,16 +11,12 @@ const {
     minutesToBalanceLabel,
     minutesToDurationLabel,
     parseBalanceInputToMinutes
-} = require('../utils/bancoHoras');
-const {
-    describeBancoHorasMissingPieces,
-    ensureBancoHorasTable,
-    getBancoHorasCapabilities,
-    getSchemaInfo
-} = require('../utils/schema');
-const { withTransaction } = require('../utils/transactions');
-const { ensurePositiveInt, extractDateString, normalizeOptionalText } = require('../utils/validation');
-const { serializePlantaoRecord } = require('../utils/plantoes');
+} = require('../services/bancoHoras');
+const { withTransaction } = require('../db/transactions');
+const { colaboradoresVisiveis, exigirColaboradorVisivel } = require('../auth/acesso-setores');
+const { ensurePositiveInt, extractDateString, normalizeOptionalText } = require('../lib/validation');
+const { serializePlantaoRecord } = require('../services/plantoes');
+const { SQL_EQUIPE_PLANTAO, SQL_PLANTAO_COM_COLABORADOR } = require('../services/equipe-plantao');
 
 function mapResumoRow(row) {
     return {
@@ -36,62 +32,30 @@ function mapResumoRow(row) {
     };
 }
 
-function buildAusenciasSelect(schema) {
-    const capabilities = getBancoHorasCapabilities(schema);
-    const columns = [
-        'Id',
-        'ColaboradorId',
-        'Tipo',
-        'DataInicio',
-        'DataFim',
-        'PeriodoTipo',
-        'HoraInicio',
-        'HoraFim'
-    ];
+const AUSENCIA_COLUNAS = `
+                Id,
+                ColaboradorId,
+                Tipo,
+                DataInicio,
+                DataFim,
+                PeriodoTipo,
+                HoraInicio,
+                HoraFim,
+                Subtipo,
+                DescontaBancoHoras,
+                Observacao`;
 
-    if (capabilities.hasAusenciaSubtipo) {
-        columns.push('Subtipo');
-    }
-
-    if (capabilities.hasAusenciaDesconta) {
-        columns.push('DescontaBancoHoras');
-    }
-
-    if (capabilities.hasAusenciaObservacao) {
-        columns.push('Observacao');
-    }
-
-    return columns.join(',\n                ');
-}
-
-function buildPlantoesSelect(schema) {
-    const capabilities = getBancoHorasCapabilities(schema);
-    const columns = [
-        'id',
-        'data_plantao',
-        'colaboradores_ids',
-        'criado_em',
-        'atualizado_em'
-    ];
-
-    if (capabilities.hasPlantaoHoraInicio) {
-        columns.push('hora_inicio');
-    }
-
-    if (capabilities.hasPlantaoHoraFim) {
-        columns.push('hora_fim');
-    }
-
-    if (capabilities.hasPlantaoObservacao) {
-        columns.push('observacao');
-    }
-
-    if (capabilities.hasPlantaoTipo) {
-        columns.push('tipo_plantao');
-    }
-
-    return columns.join(',\n                ');
-}
+const PLANTAO_COLUNAS = `
+                id,
+                data_plantao,
+                ${SQL_EQUIPE_PLANTAO},
+                criado_em,
+                atualizado_em,
+                hora_inicio,
+                hora_fim,
+                observacao,
+                tipo_plantao,
+                tipo_credito`;
 
 async function insertMovimento(poolOrTx, movimento) {
     await poolOrTx.request()
@@ -135,27 +99,39 @@ async function getSaldoAtualMinutos(poolOrTx, colaboradorId) {
     return Number(result.recordset[0]?.saldoAtualMinutos || 0);
 }
 
-router.get('/status', async (req, res) => {
-    const pool = await conectar();
-    const schema = await getSchemaInfo(pool);
-    const capabilities = getBancoHorasCapabilities(schema);
-    const missing = describeBancoHorasMissingPieces(schema);
+// Mantido pelo contrato da API. Se esta rota responde, o portao de prontidao
+// do server.js ja garantiu todas as migrations aplicadas — o banco de horas
+// esta sempre habilitado e nada falta.
+const CAPACIDADES_BANCO_HORAS = Object.freeze({
+    hasMovimentosTable: true,
+    hasJornadaSemanalTable: true,
+    hasAusenciaSubtipo: true,
+    hasAusenciaDesconta: true,
+    hasAusenciaObservacao: true,
+    hasColaboradorSetorId: true,
+    hasSetoresTable: true,
+    hasAlmocosPersonalizadosTable: true,
+    hasPlantaoHoraInicio: true,
+    hasPlantaoHoraFim: true,
+    hasPlantaoObservacao: true,
+    hasPlantaoTipo: true,
+    hasPlantaoTipoCredito: true
+});
 
+router.get('/status', (req, res) => {
     res.json({
-        enabled: capabilities.hasMovimentosTable,
-        capabilities,
-        missing
+        enabled: true,
+        capabilities: CAPACIDADES_BANCO_HORAS,
+        missing: []
     });
 });
 
 router.get('/resumo', async (req, res) => {
     const pool = await conectar();
-    const schema = await getSchemaInfo(pool);
-    ensureBancoHorasTable(schema);
 
     const request = pool.request();
     const clauses = [];
-    const search = (req.query.search || '').trim();
+    const search = String(req.query.search || '').trim();
 
     if (req.query.colaboradorId) {
         request.input('colaboradorId', sql.Int, ensurePositiveInt(req.query.colaboradorId, 'Colaborador'));
@@ -194,19 +170,55 @@ router.get('/resumo', async (req, res) => {
         ORDER BY c.Nome
     `);
 
+    const visiveis = await colaboradoresVisiveis(pool, req);
+    const linhas = visiveis ? result.recordset.filter((linha) => visiveis.has(Number(linha.Id))) : result.recordset;
+
     res.json({
         enabled: true,
-        items: result.recordset.map(mapResumoRow)
+        items: linhas.map(mapResumoRow)
     });
 });
+
+// Plantoes do colaborador marcados como hora extra, do mais novo para o mais
+// velho.
+async function listarHorasExtrasDoColaborador(pool, colaboradorId, limit) {
+    const result = await pool.request()
+        .input('colaboradorId', sql.Int, colaboradorId)
+        .input('limite', sql.Int, limit)
+        .query(`
+            SELECT TOP (@limite) id, data_plantao, ${SQL_EQUIPE_PLANTAO}, hora_inicio, hora_fim, observacao, tipo_plantao, tipo_credito
+            FROM plantoes
+            WHERE LOWER(tipo_credito) = 'extra'
+              AND ${SQL_PLANTAO_COM_COLABORADOR}
+            ORDER BY data_plantao DESC, id DESC
+        `);
+
+    return result.recordset
+        .map((row) => serializePlantaoRecord(row))
+        .map((plantao) => {
+            const minutos = plantao.horaInicio && plantao.horaFim
+                ? calculateIntervalMinutes(plantao.horaInicio, plantao.horaFim)
+                : 0;
+
+            return {
+                plantaoId: plantao.id,
+                dataReferencia: plantao.dataISO,
+                horaInicio: plantao.horaInicio,
+                horaFim: plantao.horaFim,
+                minutos,
+                minutosFormatado: minutesToDurationLabel(minutos),
+                tipoPlantao: plantao.tipoPlantao,
+                observacao: plantao.observacao
+            };
+        });
+}
 
 router.get('/colaborador/:id', async (req, res) => {
     const colaboradorId = ensurePositiveInt(req.params.id, 'Colaborador');
     const pool = await conectar();
-    const schema = await getSchemaInfo(pool);
-    ensureBancoHorasTable(schema);
 
     const limit = req.query.limit ? Math.min(ensurePositiveInt(req.query.limit, 'Limite'), 200) : 100;
+    exigirColaboradorVisivel(await colaboradoresVisiveis(pool, req), colaboradorId);
 
     const colaboradorResult = await pool.request()
         .input('id', sql.Int, colaboradorId)
@@ -244,6 +256,14 @@ router.get('/colaborador/:id', async (req, res) => {
             ORDER BY DataReferencia DESC, Id DESC
         `);
 
+    // Plantao lancado como hora extra nao gera movimento no banco de propósito
+    // (a hora e paga em folha), entao ele nao aparece no extrato acima. Sem
+    // isso, quem trabalhou num sabado inteiro nao encontra o registro em lugar
+    // nenhum e parece que o plantao se perdeu. Vai numa lista a parte, fora da
+    // conta do saldo.
+    const horasExtras = await listarHorasExtrasDoColaborador(pool, colaboradorId, limit);
+    const horasExtrasMinutos = horasExtras.reduce((total, item) => total + item.minutos, 0);
+
     res.json({
         colaborador: colaboradorResult.recordset[0],
         items: extratoResult.recordset.map((row) => ({
@@ -260,15 +280,16 @@ router.get('/colaborador/:id', async (req, res) => {
             descricao: row.Descricao,
             observacao: row.Observacao,
             criadoEm: row.CriadoEm
-        }))
+        })),
+        horasExtras,
+        horasExtrasMinutos,
+        horasExtrasFormatado: minutesToDurationLabel(horasExtrasMinutos)
     });
 });
 
 router.put('/colaborador/:id/saldo', async (req, res) => {
     const colaboradorId = ensurePositiveInt(req.params.id, 'Colaborador');
     const pool = await conectar();
-    const schema = await getSchemaInfo(pool);
-    ensureBancoHorasTable(schema);
 
     const saldoMinutos = parseBalanceInputToMinutes(req.body?.saldo);
     const observacao = req.body?.observacao !== undefined
@@ -330,8 +351,6 @@ router.put('/colaborador/:id/saldo', async (req, res) => {
 
 router.post('/recalcular', async (req, res) => {
     const pool = await conectar();
-    const schema = await getSchemaInfo(pool);
-    ensureBancoHorasTable(schema);
 
     const resultado = await withTransaction(sql, pool, async (tx) => {
         const warnings = [];
@@ -341,8 +360,7 @@ router.post('/recalcular', async (req, res) => {
         await tx.request().query('DELETE FROM BancoHorasMovimentos');
 
         const ausenciasResult = await tx.request().query(`
-            SELECT
-                ${buildAusenciasSelect(schema)}
+            SELECT ${AUSENCIA_COLUNAS}
             FROM Ausencias
             ORDER BY DataInicio, Id
         `);
@@ -381,14 +399,20 @@ router.post('/recalcular', async (req, res) => {
         }
 
         const plantoesResult = await tx.request().query(`
-            SELECT
-                ${buildPlantoesSelect(schema)}
+            SELECT ${PLANTAO_COLUNAS}
             FROM plantoes
             ORDER BY data_plantao, id
         `);
 
         for (const row of plantoesResult.recordset) {
             const plantao = serializePlantaoRecord(row);
+
+            // Hora extra e paga em folha e nao gera movimento (mesma regra de
+            // syncPlantaoMovements, em routes/plantoes.js). Sem este corte, o
+            // recalculo devolvia ao saldo as horas que ja tinham sido pagas.
+            if (plantao.tipoCredito === 'extra') {
+                continue;
+            }
 
             if (!plantao.horaInicio || !plantao.horaFim) {
                 warnings.push(`Plantao ${plantao.id}: horario nao informado, credito ignorado.`);

@@ -245,7 +245,7 @@ main,
    BOTÕES DA SIDEBAR
 =========================== */
 
-/* Aplicada por Js/permissoes.js: esconde da barra lateral as telas que o
+/* Aplicada por js/core/permissoes.js: esconde da barra lateral as telas que o
    perfil do usuario logado nao pode acessar. Usa !important porque
    .sidebar-btn define display: flex e as regras de estado (active, hover)
    tem especificidade maior. */

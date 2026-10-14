@@ -1,11 +1,18 @@
 const express = require('express');
 
 const { conectar, fecharConexao, testarConexao } = require('../db');
-const { createSystemBackup, ensureBackupDirectory, restoreSystemBackup } = require('../utils/backup-service');
-const { initializeAutoBackupScheduler } = require('../utils/backup-scheduler');
-const { openNativeFolderPicker } = require('../utils/folder-picker');
-const { AppError } = require('../utils/errors');
-const { mapDatabaseConnectionError } = require('../utils/database-connection-error');
+const {
+    coerceBackupPayload,
+    createSystemBackup,
+    ensureBackupDirectory,
+    formatBackupTimestamp,
+    montarBackup,
+    restoreSystemBackup
+} = require('../services/backup-service');
+const { initializeAutoBackupScheduler } = require('../services/backup-scheduler');
+const { openNativeFolderPicker } = require('../lib/folder-picker');
+const { AppError } = require('../lib/errors');
+const { mapDatabaseConnectionError } = require('../db/database-connection-error');
 const {
     buildBackupExecutionSettings,
     buildBackupRestoreSettings,
@@ -13,17 +20,16 @@ const {
     getPublicBackupSettings,
     normalizeBackupDirectory,
     saveBackupSettings
-} = require('../utils/backup-config');
+} = require('../services/backup-config');
 const {
     getDefaultDatabaseSettings,
     getEffectiveDatabaseSettings,
     getPublicDatabaseSettings,
     normalizeDatabaseSettings,
     saveDatabaseSettings
-} = require('../utils/database-config');
-const { ensureApplicationSchema, applyExampleSeed, REQUIRED_TABLES } = require('../utils/database-schema');
-const { clearSchemaCache } = require('../utils/schema');
-const { setSchemaReady } = require('../utils/app-state');
+} = require('../db/database-config');
+const { ensureApplicationSchema, applyExampleSeed, REQUIRED_TABLES } = require('../db/database-schema');
+const { setSchemaReady } = require('../lib/app-state');
 
 const router = express.Router();
 
@@ -64,7 +70,6 @@ router.post('/salvar', async (req, res, next) => {
         const connection = await testarConexao(payload);
         const saved = saveDatabaseSettings(payload);
 
-        clearSchemaCache();
         await fecharConexao();
 
         // Garante tabelas (e o admin inicial, se o banco for novo) ja na
@@ -236,9 +241,41 @@ router.post('/backup/gerar', async (req, res, next) => {
     }
 });
 
+// Backup completo para baixar pela tela ("Exportar Dados"). E o mesmo conteudo
+// do backup gravado na pasta do servidor, entao "Importar Dados" com este
+// arquivo devolve o sistema inteiro. Antes a tela exportava so colaboradores e
+// ausencias, e importar esse arquivo apagava todo o resto.
+router.get('/backup/baixar', async (req, res, next) => {
+    try {
+        const pool = await conectar();
+        const databaseSettings = getPublicDatabaseSettings();
+        const payload = await montarBackup(pool, {
+            generatedBy: 'download',
+            databaseInfo: {
+                host: databaseSettings.host,
+                instanceName: databaseSettings.instanceName,
+                database: databaseSettings.database,
+                source: databaseSettings.source
+            }
+        });
+
+        res.setHeader(
+            'Content-Disposition',
+            `attachment; filename="backup-escalas-${formatBackupTimestamp(new Date())}.json"`
+        );
+        res.json(payload);
+    } catch (error) {
+        next(error instanceof AppError ? error : mapDatabaseConnectionError(error, 'Erro ao gerar o backup para download.'));
+    }
+});
+
 router.post('/backup/restaurar', async (req, res, next) => {
     try {
         const backupData = req.body?.backupData ?? req.body;
+        // Valida o arquivo ANTES de tudo: um arquivo invalido nao deve gerar
+        // backup de seguranca nem tocar no banco.
+        coerceBackupPayload(backupData);
+
         const currentSettings = getBackupSettings();
         const pool = await conectar();
 

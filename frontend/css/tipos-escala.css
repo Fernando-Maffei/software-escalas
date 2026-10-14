@@ -1,0 +1,232 @@
+/* ===========================================================
+   TIPOS DE ESCALA (Configuracoes -> Escalas)
+   -----------------------------------------------------------
+   Estilos proprios em vez de reaproveitar os da jornada semanal
+   do editor de colaborador: aqueles estao escopados em
+   #colaboradorEditor, e trocar o ID por uma classe compartilhada
+   baixaria a especificidade das regras existentes, podendo deixar
+   outras vencerem em telas que nao teriam como ser testadas aqui.
+   =========================================================== */
+
+.tipos-escala-acoes-topo {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 14px;
+}
+
+.tipos-escala-lista {
+    display: grid;
+    gap: 8px;
+}
+
+.tipos-escala-vazio {
+    padding: 18px;
+    border: 1px dashed var(--border);
+    border-radius: 12px;
+    color: var(--text-light);
+    font-size: 13px;
+    text-align: center;
+}
+
+.tipo-escala-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    padding: 12px 14px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--surface-raised);
+}
+
+.tipo-escala-item.is-editando {
+    border-color: rgba(29, 99, 237, 0.45);
+    background: rgba(29, 99, 237, 0.08);
+}
+
+.tipo-escala-info {
+    min-width: 0;
+    flex: 1 1 260px;
+}
+
+.tipo-escala-info strong {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    color: var(--text);
+}
+
+.tipo-escala-info p {
+    margin: 2px 0 0;
+    font-size: 12px;
+    color: var(--text-light);
+}
+
+.tipo-escala-regra {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.tipo-escala-chip {
+    font-size: 10px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    padding: 2px 8px;
+    border-radius: 999px;
+}
+
+.tipo-escala-chip.is-inativo {
+    background: rgba(148, 163, 184, 0.25);
+    color: var(--text-light);
+}
+
+/* ---- Editor ---- */
+
+.tipos-escala-editor {
+    margin-top: 16px;
+    padding: 16px;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    background: var(--surface-raised);
+    display: grid;
+    gap: 14px;
+}
+
+.tipos-escala-editor.is-hidden {
+    display: none;
+}
+
+.tipo-escala-editor-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.tipo-escala-editor-header h3 {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+    font-size: 15px;
+    color: var(--text);
+}
+
+.tipo-dias-grid {
+    display: grid;
+    gap: 8px;
+}
+
+.tipo-dia-row {
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--surface-raised);
+    padding: 10px;
+    display: grid;
+    gap: 8px;
+}
+
+.tipo-dia-row.is-selected {
+    border-color: rgba(29, 99, 237, 0.35);
+    background: rgba(29, 99, 237, 0.08);
+}
+
+.tipo-dia-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 0;
+    cursor: pointer;
+}
+
+.tipo-dia-times {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 10px;
+}
+
+.tipo-dia-times.is-hidden {
+    display: none;
+}
+
+.tipo-dia-group {
+    display: grid;
+    gap: 6px;
+}
+
+.tipo-dia-group small {
+    color: var(--text-light);
+    font-size: 10px;
+    font-weight: 800;
+    text-transform: uppercase;
+}
+
+.tipo-dia-pair {
+    display: grid;
+    grid-template-columns: minmax(96px, 1fr) 28px minmax(96px, 1fr);
+    gap: 8px;
+    align-items: center;
+}
+
+.tipo-dia-pair input {
+    width: 100%;
+    min-width: 0;
+    height: 38px;
+    padding: 8px 10px;
+    text-align: center;
+}
+
+.tipo-dia-pair span {
+    color: var(--text-light);
+    font-size: 12px;
+    font-weight: 700;
+    text-align: center;
+}
+
+.tipo-escala-regra-campos {
+    display: grid;
+    gap: 10px;
+}
+
+.tipo-escala-inline {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    font-size: 13px;
+    color: var(--text);
+    margin-bottom: 0;
+}
+
+.tipo-escala-inline input[type="number"] {
+    width: 84px;
+    height: 36px;
+    text-align: center;
+}
+
+.tipo-escala-acoes {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+@media (max-width: 640px) {
+    .tipo-escala-item {
+        align-items: stretch;
+    }
+
+    .tipo-dia-pair {
+        grid-template-columns: minmax(0, 1fr) 24px minmax(0, 1fr);
+    }
+}
+
+/* Sem bloco de tema escuro: --surface-raised e --border ja sao
+   redefinidos por tema em themes.css, entao as regras acima valem nos dois. */

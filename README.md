@@ -1,7 +1,7 @@
 # Central de Escalas
 
 ![Versão](https://img.shields.io/badge/versão-1.6.3-6366f1)
-![Node](https://img.shields.io/badge/Node-20%2B-3c873a)
+![Node](https://img.shields.io/badge/Node-22%2B-3c873a)
 ![Licença](https://img.shields.io/badge/licença-proprietária-lightgrey)
 [![CI](https://github.com/Fernando-Maffei/software-escalas/actions/workflows/ci.yml/badge.svg)](https://github.com/Fernando-Maffei/software-escalas/actions/workflows/ci.yml)
 
@@ -13,10 +13,13 @@ Uma máquina roda o servidor; qualquer dispositivo da rede acessa pelo navegador
 - [Funcionalidades](#funcionalidades)
 - [Tecnologias](#tecnologias)
 - [Início rápido](#início-rápido-desenvolvimento)
+- [Testes e qualidade](#testes-e-qualidade)
+- [Estrutura do código](#estrutura-do-código)
 - [Implantação](#implantação)
 - [Login e primeiro acesso](#login-e-primeiro-acesso)
 - [Configuração inicial do banco](#configuração-inicial-do-banco)
 - [Usuários do sistema](#usuários-do-sistema)
+- [Backup](#backup)
 - [Atualização](#atualização)
 - [Versionamento](#versionamento)
 - [Documentação](#documentação)
@@ -40,14 +43,15 @@ Uma máquina roda o servidor; qualquer dispositivo da rede acessa pelo navegador
 | Camada | Stack |
 |--------|-------|
 | Frontend | HTML, CSS e JavaScript |
-| Backend | Node.js 20+ e Express |
+| Backend | Node.js 22+ e Express |
 | Banco de dados | SQL Server |
 
 ## Início rápido (desenvolvimento)
 
-### Com Docker (recomendado)
+### Com Docker
 
-Sobe o servidor **e** o banco juntos, sem instalar Node nem SQL Server na máquina:
+Sobe o servidor **e** o banco juntos, sem instalar Node nem SQL Server na máquina
+(exige o Docker Desktop e a máquina virtual do WSL 2, que ocupa alguns GB de RAM):
 
 ```bash
 cp .env.docker.example .env
@@ -62,13 +66,33 @@ ficar vazio, a senha aparece uma única vez em `docker compose logs app`. Os dad
 ficam em volumes e sobrevivem a reinícios; com `restart: always` os containers
 voltam sozinhos quando a máquina liga.
 
+O app conecta com um login próprio, `escalas_app`, dono só do banco do app (senha
+em `APP_DB_PASSWORD` no `.env`); o `sa` fica só para o passo que cria banco e
+login. A porta 1433 do SQL só aceita conexão desta máquina. Quem já usava o
+Docker com o `sa` segue o passo a passo de atualização em
+[`docs/DOCKER.md`](docs/DOCKER.md).
+
+O app roda **sem root** (usuário `node` da imagem). Ele só grava em `/data` (volume
+`app-data`) e na pasta de backup — que deve ficar dentro de `/data` (ex.:
+`/data/backups`) ou num volume montado. Um passo curto do compose
+(`app-permissoes`) acerta o dono de `/data` antes de o app subir, o que também
+migra volumes criados por versões antigas. Se atualizar só o app com
+`docker compose up -d --no-deps app`, rode antes `docker compose run --rm app-permissoes`.
+
 ```bash
 docker compose down
 ```
 
 ### Sem Docker
 
-Requer Node 20+ e um SQL Server acessível:
+Requer Node 22.12+ e um SQL Server na máquina (o Express serve). O app conecta
+por **TCP/IP**, que o SQL Server Express traz desabilitado; o script abaixo, rodado
+uma vez no PowerShell **como Administrador**, habilita o TCP/IP numa porta fixa,
+cria o banco e um login próprio do app e libera a porta 4450 no firewall:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\preparar-sql-server.ps1
+```
 
 ```bash
 npm install
@@ -77,27 +101,136 @@ npm start
 
 Acesse `http://localhost:4450`. Configure a conexão com o SQL Server pela própria
 tela de configuração inicial (veja [Configuração inicial do banco](#configuração-inicial-do-banco)).
+Um arquivo `.env` na raiz do projeto (modelo em [`.env.example`](.env.example)) é
+lido na subida — útil para `PORT` e `ADMIN_PASSWORD`. O passo a passo completo
+está em [`docs/SERVIDOR-COMO-INSTALAR.md`](docs/SERVIDOR-COMO-INSTALAR.md).
 
-Testes:
+## Testes e qualidade
+
+Uma verificação completa antes de abrir um Pull Request (o CI roda o mesmo):
 
 ```bash
-npm test         # suíte de testes
-npm run smoke    # checagem rápida de sintaxe de todos os módulos
+npm run verificar
 ```
+
+Ela executa, em ordem:
+
+| Comando | O que faz |
+|---|---|
+| `npm run smoke` | Checagem de sintaxe de todos os `.js` |
+| `npm run lint` | ESLint. O frontend é analisado como módulos ES sem nenhum global do projeto: nome que não é import, local ou API do navegador é erro, e função sem uso também |
+| `npm run typecheck` | TypeScript em modo `checkJs` sobre backend, scripts e testes |
+| `npm run format:check` | Prettier (por enquanto só nos arquivos novos — ver `.prettierignore`) |
+| `npm test` | Testes unitários das regras de negócio, sem banco |
+
+### Testes de integração (SQL Server de verdade)
+
+Sobem o servidor em processo contra um SQL Server descartável em Docker e
+exercitam as rotas por HTTP: login e permissões, colaboradores, lançamentos,
+folgas de domingo, limite de setores e backup/restauração.
+
+```bash
+npm run integracao:banco:subir
+```
+```bash
+npm run test:integracao
+```
+
+O banco de teste fica em `127.0.0.1:14339` (container `escalas-integracao-db`) e
+é apagado e recriado a cada execução. Por segurança, os testes só aceitam banco
+com "Integracao" no nome — nunca tocam a produção (porta 4450/1433).
+`npm run integracao:banco:derrubar` remove o container.
+
+Para conferir telas no navegador com dados de exemplo, sem tocar na produção:
+
+```bash
+npm run integracao:servidor
+```
+
+Abra `http://127.0.0.1:4480` (login `admin` / `Admin!Integracao1`).
+
+### Prova de equivalência em refatorações grandes
+
+`tests/integracao/golden-master.js` executa um roteiro fixo por todas as rotas de
+dados e fotografa todas as tabelas. Gere antes da mudança e compare depois
+(no mesmo dia):
+
+```bash
+node tests/integracao/golden-master.js gerar antes.json
+```
+```bash
+node tests/integracao/golden-master.js comparar antes.json
+```
+
+### Robô de testes de tela (Playwright)
+
+```bash
+npm run e2e:demo
+```
+
+Clica aleatoriamente pelas telas da demo (sem backend). Para rodar contra uma
+instância com banco, use `npm run teste:subir` e `npm run e2e:teste` (detalhes em
+[`docs/ROBO-DE-TESTES.md`](docs/ROBO-DE-TESTES.md)).
+
+### Código morto no frontend
+
+```bash
+npm run analisar:codigo-morto
+```
+
+Junta os imports de todos os módulos do frontend e acusa exports que nenhum
+módulo importa (o ESLint já pega o que nem é exportado) e imports de algo que
+o módulo de destino não exporta — que no navegador impediria a página de
+carregar. Roda dentro do `npm run verificar`.
+
+### Comparação A/B do frontend
+
+Antes de refatorar uma tela, [`tests/e2e/comparar-ab/`](tests/e2e/comparar-ab/roteiro.js)
+roda o mesmo roteiro (todas as telas, editar, excluir, relatórios) na demo de um
+commit anterior e na atual e compara texto, formulários e erros passo a passo.
+O passo a passo está no cabeçalho do `roteiro.js`.
+
+## Estrutura do código
+
+```
+backend/
+  server.js            sobe e derruba o servidor HTTP
+  app.js               aplicação Express: portões (banco pronto, login,
+                       permissão), rotas, tratamento de erro
+  routes/              uma rota por recurso; coordena, não calcula
+  services/            regras de negócio (escala, banco de horas, plantões,
+                       backup/, horas-em-carteira, exclusão de colaborador...)
+  auth/                sessões, permissões, limite de setores, rate limit
+  db/                  conexão, transação, bootstrap do schema
+  lib/                 validação, domínio, erros, CORS, IP, cabeçalhos
+database/migrations/   scripts SQL, cada um aplicado uma vez por banco
+                       (registro em dbo.SchemaMigrations)
+frontend/              HTML/CSS/JS sem bundler, em módulos ES nativos
+  js/main.js           ponto de entrada (<script type="module">)
+  js/core/estado.js    estado compartilhado entre as telas
+  js/core/acoes-html.js funções chamadas por onclick="..." (as únicas em window)
+demo/                  modo demonstração (mock da API) usado pelo robô
+tests/unit|integracao|e2e
+```
+
+A auditoria técnica completa, com o que foi corrigido e o que está pendente,
+está em [`AUDITORIA.md`](AUDITORIA.md).
 
 ## Implantação
 
 O modelo recomendado é **um servidor central na rede**; o time acessa pelo navegador.
-A forma mais simples de manter esse servidor no ar é o Docker: `restart: always`
-faz app e banco subirem sozinhos quando a máquina liga, sem ninguém precisar logar.
+Ele roda direto no Windows, como serviço, ao lado de um SQL Server Express — sobe
+sozinho quando a máquina liga, sem ninguém precisar logar. O Docker
+([`docs/DOCKER.md`](docs/DOCKER.md)) é a alternativa: `restart: always` faz o mesmo
+papel, ao custo da máquina virtual do WSL 2.
 
-- **Montar o servidor** (serviço do Windows, firewall, IP fixo):
+- **Montar o servidor** (SQL Server, serviço do Windows, firewall, IP fixo):
   [`docs/SERVIDOR-COMO-INSTALAR.md`](docs/SERVIDOR-COMO-INSTALAR.md)
 - **Acessar e instalar o app** (para o time, Chrome/Edge):
   [`docs/README-TIME.md`](docs/README-TIME.md)
 
-Para parar o servidor, use `docker compose down` (ou pare o serviço, se
-configurado sem Docker).
+Para parar o servidor, pare o serviço do Windows (ou `docker compose down`, se
+estiver no Docker).
 
 ## Login e primeiro acesso
 
@@ -105,9 +238,17 @@ A partir da versão 1.3.0 o sistema exige login. Na primeira execução com um b
 novo, se a tabela `Usuarios` estiver vazia, um administrador é criado automaticamente:
 
 - **Usuário:** valor de `ADMIN_USERNAME` (padrão `admin`)
-- **Senha:** valor de `ADMIN_PASSWORD` se definido no `.env`; caso contrário, uma
-  senha aleatória é gerada e exibida **uma única vez** (na tela de configuração
-  inicial ou no console do servidor), com troca obrigatória no primeiro login.
+- **Senha:** valor de `ADMIN_PASSWORD` se definido no `.env` (mínimo de 8
+  caracteres); caso contrário — ou se for curta demais — uma senha aleatória é
+  gerada e exibida **uma única vez** (na tela de configuração inicial ou no console
+  do servidor), com troca obrigatória no primeiro login.
+
+Enquanto a senha provisória não for trocada, o servidor recusa as rotas de dados.
+Para trocar a senha é preciso informar a senha atual; a troca encerra as outras
+sessões abertas da conta.
+
+Com um proxy reverso na frente do app (nginx, IIS), configure `TRUST_PROXY` para o
+limite de tentativas de login enxergar o IP real do cliente (ver `.env.example`).
 
 Veja [`.env.example`](.env.example) para `ADMIN_USERNAME`, `ADMIN_PASSWORD` e a lista
 de origens liberadas em `CORS_ORIGINS`.
@@ -126,6 +267,21 @@ Administradores gerenciam contas em **Configurações → Usuários**: criar usu
 senha temporária e troca obrigatória no primeiro acesso), ativar/desativar,
 promover/remover administrador e resetar senha. Usuários comuns não veem essa tela. O
 sistema impede desativar ou rebaixar a própria conta e o último administrador ativo.
+
+Uma conta pode ter **setores permitidos**: nesse caso ela só vê colaboradores
+desses setores — e as ausências, plantões, banco de horas, jornadas e folgas
+deles — em todas as telas e na API.
+
+## Backup
+
+Em **Configurações → Banco de dados** é possível gerar backups na pasta do servidor,
+agendar backups automáticos e restaurar um arquivo. **Exportar Dados** baixa o
+mesmo backup completo; **Importar Dados** restaura o sistema a partir dele. Antes
+de restaurar, um backup de segurança do estado atual é salvo automaticamente. O
+arquivo de backup não contém contas nem sessões. Em **Manter os últimos backups
+automáticos** dá para limitar quantos backups automáticos ficam na pasta (0 =
+todos); só os automáticos (`backup-escalas-auto-*.json`) são apagados, nunca os
+manuais nem os de segurança.
 
 ## Atualização
 

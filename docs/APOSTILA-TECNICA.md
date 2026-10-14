@@ -15,7 +15,7 @@
 3. [Estrutura de pastas e arquivos](#3-estrutura-de-pastas-e-arquivos)
 4. [Documentação do código](#4-documentação-do-código)
    - 4.1 [Backend — ponto de entrada e infraestrutura](#41-backend--ponto-de-entrada-e-infraestrutura)
-   - 4.2 [Backend — utilitários (regras e serviços)](#42-backend--utilitários-regras-e-serviços)
+   - 4.2 [Backend — banco, segurança e regras de negócio](#42-backend--banco-segurança-e-regras-de-negócio)
    - 4.3 [Backend — rotas (a API REST)](#43-backend--rotas-a-api-rest)
    - 4.4 [Banco de dados — migrations e seed](#44-banco-de-dados--migrations-e-seed)
    - 4.5 [Frontend — arquitetura e módulos](#45-frontend--arquitetura-e-módulos)
@@ -84,12 +84,12 @@ Para cada tecnologia: **o que é**, **para que serve** e **por que/como foi usad
 ### SQL Server (Microsoft) + driver `mssql`
 - **O que é:** o SQL Server é um banco de dados relacional da Microsoft; `mssql` é a biblioteca Node que conversa com ele.
 - **Para que serve:** guardar os dados de forma estruturada (tabelas, relações) e consultá-los com SQL.
-- **Como foi usado aqui:** é a **fonte de verdade** do sistema. O código usa `mssql` com **pool de conexão** ([`backend/db.js`](../backend/db.js)) e queries parametrizadas (`@id`) para evitar injeção de SQL. O esquema é criado por **migrations** (seção 4.4).
+- **Como foi usado aqui:** é a **fonte de verdade** do sistema. O código usa `mssql` com **pool de conexão** ([`backend/db/index.js`](../backend/db/index.js)) e queries parametrizadas (`@id`) para evitar injeção de SQL. O esquema é criado por **migrations** (seção 4.4).
 
 ### JavaScript "puro" (Vanilla JS) no front-end
 - **O que é:** JavaScript sem framework (sem React/Vue/Angular).
 - **Para que serve:** dar comportamento às telas (montar HTML, tratar cliques, chamar a API).
-- **Como foi usado aqui:** todo o front-end é Vanilla JS, dividido em **módulos por tela** ([`frontend/Js/`](../frontend/Js/)). Cada módulo se registra em `window` e é orquestrado pelo `app.js`. Não há build/compilação — os arquivos são servidos direto.
+- **Como foi usado aqui:** todo o front-end é Vanilla JS, dividido em **módulos por tela** ([`frontend/js/`](../frontend/js/): `core/`, `telas/` e `lib/`). Cada módulo se registra em `window` e é orquestrado pelo `app.js`. Não há build/compilação — os arquivos são servidos direto.
 
 ### HTML5 + CSS3
 - **O que é:** as linguagens de estrutura (HTML) e estilo (CSS) das páginas web.
@@ -102,7 +102,7 @@ Para cada tecnologia: **o que é**, **para que serve** e **por que/como foi usad
 
 ### jsPDF (no navegador)
 - **O que é:** biblioteca JavaScript que gera arquivos PDF no lado do cliente.
-- **Como foi usado aqui:** exportar relatórios de escala/mensais em PDF direto do navegador ([`frontend/Js/pdf-utils.js`](../frontend/Js/pdf-utils.js), [`escala-relatorio.js`](../frontend/Js/escala-relatorio.js)).
+- **Como foi usado aqui:** exportar relatórios de escala/mensais em PDF direto do navegador ([`frontend/js/lib/pdf-utils.js`](../frontend/js/lib/pdf-utils.js), [`escala-relatorio.js`](../frontend/js/telas/escala-relatorio.js)).
 
 ### Docker + Docker Compose
 - **O que é:** Docker empacota um programa (com tudo que precisa) em um "contêiner" isolado; o Compose sobe vários contêineres juntos.
@@ -111,7 +111,7 @@ Para cada tecnologia: **o que é**, **para que serve** e **por que/como foi usad
 
 ### Serviço do Windows (schtasks / NSSM)
 - **O que é:** formas de fazer um programa iniciar sozinho junto com o Windows.
-- **Como foi usado aqui:** [`backend/utils/background-service.js`](../backend/utils/background-service.js) registra uma tarefa (`schtasks /SC ONSTART /RU SYSTEM`) para o servidor subir no **boot da máquina, sem login**. O NSSM é a alternativa mais robusta documentada nos guias.
+- **Como foi usado aqui:** [`backend/lib/background-service.js`](../backend/lib/background-service.js) registra uma tarefa (`schtasks /SC ONSTART /RU SYSTEM`) para o servidor subir no **boot da máquina, sem login**. O NSSM é a alternativa mais robusta documentada nos guias.
 
 ### Git
 - **O que é:** sistema de controle de versão.
@@ -119,7 +119,7 @@ Para cada tecnologia: **o que é**, **para que serve** e **por que/como foi usad
 
 ### Testes em Node puro
 - **O que é:** um pequeno executor de testes próprio, sem framework externo.
-- **Como foi usado aqui:** [`tests/run-tests.js`](../tests/run-tests.js) roda os testes de regra de negócio (banco de horas, escala, permissões, validação, etc.) com `npm test`. Foca na **lógica pura**, sem precisar de banco.
+- **Como foi usado aqui:** [`tests/unit/run-tests.js`](../tests/unit/run-tests.js) roda os testes de regra de negócio (banco de horas, escala, permissões, validação, etc.) com `npm test`. Foca na **lógica pura**, sem precisar de banco.
 
 ---
 
@@ -130,52 +130,74 @@ Visão de alto nível (ignorando `node_modules`, `.git` e afins):
 ```
 App de escalas/
 ├── backend/                    ← todo o servidor (Node/Express)
-│   ├── server.js               ← ponto de entrada: middlewares, rotas, erro, boot
-│   ├── db.js                   ← conexão com o SQL Server (pool)
+│   ├── server.js               ← ponto de entrada: sobe e derruba o servidor HTTP
+│   ├── app.js                  ← aplicação Express: middlewares, portões, rotas, erro
 │   ├── config/                 ← config local (database.local.json) — NÃO versionado
 │   ├── routes/                 ← a API REST, um arquivo por domínio
 │   │   ├── colaboradores.js, escala.js, ausencias.js, feriados.js,
 │   │   ├── plantoes.js, banco-horas.js, setores.js, jornada-semanal.js,
 │   │   └── auth.js, usuarios.js, configuracao-banco.js, sistema.js
-│   └── utils/                  ← regras de negócio + serviços (sem HTTP)
-│       ├── auth.js, permissoes.js, rate-limit.js       (segurança)
-│       ├── database-config.js, database-schema.js, schema.js, app-paths.js
-│       ├── db-* / backup-*     (backup e configuração)
-│       ├── escala.js, bancoHoras.js, plantoes.js, jornada-semanal.js, setores.js
-│       ├── validation.js, transactions.js, errors.js
+│   ├── db/                     ← acesso ao SQL Server
+│   │   ├── index.js            ← conexão (pool)
+│   │   └── database-config.js, database-schema.js, transactions.js, ...
+│   ├── auth/                   ← segurança: sessão/login, permissões, rate limit, acesso por setor
+│   ├── services/               ← regras de negócio (sem HTTP)
+│   │   ├── escala.js, bancoHoras.js, plantoes.js, jornada-semanal.js, setores.js
+│   │   ├── horas-em-carteira.js, exclusao-colaborador.js, folgas-domingo.js, tipos-escala.js
+│   │   ├── backup-config.js, backup-service.js, backup-scheduler.js
+│   │   └── backup/             ← especificacao.js (o que o backup guarda) e normalizacao.js
+│   └── lib/                    ← utilitários gerais
+│       ├── errors.js, validation.js, dominio.js, app-paths.js, app-state.js
+│       ├── cors.js, rede.js, ip-cliente.js, cabecalhos-seguranca.js, tratador-erros.js
+│       ├── bootstrap-banco.js  ← conectar + schema + retentativa + limpeza de sessões
 │       └── background-service.js, folder-picker.js     (integração Windows)
 │
 ├── frontend/                   ← tudo que roda no navegador
 │   ├── index.html              ← página única; telas montadas via JS
 │   ├── manifest.json           ← PWA
 │   ├── style.css, css/*.css    ← estilos, separados por tela
-│   └── Js/                     ← módulos por tela (Vanilla JS)
-│       ├── app.js              ← orquestrador das telas
-│       ├── api.js              ← camada única de acesso à API
-│       ├── auth.js             ← tela e fluxo de login
-│       ├── escala-dia-editor.js / escala-dia-shared.js  ← a Escala do Dia
-│       ├── lancamentos.js, dashboard.js, calendar.js
-│       ├── escala-relatorio.js / escala-report-utils.js / pdf-utils.js
-│       ├── configuracoes-backup.js / configuracoes-usuarios.js / permissoes.js
-│       └── runtime-fixes.js    ← funcionalidades diversas (apesar do nome)
+│   └── js/                     ← módulos Vanilla JS
+│       ├── core/               ← base carregada por todas as telas
+│       │   ├── app.js          ← estado global e bootstrap (207 linhas)
+│       │   ├── app/            ← 13 partes do antigo app.js, por responsabilidade
+│       │   ├── api.js          ← camada única de acesso à API
+│       │   ├── auth.js, permissoes.js, meus-setores.js  ← login, perfil e setores
+│       │   └── runtime/        ← o antigo runtime-fixes.js, dividido
+│       │       ├── normalizacao.js, dados-e-modais.js, relatorio-mensal.js
+│       │       ├── escala-e-relatorios.js
+│       │       └── plantao-colaboradores/  ← plantão, colaboradores, jornada
+│       ├── telas/              ← uma pasta ou arquivo por tela
+│       │   ├── escala-dia/ + escala-dia-editor.js, escala-dia-shared.js
+│       │   ├── escala-relatorio/ + escala-relatorio.js
+│       │   ├── dashboard/
+│       │   ├── banco-horas.js, lancamentos.js, calendar.js
+│       │   └── configuracoes-backup.js / configuracoes-usuarios.js
+│       └── lib/                ← utilitários sem tela
+│           └── pdf-utils.js, escala-report-utils.js, html-seguro.js (escapeHtml único)
 │
 ├── database/
 │   ├── migrations/             ← evolução do esquema (arquivos SQL datados)
-│   └── seeds/dados-exemplo.sql ← dados de exemplo (setores, colaboradores, feriados)
+│   └── seeds/dados-exemplo.sql ← dados de exemplo (setores, colaboradores)
 │
-├── docs/                       ← guias (Docker, servidor, time) + esta apostila
-├── tests/                      ← testes de lógica (Node puro)
+├── docs/                       ← guias (Docker, servidor, time, robô de testes,
+│                                  plano do instalador) + esta apostila
+├── tests/
+│   ├── unit/                   ← testes de lógica (Node puro, npm test)
+│   ├── integracao/             ← rotas contra SQL Server descartável + golden master
+│   ├── e2e/                    ← robô de testes no navegador (Playwright)
+│   └── smoke.js                ← checagem de sintaxe (npm run smoke)
 │
 ├── Dockerfile, docker-compose.yml   ← execução em contêiner
+├── docker-compose.teste.yml         ← instância isolada para o robô de testes
 ├── docker/init-db.sh                ← cria o banco na primeira subida
 ├── package.json                     ← dependências e scripts (npm)
-└── *.md                             ← README, CHANGELOG, planos, relatórios
+└── *.md                             ← README, CHANGELOG, CONTRIBUTING, SECURITY
 ```
 
 ### A lógica por trás dessa organização
 
-- **`backend/routes/` x `backend/utils/`:** as *rotas* só cuidam de HTTP (ler o pedido, validar, responder). A *regra de negócio* fica nos *utils*, isolada — assim ela pode ser **testada sem subir servidor** (é o que os `tests/` fazem).
-- **`frontend/Js/` um arquivo por tela:** o front-end é grande (~18 mil linhas); separar por tela evita um arquivo único impossível de manter. O `api.js` centraliza **todo** acesso à API, então trocar algo na comunicação mexe em um lugar só.
+- **`backend/routes/` x `backend/services/`:** as *rotas* só cuidam de HTTP (ler o pedido, validar, responder). A *regra de negócio* fica em `services/`, isolada — assim ela pode ser **testada sem subir servidor** (é o que os `tests/unit/` fazem). O acesso ao banco fica em `db/`, a segurança em `auth/` e os utilitários gerais em `lib/`.
+- **`frontend/js/` um arquivo por tela:** o front-end é grande (~18 mil linhas); separar por tela evita um arquivo único impossível de manter. Em `core/` fica o que toda tela usa, em `telas/` um arquivo por tela e em `lib/` os utilitários sem interface. Cada arquivo é um **módulo ES** e importa o que usa (`import { ... } from`), então as dependências estão escritas no próprio código e a ordem das tags deixou de importar: o `index.html` carrega só `js/main.js`. O `api.js` centraliza **todo** acesso à API, então trocar algo na comunicação mexe em um lugar só.
 - **`database/migrations/`:** o esquema não é criado "na mão"; cada mudança é um arquivo SQL datado, aplicado em ordem. Isso deixa o banco **reproduzível** e versionado junto do código.
 
 ---
@@ -186,7 +208,19 @@ App de escalas/
 
 ### 4.1 Backend — ponto de entrada e infraestrutura
 
-#### `backend/server.js` — o coração do servidor
+#### `backend/server.js` e `backend/app.js` — o coração do servidor
+
+> **Atualização (auditoria de 2026-09):** o antigo `server.js` foi dividido por
+> responsabilidade. O que esta seção descreve continua valendo, mas mora agora em:
+> `app.js` (middlewares, portões e rotas), `lib/cors.js` (CORS),
+> `lib/rede.js` (endereços de acesso e porta), `lib/bootstrap-banco.js` (conexão,
+> schema e retentativa) e `server.js` (subir e derrubar o servidor). Os números de
+> linha abaixo se referem ao arquivo antigo. Mudaram também: o corpo JSON é
+> limitado a 1 MB (25 MB só na restauração de backup), toda resposta leva
+> cabeçalhos de segurança (`lib/cabecalhos-seguranca.js`), o IP do cliente só vem
+> de `X-Forwarded-For` com `TRUST_PROXY` configurado, erro inesperado não expõe
+> mensagem interna (`lib/tratador-erros.js`) e conta com senha provisória só
+> acessa `/api/auth/*` até trocar a senha.
 
 Este arquivo faz o "sanduíche" de uma requisição: ela entra, passa por várias camadas de segurança (os *middlewares*), chega na rota certa, e a resposta volta. A ordem em que as camadas são declaradas **importa** — é a ordem em que a requisição passa por elas.
 
@@ -245,7 +279,7 @@ app.use('/api/escala', escalaRoutes);
 
 **Ciclo de vida do servidor (a partir da 375):** `start()` sobe o `app.listen`, e no callback tenta conectar no banco e rodar `ensureApplicationSchema` (criar/verificar tabelas). Repare (visto na seção sobre o boot): se o banco falhar aqui, o servidor **continua no ar** e apenas loga o erro, em vez de derrubar tudo. Há também tratamento de `EADDRINUSE` (porta ocupada) e desligamento gracioso (fecha o pool ao receber sinal de encerramento).
 
-#### `backend/db.js` — a conexão com o banco
+#### `backend/db/index.js` — a conexão com o banco
 
 Arquivo curto e central. Gerencia **um pool de conexões** reaproveitável.
 
@@ -264,9 +298,9 @@ let activePoolFingerprint = null;
 
 ---
 
-### 4.2 Backend — utilitários (regras e serviços)
+### 4.2 Backend — banco, segurança e regras de negócio
 
-A pasta `utils/` guarda tudo que **não** é HTTP: segurança, acesso ao banco, regras de negócio. Estão aqui porque podem (e devem) ser testados isoladamente.
+Tudo que **não** é HTTP fica fora de `routes/`, em quatro pastas: `db/` (acesso ao banco), `auth/` (segurança), `services/` (regras de negócio) e `lib/` (utilitários gerais). Ficam separados porque podem (e devem) ser testados isoladamente.
 
 #### Segurança
 
@@ -332,8 +366,8 @@ Cada arquivo em `routes/` é um **Router do Express** que agrupa os endpoints de
 const express = require('express');
 const router = express.Router();
 const { sql, conectar } = require('../db');
-const { AppError } = require('../utils/errors');
-const { /* validadores */ } = require('../utils/validation');
+const { AppError } = require('../lib/errors');
+const { /* validadores */ } = require('../lib/validation');
 
 // 1) Uma função que monta e valida o "payload" a partir do corpo da requisição
 function buildColaboradorPayload(body, fallback = {}) { /* valida cada campo */ }
@@ -356,7 +390,7 @@ Três princípios se repetem:
 
 - **`buildColaboradorPayload(body, fallback)` (linhas 24+):** monta o objeto do colaborador validando cada campo — `nome` (obrigatório, até 300 caracteres), horários de trabalho/almoço (`normalizeNullableTime`), `setorId` (existe?), e por fim `validateWorkSchedule` (o fim é depois do início? o almoço cabe no expediente?). O parâmetro `fallback` permite atualizações parciais: se o `body` não trouxe um campo, usa o valor atual do registro.
 - Ao criar/editar, além de gravar o colaborador, a rota chama `syncColaboradorDefaultsToEscalaDia` (de `escala.js`) — para que mudar o horário padrão do colaborador **reflita** na escala do dia. Operações que mexem em várias tabelas usam `withTransaction` (tudo ou nada).
-- Repare nos imports: a rota puxa regras de vários utils (`escala`, `jornada-semanal`, `setores`, `schema`, `validation`). Isso mostra o desenho: **a rota coordena; os utils fazem**.
+- Repare nos imports: a rota puxa regras de `services/` (`escala`, `jornada-semanal`, `setores`, `exclusao-colaborador`), o controle de setores de `auth/acesso-setores` e `lib/validation`. (Até a auditoria de 2026-09 as rotas também consultavam `db/schema` para descobrir, a cada requisição, se colunas existiam; isso saiu — o servidor só libera as rotas depois de aplicar todas as migrations.) Isso mostra o desenho: **a rota coordena; os serviços fazem**.
 
 #### Papel de cada arquivo de rota
 
@@ -385,7 +419,8 @@ Três princípios se repetem:
 
 O esquema do banco **não** é criado à mão. Cada evolução é um arquivo `.sql` **datado** em `database/migrations/`, aplicado em ordem por `ensureApplicationSchema` (seção 4.2). Duas características importantes:
 
-- **Idempotentes:** cada arquivo pode rodar várias vezes sem estragar nada. Usam guardas como `IF OBJECT_ID('dbo.Setores') IS NULL` (só cria a tabela se ela não existe) e `IF COL_LENGTH(...) IS NULL` (só adiciona a coluna se falta). Isso permite rodar as migrations em todo boot, com segurança.
+- **Aplicadas uma vez por banco:** `backend/db/migracoes.js` registra cada script em `dbo.SchemaMigrations` (nome e checksum) e, a cada boot, só roda os que ainda não foram aplicados. Script já aplicado cujo arquivo mudou **não** roda de novo — só gera um aviso no log: correção de schema é sempre um arquivo novo, acrescentado ao fim da lista.
+- **Idempotentes:** mesmo assim, cada arquivo pode rodar várias vezes sem estragar nada (guardas como `IF OBJECT_ID('dbo.Setores') IS NULL` e `IF COL_LENGTH(...) IS NULL`). Isso cobre um banco antigo, sem registros, que roda tudo uma vez, e um script que falhe no meio e seja repetido na subida seguinte.
 - **Batches com `GO`:** o SQL é dividido por `GO` (separador de lote do SQL Server), executado um bloco por vez.
 
 Ordem dos arquivos:
@@ -399,6 +434,8 @@ Ordem dos arquivos:
 | `2026-05-28-colaborador-jornada-semanal.sql` | `ColaboradorJornadaSemanal`. |
 | `2026-07-08-usuarios.sql` | `Usuarios` (contas de acesso). |
 | `2026-07-09-usuarios-admin.sql` | Coluna/ajuste de admin em `Usuarios`. |
+| … | (a lista completa, na ordem de aplicação, está em `SCHEMA_SCRIPT_PATHS`, `backend/db/database-schema.js`) |
+| `2026-09-28-plantao-colaborador.sql` | `PlantaoColaborador`: a equipe do plantão sai do JSON `plantoes.colaboradores_ids` para uma tabela de ligação com FK. |
 
 #### As tabelas principais
 
@@ -410,6 +447,8 @@ Ordem dos arquivos:
 | `Ausencias` | Faltas/afastamentos | período, tipo |
 | `Feriados` | Datas especiais | `Nome`, `Data`, `Tipo` (nacional/estadual/municipal) |
 | `plantoes` | Trabalho de fim de semana | `data_plantao`, `tipo_plantao` (sabado/domingo) |
+| `PlantaoColaborador` | Quem faz cada plantão | `PlantaoId`, `ColaboradorId` (FK para os dois lados) |
+| `SchemaMigrations` | Migrations já aplicadas | `Nome`, `Checksum`, `AplicadaEm` |
 | `BancoHorasMovimentos` | Créditos/débitos de horas | colaborador, valor, data |
 | `escala_dia` | A escala materializada por dia | colaborador, data, horários |
 | `AlmocosPersonalizados` | Almoço específico num dia | colaborador, data, início/fim |
@@ -417,7 +456,7 @@ Ordem dos arquivos:
 
 #### O seed de exemplo — `database/seeds/dados-exemplo.sql`
 
-Um script **opcional** e **idempotente** para um banco novo não começar vazio. Só faz `INSERT` com guarda `IF NOT EXISTS` — **nunca** apaga nem sobrescreve dados existentes. Adiciona: alguns setores, colaboradores de demonstração (marcados "(exemplo)") e os feriados nacionais de 2026/2027. É acionado pelo botão "Carregar Dados de Exemplo" (ou pelo endpoint `POST /configuracao-banco/carregar-exemplos`).
+Um script **opcional** e **idempotente** para um banco novo não começar vazio. Só faz `INSERT` com guarda `IF NOT EXISTS` — **nunca** apaga nem sobrescreve dados existentes. Adiciona: alguns setores e colaboradores de demonstração (marcados "(exemplo)"). Feriado nacional **não** entra: o sistema calcula (ver `backend/services/feriados-nacionais.js`), e gravar no banco fazia o mesmo dia aparecer duas vezes na tela. É acionado pelo botão "Carregar Dados de Exemplo" (ou pelo endpoint `POST /configuracao-banco/carregar-exemplos`).
 
 ---
 
@@ -425,16 +464,16 @@ Um script **opcional** e **idempotente** para um banco novo não começar vazio.
 
 #### A arquitetura em uma frase
 
-Uma **única página** (`index.html`) que carrega vários **módulos JavaScript**, cada um responsável por uma tela. Não há framework nem etapa de build: os arquivos `.js` são servidos direto e se registram em `window`, e um orquestrador (`app.js`) decide qual tela montar.
+Uma **única página** (`index.html`) que carrega vários **módulos JavaScript**, cada um responsável por uma tela. Não há framework nem etapa de build: os arquivos `.js` são **módulos ES nativos** servidos direto (o navegador resolve os `import`), a entrada é `js/main.js`, e `carregarPagina` (em `core/app/modais-e-navegacao.js`) decide qual tela montar.
 
 **Por que sem framework?** É uma escolha de simplicidade: qualquer navegador roda direto, não precisa de Node/npm no cliente, e o deploy é só copiar arquivos. O custo é que a organização fica por conta da disciplina do código (um arquivo por tela, `api.js` central).
 
-#### `Js/api.js` — a camada única de comunicação (central)
+#### `js/core/api.js` — a camada única de comunicação (central)
 
 Todo acesso à API passa por aqui. Isso concentra num só lugar coisas como URL base, tratamento de sessão expirada e formato de erro.
 
 - **URL base dinâmica (`getRuntimeApiBaseUrl`, linhas 3–14):** a base da API é derivada de `window.location.origin`. Ou seja: se você abre o app por `http://192.168.0.10:4450`, a API é chamada nesse mesmo endereço — **sem configuração**. É isso que faz o mesmo código funcionar em localhost, no IP da rede ou no Docker.
-- **Normalizador de `fetch` (linhas 66–86):** o código "envelopa" o `window.fetch` nativo. Dois motivos: (1) reescrever URLs antigas com `:3000` hardcoded para a base atual (compatibilidade com código legado); (2) observar as respostas para detectar sessão expirada.
+- **Vigia de sessão no `fetch` (`installSessionExpiryWatcher`):** o código "envelopa" o `window.fetch` nativo só para observar as respostas e detectar sessão expirada. (Até 2026-09 ele também reescrevia URLs antigas com `:3000` fixo; as chamadas passaram a usar `window.API` e a reescrita saiu.)
 - **Sessão expirada (`notifyIfSessionExpired`, linhas 54–64):** se qualquer chamada de API (fora as de `/auth`) responder **401**, dispara o evento `auth:expired`. A aplicação escuta esse evento e volta para a tela de login — assim o usuário não fica "preso" numa tela quebrada quando a sessão de 12h vence.
 - **O objeto `API` (linhas 88+):**
   - `request(endpoint, options)`: o coração. Garante `Content-Type: application/json` quando há corpo, envia o cookie de sessão, lê a resposta (JSON ou texto), e — se `!response.ok` — lança um `Error` com `.status` e `.payload`. Assim, quem chama a API só precisa de um `try/catch`.
@@ -444,27 +483,39 @@ Todo acesso à API passa por aqui. Isso concentra num só lugar coisas como URL 
 
 #### Os módulos de tela (por responsabilidade)
 
+Caminhos relativos a `frontend/js/`.
+
 | Arquivo | Responsabilidade |
 |---|---|
-| `app.js` (~4.400 linhas) | O **orquestrador**. Monta o HTML das telas, controla a navegação entre elas, inicializa cada tela (`inicializarConfiguracaoBancoTela`, etc.), a barra lateral do app e as configurações. É grande porque concentra o "esqueleto" de várias telas. |
-| `auth.js` | A tela e o fluxo de **login** (enviar credenciais, tratar erro, reagir ao evento `auth:expired`). |
-| `escala-dia-editor.js` (~1.826 linhas) | A **Escala do Dia**: monta a grade de horários (timeline), o arrasta-e-solta do almoço, o painel lateral de edição, a navegação por dia. |
-| `escala-dia-shared.js` | Funções compartilhadas da Escala do Dia (conversões de horário, helpers usados pelo editor e por outros). |
-| `lancamentos.js` (~1.754 linhas) | O cadastro/edição de lançamentos (colaboradores, jornada, etc.) via modais. |
-| `dashboard.js` | A tela inicial / painel com indicadores. |
-| `calendar.js` | Componente de calendário (seleção de datas, feriados). |
-| `escala-relatorio.js` (~1.822 linhas) + `escala-report-utils.js` | Geração dos relatórios de escala (mensal, por escala). |
-| `pdf-utils.js` | Helpers de PDF (jsPDF/canvas) usados pelos relatórios. |
-| `configuracoes-backup.js` | A tela de configuração de **banco e backup** (testar/salvar conexão, gerar/restaurar backup, carregar exemplos). |
-| `configuracoes-usuarios.js` | A tela de gestão de **usuários** (admin). |
-| `permissoes.js` | Aplica no front-end o que o perfil pode ver/fazer (esconde botões que o usuário comum não usa). |
-| `runtime-fixes.js` (~4.556 linhas) | Apesar do nome, contém **funcionalidades de verdade** (cerca de dois terços do arquivo), além de ajustes. Historicamente cresceu como um "extra" ao `app.js`. |
+| `core/app.js` (~4.400 linhas) | O **orquestrador**. Monta o HTML das telas, controla a navegação entre elas, inicializa cada tela (`inicializarConfiguracaoBancoTela`, etc.), a barra lateral do app e as configurações. É grande porque concentra o "esqueleto" de várias telas. |
+| `core/auth.js` | A tela e o fluxo de **login** (enviar credenciais, tratar erro, reagir ao evento `auth:expired`). |
+| `telas/escala-dia-editor.js` (~1.826 linhas) | A **Escala do Dia**: monta a grade de horários (timeline), o arrasta-e-solta do almoço, o painel lateral de edição, a navegação por dia. |
+| `telas/escala-dia-shared.js` | Funções compartilhadas da Escala do Dia (conversões de horário, helpers usados pelo editor e por outros). |
+| `telas/lancamentos.js` (~1.754 linhas) | O cadastro/edição de lançamentos (colaboradores, jornada, etc.) via modais. |
+| `telas/dashboard/` | A tela inicial / painel com indicadores. |
+| `telas/calendar.js` | Componente de calendário (seleção de datas, feriados). |
+| `telas/escala-relatorio.js` (~1.822 linhas) + `lib/escala-report-utils.js` | Geração dos relatórios de escala (mensal, por escala). |
+| `lib/pdf-utils.js` | Helpers de PDF (jsPDF/canvas) usados pelos relatórios. |
+| `telas/configuracoes-backup.js` | A tela de configuração de **banco e backup** (testar/salvar conexão, gerar/restaurar backup, carregar exemplos). |
+| `telas/configuracoes-usuarios.js` | A tela de gestão de **usuários** (admin). |
+| `core/permissoes.js` | Aplica no front-end o que o perfil pode ver/fazer (esconde botões que o usuário comum não usa). |
+| `core/estado.js` | O **estado compartilhado** entre telas (listas carregadas da API, seleções, caches usados por mais de um módulo). Estado de um módulo só fica dentro dele. |
+| `core/acoes-html.js` | As funções chamadas por atributos `onclick="..."` dos templates — as únicas publicadas em `window`, porque um atributo `on*` só enxerga o escopo global. |
+| `core/layout-pagina.js` | Barra lateral (navegação, botão ativo, recolher) e indicador de carregamento. |
+| `core/runtime/` | O antigo `runtime-fixes.js`. Apesar do nome antigo, contém **funcionalidades de verdade** (e, desde a migração para módulos, nenhum ajuste por cima de outro arquivo): caches e modais (`dados-e-modais.js`), relatório do calendário (`relatorio-mensal.js`), escala e relatórios de plantão (`escala-e-relatorios.js`) e a pasta `plantao-colaboradores/` com a tela de plantão, o editor de colaborador e a jornada semanal. |
 
-> **Nota de manutenção:** `app.js` e `runtime-fixes.js` são os dois arquivos gigantes do front-end e concentram a maior parte da complexidade. Um trabalho contínuo do projeto é ir extraindo pedaços deles para módulos menores e nomeados — foi assim que nasceram `configuracoes-backup.js`, `pdf-utils.js`, `escala-dia-editor.js`, etc.
+> **Nota de manutenção:** o front não tem bundler — são **módulos ES** (desde 2026-09; antes eram `<script>` clássicos num escopo global, com ordem de carga fixa e arquivos que sobrescreviam funções de outros via `window.X = X = function...`).
+>
+> - Tela ou arquivo novo: exporte o que outros usam e importe onde for usar; se o módulo só registra listeners e ninguém o importa, adicione-o em `js/main.js`. Os dois `index.html` (`frontend/` e `demo/`) não mudam.
+> - Estado compartilhado entre telas vai em `core/estado.js` (`estado.colaboradores`, ...). Um `export let` não serve para isso: quem importa não pode reatribuir.
+> - Função chamada por `onclick="..."` num template precisa estar em `core/acoes-html.js`; o resto não vai para `window`.
+> - `npm run lint` acusa nome não importado e função sem uso; `npm run analisar:codigo-morto` acusa export que ninguém importa e import de algo que não existe.
 
 #### PWA
 
-`manifest.json` declara nome, ícones e cor de marca, permitindo "instalar" o app. **Não há service worker** de propósito: como o sistema mostra dados ao vivo do banco, cachear telas causaria informação velha. O controle de cache de versão é feito por `?v=1.6.1` nos links de CSS/JS.
+`manifest.json` declara nome, ícones e cor de marca, permitindo "instalar" o app. **Não há service worker** de propósito: como o sistema mostra dados ao vivo do banco, cachear telas causaria informação velha.
+
+O cache de CSS/JS é controlado por **header, não por query string**: `backend/server.js` serve o front-end com `Cache-Control: no-store, must-revalidate` e sem `ETag`/`Last-Modified`, o que cobre também o `index.html` — que, por ser o documento de entrada, não teria onde pendurar um `?v=`. Os links são limpos por isso (`js/core/app.js`, não `js/core/app.js?v=...`): a query string é anterior ao header, deixou de ter efeito quando ele entrou e só sobrava como um passo manual de bump que ninguém mantinha em dia. A demo publicada na Vercel não passa pelo Express, então declara o mesmo header em `vercel.json`.
 
 ---
 
@@ -550,6 +601,9 @@ Pré-requisitos: **Node.js** (LTS) e **SQL Server** (Express serve) instalados; 
 | `npm start` | Sobe o servidor (`node backend/server.js`). |
 | `npm test` | Roda os testes de lógica (banco de horas, escala, permissões, validação...). |
 | `npm run smoke` | Checagem rápida de sintaxe (`node --check`) em todos os arquivos-chave. |
+| `npm run verificar` | Sintaxe, lint, tipos, formatação e testes unitários (o mesmo que o CI roda). |
+| `npm run test:integracao` | Testes das rotas contra um SQL Server descartável (`npm run integracao:banco:subir` antes). |
+| `npm run analisar:codigo-morto` | Acusa exports do frontend que nenhum módulo importa e imports quebrados. |
 
 ### Acesso pelo time (rede)
 

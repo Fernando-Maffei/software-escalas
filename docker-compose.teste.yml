@@ -1,0 +1,88 @@
+# Instancia de TESTE do App de Escalas, isolada da producao. E nela que o
+# robo de testes (tests/e2e/) roda: ele cria, altera e exclui registros aleatorios,
+# entao nunca pode tocar no banco real.
+#
+# Diferencas para o docker-compose.yml de producao:
+#   - projeto, containers, imagem e volumes com nome proprio (app-de-escalas-teste)
+#   - app na porta 4460; o banco nao e publicado no host (nao disputa a 1433)
+#   - senhas fixas de teste, sem .env, e sem restart automatico
+#
+# Uso:
+#   npm run teste:subir      sobe (ou atualiza) a instancia
+#   npm run e2e:teste        roda o robo e os roteiros contra ela
+#   npm run teste:derrubar   apaga containers E volumes (o banco volta a zero)
+
+name: app-de-escalas-teste
+
+services:
+  db:
+    image: mcr.microsoft.com/mssql/server:2022-CU27-GDR1-ubuntu-22.04
+    container_name: escalas-teste-db
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: "Teste!Escalas2026"
+      MSSQL_PID: "Express"
+    volumes:
+      - db-data:/var/opt/mssql
+
+  db-init:
+    image: mcr.microsoft.com/mssql-tools@sha256:62556500522072535cb3df2bb5965333dded9be47000473e9e0f84118e248642
+    container_name: escalas-teste-db-init
+    depends_on:
+      - db
+    environment:
+      DB_PASSWORD: "Teste!Escalas2026"
+      APP_DB_PASSWORD: "AppTeste!Escalas2026"
+    volumes:
+      - ./docker/init-db.sh:/init-db.sh:ro
+    entrypoint: ["/bin/bash", "/init-db.sh"]
+
+  # ---- Ajusta o dono da pasta de dados e sai -------------------------------
+  # O app roda como o usuario "node", sem root (ver Dockerfile). Volumes criados
+  # quando o app rodava como root tem arquivos do root que o app nao conseguiria
+  # mais gravar; este passo passa a pasta para o "node" antes do app subir. E o
+  # unico momento em que algo roda como root, e o container sai em seguida.
+  app-permissoes:
+    build: .
+    image: app-de-escalas-teste-app
+    user: "0:0"
+    entrypoint: ["chown", "-R", "node:node", "/data"]
+    volumes:
+      - app-data:/data
+    restart: "no"
+
+  app:
+    build: .
+    image: app-de-escalas-teste-app
+    container_name: escalas-teste-app
+    depends_on:
+      db-init:
+        condition: service_completed_successfully
+      app-permissoes:
+        condition: service_completed_successfully
+    environment:
+      PORT: "4450"
+      # Sem TZ o container roda em UTC e todo "hoje" do app (escala, banco de
+      # horas, desligamento, horario do backup) vira o dia seguinte as 21h.
+      TZ: "America/Sao_Paulo"
+      DB_HOST: "db"
+      DB_PORT: "1433"
+      DB_DATABASE: "SoftwareEscalas"
+      # Mesmo login restrito da producao (criado pelo init-db.sh), para o robo
+      # exercitar o app com as permissoes de verdade.
+      DB_USER: "escalas_app"
+      DB_PASSWORD: "AppTeste!Escalas2026"
+      DB_AUTH_TYPE: "sql"
+      DB_ENCRYPT: "true"
+      DB_TRUST_CERT: "true"
+      ADMIN_USERNAME: "admin"
+      ADMIN_PASSWORD: "Robo!Teste2026"
+      APP_DE_ESCALAS_DATA_DIR: "/data"
+    ports:
+      - "4460:4450"
+    volumes:
+      - app-data:/data
+
+volumes:
+  db-data:
+  app-data:

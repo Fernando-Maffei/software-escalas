@@ -1,9 +1,10 @@
 const express = require('express');
 
 const { conectar } = require('../db');
-const { AppError } = require('../utils/errors');
+const { AppError } = require('../lib/errors');
 const {
     clearSessionCookie,
+    credenciaisValidas,
     createSession,
     destroySession,
     findUserById,
@@ -12,14 +13,15 @@ const {
     normalizePassword,
     normalizeUsername,
     requireAuth,
+    revokeOtherUserSessions,
     setSessionCookie,
     touchLastLogin,
     updateUserPassword,
-    updateUserSetoresVisiveis,
-    verifyPassword
-} = require('../utils/auth');
+    updateUserSetoresVisiveis
+} = require('../auth/auth');
 
-const { createRateLimiter } = require('../utils/rate-limit');
+const { createRateLimiter } = require('../auth/rate-limit');
+const { getClientIp } = require('../lib/ip-cliente');
 
 const router = express.Router();
 
@@ -27,12 +29,6 @@ const router = express.Router();
 // repetida nao vazar para outras contas nem para a tentativa de outra pessoa
 // na mesma rede.
 const loginRateLimiter = createRateLimiter();
-
-function getClientIpFromRequest(req) {
-    const forwardedFor = String(req.headers['x-forwarded-for'] || '').split(',')[0].trim();
-    const rawIp = forwardedFor || req.socket?.remoteAddress || req.ip || '';
-    return String(rawIp).replace(/^::ffff:/, '');
-}
 
 function toPublicUser(user) {
     return {
@@ -50,8 +46,8 @@ router.post('/login', async (req, res, next) => {
         const username = normalizeUsername(req.body?.username);
         const password = normalizePassword(req.body?.password, 'Senha');
 
-        const rateKey = `${getClientIpFromRequest(req)}|${username.toLowerCase()}`;
-        const limite = loginRateLimiter.check(rateKey);
+        const rateKey = `${getClientIp(req)}|${username.toLowerCase()}`;
+        const limite = loginRateLimiter.consume(rateKey);
 
         if (limite.blocked) {
             const minutos = Math.ceil(limite.retryAfterMs / 60000);
@@ -61,8 +57,7 @@ router.post('/login', async (req, res, next) => {
         const pool = await conectar();
         const user = await findUserByUsername(pool, username);
 
-        if (!user || !user.ativo || !verifyPassword(password, user.passwordHash, user.passwordSalt)) {
-            loginRateLimiter.registerFailure(rateKey);
+        if (!(await credenciaisValidas(user, password))) {
             throw new AppError(401, 'Usuario ou senha invalidos.');
         }
 
@@ -116,9 +111,34 @@ router.post('/trocar-senha', requireAuth, async (req, res, next) => {
         }
 
         const novaSenha = normalizePassword(req.body?.novaSenha, 'Nova senha');
-        const pool = await conectar();
+        const senhaAtual = String(req.body?.senhaAtual || '');
 
+        if (!senhaAtual) {
+            throw new AppError(400, 'Informe a senha atual.');
+        }
+
+        // A senha atual e exigida: uma sessao aberta num computador destravado
+        // (ou sequestrada) nao pode trocar a senha e trancar o dono do lado de
+        // fora. Mesmo limitador de forca bruta do login, com chave propria.
+        const rateKey = `trocar-senha|${getClientIp(req)}|${req.user.id}`;
+        const limite = loginRateLimiter.consume(rateKey);
+
+        if (limite.blocked) {
+            const minutos = Math.ceil(limite.retryAfterMs / 60000);
+            throw new AppError(429, `Muitas tentativas. Tente novamente em ${minutos} minuto(s).`);
+        }
+
+        const pool = await conectar();
+        const user = await findUserById(pool, req.user.id);
+
+        if (!(await credenciaisValidas(user, senhaAtual))) {
+            throw new AppError(403, 'Senha atual incorreta.');
+        }
+
+        loginRateLimiter.reset(rateKey);
         await updateUserPassword(pool, req.user.id, novaSenha, { deveTrocarSenha: false });
+        // As outras sessoes da conta caem; a atual continua valendo.
+        await revokeOtherUserSessions(pool, req.user.id, getSessionTokenFromRequest(req));
 
         res.json({ success: true });
     } catch (error) {
@@ -126,10 +146,6 @@ router.post('/trocar-senha', requireAuth, async (req, res, next) => {
     }
 });
 
-// Confirma a senha do PROPRIO usuario logado. Serve de "portao" para acoes
-// sensiveis (ex.: excluir um colaborador) sem alterar o contrato dessas rotas:
-// o front chama isto ANTES de agir e so prossegue se der 200. Usa o mesmo
-// limitador de forca bruta do login, com chave propria.
 // Salva a preferencia "Meus setores" do PROPRIO usuario logado (nao e area
 // administrativa: cada um ajusta a propria visao). Corpo: { setores: [ids] }.
 // Lista vazia = ver todos (sem filtro). Retorna a lista ja normalizada.
@@ -145,6 +161,10 @@ router.put('/me/setores', requireAuth, async (req, res, next) => {
     }
 });
 
+// Confirma a senha do PROPRIO usuario logado. Serve de "portao" para acoes
+// sensiveis (ex.: excluir um colaborador) sem alterar o contrato dessas rotas:
+// o front chama isto ANTES de agir e so prossegue se der 200. Usa o mesmo
+// limitador de forca bruta do login, com chave propria.
 router.post('/verify-password', requireAuth, async (req, res, next) => {
     try {
         const password = String(req.body?.password || '');
@@ -153,8 +173,8 @@ router.post('/verify-password', requireAuth, async (req, res, next) => {
             throw new AppError(400, 'Informe a senha.');
         }
 
-        const rateKey = `verify|${getClientIpFromRequest(req)}|${req.user.id}`;
-        const limite = loginRateLimiter.check(rateKey);
+        const rateKey = `verify|${getClientIp(req)}|${req.user.id}`;
+        const limite = loginRateLimiter.consume(rateKey);
 
         if (limite.blocked) {
             const minutos = Math.ceil(limite.retryAfterMs / 60000);
@@ -164,8 +184,7 @@ router.post('/verify-password', requireAuth, async (req, res, next) => {
         const pool = await conectar();
         const user = await findUserById(pool, req.user.id);
 
-        if (!user || !user.ativo || !verifyPassword(password, user.passwordHash, user.passwordSalt)) {
-            loginRateLimiter.registerFailure(rateKey);
+        if (!(await credenciaisValidas(user, password))) {
             throw new AppError(403, 'Senha incorreta.');
         }
 

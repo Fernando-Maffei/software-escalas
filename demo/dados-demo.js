@@ -97,5 +97,66 @@ window.DemoDados = (function () {
             });
     }
 
-    return { SETORES, COLABORADORES, FERIADOS, escalaDoDia, diaDaSemana };
+    // Moldes de padrao semanal. O plantonista trabalha de sabado a quarta e
+    // folga quinta e sexta — e o caso que o modelo de Tipo de Escala existe
+    // para representar sem booleano nem regra no codigo.
+    function diasDoTipo(diasTrabalhados, inicio, fim, almocoInicio, almocoFim) {
+        return [0, 1, 2, 3, 4, 5, 6].map((diaSemana) => {
+            const trabalha = diasTrabalhados.includes(diaSemana);
+
+            return {
+                diaSemana,
+                trabalha,
+                trabalhoInicio: trabalha ? `${inicio}:00` : null,
+                trabalhoFim: trabalha ? `${fim}:00` : null,
+                almocoInicio: trabalha ? `${almocoInicio}:00` : null,
+                almocoFim: trabalha ? `${almocoFim}:00` : null
+            };
+        });
+    }
+
+    const TIPOS_ESCALA = [
+        {
+            id: 1,
+            nome: '5x2 Comercial',
+            cicloTipo: 'semanal',
+            domingosFolgaCada: null,
+            exigeReposicao: false,
+            ativo: true,
+            ordem: 1,
+            observacao: 'Segunda a sexta.',
+            dias: diasDoTipo([1, 2, 3, 4, 5], '08:00', '18:00', '12:00', '13:00')
+        },
+        {
+            id: 2,
+            nome: 'Plantonista Sáb-Qua',
+            cicloTipo: 'semanal',
+            domingosFolgaCada: 4,
+            exigeReposicao: true,
+            ativo: true,
+            ordem: 2,
+            observacao: 'Trabalha de sabado a quarta, folga quinta e sexta.',
+            dias: diasDoTipo([6, 0, 1, 2, 3], '13:00', '22:00', '17:00', '18:00')
+        }
+    ];
+
+    // Uma folga de domingo ja registrada, para o painel ter o que mostrar.
+    // 27/09/2026 e domingo; 01/10 e quinta, dia em que o plantonista folgaria.
+    const FOLGAS_DOMINGO = [
+        {
+            id: 1,
+            colaboradorId: 10,
+            colaboradorNome: 'Rafael Siqueira',
+            dataDomingo: '2026-09-27',
+            dataReposicao: '2026-10-01',
+            reposicaoHoraInicio: '13:00:00',
+            reposicaoHoraFim: '22:00:00',
+            reposicaoAlmocoInicio: '17:00:00',
+            reposicaoAlmocoFim: '18:00:00',
+            plantaoId: null,
+            observacao: 'Folga de domingo do mes'
+        }
+    ];
+
+    return { SETORES, COLABORADORES, FERIADOS, TIPOS_ESCALA, FOLGAS_DOMINGO, escalaDoDia, diaDaSemana };
 })();

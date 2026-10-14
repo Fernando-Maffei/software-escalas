@@ -1,11 +1,11 @@
 /* Modo demonstracao: responde as chamadas de API sem backend nem banco.
  *
- * A intercepcao e feita no fetch, e nao trocando os metodos de Js/api.js.
+ * A intercepcao e feita no fetch, e nao trocando os metodos de js/core/api.js.
  * Assim o app roda EXATAMENTE como em producao — mesma tela, mesmo fluxo,
  * mesmas rotas — e so a resposta da rede e que vem de dados ficticios. Se a
  * API mudar, aqui muda junto ou aparece no console, em vez de a demo silenciar.
  *
- * Precisa ser carregado ANTES de Js/api.js.
+ * Precisa ser carregado ANTES de js/core/api.js.
  */
 (function () {
     'use strict';
@@ -18,6 +18,45 @@
             status: status || 200,
             headers: { 'Content-Type': 'application/json' }
         }));
+    }
+
+    function isoLocal(data) {
+        return `${data.getFullYear()}-${String(data.getMonth() + 1).padStart(2, '0')}-${String(data.getDate()).padStart(2, '0')}`;
+    }
+
+    function hojeISO() {
+        return isoLocal(new Date());
+    }
+
+    function parametro(url, nome) {
+        return new URL(url, location.origin).searchParams.get(nome);
+    }
+
+    // Grade vazia no formato de GET /api/banco-horas-semanal: as ultimas
+    // semanas (segunda-feira, mais antiga primeiro) sem nenhuma celula lancada.
+    function gradeBancoHorasSemanal() {
+        const hoje = new Date();
+        const segunda = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate() - ((hoje.getDay() + 6) % 7));
+        const semanas = [];
+
+        for (let i = 3; i >= 0; i -= 1) {
+            const data = new Date(segunda.getFullYear(), segunda.getMonth(), segunda.getDate() - 7 * i);
+            const iso = isoLocal(data);
+            semanas.push({
+                semanaSegunda: iso,
+                label: iso.split('-').reverse().join('/'),
+                totalMinutos: 0,
+                totalFormatado: '0:00',
+                observacao: null,
+                celulas: {}
+            });
+        }
+
+        return {
+            periodo: { inicio: semanas[0].semanaSegunda, fim: semanas[semanas.length - 1].semanaSegunda },
+            colaboradores: D.COLABORADORES.map((c) => ({ id: c.id, nome: c.nome, setorId: c.setorId })),
+            semanas
+        };
     }
 
     // Rotas de leitura que a demo cobre. Escrita e tratada mais abaixo:
@@ -41,16 +80,21 @@
 
         [/\/api\/setores/, () => json(D.SETORES)],
 
-        [/\/api\/colaboradores$/, () => json(D.COLABORADORES.map((c) => ({
-            id: c.id,
-            nome: c.nome,
-            setorId: c.setorId,
-            setorNome: (D.SETORES.find((s) => s.id === c.setorId) || {}).nome,
-            trabalhoInicio: `${c.inicio}:00`,
-            trabalhoFim: `${c.fim}:00`,
-            almocoInicio: `${c.almoco}:00`,
-            almocoFim: null,
-            ativo: true
+        // Aceita tambem ?incluirInativos=1, que a modal de lancamentos usa para
+        // montar o diretorio de nomes (inclusive de quem foi desligado).
+        // Mesmo formato da API real: `SELECT c.*, s.Nome AS SetorNome`, entao
+        // as chaves vem com a caixa das colunas (Id, Nome, SetorId...).
+        [/\/api\/colaboradores(\?.*)?$/, () => json(D.COLABORADORES.map((c) => ({
+            Id: c.id,
+            Nome: c.nome,
+            SetorId: c.setorId,
+            SetorNome: (D.SETORES.find((s) => s.id === c.setorId) || {}).nome || null,
+            TrabalhoInicio: `${c.inicio}:00`,
+            TrabalhoFim: `${c.fim}:00`,
+            AlmocoInicio: `${c.almoco}:00`,
+            AlmocoFim: null,
+            Ativo: true,
+            DataDesligamento: null
         })))],
 
         [/\/api\/escala\/dia\/(\d{4}-\d{2}-\d{2})/, (m) => json({
@@ -58,12 +102,51 @@
             items: D.escalaDoDia(m[1])
         })],
 
+        // A demo nao tem backend para calcular os nacionais: devolve vazio e o
+        // api.js cai na BrasilAPI. Precisa vir antes da rota generica abaixo.
+        [/\/api\/feriados\/nacionais/, () => json([])],
         [/\/api\/feriados/, () => json(D.FERIADOS)],
         [/\/api\/ausencias/, () => json([])],
         [/\/api\/plantoes\/disponibilidade/, () => json({ disponiveis: D.COLABORADORES.map((c) => c.id) })],
         [/\/api\/plantoes/, () => json([])],
         [/\/api\/jornada-semanal/, () => json([])],
-        [/\/api\/banco-horas/, () => json({ itens: [], resumo: {} })],
+        [/\/api\/tipos-escala/, () => json({ total: D.TIPOS_ESCALA.length, items: D.TIPOS_ESCALA })],
+        // Filtra por data como a API real: o painel do plantao pede um domingo
+        // so, entao sem o filtro a folga apareceria em todos os domingos.
+        [/\/api\/folgas-domingo/, (m, url) => {
+            const inicio = parametro(url, 'dataInicio');
+            const fim = parametro(url, 'dataFim');
+            const itens = D.FOLGAS_DOMINGO.filter((f) => (
+                (!inicio || f.dataDomingo >= inicio || (f.dataReposicao && f.dataReposicao >= inicio))
+                && (!fim || f.dataDomingo <= fim || (f.dataReposicao && f.dataReposicao <= fim))
+            ));
+            return json({ total: itens.length, items: itens });
+        }],
+        // A grade semanal e suas sub-rotas vem ANTES de /api/banco-horas e esta
+        // e ancorada: sem isso o prefixo capturava /api/banco-horas-semanal e a
+        // tela recebia { itens, resumo } no lugar de { periodo, colaboradores, semanas }.
+        [/\/api\/banco-horas-semanal\/verificar/, (m, url) => json({
+            data: parametro(url, 'data') || hojeISO(),
+            itens: [],
+            avisos: []
+        })],
+        [/\/api\/banco-horas-semanal\/saldos/, (m, url) => json({
+            data: parametro(url, 'data') || hojeISO(),
+            saldos: []
+        })],
+        [/\/api\/banco-horas-semanal\/horas-extras/, (m, url) => json({
+            disponivel: true,
+            inicio: parametro(url, 'inicio') || `${hojeISO().slice(0, 7)}-01`,
+            fim: parametro(url, 'fim') || hojeISO(),
+            itens: [],
+            totalMinutos: 0,
+            totalFormatado: '0:00',
+            totalColaboradores: 0,
+            totalDias: 0,
+            avisos: []
+        })],
+        [/\/api\/banco-horas-semanal(\?.*)?$/, () => json(gradeBancoHorasSemanal())],
+        [/\/api\/banco-horas(\/|\?|$)/, () => json({ itens: [], resumo: {} })],
         [/\/api\/usuarios/, () => json([])],
 
         // O relatorio alimenta a faixa da semana; devolve os 7 dias montados

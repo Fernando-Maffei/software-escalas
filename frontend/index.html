@@ -12,7 +12,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Escalas">
   <link rel="apple-touch-icon" href="assets/branding/icon-192.png">
-  <link rel="stylesheet" href="style.css?v=1.6.11">
+  <link rel="stylesheet" href="style.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
@@ -110,6 +110,10 @@
       <p>Este acesso usa uma senha gerada automaticamente. Defina uma nova senha para continuar.</p>
     </div>
     <form id="trocarSenhaForm" class="login-form">
+      <div class="form-group">
+        <label for="senhaAtualInput">Senha temporaria (a que voce acabou de usar)</label>
+        <input type="password" id="senhaAtualInput" class="form-control" autocomplete="current-password" required>
+      </div>
       <div class="form-group">
         <label for="novaSenhaInput">Nova senha</label>
         <input type="password" id="novaSenhaInput" class="form-control" minlength="8" autocomplete="new-password" required>
@@ -251,211 +255,199 @@
 </div>
 
 <!-- MODAIS - DEPOIS DO CONTEÚDO PRINCIPAL -->
-<div id="modalLancamento" class="modal hidden">
-    <div class="modal-content">
-        <div class="modal-header">
-            <h3><i class="fas fa-calendar-alt"></i> Gerenciar Lançamentos</h3>
-            <button class="modal-close" id="fecharModalLancamentoBtn">&times;</button>
-        </div>
-        
-        <div class="modal-body">
-            <div class="modal-columns">
-                <!-- COLUNA ESQUERDA: Listagem -->
-                <div class="list-column">
-                    <!-- Abas -->
-                    <div class="list-tabs">
-                        <button class="tab-btn active" data-tab="pessoal" id="tabPessoal">
-                            <i class="fas fa-users"></i>
-                            <span>Pessoal</span>
-                        </button>
-                        <button class="tab-btn" data-tab="feriados" id="tabFeriados">
-                            <i class="fas fa-city"></i>
-                            <span>Feriados</span>
-                        </button>
-                    </div>
-                    
-                    <!-- Loading State -->
-                    <div id="loadingLancamentos" class="loading-state">
-                        <i class="fas fa-spinner fa-spin"></i>
-                        <p>Carregando lançamentos...</p>
-                    </div>
-                    
-                    <!-- Lista de Lançamentos Pessoais -->
-                    <div id="listaPessoalContainer" class="tab-content active">
-                        <h4 class="section-title">
-                            <i class="fas fa-list"></i>
-                            Lançamentos Pessoais
-                        </h4>
-                        <div id="listaPessoal" class="lancamentos-list"></div>
-                    </div>
-                    
-                    <!-- Lista de Feriados -->
-                    <div id="listaFeriadosContainer" class="tab-content">
-                        <h4 class="section-title">
-                            <i class="fas fa-list"></i>
-                            Feriados
-                        </h4>
-                        <div id="listaFeriados" class="lancamentos-list"></div>
-                    </div>
-                    
-                    <!-- Empty State -->
-                    <div id="emptyLancamentos" class="empty-state hidden">
-                        <i class="fas fa-calendar-times"></i>
-                        <p>Nenhum lançamento encontrado</p>
-                        <small>Clique em "Novo Lançamento" para adicionar</small>
-                    </div>
-                </div>
+<!-- MODAL DE LANÇAMENTOS (reconstruída — ver frontend/js/telas/lancamentos.js) -->
+<div id="modalLancamento" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="lcTitulo">
+    <div class="modal-content lc-modal">
 
-                <!-- COLUNA DIREITA: Formulário -->
-                <div class="form-column">
-                    <div class="form-section">
-                        <h4 class="form-titulo" id="formTitulo">
-                            <i class="fas fa-pen"></i>
-                            Novo Lançamento
-                        </h4>
-                        
-                        <!-- Tipo de Lançamento -->
-                        <div class="form-group">
-                            <label>
-                                <i class="fas fa-tag"></i>
-                                Tipo
-                            </label>
-                            <select id="tipoLancamento" class="form-control">
-                                <option value="folga">Folga</option>
-                                <option value="ausencia">Ausência</option>
-                                <option value="ferias">Férias</option>
-                                <option value="feriado">Feriado</option>
-                            </select>
-                        </div>
-
-                        <!-- Campos para Pessoal -->
-                        <div id="camposPessoal">
-                            <div class="form-group">
-                                <label>
-                                    <i class="fas fa-user"></i>
-                                    Colaborador
-                                </label>
-                                <select id="colaboradorSelect" class="form-control">
-                                    <option value="">Selecione um colaborador</option>
-                                </select>
-                            </div>
-
-                            <div class="form-group">
-                                <label>
-                                    <i class="fas fa-clock"></i>
-                                    Tipo de Período
-                            </label>
-                            <select id="periodoTipo" class="form-control">
-                                    <option value="dia_inteiro">Dia inteiro</option>
-                                    <option value="horas">Horas específicas</option>
-                            </select>
-                        </div>
-                        </div>
-
-                        <!-- Campos para Feriado -->
-                        <div id="camposFeriado" class="hidden">
-                            <div class="form-group">
-                                <label>
-                                    <i class="fas fa-map-marker-alt"></i>
-                                    Abrangência
-                            </label>
-                            <select id="feriadoTipo" class="form-control">
-                                    <option value="municipal">Municipal</option>
-                                    <option value="estadual">Estadual</option>
-                            </select>
-                        </div>
-                        </div>
-
-                        <!-- Datas -->
-                        <div class="form-group">
-                            <label>
-                                <i class="fas fa-calendar-day"></i>
-                                Data Início
-                            </label>
-                            <input type="date" id="dataInicio" class="form-control">
-                        </div>
-
-                        <div class="form-group">
-                            <label>
-                                <i class="fas fa-calendar-check"></i>
-                                Data Fim
-                            </label>
-                            <input type="date" id="dataFim" class="form-control">
-                        </div>
-
-                        <!-- Campos de Hora (condicional) -->
-                        <div id="camposHora" class="conditional-fields hidden">
-                            <div class="form-row">
-                                <div class="form-group">
-                                    <label>Início</label>
-                                    <input type="time" id="horaInicio" class="form-control">
-                                </div>
-                                <div class="form-group">
-                                    <label>Fim</label>
-                                    <input type="time" id="horaFim" class="form-control">
-                                </div>
-                            </div>
-                        </div>
-
-                        <div id="camposBancoHorasPessoal" class="conditional-fields">
-                            <div class="form-group">
-                                <label>
-                                    <i class="fas fa-stethoscope"></i>
-                                    Subtipo
-                                </label>
-                                <select id="ausenciaSubtipo" class="form-control">
-                                    <option value="comum">Comum</option>
-                                    <option value="medico">Medico / atestado</option>
-                                    <option value="particular">Particular</option>
-                                    <option value="compensacao">Compensacao</option>
-                                    <option value="outro">Outro</option>
-                                </select>
-                            </div>
-
-                            <label class="checkbox-inline banco-horas-toggle">
-                                <input type="checkbox" id="descontaBancoHoras" checked>
-                                <span>Descontar do banco de horas</span>
-                            </label>
-                            <small id="descontaBancoHorasHint" class="helper-text">
-                                Folga e ausencia descontam por padrao. Lancamentos medicos podem ficar sem desconto.
-                            </small>
-
-                            <div class="form-group">
-                                <label>
-                                    <i class="fas fa-align-left"></i>
-                                    Observacao
-                                </label>
-                                <textarea id="observacaoLancamento" class="form-control" rows="3"
-                                          placeholder="Detalhes opcionais para o historico do banco de horas"></textarea>
-                            </div>
-                        </div>
-
-                        <!-- Nome do Feriado (condicional) -->
-                        <div id="campoNomeFeriado" class="conditional-fields hidden">
-                            <div class="form-group">
-                                <label>
-                                    <i class="fas fa-tag"></i>
-                                    Nome do Feriado
-                                </label>
-                                <input type="text" id="feriadoNome" class="form-control" 
-                                       placeholder="Ex: Aniversário da Cidade">
-                            </div>
-                        </div>
-
-                        <!-- Botões de ação -->
-                        <div class="form-actions">
-                            <button id="salvarLancamentoBtn" class="btn-primary full-width">
-                                <i class="fas fa-save"></i>
-                                Salvar
-                            </button>
-                            <button id="cancelarEdicaoLancamentoBtn" class="btn-secondary full-width hidden">
-                                <i class="fas fa-times"></i>
-                                Cancelar Edição
-                            </button>
-                        </div>
-                    </div>
+        <header class="lc-header">
+            <div class="lc-header-ident">
+                <span class="lc-header-icon" aria-hidden="true"><i class="fas fa-calendar-check"></i></span>
+                <div class="lc-header-texto">
+                    <h3 id="lcTitulo">Lançamentos</h3>
+                    <p class="lc-header-sub" id="lcEscopoLabel">Carregando…</p>
                 </div>
             </div>
+            <button type="button" class="lc-close" id="fecharModalLancamentoBtn" aria-label="Fechar">
+                <i class="fas fa-xmark"></i>
+            </button>
+        </header>
+
+        <div class="lc-body">
+
+            <!-- ===== COLUNA ESQUERDA: LISTA ===== -->
+            <section class="lc-list-pane" aria-label="Lançamentos do período">
+                <div class="lc-toolbar">
+                    <div class="lc-segmented" role="tablist" aria-label="Tipo de lançamento">
+                        <button type="button" class="tab-btn active" id="tabPessoal" data-tab="pessoal"
+                                role="tab" aria-selected="true" aria-controls="listaPessoalContainer">
+                            <i class="fas fa-user-group" aria-hidden="true"></i>
+                            <span>Pessoal</span>
+                            <em class="lc-count" id="lcCountPessoal">0</em>
+                        </button>
+                        <button type="button" class="tab-btn" id="tabFeriados" data-tab="feriados"
+                                role="tab" aria-selected="false" aria-controls="listaFeriadosContainer">
+                            <i class="fas fa-calendar-day" aria-hidden="true"></i>
+                            <span>Feriados</span>
+                            <em class="lc-count" id="lcCountFeriados">0</em>
+                        </button>
+                    </div>
+
+                    <div class="lc-filtros">
+                        <div class="lc-search">
+                            <i class="fas fa-magnifying-glass" aria-hidden="true"></i>
+                            <input type="search" id="lcBusca" placeholder="Buscar por nome…"
+                                   autocomplete="off" aria-label="Buscar lançamento">
+                        </div>
+                        <div class="lc-scope" id="lcScope" role="group" aria-label="Período exibido">
+                            <button type="button" class="lc-scope-btn" data-escopo="dia">Este dia</button>
+                            <button type="button" class="lc-scope-btn is-active" data-escopo="mes">Mês todo</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="lc-avisos">
+                    <p class="lc-aviso lc-aviso--alerta hidden" id="lcAvisoDuplicados" role="status"></p>
+                    <p class="lc-aviso hidden" id="lcAvisoInativos" role="status"></p>
+                </div>
+
+                <div class="lc-list-scroll">
+                    <div id="loadingLancamentos" class="lc-skeleton hidden" aria-hidden="true">
+                        <div class="lc-skeleton-card"></div>
+                        <div class="lc-skeleton-card"></div>
+                        <div class="lc-skeleton-card"></div>
+                    </div>
+
+                    <div id="listaPessoalContainer" class="tab-content active" role="tabpanel" aria-labelledby="tabPessoal">
+                        <div id="listaPessoal" class="lancamentos-list"></div>
+                    </div>
+
+                    <div id="listaFeriadosContainer" class="tab-content" role="tabpanel" aria-labelledby="tabFeriados">
+                        <div id="listaFeriados" class="lancamentos-list"></div>
+                    </div>
+
+                    <!-- Estado vazio agora é renderizado dentro de cada lista pelo JS. -->
+                    <div id="emptyLancamentos" class="lc-state hidden"></div>
+                </div>
+            </section>
+
+            <!-- ===== COLUNA DIREITA: FORMULÁRIO ===== -->
+            <aside class="lc-form-pane" id="lcFormPane" aria-label="Formulário de lançamento">
+                <div class="lc-form-head">
+                    <h4 id="formTitulo"><i class="fas fa-user-clock"></i> Novo lançamento</h4>
+                    <span class="lc-edit-chip hidden" id="lcEditChip"><i class="fas fa-pen"></i> Editando</span>
+                </div>
+
+                <div class="lc-form-scroll">
+                    <div class="lc-field">
+                        <label for="tipoLancamento">Tipo</label>
+                        <select id="tipoLancamento" class="form-control">
+                            <option value="folga">Folga</option>
+                            <option value="ausencia">Ausência</option>
+                            <option value="ferias">Férias</option>
+                            <option value="feriado">Feriado</option>
+                        </select>
+                    </div>
+
+                    <!-- Campos de lançamento pessoal -->
+                    <div id="camposPessoal">
+                        <div class="lc-field">
+                            <label for="colaboradorSelect">Colaborador</label>
+                            <select id="colaboradorSelect" class="form-control">
+                                <option value="">Selecione um colaborador</option>
+                            </select>
+                        </div>
+
+                        <div class="lc-field">
+                            <label for="periodoTipo">Período</label>
+                            <select id="periodoTipo" class="form-control">
+                                <option value="dia_inteiro">Dia inteiro</option>
+                                <option value="horas">Horas específicas</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Campos de feriado -->
+                    <div id="camposFeriado" class="hidden">
+                        <div class="lc-field">
+                            <label for="feriadoTipo">Abrangência</label>
+                            <select id="feriadoTipo" class="form-control">
+                                <option value="municipal">Municipal</option>
+                                <option value="estadual">Estadual</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="lc-field-row">
+                        <div class="lc-field">
+                            <label for="dataInicio">Data início</label>
+                            <input type="date" id="dataInicio" class="form-control">
+                        </div>
+                        <div class="lc-field" id="lcCampoDataFim">
+                            <label for="dataFim">Data fim</label>
+                            <input type="date" id="dataFim" class="form-control">
+                        </div>
+                    </div>
+
+                    <div id="camposHora" class="conditional-fields hidden">
+                        <div class="lc-field-row">
+                            <div class="lc-field">
+                                <label for="horaInicio">Hora início</label>
+                                <input type="time" id="horaInicio" class="form-control">
+                            </div>
+                            <div class="lc-field">
+                                <label for="horaFim">Hora fim</label>
+                                <input type="time" id="horaFim" class="form-control">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Banco de horas (comportamento em js/core/runtime/plantao-colaboradores/banco-horas-lancamento.js) -->
+                    <div id="camposBancoHorasPessoal" class="conditional-fields">
+                        <div class="lc-field" id="lcCampoSubtipo">
+                            <label for="ausenciaSubtipo">Subtipo</label>
+                            <select id="ausenciaSubtipo" class="form-control">
+                                <option value="comum">Comum</option>
+                                <option value="medico">Médico / atestado</option>
+                                <option value="particular">Particular</option>
+                                <option value="compensacao">Compensação</option>
+                                <option value="outro">Outro</option>
+                            </select>
+                        </div>
+
+                        <label class="checkbox-inline banco-horas-toggle" for="descontaBancoHoras">
+                            <input type="checkbox" id="descontaBancoHoras" checked>
+                            <span>Descontar do banco de horas</span>
+                        </label>
+                        <small id="descontaBancoHorasHint" class="helper-text">
+                            Folga e ausência descontam por padrão. Lançamentos médicos podem ficar sem desconto.
+                        </small>
+
+                        <div class="lc-field">
+                            <label for="observacaoLancamento">Observação</label>
+                            <textarea id="observacaoLancamento" class="form-control" rows="3"
+                                      placeholder="Detalhes opcionais para o histórico do banco de horas"></textarea>
+                        </div>
+                    </div>
+
+                    <div id="campoNomeFeriado" class="conditional-fields hidden">
+                        <div class="lc-field">
+                            <label for="feriadoNome">Nome do feriado</label>
+                            <input type="text" id="feriadoNome" class="form-control"
+                                   placeholder="Ex.: Aniversário da cidade">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="lc-form-actions">
+                    <button type="button" id="salvarLancamentoBtn" class="btn-primary full-width">
+                        <i class="fas fa-plus"></i> Salvar
+                    </button>
+                    <button type="button" id="cancelarEdicaoLancamentoBtn" class="btn-secondary full-width hidden">
+                        <i class="fas fa-xmark"></i> Cancelar edição
+                    </button>
+                </div>
+            </aside>
+
         </div>
     </div>
 </div>
@@ -526,6 +518,10 @@
         <div class="modal-body">
             <form id="modalTrocarSenhaForm">
                 <div class="form-group">
+                    <label>Senha atual</label>
+                    <input type="password" id="modalSenhaAtualInput" class="form-control" autocomplete="current-password" required>
+                </div>
+                <div class="form-group">
                     <label>Nova senha</label>
                     <input type="password" id="modalNovaSenhaInput" class="form-control" minlength="8" autocomplete="new-password" required>
                 </div>
@@ -547,168 +543,8 @@
     </div>
 </div>
 
-<!-- MODAL DE HORÁRIOS -->
-<div id="modalHorario" class="modal hidden">
-    <div class="modal-content">
-        <div class="modal-header">
-            <h3><i class="fas fa-clock"></i> Editar Horários</h3>
-            <button class="modal-close" id="fecharModalHorarioBtn">&times;</button>
-        </div>
-        
-        <div class="modal-body">
-            <h4 id="modalNome" style="margin-bottom: 20px; color: var(--primary);"></h4>
-            
-            <div class="form-group">
-                <label>Início do Trabalho</label>
-                <input type="time" id="modalTrabInicio" class="form-control">
-            </div>
-            
-            <div class="form-group">
-                <label>Fim do Trabalho</label>
-                <input type="time" id="modalTrabFim" class="form-control">
-            </div>
-            
-            <div class="form-group">
-                <label>Início do Almoço</label>
-                <input type="time" id="modalAlmInicio" class="form-control">
-            </div>
-            
-            <div class="form-group">
-                <label>Fim do Almoço</label>
-                <input type="time" id="modalAlmFim" class="form-control">
-            </div>
-        </div>
 
-        <div class="modal-actions">
-            <button onclick="salvarHorarioModal()" class="btn-primary">
-                <i class="fas fa-save"></i> Salvar
-            </button>
-            <button id="fecharModalHorarioBtn2" class="btn-secondary">
-                <i class="fas fa-times"></i> Cancelar
-            </button>
-        </div>
-    </div>
-</div>
-
-<script src="Js/auth.js?v=1.6.3"></script>
-<script src="Js/meus-setores.js?v=1.6.3"></script>
-<script src="Js/api.js?v=1.6.11"></script>
-<script src="Js/calendar.js?v=1.6.3"></script>
-<script src="Js/dashboard.js?v=1.6.3"></script>
-<script src="Js/app.js?v=1.6.11"></script>
-<script src="Js/banco-horas.js?v=1.6.8"></script>
-<script src="Js/lancamentos.js?v=1.6.3"></script>
-<script src="Js/escala-report-utils.js?v=1.6.3"></script>
-<script src="Js/configuracoes-backup.js?v=1.6.3"></script>
-<script src="Js/configuracoes-usuarios.js?v=1.6.8"></script>
-<script src="Js/pdf-utils.js?v=1.6.3"></script>
-<script src="Js/escala-dia-shared.js?v=1.6.3"></script>
-<script src="Js/escala-dia-editor.js?v=1.6.3"></script>
-<script src="Js/escala-relatorio.js?v=1.6.3"></script>
-<script src="Js/runtime-fixes.js?v=1.6.11"></script>
-<script src="Js/permissoes.js?v=1.6.3"></script>
-
-<script>
-    document.addEventListener('DOMContentLoaded', function() {
-        setTimeout(() => {
-            const loading = document.querySelector('.loading-indicator');
-            if (loading) loading.style.display = 'none';
-        }, 500);
-    });
-</script>
-
-<script>
-    (function() {
-        console.log('Inicializando sidebar...');
-        
-        document.addEventListener('DOMContentLoaded', function() {
-            // ===== NAVEGAÇÃO DOS BOTÕES =====
-            const sidebarBtns = document.querySelectorAll('.sidebar-btn');
-            
-            sidebarBtns.forEach(btn => {
-                btn.addEventListener('click', function(e) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    
-                    const page = this.dataset.page;
-                    console.log('Botão clicado:', page);
-                    
-                    // Remove active de todos
-                    sidebarBtns.forEach(b => b.classList.remove('active'));
-                    
-                    // Adiciona active no clicado
-                    this.classList.add('active');
-                    
-                    // Chama a função carregarPagina
-                    if (typeof window.carregarPagina === 'function') {
-                        window.carregarPagina(page);
-                    } else if (typeof carregarPagina === 'function') {
-                        carregarPagina(page);
-                    } else {
-                        console.error('Função carregarPagina não encontrada!');
-                    }
-                });
-            });
-            
-            // Função para ativar botão por página
-            window.setActiveButton = function(page) {
-                sidebarBtns.forEach(btn => {
-                    if (btn.dataset.page === page) {
-                        btn.classList.add('active');
-                    } else {
-                        btn.classList.remove('active');
-                    }
-                });
-            };
-        });
-    })();
-</script>
-
-<script>
-  (function () {
-    document.addEventListener('DOMContentLoaded', function () {
-      const toggleBtn = document.getElementById('toggleMainSidebar');
-
-      if (!toggleBtn) return;
-
-      document.body.classList.add('sidebar-no-transition');
-
-      const estadoSalvo = localStorage.getItem('mainSidebarCollapsed');
-
-      if (estadoSalvo === 'true') {
-        document.body.classList.add('main-sidebar-collapsed');
-        toggleBtn.title = 'Expandir menu';
-      } else {
-        document.body.classList.remove('main-sidebar-collapsed');
-        toggleBtn.title = 'Recolher menu';
-      }
-
-      setTimeout(function () {
-        document.body.classList.remove('sidebar-no-transition');
-      }, 100);
-
-      toggleBtn.addEventListener('click', function (e) {
-        e.preventDefault();
-        e.stopPropagation();
-
-        document.body.classList.add('sidebar-is-animating');
-
-        const vaiRecolher = !document.body.classList.contains('main-sidebar-collapsed');
-
-        document.body.classList.toggle('main-sidebar-collapsed', vaiRecolher);
-
-        localStorage.setItem('mainSidebarCollapsed', vaiRecolher ? 'true' : 'false');
-
-        toggleBtn.title = vaiRecolher ? 'Expandir menu' : 'Recolher menu';
-
-        setTimeout(function () {
-          document.body.classList.remove('sidebar-is-animating');
-          window.dispatchEvent(new Event('resize'));
-        }, 340);
-      });
-    });
-  })();
-</script>
+<script type="module" src="js/main.js"></script>
 
 </body>
 </html>

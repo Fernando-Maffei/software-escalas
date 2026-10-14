@@ -1,0 +1,311 @@
+/* ===========================================================
+   FOLGA DE DOMINGO (painel dentro de Lancar Plantao)
+   -----------------------------------------------------------
+   Arquivo proprio em vez de crescer plantao.css, que ja passa de
+   mil linhas. Usa os tokens de tema (--surface-raised, --border,
+   --text-light), que themes.css redefine por tema.
+   =========================================================== */
+
+.folga-domingo-bloco {
+    border-top: 1px dashed var(--border);
+    padding-top: 14px;
+    margin-top: 6px;
+}
+
+.folga-domingo-lista {
+    display: grid;
+    gap: 6px;
+    margin: 10px 0;
+}
+
+.folga-domingo-vazio {
+    padding: 12px;
+    border: 1px dashed var(--border);
+    border-radius: 10px;
+    color: var(--text-light);
+    font-size: 12px;
+    text-align: center;
+}
+
+.folga-domingo-item {
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--surface-raised);
+}
+
+.folga-domingo-item.is-editando {
+    border-color: var(--primary);
+}
+
+.folga-domingo-item-topo {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.folga-domingo-item-acoes {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+}
+
+.folga-domingo-item strong {
+    font-size: 13px;
+    color: var(--text);
+}
+
+.folga-domingo-item p {
+    margin: 2px 0 0;
+    font-size: 12px;
+    color: var(--text-light);
+}
+
+.folga-domingo-obs {
+    font-style: italic;
+}
+
+/* Estado da reposicao no cartao. Pendente e ambar (falta fazer), marcada e
+   verde (resolvida) — nenhum dos dois e erro. */
+.folga-domingo-chip {
+    display: inline-block;
+    margin-top: 6px;
+    padding: 2px 8px;
+    border-radius: 8px;
+    font-size: 11px;
+    font-weight: 600;
+}
+
+.folga-domingo-chip--pendente {
+    background: var(--warning-soft, #fef3c7);
+    color: var(--warning-text, #92500e);
+}
+
+.folga-domingo-chip--marcada {
+    background: var(--success-soft, #dcfce7);
+    color: var(--success-text, #14532d);
+}
+
+/* Botoes menores que o padrao: cabem no cartao sem quebrar a linha. */
+.folga-domingo-btn {
+    padding: 6px 10px;
+    font-size: 12px;
+    white-space: nowrap;
+}
+
+.folga-domingo-acoes {
+    display: flex;
+    gap: 6px;
+}
+
+.folga-domingo-edicao {
+    display: grid;
+    gap: 10px;
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px dashed var(--border);
+}
+
+.folga-domingo-reposicao {
+    grid-column: 1 / -1;
+    display: grid;
+    gap: 10px;
+}
+
+.folga-domingo-dica {
+    margin: 0;
+    font-size: 11px;
+    color: var(--text-light);
+}
+
+/* Recusa do servidor (ferias, ajuste manual...): fica junto do botao, com o
+   motivo, e o formulario segue preenchido. */
+.folga-domingo-aviso {
+    grid-column: 1 / -1;
+    padding: 8px 10px;
+    border-radius: 8px;
+    background: var(--warning-soft, #fef3c7);
+    color: var(--warning-text, #92500e);
+    font-size: 12px;
+}
+
+.folga-domingo-aviso[hidden],
+.folga-domingo-reposicao[hidden],
+.folga-domingo-dica[hidden] {
+    display: none;
+}
+
+.folga-domingo-opcoes {
+    display: flex;
+    gap: 6px;
+}
+
+.folga-domingo-opcao {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 9px 10px;
+    border: 1.5px solid var(--border);
+    border-radius: 10px;
+    font-size: 13px;
+    cursor: pointer;
+    background: var(--surface-raised);
+    color: var(--text);
+}
+
+.folga-domingo-opcao input {
+    accent-color: var(--primary);
+}
+
+.folga-domingo-opcao.is-ativa {
+    border-color: var(--primary);
+    background: var(--primary-soft);
+}
+
+/* ---------------------------------------------------------------------
+Aba "Pendencias" da tela de plantoes: uma secao por tipo de pendencia, cada
+linha com a etiqueta de espera e o botao que resolve.
+--------------------------------------------------------------------- */
+.pendencias-secao {
+    margin-bottom: 16px;
+    padding: 14px 16px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--surface-raised);
+}
+
+.pendencias-titulo {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.pendencias-titulo h4 {
+    margin: 0;
+    font-size: 14px;
+    color: var(--text);
+}
+
+.pendencias-contagem {
+    padding: 1px 8px;
+    border-radius: 8px;
+    background: var(--warning-soft, #fef3c7);
+    color: var(--warning-text, #92500e);
+    font-size: 11px;
+    font-weight: 700;
+}
+
+.pendencias-contagem.is-zero {
+    background: var(--success-soft, #dcfce7);
+    color: var(--success-text, #14532d);
+}
+
+.pendencias-sub {
+    margin: 4px 0 6px;
+    font-size: 12px;
+    color: var(--text-light);
+}
+
+.pendencias-vazio {
+    margin: 0;
+    padding: 12px 0 4px;
+    font-size: 12px;
+    color: var(--text-light);
+}
+
+.pendencias-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 9px 0;
+    border-top: 1px solid var(--border);
+}
+
+.pendencias-item strong {
+    font-size: 13px;
+    color: var(--text);
+}
+
+.pendencias-item p {
+    margin: 2px 0 0;
+    font-size: 12px;
+    color: var(--text-light);
+}
+
+.pendencias-tag {
+    display: inline-block;
+    margin-left: 6px;
+    padding: 2px 8px;
+    border-radius: 8px;
+    font-size: 11px;
+    font-weight: 600;
+    vertical-align: 1px;
+}
+
+.pendencias-tag--espera {
+    background: var(--warning-soft, #fef3c7);
+    color: var(--warning-text, #92500e);
+}
+
+.pendencias-tag--atraso {
+    background: var(--danger-soft, #fee2e2);
+    color: var(--danger, #b91c1c);
+}
+
+.pendencias-tag--neutra {
+    background: var(--bg-soft, #f1f5f9);
+    color: var(--text-light);
+}
+
+/* Selo da aba Pendencias: ambar, tambem com a aba ativa (senao sumiria no azul). */
+.plantao-aba .plantao-aba-contagem--alerta,
+.plantao-aba.is-ativa .plantao-aba-contagem--alerta {
+    background: var(--warning, #e0973a);
+    color: #fff;
+}
+
+.plantao-aba-contagem[hidden] {
+    display: none;
+}
+
+/* ---------------------------------------------------------------------
+"Repor domingo" na barra da Escala do Dia: botao de icone com a contagem de
+folgas aguardando reposicao, e o dialogo que grava o dia como reposicao.
+--------------------------------------------------------------------- */
+.escala-acao-com-badge {
+    position: relative;
+}
+
+.escala-acao-com-badge[hidden] {
+    display: none !important;
+}
+
+.escala-acao-badge {
+    position: absolute;
+    top: -6px;
+    right: -6px;
+    min-width: 18px;
+    padding: 0 5px;
+    border-radius: 9px;
+    background: var(--warning, #e0973a);
+    color: #fff;
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 18px;
+    text-align: center;
+}
+
+.reposicao-modal-content {
+    width: 440px;
+    max-width: calc(100vw - 32px);
+}
+
+.reposicao-modal-corpo {
+    display: grid;
+    gap: 14px;
+}

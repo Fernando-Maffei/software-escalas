@@ -1,10 +1,9 @@
 const express = require('express');
 
 const { sql, conectar } = require('../db');
-const { withTransaction } = require('../utils/transactions');
-const { AppError } = require('../utils/errors');
-const { getSchemaInfo } = require('../utils/schema');
-const { getSetoresPermitidosRequest, idsPermitidosNumericos } = require('../utils/acesso-setores');
+const { withTransaction, withTransactionDescartada } = require('../db/transactions');
+const { AppError } = require('../lib/errors');
+const { getSetoresPermitidosRequest, idsPermitidosNumericos } = require('../auth/acesso-setores');
 const {
     applyLunchPeriod,
     ensureEscalaDiaForPeriod,
@@ -14,16 +13,18 @@ const {
     normalizeEscalaTipo,
     resetEscalaLunchesToCadastro,
     upsertManualEscalaDia
-} = require('../utils/escala');
+} = require('../services/escala');
 const {
     buildDateRange,
     ensurePositiveInt,
     normalizeIsoDate,
     normalizeNullableTime,
     normalizeOptionalText
-} = require('../utils/validation');
+} = require('../lib/validation');
 
 const router = express.Router();
+
+const MAX_DIAS_RELATORIO = 366;
 
 function parseManualEscalaPayload(req) {
     return {
@@ -83,13 +84,14 @@ function parseRebuildPeriodPayload(body = {}) {
 
 router.get('/dia/:dataISO', async (req, res) => {
     const pool = await conectar();
-    const schema = await getSchemaInfo(pool);
     const dataISO = normalizeIsoDate(req.params.dataISO, 'Data');
     const setorId = req.query.setorId
         ? ensurePositiveInt(req.query.setorId, 'Setor')
         : null;
 
-    const items = await withTransaction(sql, pool, async (tx) => listEscalaDiaByDate(tx, schema, dataISO, {
+    // Leitura: gera a escala do dia numa transacao descartada — a resposta e a
+    // mesma, e nada fica gravado (ver withTransactionDescartada).
+    const items = await withTransactionDescartada(sql, pool, async (tx) => listEscalaDiaByDate(tx, dataISO, {
         setorId
     }));
 
@@ -121,13 +123,18 @@ async function filtrarItensPorSetoresPermitidos(pool, req, items) {
 
 router.get('/relatorio', async (req, res) => {
     const pool = await conectar();
-    const schema = await getSchemaInfo(pool);
 
     if (!req.query.dataInicio || !req.query.dataFim) {
         throw new AppError(400, 'Informe dataInicio e dataFim para gerar o relatorio de escala.');
     }
 
-    const { dataInicio, dataFim } = buildDateRange(req.query.dataInicio, req.query.dataFim);
+    // A leitura gera a escala do periodo inteiro (ensureEscalaDiaForPeriod),
+    // numa transacao descartada, e qualquer conta, ate a de visualizacao, chama
+    // esta rota: nada fica gravado, mas o trabalho cresce com o periodo. Um ano
+    // basta para o quadro mensal, a semana e o relatorio detalhado.
+    const { dataInicio, dataFim } = buildDateRange(req.query.dataInicio, req.query.dataFim, {
+        maxDias: MAX_DIAS_RELATORIO
+    });
     const colaboradorId = req.query.colaboradorId
         ? ensurePositiveInt(req.query.colaboradorId, 'Colaborador')
         : null;
@@ -138,7 +145,7 @@ router.get('/relatorio', async (req, res) => {
         ? normalizeEscalaTipo(req.query.tipo)
         : null;
 
-    const items = await withTransaction(sql, pool, async (tx) => listEscalaReport(tx, schema, {
+    const items = await withTransactionDescartada(sql, pool, async (tx) => listEscalaReport(tx, {
         dataInicio,
         dataFim,
         colaboradorId,
@@ -161,10 +168,9 @@ router.get('/relatorio', async (req, res) => {
 
 router.put('/dia/:dataISO/colaborador/:colaboradorId', async (req, res) => {
     const pool = await conectar();
-    const schema = await getSchemaInfo(pool);
     const payload = parseManualEscalaPayload(req);
 
-    const record = await withTransaction(sql, pool, async (tx) => upsertManualEscalaDia(tx, schema, payload));
+    const record = await withTransaction(sql, pool, async (tx) => upsertManualEscalaDia(tx, payload));
 
     res.json({
         message: 'Escala diaria atualizada com sucesso!',
@@ -175,10 +181,9 @@ router.put('/dia/:dataISO/colaborador/:colaboradorId', async (req, res) => {
 
 router.put('/almoco-periodo', async (req, res) => {
     const pool = await conectar();
-    const schema = await getSchemaInfo(pool);
     const payload = parseLunchPeriodPayload(req.body);
 
-    const result = await withTransaction(sql, pool, async (tx) => applyLunchPeriod(tx, schema, payload));
+    const result = await withTransaction(sql, pool, async (tx) => applyLunchPeriod(tx, payload));
 
     res.json({
         message: 'Horario de almoco aplicado no periodo com sucesso!',
@@ -192,13 +197,12 @@ router.put('/almoco-periodo', async (req, res) => {
 
 router.put('/dia/:dataISO/almocos/cadastro', async (req, res) => {
     const pool = await conectar();
-    const schema = await getSchemaInfo(pool);
     const dataISO = normalizeIsoDate(req.params.dataISO, 'Data');
     const setorId = req.body?.setorId
         ? ensurePositiveInt(req.body.setorId, 'Setor')
         : null;
 
-    const result = await withTransaction(sql, pool, async (tx) => resetEscalaLunchesToCadastro(tx, schema, dataISO, {
+    const result = await withTransaction(sql, pool, async (tx) => resetEscalaLunchesToCadastro(tx, dataISO, {
         setorId
     }));
 
@@ -215,14 +219,13 @@ router.put('/dia/:dataISO/almocos/cadastro', async (req, res) => {
 
 router.post('/rebuild', async (req, res) => {
     const pool = await conectar();
-    const schema = await getSchemaInfo(pool);
 
     const { dataInicio, dataFim } = parseRebuildPeriodPayload(req.body || {});
     const colaboradorId = req.body.colaboradorId
         ? ensurePositiveInt(req.body.colaboradorId, 'Colaborador')
         : null;
 
-    const result = await withTransaction(sql, pool, async (tx) => ensureEscalaDiaForPeriod(tx, schema, dataInicio, dataFim, {
+    const result = await withTransaction(sql, pool, async (tx) => ensureEscalaDiaForPeriod(tx, dataInicio, dataFim, {
         colaboradorId
     }));
     const rows = Array.from(result.existingMap?.values?.() || []);

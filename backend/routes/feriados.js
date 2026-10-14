@@ -2,13 +2,14 @@ const express = require('express');
 const router = express.Router();
 
 const { sql, conectar } = require('../db');
-const { AppError } = require('../utils/errors');
+const { AppError } = require('../lib/errors');
+const { feriadosNacionaisDoAno, nomeFeriadoNacional } = require('../services/feriados-nacionais');
 const {
     ensurePositiveInt,
     extractDateString,
     normalizeIsoDate,
     normalizeOptionalText
-} = require('../utils/validation');
+} = require('../lib/validation');
 
 function buildFeriadoPayload(body, fallback = {}) {
     const nome = body.nome !== undefined
@@ -32,6 +33,18 @@ function buildFeriadoPayload(body, fallback = {}) {
         data,
         tipo: tipo || 'municipal'
     };
+}
+
+// Feriado nacional nao vai para a tabela: o sistema calcula (services/
+// feriados-nacionais.js) e o front-end ja mostra a etiqueta. Cadastrar
+// tambem no banco era o que deixava o dia duplicado na tela.
+function ensureDataSemFeriadoNacional(dataISO) {
+    const nacional = nomeFeriadoNacional(dataISO);
+
+    if (nacional) {
+        const [ano, mes, dia] = String(dataISO).split('-');
+        throw new AppError(400, `${dia}/${mes}/${ano} ja e feriado nacional (${nacional}) e o sistema reconhece sozinho. Cadastre aqui somente feriado municipal ou estadual.`);
+    }
 }
 
 async function findFeriadoById(pool, id) {
@@ -103,6 +116,17 @@ router.get('/mes/:ano/:mes', async (req, res) => {
     res.json(feriados);
 });
 
+// Feriados nacionais do ano, calculados. Serve para a tela nao depender da
+// BrasilAPI e para usar a mesma lista que decide o tipo do plantao.
+router.get('/nacionais/:ano', async (req, res) => {
+    const ano = ensurePositiveInt(req.params.ano, 'Ano');
+    res.json(feriadosNacionaisDoAno(ano).map((item) => ({
+        data: item.data,
+        nome: item.nome,
+        tipo: 'nacional'
+    })));
+});
+
 router.get('/:id', async (req, res) => {
     const id = ensurePositiveInt(req.params.id, 'Feriado');
     const pool = await conectar();
@@ -116,8 +140,10 @@ router.get('/:id', async (req, res) => {
 });
 
 router.post('/', async (req, res) => {
-    const pool = await conectar();
     const payload = buildFeriadoPayload(req.body);
+    ensureDataSemFeriadoNacional(payload.data);
+
+    const pool = await conectar();
 
     const checkResult = await pool.request()
         .input('data', sql.Date, payload.data)
@@ -154,6 +180,7 @@ router.put('/:id', async (req, res) => {
     }
 
     const payload = buildFeriadoPayload(req.body, existing);
+    ensureDataSemFeriadoNacional(payload.data);
 
     const dataCheck = await pool.request()
         .input('data', sql.Date, payload.data)

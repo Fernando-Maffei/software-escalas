@@ -1,641 +1,10 @@
-/* ================= MODAL DE LANÇAMENTOS ================= */
-#modalLancamento .modal-content {
-    max-width: 1200px;
-    width: 95%;
-    background: var(--card);
-    border-radius: var(--radius-lg);
-    overflow: hidden;
-    box-shadow: var(--shadow-xl);
-    border: 1px solid var(--border);
-    max-height: 90vh;
-    display: flex;
-    flex-direction: column;
-}
+/* =====================================================================
+   MODAIS
+   ---------------------------------------------------------------------
+   O bloco de #modalLancamento saiu daqui e virou css/lancamentos.css,
+   junto com a reconstrucao da modal. Este arquivo cuida dos demais.
+   ===================================================================== */
 
-#modalLancamento .modal-header {
-    background: var(--accent);
-    padding: 12px 20px;
-}
-
-#modalLancamento .modal-header h3 {
-    font-size: 18px;
-    color: white;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-
-#modalLancamento .modal-header h3 i {
-    font-size: 20px;
-}
-
-#modalLancamento .modal-close {
-    width: 32px;
-    height: 32px;
-    border: none;
-    border-radius: 8px;
-    background: rgba(255,255,255,0.2);
-    color: white;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: var(--transition);
-}
-
-#modalLancamento .modal-close:hover {
-    background: rgba(255,255,255,0.3);
-    transform: rotate(90deg);
-}
-
-#modalLancamento .modal-body {
-    padding: 16px;
-    background: var(--bg-soft);
-    overflow-y: auto;
-    flex: 1;
-}
-
-/* ================= COLUNAS DO MODAL ================= */
-#modalLancamento .modal-columns {
-    display: flex;
-    gap: 16px;
-    min-height: 500px;
-    height: auto;
-    align-items: stretch;
-}
-
-/* Coluna esquerda - Listagem */
-#modalLancamento .list-column {
-    flex: 1.2;
-    background: var(--card);
-    border-radius: 16px;
-    padding: 16px;
-    box-shadow: var(--shadow-sm);
-    border: 1px solid var(--border);
-    display: flex;
-    flex-direction: column;
-    min-height: 500px;
-    max-height: 600px;
-}
-
-/* Coluna direita - Formulário */
-#modalLancamento .form-column {
-    width: 320px;
-    background: var(--card);
-    border-radius: 16px;
-    padding: 16px;
-    box-shadow: var(--shadow-sm);
-    border: 1px solid var(--border);
-    display: flex;
-    flex-direction: column;
-    min-height: 500px;
-}
-
-/* ================= ABAS DE NAVEGAÇÃO ================= */
-#modalLancamento .list-tabs {
-    display: flex;
-    gap: 6px;
-    margin-bottom: 12px;
-    padding: 3px;
-    background: var(--card-dark);
-    border-radius: 10px;
-}
-
-#modalLancamento .tab-btn {
-    flex: 1;
-    padding: 8px 12px;
-    border: none;
-    border-radius: 8px;
-    background: transparent;
-    color: var(--text-light);
-    font-weight: 600;
-    font-size: 13px;
-    cursor: pointer;
-    transition: var(--transition);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
-}
-
-#modalLancamento .tab-btn:hover {
-    background: var(--primary-soft);
-    color: var(--primary);
-}
-
-#modalLancamento .tab-btn.active {
-    background: var(--primary);
-    color: white;
-}
-
-#modalLancamento .tab-content {
-    display: none !important;
-    height: 100%;
-    flex: 1;
-    min-height: 350px;
-}
-
-#modalLancamento .tab-content.active {
-    display: flex !important;
-    flex-direction: column;
-    height: 100%;
-    flex: 1;
-}
-
-#modalLancamento .section-title {
-    font-size: 14px;
-    font-weight: 600;
-    color: var(--text);
-    margin-bottom: 12px;
-    padding-bottom: 8px;
-    border-bottom: 2px solid var(--border);
-    display: flex;
-    align-items: center;
-    gap: 6px;
-}
-
-#modalLancamento .section-title i {
-    color: var(--primary);
-    font-size: 16px;
-}
-
-/* ================= LISTA DE CARDS ================= */
-#modalLancamento .lancamentos-list {
-    flex: 1;
-    overflow-y: auto;
-    padding-right: 8px;
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-    min-height: 350px;
-    max-height: 450px;
-}
-
-/* ================= CARDS ================= */
-#modalLancamento .lancamento-card {
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 16px;
-    transition: var(--transition);
-    position: relative;
-    width: 100%;
-    box-sizing: border-box;
-}
-
-#modalLancamento .lancamento-card:hover {
-    border-color: var(--primary);
-    box-shadow: var(--shadow-md);
-    transform: translateY(-2px);
-}
-
-#modalLancamento .lancamento-card.pessoal {
-    border-left: 4px solid var(--primary);
-}
-
-#modalLancamento .lancamento-card.feriado {
-    border-left: 4px solid var(--warning);
-}
-
-#modalLancamento .lancamento-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 12px;
-    padding-bottom: 8px;
-    border-bottom: 1px solid var(--border);
-    gap: 12px;
-}
-
-#modalLancamento .lancamento-titulo {
-    font-weight: 600;
-    color: var(--text);
-    font-size: 15px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    min-width: 0;
-    flex: 1;
-}
-
-#modalLancamento .lancamento-titulo span {
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-#modalLancamento .lancamento-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    padding: 4px 10px;
-    border-radius: 20px;
-    font-size: 11px;
-    font-weight: 600;
-    white-space: nowrap;
-    flex-shrink: 0;
-}
-
-/* Grid de informações do card */
-#modalLancamento .lancamento-info-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-    gap: 12px;
-    margin: 12px 0;
-    padding: 12px;
-    background: var(--card-dark);
-    border-radius: 10px;
-    width: 100%;
-    box-sizing: border-box;
-}
-
-#modalLancamento .info-item {
-    display: flex;
-    align-items: flex-start;
-    gap: 10px;
-    min-width: 0;
-    flex-wrap: wrap;
-}
-
-#modalLancamento .info-item i {
-    font-size: 14px;
-    margin-top: 2px;
-    opacity: 0.8;
-    flex-shrink: 0;
-}
-
-#modalLancamento .info-detalhes {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    min-width: 0;
-}
-
-#modalLancamento .info-label {
-    font-size: 10px;
-    color: var(--text-light);
-    text-transform: uppercase;
-    letter-spacing: 0.3px;
-}
-
-#modalLancamento .info-valor {
-    font-size: 13px;
-    font-weight: 500;
-    color: var(--text);
-    line-height: 1.4;
-    word-break: break-word;
-}
-
-#modalLancamento .info-horario {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    background: var(--card);
-    padding: 4px 8px;
-    border-radius: 16px;
-    font-size: 11px;
-    margin-top: 2px;
-}
-
-/* Ações do card */
-#modalLancamento .lancamento-actions {
-    display: flex;
-    gap: 8px;
-    justify-content: flex-end;
-    padding-top: 12px;
-    border-top: 1px dashed var(--border);
-}
-
-#modalLancamento .btn-icon-sm {
-    width: 32px;
-    height: 32px;
-    border: none;
-    border-radius: 8px;
-    background: var(--card-dark);
-    color: var(--text-light);
-    cursor: pointer;
-    transition: var(--transition);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border: 1px solid var(--border);
-}
-
-#modalLancamento .btn-icon-sm:hover {
-    transform: translateY(-2px);
-}
-
-#modalLancamento .btn-icon-sm.edit:hover {
-    background: var(--primary);
-    color: white;
-    border-color: var(--primary);
-}
-
-#modalLancamento .btn-icon-sm.delete:hover {
-    background: var(--danger);
-    color: white;
-    border-color: var(--danger);
-}
-
-/* ================= ESTADOS (LOADING/EMPTY) ================= */
-#modalLancamento .loading-state,
-#modalLancamento .empty-state {
-    display: flex !important;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    width: 100%;
-    height: 100%;
-    min-height: 300px;
-    padding: 30px 20px;
-    color: var(--text-light);
-    background: var(--card-dark);
-    border-radius: 16px;
-    border: 2px dashed var(--border);
-    margin: 0;
-    box-sizing: border-box;
-    text-align: center;
-}
-
-#modalLancamento .loading-state i,
-#modalLancamento .empty-state i {
-    font-size: 48px;
-    margin-bottom: 16px;
-    color: var(--primary);
-    opacity: 0.5;
-}
-
-#modalLancamento .loading-state p,
-#modalLancamento .empty-state p {
-    font-size: 16px;
-    margin-bottom: 8px;
-    color: var(--text-light);
-}
-
-#modalLancamento .empty-state small {
-    font-size: 13px;
-    color: var(--text-lighter);
-}
-
-/* ================= FORMULÁRIO ================= */
-#modalLancamento .form-titulo {
-    font-size: 16px;
-    font-weight: 600;
-    color: var(--text);
-    margin-bottom: 16px;
-    padding-bottom: 10px;
-    border-bottom: 2px solid var(--border);
-    display: flex;
-    align-items: center;
-    gap: 6px;
-}
-
-#modalLancamento .form-titulo i {
-    color: var(--primary);
-    font-size: 18px;
-}
-
-#modalLancamento .form-group {
-    margin-bottom: 12px;
-}
-
-#modalLancamento .form-group label {
-    display: block;
-    font-size: 11px;
-    font-weight: 600;
-    color: var(--text-light);
-    margin-bottom: 4px;
-    letter-spacing: 0.3px;
-}
-
-#modalLancamento .form-group label i {
-    font-size: 12px;
-    margin-right: 4px;
-    color: var(--primary);
-}
-
-#modalLancamento .form-control {
-    width: 100%;
-    padding: 8px 10px;
-    font-size: 13px;
-    border-radius: 8px;
-    border: 2px solid var(--border);
-    background: var(--card);
-    color: var(--text);
-    transition: var(--transition);
-}
-
-#modalLancamento .form-control:focus {
-    border-color: var(--primary);
-    outline: none;
-    box-shadow: 0 0 0 4px var(--primary-soft);
-}
-
-/* Foco por teclado visivel nas abas, botoes e no fechar (a11y). */
-#modalLancamento .tab-btn:focus-visible,
-#modalLancamento .btn-icon-sm:focus-visible,
-#modalLancamento .btn-primary.full-width:focus-visible,
-#modalLancamento .btn-secondary.full-width:focus-visible,
-#modalLancamento .modal-close:focus-visible {
-    outline: none;
-    box-shadow: 0 0 0 4px var(--primary-soft);
-}
-
-#modalLancamento .conditional-fields {
-    background: var(--card-dark);
-    border-radius: 12px;
-    padding: 10px;
-    margin: 8px 0;
-    border: 1px dashed var(--border);
-}
-
-#modalLancamento .hidden {
-    display: none !important;
-}
-
-#modalLancamento .form-actions {
-    margin-top: 16px;
-    padding-top: 16px;
-    border-top: 1px solid var(--border);
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-}
-
-#modalLancamento .btn-primary.full-width {
-    background: var(--accent);
-    color: var(--accent-contrast);
-    border: none;
-    border-radius: var(--radius-sm);
-    padding: 10px;
-    font-weight: 600;
-    font-size: 14px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
-    cursor: pointer;
-    transition: var(--transition);
-}
-
-#modalLancamento .btn-primary.full-width:hover {
-    background: var(--accent-hover);
-    transform: translateY(-2px);
-    box-shadow: var(--shadow-primary);
-}
-
-#modalLancamento .btn-secondary.full-width {
-    background: var(--card-dark);
-    color: var(--text);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 10px;
-    font-weight: 600;
-    font-size: 14px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
-    cursor: pointer;
-    transition: var(--transition);
-}
-
-#modalLancamento .btn-secondary.full-width:hover {
-    border-color: var(--primary);
-    color: var(--primary);
-}
-
-/* ================= CORES DOS BADGES =================
-   Semantica via tokens: fundo *-soft + texto/borda forte. Os tokens ja
-   trocam sozinhos no tema escuro, entao nao ha override manual abaixo. */
-#modalLancamento .lancamento-badge.folga {
-    color: var(--success);
-    border-color: var(--success);
-    background: var(--success-soft);
-}
-
-#modalLancamento .lancamento-badge.ausencia {
-    color: var(--danger);
-    border-color: var(--danger);
-    background: var(--danger-soft);
-}
-
-#modalLancamento .lancamento-badge.ferias {
-    color: var(--accent);
-    border-color: var(--accent);
-    background: var(--accent-soft);
-}
-
-#modalLancamento .lancamento-badge.feriado,
-#modalLancamento .lancamento-badge.municipal,
-#modalLancamento .lancamento-badge.estadual {
-    color: var(--warning);
-    border-color: var(--warning);
-    background: var(--warning-soft);
-}
-
-/* ================= TEMA ESCURO ================= */
-[data-theme="dark"] #modalLancamento .info-horario {
-    background: var(--card-dark);
-}
-
-[data-theme="dark"] #modalLancamento .lancamento-info-grid {
-    background: var(--card);
-}
-
-[data-theme="dark"] #modalLancamento .btn-secondary.full-width {
-    background: var(--card);
-}
-
-[data-theme="dark"] #modalLancamento .btn-icon-sm {
-    background: var(--card);
-}
-
-/* Badges usam tokens semanticos: nao precisam de override no tema escuro. */
-
-/* ================= RESPONSIVIDADE ================= */
-@media (max-width: 968px) {
-    #modalLancamento .modal-columns {
-        flex-direction: column;
-        min-height: auto;
-    }
-    
-    #modalLancamento .form-column {
-        width: 100%;
-        min-height: auto;
-    }
-    
-    #modalLancamento .list-column {
-        min-height: 400px;
-    }
-}
-/* ================= ABA DE FERIADOS ================= */
-
-/* Cards de feriado da API */
-#modalLancamento .lancamento-card.feriado-api {
-    border-left: 4px solid var(--accent);
-}
-
-/* Cards de feriado manual */
-#modalLancamento .lancamento-card.feriado-manual {
-    border-left: 4px solid var(--warning);
-}
-
-/* Badge para feriados federais */
-#modalLancamento .lancamento-badge.federal {
-    color: var(--accent);
-    border-color: var(--accent);
-    background: var(--accent-soft);
-}
-
-/* Badge para feriados municipais/estaduais */
-#modalLancamento .lancamento-badge.municipal,
-#modalLancamento .lancamento-badge.estadual {
-    color: var(--warning);
-    border-color: var(--warning);
-    background: var(--warning-soft);
-}
-
-/* Ícone de cadeado para feriados oficiais */
-#modalLancamento .info-horario.locked {
-    background: var(--neutral-fill);
-    color: var(--text-muted);
-    font-size: var(--text-xs);
-    padding: 4px 10px;
-    border-radius: var(--radius-pill);
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-}
-
-#modalLancamento .info-horario.locked i {
-    font-size: 10px;
-    color: var(--text-muted);
-}
-
-/* Separador visual na lista */
-#modalLancamento .feriados-section {
-    margin-top: 16px;
-    padding-top: 16px;
-    border-top: 2px dashed var(--border);
-}
-
-#modalLancamento .feriados-section h5 {
-    font-size: 12px;
-    font-weight: 600;
-    color: var(--text-light);
-    margin-bottom: 12px;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-}
-
-/* Estilo para quando não há feriados */
-#modalLancamento .empty-state.feriados i {
-    color: var(--warning);
-}
-
-/* Feriados usam tokens: cards chapados e badges semanticos, sem override escuro. */
 /* ================= MODAL DE DETALHES DA HORA ================= */
 .detalhes-hora-modal .modal-content {
     max-width: 450px;
@@ -668,43 +37,6 @@
 
 [data-theme="dark"] .detalhes-hora-modal h4 {
     color: var(--text);
-}
-/* Botão de toggle de filtro */
-.btn-toggle-filtro {
-    background: var(--card-dark);
-    border: 1px solid var(--border);
-    border-radius: 20px;
-    padding: 6px 16px;
-    font-size: 12px;
-    font-weight: 600;
-    color: var(--text);
-    cursor: pointer;
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    margin-left: 16px;
-    transition: var(--transition);
-}
-
-.btn-toggle-filtro:hover {
-    background: var(--primary);
-    color: white;
-    border-color: var(--primary);
-}
-
-.btn-toggle-filtro i {
-    font-size: 12px;
-}
-
-/* Tema escuro */
-[data-theme="dark"] .btn-toggle-filtro {
-    background: var(--card);
-    color: var(--text);
-}
-
-[data-theme="dark"] .btn-toggle-filtro:hover {
-    background: var(--primary);
-    color: white;
 }
 
 /* ================= MODAL DE CONFIRMAÇÃO ================= */
@@ -1058,4 +390,83 @@
 
 .banco-horas-movimento.debito {
     border-left: 4px solid var(--danger);
+}
+
+/* Horas extras de plantao no extrato: sao pagas em folha e NAO entram no
+   saldo, entao ficam numa secao separada, visualmente distinta dos
+   movimentos do banco (laranja em vez de verde/vermelho). */
+.banco-horas-extras {
+    margin-top: 20px;
+    padding-top: 16px;
+    border-top: 1px dashed var(--border);
+}
+
+.banco-horas-extras-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.banco-horas-extras-header h4 {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.banco-horas-extras-header h4 i {
+    color: #c2410c;
+}
+
+.banco-horas-extras-header strong {
+    font-size: 15px;
+    color: #c2410c;
+    font-variant-numeric: tabular-nums;
+}
+
+.banco-horas-extras-aviso {
+    margin: 4px 0 12px;
+    font-size: 12px;
+    color: var(--text-light);
+}
+
+.banco-horas-extras-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.banco-horas-extra {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 16px;
+    border-radius: 14px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-left: 4px solid #f97316;
+}
+
+.banco-horas-extra span {
+    display: block;
+    font-size: 12px;
+    color: var(--text-light);
+    margin-top: 4px;
+    font-variant-numeric: tabular-nums;
+}
+
+.banco-horas-extra-total {
+    color: #c2410c;
+    font-variant-numeric: tabular-nums;
+}
+
+[data-theme="dark"] .banco-horas-extras-header h4 i,
+[data-theme="dark"] .banco-horas-extras-header strong,
+[data-theme="dark"] .banco-horas-extra-total {
+    color: #fdba74;
 }

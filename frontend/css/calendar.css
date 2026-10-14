@@ -109,7 +109,7 @@
   background: white;
 }
 
-/* Aplicada por Js/calendar.js quando o usuario logado nao e admin: o dia
+/* Aplicada por js/telas/calendar.js quando o usuario logado nao e admin: o dia
    continua legivel, mas perde as pistas visuais de que e clicavel, porque
    nesse perfil nao ha modal de lancamento para abrir. */
 .day.calendario-somente-leitura {
@@ -187,6 +187,15 @@
     border-left-color: #10b981;
     color: #065f46;
     background: #ecfdf5;
+}
+
+/* Lancamento de colaborador desligado: continua visivel (o historico do banco
+   de horas depende dele), mas em segundo plano e riscado. */
+.ausencia-tag.inativo {
+    opacity: 0.62;
+    font-style: italic;
+    text-decoration: line-through;
+    text-decoration-thickness: 1px;
 }
 
 .holiday-tag {

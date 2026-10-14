@@ -1,24 +1,29 @@
 const express = require('express');
 
 const { conectar } = require('../db');
-const { getSchemaInfo } = require('../utils/schema');
-const { listJornadaSemanal } = require('../utils/jornada-semanal');
-const { ensurePositiveInt } = require('../utils/validation');
+const { listJornadaSemanal } = require('../services/jornada-semanal');
+const { colaboradoresVisiveis, exigirColaboradorVisivel } = require('../auth/acesso-setores');
+const { ensurePositiveInt } = require('../lib/validation');
 
 const router = express.Router();
 
 router.get('/', async (req, res) => {
     const pool = await conectar();
-    const schema = await getSchemaInfo(pool);
     const colaboradorId = req.query.colaboradorId
         ? ensurePositiveInt(req.query.colaboradorId, 'Colaborador')
         : null;
 
-    const items = await listJornadaSemanal(pool, schema, {
+    const visiveis = await colaboradoresVisiveis(pool, req);
+
+    if (colaboradorId) {
+        exigirColaboradorVisivel(visiveis, colaboradorId);
+    }
+
+    const todos = await listJornadaSemanal(pool, {
         colaboradorId,
-        onlyActive: true,
-        allowMissingTable: true
+        onlyActive: true
     });
+    const items = visiveis ? todos.filter((item) => visiveis.has(Number(item.colaboradorId))) : todos;
 
     res.json({
         colaboradorId,

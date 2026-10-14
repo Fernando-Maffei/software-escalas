@@ -71,7 +71,7 @@
     border-right: none;
 }
 
-/* Densidade das linhas, alternada pelos botoes em Js/escala-dia-editor.js
+/* Densidade das linhas, alternada pelos botoes em js/telas/escala-dia-editor.js
    (gravam data-densidade no .escala-page). O modo compacto mexe so na
    ALTURA da linha, nao nas larguras de coluna: as larguras ja variam por
    breakpoint mais abaixo, e sobrepo-las aqui faria a versao "compacta"
@@ -2972,7 +2972,7 @@
    derrubava esse sticky e o rotulo "Total" saia do lugar ao rolar. */
 .escala-page[data-horas-densas="1"] .timeline-header .hora-header:not(.total-header) {
     padding: 0 2px;
-    /* Definida em Js/escala-dia-editor.js (ajustarFonteHorasEscala) a partir
+    /* Definida em js/telas/escala-dia-editor.js (ajustarFonteHorasEscala) a partir
        da largura real da coluna: abrir a barra lateral e o painel de ajustes
        juntos aperta a grade, e a fonte encolhe junto em vez de deixar os
        rotulos se encostarem. O 11px e o fallback do dia folgado. */
@@ -4179,6 +4179,15 @@
 
 .escala-page .escala-bar-plantao { background: #0ea5a4; }
 
+/* O rotulo da barra ("08:00–18:00") e alinhado a esquerda, entao uma ausencia
+   que comece junto com a jornada o cobria e ele virava "8:00" pela metade.
+   Sobe acima dos blocos de almoco e ausencia: o texto e branco e continua
+   legivel sobre os dois. */
+.escala-page .escala-bar .escala-bar-label {
+    position: relative;
+    z-index: 4;
+}
+
 .escala-page .escala-lunch {
     position: absolute;
     top: 7px;
@@ -4234,6 +4243,43 @@
 .escala-page .escala-lunch:hover .escala-lunch-time,
 .escala-page .escala-lunch.is-dragging .escala-lunch-time {
     opacity: 1;
+}
+
+/* Ausencia por periodo sobre a barra de jornada. Mesma geometria do bloco de
+   almoco, com duas diferencas de proposito: fica ACIMA dele (z-index 3), para
+   uma ausencia que caia no horario de almoco continuar visivel; e mantem
+   pointer-events:none, porque nao e um controle — o almoco se arrasta, a
+   ausencia se edita no lancamento. O overlay inteiro ja e pointer-events:none,
+   entao o arrasto do almoco por baixo segue funcionando na sobreposicao. */
+.escala-page .escala-ausencia-parcial {
+    position: absolute;
+    top: 7px;
+    bottom: 7px;
+    border-radius: 7px;
+    background: var(--escala-status-ausencia-parcial, #b83b64);
+    border: 1px solid rgba(0, 0, 0, 0.18);
+    z-index: 3;
+    pointer-events: none;
+}
+
+/* O bloco costuma ser estreito demais para o texto caber dentro (uma hora numa
+   jornada de dez), entao o horario vira etiqueta acima — como a do almoco, mas
+   sempre visivel: aqui nao ha hover para descobrir que existe. */
+.escala-page .escala-ausencia-parcial .escala-ausencia-parcial-time {
+    position: absolute;
+    bottom: calc(100% + 5px);
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 2px 7px;
+    border-radius: 6px;
+    background: var(--escala-status-ausencia-parcial, #b83b64);
+    color: #fff;
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    white-space: nowrap;
+    pointer-events: none;
+    z-index: 5;
 }
 
 .escala-page .escala-band {

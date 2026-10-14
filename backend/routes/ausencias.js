@@ -2,19 +2,20 @@ const express = require('express');
 const router = express.Router();
 
 const { sql, conectar } = require('../db');
-const { AppError } = require('../utils/errors');
+const { AppError } = require('../lib/errors');
+const { AUSENCIA_PERIODOS: PERIODO_TIPOS, AUSENCIA_TIPOS } = require('../lib/dominio');
 const {
     calculateAusenciaDebitMinutes,
     describeAusenciaMovement,
     normalizeSubtipo,
     resolveDefaultDescontaBancoHoras
-} = require('../utils/bancoHoras');
-const { getBancoHorasCapabilities, getSchemaInfo, hasTable } = require('../utils/schema');
+} = require('../services/bancoHoras');
 const {
     restoreEscalaDefaultsForPeriod,
     syncAusenciaToEscalaDia
-} = require('../utils/escala');
-const { withTransaction } = require('../utils/transactions');
+} = require('../services/escala');
+const { withTransaction } = require('../db/transactions');
+const { colaboradoresVisiveis, exigirColaboradorVisivel } = require('../auth/acesso-setores');
 const {
     buildDateRange,
     ensurePositiveInt,
@@ -26,46 +27,28 @@ const {
     normalizeNullableTime,
     normalizeOptionalText,
     toSqlTime
-} = require('../utils/validation');
+} = require('../lib/validation');
 
-const AUSENCIA_TIPOS = ['folga', 'ausencia', 'ferias'];
-const PERIODO_TIPOS = ['dia_inteiro', 'horas'];
 
-function buildAusenciasSelect(schema) {
-    const capabilities = getBancoHorasCapabilities(schema);
-    const columns = [
-        'Id',
-        'ColaboradorId',
-        'Tipo',
-        'DataInicio',
-        'DataFim',
-        'DataCadastro',
-        'PeriodoTipo',
-        'HoraInicio',
-        'HoraFim'
-    ];
+const AUSENCIA_COLUNAS = `
+            Id,
+            ColaboradorId,
+            Tipo,
+            DataInicio,
+            DataFim,
+            DataCadastro,
+            PeriodoTipo,
+            HoraInicio,
+            HoraFim,
+            Subtipo,
+            DescontaBancoHoras,
+            Observacao`;
 
-    if (capabilities.hasAusenciaSubtipo) {
-        columns.push('Subtipo');
-    }
-
-    if (capabilities.hasAusenciaDesconta) {
-        columns.push('DescontaBancoHoras');
-    }
-
-    if (capabilities.hasAusenciaObservacao) {
-        columns.push('Observacao');
-    }
-
-    return columns.join(',\n            ');
-}
-
-async function findAusenciaById(poolOrTx, id, schema) {
+async function findAusenciaById(poolOrTx, id) {
     const result = await poolOrTx.request()
         .input('id', sql.Int, id)
         .query(`
-            SELECT
-                ${buildAusenciasSelect(schema)}
+            SELECT ${AUSENCIA_COLUNAS}
             FROM Ausencias
             WHERE Id = @id
         `);
@@ -103,8 +86,7 @@ function resolveDefaultSubtipo(tipo, value) {
     return 'comum';
 }
 
-function buildAusenciaPayload(body, fallback = {}, schema) {
-    const capabilities = getBancoHorasCapabilities(schema);
+function buildAusenciaPayload(body, fallback = {}) {
 
     const colaboradorId = body.colaboradorId !== undefined
         ? ensurePositiveInt(body.colaboradorId, 'Colaborador')
@@ -150,18 +132,14 @@ function buildAusenciaPayload(body, fallback = {}, schema) {
         throw new AppError(400, 'Ferias devem ser lancadas como dia inteiro.');
     }
 
-    const fallbackSubtipo = capabilities.hasAusenciaSubtipo
-        ? (fallback.Subtipo || fallback.subtipo)
-        : null;
+    const fallbackSubtipo = fallback.Subtipo || fallback.subtipo;
 
     const subtipo = resolveDefaultSubtipo(
         tipo,
         body.subtipo !== undefined ? body.subtipo : fallbackSubtipo
     );
 
-    const fallbackDesconto = capabilities.hasAusenciaDesconta
-        ? fallback.DescontaBancoHoras
-        : undefined;
+    const fallbackDesconto = fallback.DescontaBancoHoras;
 
     const descontaBancoHoras = body.descontaBancoHoras !== undefined
         ? normalizeBoolean(body.descontaBancoHoras, 'Desconto do banco de horas')
@@ -169,9 +147,7 @@ function buildAusenciaPayload(body, fallback = {}, schema) {
             defaultValue: resolveDefaultDescontaBancoHoras(tipo, subtipo)
         });
 
-    const fallbackObservacao = capabilities.hasAusenciaObservacao
-        ? (fallback.Observacao || fallback.observacao)
-        : null;
+    const fallbackObservacao = fallback.Observacao || fallback.observacao;
 
     const observacao = body.observacao !== undefined
         ? normalizeOptionalText(body.observacao, 'Observacao', { maxLength: 500 })
@@ -202,13 +178,7 @@ async function deleteAusenciaMovement(poolOrTx, ausenciaId) {
         `);
 }
 
-async function syncAusenciaMovement(poolOrTx, schema, ausencia, colaborador) {
-    const capabilities = getBancoHorasCapabilities(schema);
-
-    if (!capabilities.hasMovimentosTable) {
-        return { synced: false, skippedReason: 'movimentos_table_missing' };
-    }
-
+async function syncAusenciaMovement(poolOrTx, ausencia, colaborador) {
     await deleteAusenciaMovement(poolOrTx, ausencia.Id);
 
     const minutosDebito = calculateAusenciaDebitMinutes(ausencia, colaborador);
@@ -269,7 +239,6 @@ async function syncAusenciaMovement(poolOrTx, schema, ausencia, colaborador) {
 
 router.get('/', async (req, res) => {
     const pool = await conectar();
-    const schema = await getSchemaInfo(pool);
     const request = pool.request();
     const clauses = [];
 
@@ -299,61 +268,22 @@ router.get('/', async (req, res) => {
     }
 
     const result = await request.query(`
-        SELECT
-            ${buildAusenciasSelect(schema)}
+        SELECT ${AUSENCIA_COLUNAS}
         FROM Ausencias
         ${clauses.length > 0 ? `WHERE ${clauses.join(' AND ')}` : ''}
         ORDER BY DataInicio DESC, Id DESC
     `);
+    const visiveis = await colaboradoresVisiveis(pool, req);
 
-    res.json(result.recordset);
+    res.json(visiveis ? result.recordset.filter((linha) => visiveis.has(Number(linha.ColaboradorId))) : result.recordset);
 });
 
 router.post('/', async (req, res) => {
     const pool = await conectar();
-    const schema = await getSchemaInfo(pool);
-    const payload = buildAusenciaPayload(req.body, {}, schema);
+    const payload = buildAusenciaPayload(req.body, {});
 
     const result = await withTransaction(sql, pool, async (tx) => {
         const colaborador = await getColaboradorById(tx, payload.colaboradorId);
-        const capabilities = getBancoHorasCapabilities(schema);
-
-        const fields = [
-            'ColaboradorId',
-            'Tipo',
-            'DataInicio',
-            'DataFim',
-            'PeriodoTipo',
-            'HoraInicio',
-            'HoraFim',
-            'DataCadastro'
-        ];
-
-        const values = [
-            '@colaboradorId',
-            '@tipo',
-            '@dataInicio',
-            '@dataFim',
-            '@periodoTipo',
-            '@horaInicio',
-            '@horaFim',
-            'GETDATE()'
-        ];
-
-        if (capabilities.hasAusenciaSubtipo) {
-            fields.splice(5, 0, 'Subtipo');
-            values.splice(5, 0, '@subtipo');
-        }
-
-        if (capabilities.hasAusenciaDesconta) {
-            fields.splice(fields.length - 1, 0, 'DescontaBancoHoras');
-            values.splice(values.length - 1, 0, '@descontaBancoHoras');
-        }
-
-        if (capabilities.hasAusenciaObservacao) {
-            fields.splice(fields.length - 1, 0, 'Observacao');
-            values.splice(values.length - 1, 0, '@observacao');
-        }
 
         const insertResult = await tx.request()
             .input('colaboradorId', sql.Int, payload.colaboradorId)
@@ -367,30 +297,21 @@ router.post('/', async (req, res) => {
             .input('descontaBancoHoras', sql.Bit, payload.descontaBancoHoras)
             .input('observacao', sql.NVarChar(500), payload.observacao)
             .query(`
-                INSERT INTO Ausencias (${fields.join(', ')})
+                INSERT INTO Ausencias (
+                    ColaboradorId, Tipo, DataInicio, DataFim, PeriodoTipo, Subtipo, HoraInicio, HoraFim,
+                    DescontaBancoHoras, Observacao, DataCadastro
+                )
                 OUTPUT INSERTED.*
-                VALUES (${values.join(', ')})
+                VALUES (
+                    @colaboradorId, @tipo, @dataInicio, @dataFim, @periodoTipo, @subtipo, @horaInicio, @horaFim,
+                    @descontaBancoHoras, @observacao, GETDATE()
+                )
             `);
 
         const saved = insertResult.recordset[0];
 
-        if (!saved.Subtipo && capabilities.hasAusenciaSubtipo) {
-            saved.Subtipo = payload.subtipo;
-        }
-
-        if (saved.DescontaBancoHoras === undefined && capabilities.hasAusenciaDesconta) {
-            saved.DescontaBancoHoras = payload.descontaBancoHoras;
-        }
-
-        if (saved.Observacao === undefined && capabilities.hasAusenciaObservacao) {
-            saved.Observacao = payload.observacao;
-        }
-
-        await syncAusenciaMovement(tx, schema, saved, colaborador);
-
-        if (hasTable(schema, 'escala_dia')) {
-            await syncAusenciaToEscalaDia(tx, schema, saved, colaborador);
-        }
+        await syncAusenciaMovement(tx, saved, colaborador);
+        await syncAusenciaToEscalaDia(tx, saved, colaborador);
 
         return saved;
     });
@@ -405,40 +326,16 @@ router.post('/', async (req, res) => {
 router.put('/:id', async (req, res) => {
     const id = ensurePositiveInt(req.params.id, 'Lancamento');
     const pool = await conectar();
-    const schema = await getSchemaInfo(pool);
 
     const result = await withTransaction(sql, pool, async (tx) => {
-        const existing = await findAusenciaById(tx, id, schema);
+        const existing = await findAusenciaById(tx, id);
 
         if (!existing) {
             throw new AppError(404, 'Lancamento nao encontrado.');
         }
 
-        const payload = buildAusenciaPayload(req.body, existing, schema);
+        const payload = buildAusenciaPayload(req.body, existing);
         const colaborador = await getColaboradorById(tx, payload.colaboradorId);
-        const capabilities = getBancoHorasCapabilities(schema);
-
-        const setParts = [
-            'ColaboradorId = @colaboradorId',
-            'Tipo = @tipo',
-            'DataInicio = @dataInicio',
-            'DataFim = @dataFim',
-            'PeriodoTipo = @periodoTipo',
-            'HoraInicio = @horaInicio',
-            'HoraFim = @horaFim'
-        ];
-
-        if (capabilities.hasAusenciaSubtipo) {
-            setParts.push('Subtipo = @subtipo');
-        }
-
-        if (capabilities.hasAusenciaDesconta) {
-            setParts.push('DescontaBancoHoras = @descontaBancoHoras');
-        }
-
-        if (capabilities.hasAusenciaObservacao) {
-            setParts.push('Observacao = @observacao');
-        }
 
         const updateResult = await tx.request()
             .input('id', sql.Int, id)
@@ -454,37 +351,30 @@ router.put('/:id', async (req, res) => {
             .input('observacao', sql.NVarChar(500), payload.observacao)
             .query(`
                 UPDATE Ausencias
-                SET ${setParts.join(', ')}
+                SET ColaboradorId = @colaboradorId,
+                    Tipo = @tipo,
+                    DataInicio = @dataInicio,
+                    DataFim = @dataFim,
+                    PeriodoTipo = @periodoTipo,
+                    HoraInicio = @horaInicio,
+                    HoraFim = @horaFim,
+                    Subtipo = @subtipo,
+                    DescontaBancoHoras = @descontaBancoHoras,
+                    Observacao = @observacao
                 OUTPUT INSERTED.*
                 WHERE Id = @id
             `);
 
         const saved = updateResult.recordset[0];
 
-        if (!saved.Subtipo && capabilities.hasAusenciaSubtipo) {
-            saved.Subtipo = payload.subtipo;
-        }
-
-        if (saved.DescontaBancoHoras === undefined && capabilities.hasAusenciaDesconta) {
-            saved.DescontaBancoHoras = payload.descontaBancoHoras;
-        }
-
-        if (saved.Observacao === undefined && capabilities.hasAusenciaObservacao) {
-            saved.Observacao = payload.observacao;
-        }
-
-        await syncAusenciaMovement(tx, schema, saved, colaborador);
-
-        if (hasTable(schema, 'escala_dia')) {
-            await restoreEscalaDefaultsForPeriod(
-                tx,
-                schema,
-                extractDateString(existing.DataInicio),
-                extractDateString(existing.DataFim),
-                { colaboradorId: existing.ColaboradorId }
-            );
-            await syncAusenciaToEscalaDia(tx, schema, saved, colaborador);
-        }
+        await syncAusenciaMovement(tx, saved, colaborador);
+        await restoreEscalaDefaultsForPeriod(
+            tx,
+            extractDateString(existing.DataInicio),
+            extractDateString(existing.DataFim),
+            { colaboradorId: existing.ColaboradorId }
+        );
+        await syncAusenciaToEscalaDia(tx, saved, colaborador);
 
         return saved;
     });
@@ -499,37 +389,31 @@ router.put('/:id', async (req, res) => {
 router.delete('/:id', async (req, res) => {
     const id = ensurePositiveInt(req.params.id, 'Lancamento');
     const pool = await conectar();
-    const schema = await getSchemaInfo(pool);
 
     await withTransaction(sql, pool, async (tx) => {
-        const existing = await findAusenciaById(tx, id, schema);
+        const existing = await findAusenciaById(tx, id);
 
         if (!existing) {
             throw new AppError(404, 'Lancamento nao encontrado.');
         }
 
-        if (getBancoHorasCapabilities(schema).hasMovimentosTable) {
-            await deleteAusenciaMovement(tx, id);
-        }
+        await deleteAusenciaMovement(tx, id);
 
-        if (hasTable(schema, 'escala_dia')) {
-            await tx.request()
-                .input('origemTipo', sql.NVarChar(30), 'ausencia')
-                .input('origemId', sql.Int, id)
-                .query(`
-                    DELETE FROM escala_dia
-                    WHERE origem_tipo = @origemTipo
-                      AND origem_id = @origemId
-                `);
+        await tx.request()
+            .input('origemTipo', sql.NVarChar(30), 'ausencia')
+            .input('origemId', sql.Int, id)
+            .query(`
+                DELETE FROM escala_dia
+                WHERE origem_tipo = @origemTipo
+                  AND origem_id = @origemId
+            `);
 
-            await restoreEscalaDefaultsForPeriod(
-                tx,
-                schema,
-                extractDateString(existing.DataInicio),
-                extractDateString(existing.DataFim),
-                { colaboradorId: existing.ColaboradorId }
-            );
-        }
+        await restoreEscalaDefaultsForPeriod(
+            tx,
+            extractDateString(existing.DataInicio),
+            extractDateString(existing.DataFim),
+            { colaboradorId: existing.ColaboradorId }
+        );
 
         await tx.request()
             .input('id', sql.Int, id)
@@ -545,14 +429,13 @@ router.delete('/:id', async (req, res) => {
 router.get('/colaborador/:colaboradorId', async (req, res) => {
     const colaboradorId = ensurePositiveInt(req.params.colaboradorId, 'Colaborador');
     const pool = await conectar();
-    const schema = await getSchemaInfo(pool);
     await getColaboradorById(pool, colaboradorId);
+    exigirColaboradorVisivel(await colaboradoresVisiveis(pool, req), colaboradorId);
 
     const result = await pool.request()
         .input('colaboradorId', sql.Int, colaboradorId)
         .query(`
-            SELECT
-                ${buildAusenciasSelect(schema)}
+            SELECT ${AUSENCIA_COLUNAS}
             FROM Ausencias
             WHERE ColaboradorId = @colaboradorId
             ORDER BY DataInicio DESC, Id DESC

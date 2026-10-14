@@ -1,7 +1,8 @@
 const express = require('express');
 
-const { conectar } = require('../db');
-const { AppError } = require('../utils/errors');
+const { sql, conectar } = require('../db');
+const { withTransaction } = require('../db/transactions');
+const { AppError } = require('../lib/errors');
 const {
     countOtherActiveAdmins,
     createUser,
@@ -14,16 +15,34 @@ const {
     normalizeUsername,
     requireAdmin,
     revokeUserSessions,
+    travarAdministradores,
     updateUserFlags,
     updateUserPassword,
     updateUserSetoresPermitidos
-} = require('../utils/auth');
+} = require('../auth/auth');
 
 const router = express.Router();
 
 // Toda a gestao de contas e exclusiva de administradores. O requireAuth
 // global (server.js) ja rodou antes deste router.
 router.use(requireAdmin);
+
+// Recusa tirar o ultimo administrador ativo. Roda DENTRO da transacao que vai
+// gravar, depois da trava: o papel do alvo e relido ali, porque outra
+// requisicao pode ter mudado entre a leitura inicial da rota e este ponto.
+async function exigirOutroAdminAtivo(tx, alvoId, orientacao) {
+    await travarAdministradores(tx);
+
+    const alvo = await findUserById(tx, alvoId);
+
+    if (!alvo?.isAdmin || !alvo.ativo) {
+        return;
+    }
+
+    if ((await countOtherActiveAdmins(tx, alvoId)) === 0) {
+        throw new AppError(400, `Este e o unico administrador ativo. ${orientacao}`);
+    }
+}
 
 function toPublicUser(user) {
     return {
@@ -117,14 +136,7 @@ router.put('/:id', async (req, res, next) => {
             throw new AppError(400, 'Voce nao pode desativar ou remover a administracao da propria conta.');
         }
 
-        if ((querDesativar || querRemoverAdmin) && alvo.isAdmin) {
-            const outrosAdmins = await countOtherActiveAdmins(pool, alvo.id);
-
-            if (outrosAdmins === 0) {
-                throw new AppError(400, 'Este e o unico administrador ativo. Promova outro usuario antes.');
-            }
-        }
-
+        /** @type {{ ativo?: boolean, isAdmin?: boolean }} */
         const flags = {};
 
         if (querDesativar || querReativar) {
@@ -135,44 +147,49 @@ router.put('/:id', async (req, res, next) => {
             flags.isAdmin = req.body.isAdmin;
         }
 
-        await updateUserFlags(pool, alvo.id, flags);
-
-        // Setores permitidos (teto de acesso imposto). So aplica quando o campo
-        // vem no corpo, para nao zerar a permissao numa atualizacao de flags.
-        // Nao derruba a sessao: a imposicao no backend le o teto fresco do banco
-        // a cada request, entao a mudanca ja vale no proximo carregamento.
-        if (Array.isArray(req.body?.setoresPermitidos)) {
-            await updateUserSetoresPermitidos(pool, alvo.id, req.body.setoresPermitidos);
-        }
-
+        // Valida ANTES de gravar qualquer coisa: antes uma senha curta dava 400
+        // depois de ja ter mudado ativo/admin.
+        // Senha definida explicitamente pelo administrador (diferente do reset,
+        // que gera uma aleatoria). Vale como esta e nao exige troca no primeiro
+        // acesso — quem definiu ja escolheu a senha final.
+        const novaSenha = querDefinirSenha ? normalizePassword(req.body.novaSenha, 'Nova senha') : null;
         let senhaTemporaria = null;
 
-        if (querDefinirSenha) {
-            // Senha definida explicitamente pelo administrador (diferente do
-            // reset, que gera uma aleatoria). Vale como esta e nao exige troca
-            // no primeiro acesso — quem definiu ja escolheu a senha final.
-            const novaSenha = normalizePassword(req.body.novaSenha, 'Nova senha');
+        await withTransaction(sql, pool, async (tx) => {
+            if (querDesativar || querRemoverAdmin) {
+                await exigirOutroAdminAtivo(tx, alvo.id, 'Promova outro usuario antes.');
+            }
 
-            await updateUserPassword(pool, alvo.id, novaSenha, {
-                deveTrocarSenha: false
-            });
-        } else if (querResetarSenha) {
-            // Le o papel depois de updateUserFlags: se a mesma requisicao
-            // promoveu ou rebaixou o usuario, quem vale e o papel novo.
-            const alvoAtualizado = await findUserById(pool, alvo.id);
+            await updateUserFlags(tx, alvo.id, flags);
 
-            senhaTemporaria = generateRandomPassword();
-            await updateUserPassword(pool, alvo.id, senhaTemporaria, {
-                // Mesma razao da criacao: conta de visualizacao e
-                // compartilhada e nao pode exigir troca no primeiro acesso.
-                deveTrocarSenha: alvoAtualizado.isAdmin
-            });
-        }
+            // Setores permitidos (teto de acesso imposto). So aplica quando o
+            // campo vem no corpo, para nao zerar a permissao numa atualizacao de
+            // flags. Nao derruba a sessao: a imposicao no backend le o teto
+            // fresco do banco a cada request.
+            if (Array.isArray(req.body?.setoresPermitidos)) {
+                await updateUserSetoresPermitidos(tx, alvo.id, req.body.setoresPermitidos);
+            }
 
-        // Mudancas restritivas valem imediatamente, nao so no proximo login.
-        if (querDesativar || querRemoverAdmin || querResetarSenha || querDefinirSenha) {
-            await revokeUserSessions(pool, alvo.id);
-        }
+            if (novaSenha) {
+                await updateUserPassword(tx, alvo.id, novaSenha, { deveTrocarSenha: false });
+            } else if (querResetarSenha) {
+                // Le o papel depois de updateUserFlags: se a mesma requisicao
+                // promoveu ou rebaixou o usuario, quem vale e o papel novo.
+                const alvoAtualizado = await findUserById(tx, alvo.id);
+
+                senhaTemporaria = generateRandomPassword();
+                await updateUserPassword(tx, alvo.id, senhaTemporaria, {
+                    // Mesma razao da criacao: conta de visualizacao e
+                    // compartilhada e nao pode exigir troca no primeiro acesso.
+                    deveTrocarSenha: alvoAtualizado.isAdmin
+                });
+            }
+
+            // Mudancas restritivas valem imediatamente, nao so no proximo login.
+            if (querDesativar || querRemoverAdmin || querResetarSenha || querDefinirSenha) {
+                await revokeUserSessions(tx, alvo.id);
+            }
+        });
 
         const atualizado = await findUserById(pool, alvo.id);
 
@@ -209,17 +226,12 @@ router.delete('/:id', async (req, res, next) => {
         }
 
         // Mesma protecao do desativar: nunca deixar o sistema sem administrador.
-        if (alvo.isAdmin) {
-            const outrosAdmins = await countOtherActiveAdmins(pool, alvo.id);
-
-            if (outrosAdmins === 0) {
-                throw new AppError(400, 'Este e o unico administrador ativo. Promova outro usuario antes de excluir.');
-            }
-        }
-
         // deleteUser apaga a linha em Usuarios; a FK ON DELETE CASCADE da tabela
         // Sessoes remove junto qualquer sessao aberta da conta, sem passo extra.
-        await deleteUser(pool, alvo.id);
+        await withTransaction(sql, pool, async (tx) => {
+            await exigirOutroAdminAtivo(tx, alvo.id, 'Promova outro usuario antes de excluir.');
+            await deleteUser(tx, alvo.id);
+        });
 
         res.json({
             success: true,

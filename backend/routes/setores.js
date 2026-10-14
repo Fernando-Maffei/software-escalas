@@ -1,22 +1,14 @@
 const express = require('express');
 
 const { sql, conectar } = require('../db');
-const { AppError } = require('../utils/errors');
-const { getSchemaInfo, hasTable } = require('../utils/schema');
-const { withTransaction } = require('../utils/transactions');
-const { listSetores, normalizeSetorNome } = require('../utils/setores');
+const { withTransaction } = require('../db/transactions');
+const { listSetores, normalizeSetorNome } = require('../services/setores');
 
 const router = express.Router();
 
 router.get('/', async (req, res) => {
     const pool = await conectar();
-    const schema = await getSchemaInfo(pool);
     const includeInactive = String(req.query.includeInactive || '').trim().toLowerCase() === 'true';
-
-    if (!hasTable(schema, 'Setores')) {
-        res.json([]);
-        return;
-    }
 
     const items = await listSetores(pool, {
         onlyActive: !includeInactive
@@ -27,12 +19,7 @@ router.get('/', async (req, res) => {
 
 router.post('/', async (req, res) => {
     const pool = await conectar();
-    const schema = await getSchemaInfo(pool);
     const nome = normalizeSetorNome(req.body?.nome);
-
-    if (!hasTable(schema, 'Setores')) {
-        throw new AppError(409, 'A tabela de setores ainda nao foi criada. Use a opcao de verificar/gerar tabelas antes de cadastrar setores.');
-    }
 
     const result = await withTransaction(sql, pool, async (tx) => {
         const existing = await tx.request()

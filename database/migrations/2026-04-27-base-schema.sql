@@ -349,14 +349,26 @@ BEGIN
 END;
 GO
 
+-- O dia de plantao aceita VARIOS lancamentos (turnos com horarios e destinos
+-- diferentes), entao o indice por data NAO pode ser unico. Era
+-- UX_plantoes_data (unico) ate 2026-09-04; um banco que ja tenha mais de um
+-- turno num mesmo dia faria o CREATE UNIQUE falhar aqui e derrubar todo o
+-- bootstrap do schema, porque este arquivo roda antes da migration que
+-- remove o indice. Ver 2026-09-04-plantao-lancamentos.sql.
 IF NOT EXISTS (
+    SELECT 1
+    FROM sys.indexes
+    WHERE object_id = OBJECT_ID('dbo.plantoes')
+      AND name = 'IX_plantoes_data'
+)
+AND NOT EXISTS (
     SELECT 1
     FROM sys.indexes
     WHERE object_id = OBJECT_ID('dbo.plantoes')
       AND name = 'UX_plantoes_data'
 )
 BEGIN
-    CREATE UNIQUE INDEX UX_plantoes_data
+    CREATE INDEX IX_plantoes_data
         ON dbo.plantoes (data_plantao);
 END;
 GO
