@@ -92,7 +92,7 @@ function coletarAlvosNoNavegador({ seletores, texto }) {
         .filter((el) => visivel(el) && !el.closest('#loginScreen, #setupScreen'));
     const escopo = modais.length ? modais[modais.length - 1] : document.body;
 
-    const INTERATIVOS = 'button, a[href], input, select, textarea, summary, [onclick], [role="button"], [role="tab"], [role="menuitem"], [role="option"]';
+    const INTERATIVOS = 'button, a[href], input, select, textarea, summary, [onclick], [data-chamar], [role="button"], [role="tab"], [role="menuitem"], [role="option"]';
 
     const achar = (raiz) => {
         const encontrados = new Set(raiz.querySelectorAll(INTERATIVOS));

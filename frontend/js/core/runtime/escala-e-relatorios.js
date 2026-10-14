@@ -20,6 +20,7 @@ import { isColaboradoresScreenVisible } from './plantao-colaboradores/helpers.js
 import { renderListaColaboradores } from './plantao-colaboradores/plantao-editor.js';
 import { ehDataPlantaoValida, renderLancamentoPlantao } from './plantao-colaboradores/plantao-regua-e-relatorios.js';
 import { gerarRelatorioCompleto } from './relatorio-mensal.js';
+import { atributosAcao } from '../../lib/atributos-acao.js';
 
 function getCurrentPageKeyEscala() {
     const hash = (window.location.hash || '#dashboard').replace(/^#/, '').trim();
@@ -662,10 +663,10 @@ export async function renderRelatorios() {
                             </div>
                         </div>
                         <div class="relatorio-actions">
-                            <button onclick="gerarRelatorioCompleto()" class="btn-primary">
+                            <button ${atributosAcao('gerarRelatorioCompleto')} class="btn-primary">
                                 <i class="fas fa-file-alt"></i> Visualizar
                             </button>
-                            <button onclick="exportarRelatorioCompleto()" class="btn-secondary">
+                            <button ${atributosAcao('exportarRelatorioCompleto')} class="btn-secondary">
                                 <i class="fas fa-download"></i> Exportar
                             </button>
                         </div>
@@ -730,10 +731,10 @@ export async function renderRelatorios() {
                             </div>
                         </div>
                         <div class="relatorio-actions">
-                            <button onclick="gerarRelatorioEscala()" class="btn-primary">
+                            <button ${atributosAcao('gerarRelatorioEscala')} class="btn-primary">
                                 <i class="fas fa-search"></i> Visualizar
                             </button>
-                            <button onclick="exportarRelatorioEscala()" class="btn-secondary">
+                            <button ${atributosAcao('exportarRelatorioEscala')} class="btn-secondary">
                                 <i class="fas fa-download"></i> Exportar
                             </button>
                         </div>
@@ -774,10 +775,10 @@ export async function renderRelatorios() {
                             </div>
                         </div>
                         <div class="relatorio-actions">
-                            <button onclick="gerarRelatorioPlantoes()" class="btn-primary">
+                            <button ${atributosAcao('gerarRelatorioPlantoes')} class="btn-primary">
                                 <i class="fas fa-file-alt"></i> Visualizar
                             </button>
-                            <button onclick="exportarRelatorioPlantoes()" class="btn-secondary">
+                            <button ${atributosAcao('exportarRelatorioPlantoes')} class="btn-secondary">
                                 <i class="fas fa-download"></i> Exportar
                             </button>
                         </div>
@@ -788,7 +789,7 @@ export async function renderRelatorios() {
             <div id="relatorioVisualizacao" class="relatorio-visualizacao" style="display: none;">
                 <div class="relatorio-visualizacao-header">
                     <h3><i class="fas fa-file-alt"></i> <span id="relatorioTitulo"></span></h3>
-                    <button onclick="fecharRelatorio()" class="btn-secondary">
+                    <button ${atributosAcao('fecharRelatorio')} class="btn-secondary">
                         <i class="fas fa-times"></i> Fechar
                     </button>
                 </div>

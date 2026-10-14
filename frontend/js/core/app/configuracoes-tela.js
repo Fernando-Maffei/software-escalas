@@ -5,6 +5,7 @@ import { appContent } from '../app.js';
 import { gerarConfiguracaoCoresEscalaHtml, getApiBaseUrl, inicializarPersonalizacaoEscala } from './api-e-cores.js';
 import { escapeNetworkText, gerarMenuConfiguracoesHtml, inicializarDiagnosticoRede, inicializarSecoesConfiguracoes, inicializarServidorSegundoPlano } from './configuracoes-infra.js';
 import { mostrarToast } from './horas-e-resumo.js';
+import { atributosAcao } from '../../lib/atributos-acao.js';
 
 export function renderConfiguracoes() {
     // Verifica o tema atual salvo
@@ -550,22 +551,22 @@ export function renderConfiguracoes() {
                 </div>
                 
                 <div class="config-card-body">
-                    <button class="config-btn" onclick="atualizarTudo()">
+                    <button class="config-btn" ${atributosAcao('atualizarTudo')}>
                         <i class="fas fa-rotate-right"></i>
                         Atualizar Dados
                     </button>
 
-                    <button class="config-btn" onclick="exportarDados()">
+                    <button class="config-btn" ${atributosAcao('exportarDados')}>
                         <i class="fas fa-download"></i>
                         Exportar Dados
                     </button>
                     
-                    <button class="config-btn" onclick="importarDados()">
+                    <button class="config-btn" ${atributosAcao('importarDados')}>
                         <i class="fas fa-upload"></i>
                         Importar Dados
                     </button>
                     
-                    <button class="config-btn" onclick="resetarSistema()">
+                    <button class="config-btn" ${atributosAcao('resetarSistema')}>
                         <i class="fas fa-broom"></i>
                         Limpar preferências deste navegador
                     </button>

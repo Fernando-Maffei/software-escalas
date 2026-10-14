@@ -22,7 +22,8 @@ const suites = [
     ...require('./backgroundService.test.js'),
     ...require('./escalaGravacaoEmLote.test.js'),
     ...require('./transacoes.test.js'),
-    ...require('./escalaLeituraDescartada.test.js')
+    ...require('./escalaLeituraDescartada.test.js'),
+    ...require('./csp.test.js')
 ];
 
 let passed = 0;

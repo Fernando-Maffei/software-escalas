@@ -7,6 +7,7 @@ import { carregarColaboradores, carregarSetores } from '../dados-e-modais.js';
 import { getBancoHorasResumoByColaborador, obterDataISO } from './helpers.js';
 import { carregarBancoHorasResumo, renderListaColaboradores } from './plantao-editor.js';
 import { formatarDataPlantaoCard } from './plantao-regua-e-relatorios.js';
+import { atributosAcao } from '../../../lib/atributos-acao.js';
 
 let jornadaSemanalEditorMeta;
 
@@ -444,7 +445,7 @@ export async function abrirEditorColaboradores(id) {
                         <select id="editorSetorId" class="form-control">
                             ${buildSetorEditorOptions(colaborador?.SetorId || '')}
                         </select>
-                        <button type="button" onclick="adicionarSetorRapido()" class="btn-secondary btn-setor-rapido">
+                        <button type="button" ${atributosAcao('adicionarSetorRapido')} class="btn-secondary btn-setor-rapido">
                             <i class="fas fa-plus"></i> Novo setor
                         </button>
                     </div>
@@ -474,17 +475,17 @@ export async function abrirEditorColaboradores(id) {
                 ${buildJornadaSemanalEditorMarkup(buildJornadaSemanalDefaultRows(), { showSuggestion: false })}
 
                 <div class="editor-actions">
-                    <button onclick="salvarColaboradorEditor(${colaborador ? colaborador.Id : 'null'})" class="btn-primary">
+                    <button ${atributosAcao('salvarColaboradorEditor', colaborador ? colaborador.Id : null)} class="btn-primary">
                         <i class="fas fa-save"></i> ${colaborador ? 'Atualizar' : 'Salvar'}
                     </button>
-                    <button onclick="fecharColaboradorEditor()" class="btn-secondary">
+                    <button ${atributosAcao('fecharColaboradorEditor')} class="btn-secondary">
                         <i class="fas fa-times"></i> Cancelar
                     </button>
                 </div>
 
                 ${colaborador ? `
                     <div class="editor-footer">
-                        <button onclick="abrirDesligarColaborador(${colaborador.Id}, '${escapeHtml(String(colaborador.Nome || '')).replace(/'/g, "\\'")}')" class="btn-danger" style="width: 100%;">
+                        <button ${atributosAcao('abrirDesligarColaborador', colaborador.Id, String(colaborador.Nome || ''))} class="btn-danger" style="width: 100%;">
                             <i class="fas fa-user-slash"></i> Desligar colaborador
                         </button>
                         <small class="helper-text">O historico e preservado. A exclusao definitiva so acontece depois, na tela de desligados.</small>

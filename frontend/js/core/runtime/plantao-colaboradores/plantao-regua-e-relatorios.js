@@ -9,6 +9,7 @@ import { aplicarDefaultsBancoHorasLancamento } from './banco-horas-lancamento.js
 import { renderColaboradoresPlantao } from './colaboradores-e-jornada.js';
 import { fecharModalSeguro, formatarDataPtBr, formatarHoraInput, getPlantaoEditorState, isColaboradoresScreenVisible, minutosParaTexto, obterDataISO, setPlantaoEditorState } from './helpers.js';
 import { capturarRascunhoPlantao, carregarBancoHorasResumo, carregarDisponibilidadePlantao, duracaoLancamentoPlantao, lancamentosDoDiaPlantao, normalizarTipoCreditoPlantao, PLANTAO_CREDITO_META, renderListaColaboradores, renderPlantaoEditor } from './plantao-editor.js';
+import { atributosAcao } from '../../../lib/atributos-acao.js';
 
 const PLANTAO_SABADOS_PASSO = 8;
 const PLANTAO_MESES_NOMES = ['Janeiro', 'Fevereiro', 'Marco', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
@@ -546,7 +547,7 @@ function renderPlantoesLancados(filtros) {
                                 <button type="button" data-plantao-editar="${dataISO}" class="btn-icon-sm edit" title="Editar dia" aria-label="Editar plantao de ${escapeHtml(formatarDataPtBr(dataISO))}">
                                     <i class="fas fa-edit"></i>
                                 </button>
-                                <button onclick="excluirPlantao('${dataISO}')" class="btn-icon-sm delete" title="Excluir dia" aria-label="Excluir plantao de ${escapeHtml(formatarDataPtBr(dataISO))}">
+                                <button ${atributosAcao('excluirPlantao', dataISO)} class="btn-icon-sm delete" title="Excluir dia" aria-label="Excluir plantao de ${escapeHtml(formatarDataPtBr(dataISO))}">
                                     <i class="fas fa-trash"></i>
                                 </button>
                             </div>
@@ -693,7 +694,7 @@ export async function renderLancamentoPlantao() {
                                 <h3><i class="fas fa-clock"></i> <span id="plantaoDataTitle">Selecione uma data</span></h3>
                                 <div id="plantaoEditorSubtitulo" class="editor-header-chips"></div>
                             </div>
-                            <button onclick="fecharPlantaoEditor()" class="btn-close-editor" aria-label="Fechar painel">
+                            <button ${atributosAcao('fecharPlantaoEditor')} class="btn-close-editor" aria-label="Fechar painel">
                                 <i class="fas fa-times"></i>
                             </button>
                         </div>

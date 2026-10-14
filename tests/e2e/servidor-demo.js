@@ -6,6 +6,10 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 
+// A mesma politica de conteudo do app de verdade: o robo passa pelas telas com
+// script em atributo proibido, entao um onclick que volte quebra o teste.
+const { POLITICA_DE_CONTEUDO } = require('../../backend/lib/cabecalhos-seguranca');
+
 const RAIZ = path.join(__dirname, '..', '..');
 const PASTAS_PERMITIDAS = ['demo', 'frontend'];
 const PORTA = Number(process.env.DEMO_PORTA) || 4470;
@@ -50,7 +54,8 @@ http.createServer((req, res) => {
 
         res.writeHead(200, {
             'Content-Type': TIPOS[path.extname(arquivo).toLowerCase()] || 'application/octet-stream',
-            'Cache-Control': 'no-store'
+            'Cache-Control': 'no-store',
+            'Content-Security-Policy': POLITICA_DE_CONTEUDO
         });
         res.end(conteudo);
     });

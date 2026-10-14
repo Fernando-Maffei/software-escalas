@@ -1,6 +1,10 @@
-// Funcoes chamadas por atributos onclick="..." dos templates HTML. Um atributo
-// on* so enxerga o escopo global, entao estas (e so estas) ficam em window.
-// Para trocar um onclick por addEventListener, tire a funcao daqui.
+// Acoes dos botoes montados em template HTML. O template marca o botao com
+// atributosAcao('nome', ...args) (lib/atributos-acao.js) e um unico ouvinte de
+// clique, registrado aqui, chama a funcao com os argumentos.
+//
+// Antes eram atributos onclick="nome(args)" e estas funcoes ficavam em window.
+// Saiu para a pagina poder proibir script em atributo (CSP) e porque montar a
+// chamada em texto deixava o nome do colaborador virar codigo.
 import { abrirDesligarColaborador, salvarColaboradorEditor } from './runtime/plantao-colaboradores/colaboradores-e-jornada.js';
 import { adicionarSetorRapido, fecharColaboradorEditor } from './app/colaboradores.js';
 import { aplicarAlmocoPeriodoEscala, fecharEditor, salvarEscalaDia } from '../telas/escala-dia-editor.js';
@@ -13,7 +17,7 @@ import { exportarRelatorioPlantoes, gerarRelatorioPlantoes } from './runtime/esc
 import { gerarRelatorioCompleto } from './runtime/relatorio-mensal.js';
 import { importarDados } from './app.js';
 
-Object.assign(window, {
+const ACOES = Object.freeze({
     abrirDesligarColaborador,
     adicionarSetorRapido,
     aplicarAlmocoPeriodoEscala,
@@ -40,4 +44,25 @@ Object.assign(window, {
     salvarColaboradorEditor,
     salvarEscalaDia,
     salvarPlantao
+});
+
+// Mesmo momento do onclick para quem importa: o clique no botao (ou num icone
+// dentro dele) chega aqui ao borbulhar; nenhum ancestral destes botoes para a
+// propagacao.
+document.addEventListener('click', (evento) => {
+    const alvo = evento.target instanceof Element ? evento.target.closest('[data-chamar]') : null;
+
+    if (!alvo) {
+        return;
+    }
+
+    // Object.hasOwn: so as acoes registradas ("constructor" viria do prototipo).
+    const acao = Object.hasOwn(ACOES, alvo.dataset.chamar) ? ACOES[alvo.dataset.chamar] : null;
+
+    if (typeof acao !== 'function') {
+        console.error(`[acoes] acao desconhecida: ${alvo.dataset.chamar}`);
+        return;
+    }
+
+    acao(...JSON.parse(alvo.dataset.args || '[]'));
 });

@@ -8,6 +8,7 @@ import { getCurrentScaleState, setCurrentScaleState } from './estado-e-layout.js
 import { renderScaleSectorTabsEscala } from './filtros-setor.js';
 import { renderScaleRowsEscala } from './linhas-timeline.js';
 import { renderScaleErrorEscala, renderScaleLoadingEscala, renderWeekStripEscala } from './mensagens-e-semana.js';
+import { atributosAcao } from '../../lib/atributos-acao.js';
 
 export function getScaleEditorRecordEscala(colaboradorId) {
     return (getCurrentScaleState().items || []).find((item) => Number(item.colaboradorId) === Number(colaboradorId)) || null;
@@ -320,7 +321,7 @@ export function renderScaleEditorEscala(record) {
                         <h4>${escapeHtml(record.colaboradorNome || 'Colaborador')}</h4>
                         <small>${escapeHtml(formatDatePtBrEscala(record.dataISO))} • ${escapeHtml(getDayLabelEscala(record.dataISO))} • ${escapeHtml(TIPO_LABELS[record.tipo] || 'Escala')}</small>
                     </div>
-                    <button onclick="fecharEditor()" class="btn-close-editor">
+                    <button ${atributosAcao('fecharEditor')} class="btn-close-editor">
                         <i class="fas fa-times"></i>
                     </button>
                 </div>
@@ -351,10 +352,10 @@ export function renderScaleEditorEscala(record) {
                 </div>
 
                 <div class="editor-actions editor-actions-main">
-                    <button onclick="salvarEscalaDia(${record.colaboradorId})" class="btn-primary">
+                    <button ${atributosAcao('salvarEscalaDia', record.colaboradorId)} class="btn-primary">
                         <i class="fas fa-save"></i> Salvar dia
                     </button>
-                    <button onclick="fecharEditor()" class="btn-secondary">
+                    <button ${atributosAcao('fecharEditor')} class="btn-secondary">
                         <i class="fas fa-times"></i> Cancelar
                     </button>
                 </div>
@@ -380,7 +381,7 @@ export function renderScaleEditorEscala(record) {
                     <small class="helper-text">Preencha apenas quando quiser aplicar um almoco em lote. Em branco, esse bloco nao interfere na escala.</small>
 
                     <div class="editor-actions editor-actions-single">
-                        <button onclick="aplicarAlmocoPeriodoEscala(${record.colaboradorId})" class="btn-secondary">
+                        <button ${atributosAcao('aplicarAlmocoPeriodoEscala', record.colaboradorId)} class="btn-secondary">
                             <i class="fas fa-utensils"></i> Aplicar almoco no periodo
                         </button>
                     </div>

@@ -865,8 +865,39 @@ diferencas esperadas so em `escala_dia` (menos linhas) e no `id` das linhas nas
 respostas de `/escala/dia` e `/escala/relatorio`. Para separar dos outros itens,
 gere a foto de antes em `f85545c` (T18) e compare no commit do T8.
 
-**T9 — CSP sem `script-src`** · `ABERTO`
+**T9 — CSP sem `script-src`** · `RESOLVIDO`
 Ja era a recomendacao 5 da secao 5 (tirar os 26 `onclick`).
+**Feito:** os 30 `onclick="..."` dos templates (26 acoes) viraram
+`atributosAcao('nome', ...args)` (`frontend/js/lib/atributos-acao.js`), que gera
+`data-chamar` e `data-args` (JSON escapado); um ouvinte delegado em
+`core/acoes-html.js` chama a acao — so as registradas (`Object.hasOwn`). Nada
+mais vai para `window`. O atributo e `data-chamar` porque `data-acao` ja e usado
+pelas telas de usuarios e lancamentos. A politica (`lib/cabecalhos-seguranca.js`):
+`script-src 'self'` mais os dois scripts de PDF pelo endereco exato (nao o cdnjs
+inteiro), `object-src 'none'`, `base-uri 'self'`, `frame-ancestors 'self'`;
+estilo, fonte, imagem e conexao ficam livres. A mesma politica vai na demo do
+robo e no `vercel.json` (teste confere que sao iguais).
+**Prova:** parser (espree) confirmou que os 30 estavam em template literal; A/B
+da demo antes (`5225f4f`) x depois com a CSP ligada: 34 passos, 0 diferencas
+(texto, modais, formularios e erros de console) — o roteiro procurava os botoes
+por `[onclick*=...]` e passou a achar tambem por `data-chamar`; robo na demo com
+as sementes 2026, 4242 e 909: 9/9; no navegador, os tres PDFs (mensal, escala,
+plantoes) gerados sem violacao de CSP. Testes unitarios: argumentos exatos para
+nomes com aspas/barra/HTML, politica sem `unsafe-*`, scripts das paginas
+liberados, `vercel.json` igual e barreira contra `on*="..."` voltar ao front.
+
+**T19 — XSS armazenado pelo nome do colaborador** · `RESOLVIDO` (pelo T9)
+`colaboradores-e-jornada.js`, botao "Desligar colaborador":
+`onclick="abrirDesligarColaborador(id, '${escapeHtml(nome).replace(/'/g, ...)}')"`.
+O `escapeHtml` troca `'` por `&#39;`, o `replace` seguinte nao acha mais aspas,
+e o navegador desfaz a entidade ao ler o atributo, antes de rodar o JS. Nome
+`Alice'); alert('XSS'); ('` executava codigo quando outro admin clicava em
+Desligar — reproduzido no navegador na versao anterior (o alerta disparou). O
+nome pode vir tambem de um arquivo de backup importado. O cookie e `HttpOnly`,
+mas o script age como o admin pela API.
+**Feito:** o nome vai em `data-args` (JSON escapado) e volta como valor no
+clique; e a CSP impede script em atributo. Conferido no navegador: o dialogo
+mostra o nome como texto e nada executa.
 
 ### BAIXO
 

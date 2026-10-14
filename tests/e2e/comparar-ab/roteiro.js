@@ -154,29 +154,29 @@ const espera = (ms) => new Promise((r) => setTimeout(r, ms));
     await menu('dashboard');
     await menu('colaboradores');
     if (await clicar('.colaborador-card', true)) {await snap('editor colaborador');}
-    await clicar('#fecharColaboradorEditor, [onclick*="fecharColaboradorEditor"]', true);
+    await clicar('#fecharColaboradorEditor, [onclick*="fecharColaboradorEditor"], [data-chamar="fecharColaboradorEditor"]', true);
     await snap('editor colaborador fechado');
 
     await menu('escala');
     if (await clicar('.escala-row, .escala-timeline-row, [data-colaborador-id]', true)) {await snap('escala editor');}
-    await clicar('[onclick*="fecharEditor"]', true);
+    await clicar('[onclick*="fecharEditor"], [data-chamar="fecharEditor"]', true);
 
     await menu('lancamentoPlantao');
     if (await clicar('[data-plantao-data], .plantao-dia, .regua-plantao button', true)) {await snap('plantao editor');}
-    await clicar('[onclick*="fecharPlantaoEditor"]', true);
+    await clicar('[onclick*="fecharPlantaoEditor"], [data-chamar="fecharPlantaoEditor"]', true);
 
     await menu('bancoHoras');
     await menu('relatorios');
-    if (await clicar('[onclick*="gerarRelatorioCompleto"]', true)) {
+    if (await clicar('[onclick*="gerarRelatorioCompleto"], [data-chamar="gerarRelatorioCompleto"]', true)) {
         await espera(1500);
         await snap('relatorio completo');
-        await clicar('[onclick*="fecharRelatorio"]', true);
+        await clicar('[onclick*="fecharRelatorio"], [data-chamar="fecharRelatorio"]', true);
     }
-    if (await clicar('[onclick*="gerarRelatorioPlantoes"]', true)) {
+    if (await clicar('[onclick*="gerarRelatorioPlantoes"], [data-chamar="gerarRelatorioPlantoes"]', true)) {
         await espera(1500);
         await snap('relatorio plantoes');
     }
-    if (await clicar('[onclick*="gerarRelatorioEscala"]', true)) {
+    if (await clicar('[onclick*="gerarRelatorioEscala"], [data-chamar="gerarRelatorioEscala"]', true)) {
         await espera(1500);
         await snap('relatorio escala');
     }

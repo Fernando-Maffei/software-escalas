@@ -8,6 +8,7 @@ import { abrirExtratoBancoHoras, renderCardBancoHoras, renderResumoBancoHorasAvi
 import { abrirEditorColaboradores } from './colaboradores-e-jornada.js';
 import { formatarHoraInput, getPlantaoEditorState, mapBancoHorasResumo, minutosParaTexto, withInFlight } from './helpers.js';
 import { construirMapaFeriadosPlantao, rotuloTipoPlantao } from './plantao-regua-e-relatorios.js';
+import { atributosAcao } from '../../../lib/atributos-acao.js';
 
 // Aplica "Meus setores" a lista do checklist, mas SEMPRE mantem quem ja
 // esta selecionado (mesmo de outro setor). Sem isso, abrir um plantao com
@@ -373,10 +374,10 @@ function renderLancamentosPlantao(state) {
                     </div>
                     <div class="plantao-lancamento-acoes">
                         <span class="plantao-lancamento-duracao">${minutos ? escapeHtml(minutosParaTexto(minutos)) : '--'}</span>
-                        <button type="button" class="btn-icon-sm edit" title="Editar lancamento" aria-label="Editar lancamento de ${escapeHtml(nome)}" onclick="editarLancamentoPlantao(${indice})">
+                        <button type="button" class="btn-icon-sm edit" title="Editar lancamento" aria-label="Editar lancamento de ${escapeHtml(nome)}" ${atributosAcao('editarLancamentoPlantao', indice)}>
                             <i class="fas fa-pen"></i>
                         </button>
-                        <button type="button" class="btn-icon-sm delete" title="Remover lancamento" aria-label="Remover lancamento de ${escapeHtml(nome)}" onclick="removerLancamentoPlantao(${indice})">
+                        <button type="button" class="btn-icon-sm delete" title="Remover lancamento" aria-label="Remover lancamento de ${escapeHtml(nome)}" ${atributosAcao('removerLancamentoPlantao', indice)}>
                             <i class="fas fa-times"></i>
                         </button>
                     </div>
@@ -501,7 +502,7 @@ export function renderPlantaoEditor(state) {
                                 class="plantao-credito-opcao plantao-credito--${chave}${chave === tipoCredito ? ' is-active' : ''}"
                                 data-plantao-credito="${chave}"
                                 aria-pressed="${chave === tipoCredito ? 'true' : 'false'}"
-                                onclick="definirTipoCreditoPlantao('${chave}')"
+                                ${atributosAcao('definirTipoCreditoPlantao', chave)}
                             >
                                 <i class="fas ${meta.icone}"></i> ${escapeHtml(meta.label)}
                             </button>
@@ -510,12 +511,12 @@ export function renderPlantaoEditor(state) {
                     <small class="helper-text" id="plantaoCreditoAjuda">${escapeHtml(PLANTAO_CREDITO_META[tipoCredito].ajuda)}</small>
 
                     <div class="plantao-form-acoes">
-                        <button type="button" class="btn-primary" onclick="confirmarLancamentoPlantao()">
+                        <button type="button" class="btn-primary" ${atributosAcao('confirmarLancamentoPlantao')}>
                             <i class="fas ${editando ? 'fa-check' : 'fa-plus'}"></i>
                             ${editando ? 'Salvar lancamento' : 'Adicionar ao dia'}
                         </button>
                         ${editando ? `
-                            <button type="button" class="btn-secondary" onclick="cancelarEdicaoLancamentoPlantao()">
+                            <button type="button" class="btn-secondary" ${atributosAcao('cancelarEdicaoLancamentoPlantao')}>
                                 <i class="fas fa-times"></i> Cancelar edicao
                             </button>
                         ` : ''}
@@ -535,14 +536,14 @@ export function renderPlantaoEditor(state) {
                 </div>
 
                 <div class="editor-actions">
-                    <button type="button" onclick="salvarPlantao('${state.dataISO}')" class="btn-primary">
+                    <button type="button" ${atributosAcao('salvarPlantao', state.dataISO)} class="btn-primary">
                         <i class="fas fa-save"></i> ${jaLancado ? 'Salvar alteracoes' : 'Salvar dia'}
                     </button>
-                    <button type="button" onclick="fecharPlantaoEditor()" class="btn-secondary">
+                    <button type="button" ${atributosAcao('fecharPlantaoEditor')} class="btn-secondary">
                         <i class="fas fa-times"></i> Cancelar
                     </button>
                     ${jaLancado ? `
-                        <button type="button" onclick="excluirPlantao('${state.dataISO}')" class="btn-danger-ghost" title="Excluir todos os lancamentos do dia">
+                        <button type="button" ${atributosAcao('excluirPlantao', state.dataISO)} class="btn-danger-ghost" title="Excluir todos os lancamentos do dia">
                             <i class="fas fa-trash"></i> Excluir dia
                         </button>
                     ` : ''}

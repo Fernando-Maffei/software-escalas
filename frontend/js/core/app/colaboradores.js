@@ -6,6 +6,7 @@ import { carregarSetores } from '../runtime/dados-e-modais.js';
 import { abrirDesligadosColaboradores, abrirEditorColaborador } from '../runtime/plantao-colaboradores/colaboradores-e-jornada.js';
 import { renderListaColaboradores } from '../runtime/plantao-colaboradores/plantao-editor.js';
 import { mostrarToast } from './horas-e-resumo.js';
+import { atributosAcao } from '../../lib/atributos-acao.js';
 
 let colaboradoresOffsetObserver;
 let colaboradoresOffsetResizeLigado;
@@ -45,7 +46,7 @@ export function renderColaboradores() {
                 <div class="editor-content" style="opacity: 1; visibility: visible;">
                     <div class="editor-header">
                         <h3><i class="fas fa-user-edit"></i> <span id="editorTitle">Novo Colaborador</span></h3>
-                        <button onclick="fecharColaboradorEditor()" class="btn-close-editor">
+                        <button ${atributosAcao('fecharColaboradorEditor')} class="btn-close-editor">
                             <i class="fas fa-times"></i>
                         </button>
                     </div>
