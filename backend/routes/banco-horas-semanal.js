@@ -97,11 +97,11 @@ router.get('/', async (req, res) => {
         ? colaboradoresResult.recordset.filter((item) => idsPermitidos.has(Number(item.SetorId)))
         : colaboradoresResult.recordset;
 
-    // Busca todas as celulas do periodo E as semanas historicas fora dele,
-    // para que a grade tambem mostre semanas antigas ja lancadas.
+    // Le a tabela INTEIRA de proposito, sem filtrar pelo periodo: a grade mostra
+    // as semanas do periodo e tambem toda semana historica ja lancada fora dele
+    // (montarSemanas junta as duas). Sao poucas linhas por semana; se um dia
+    // pesar, o corte entra aqui e em montarSemanas juntos.
     const celulasResult = await pool.request()
-        .input('inicio', sql.Date, inicioISO)
-        .input('fim', sql.Date, fimISO)
         .query(`
             SELECT ColaboradorId, SemanaSegunda, Minutos, Observacao, Status
             FROM BancoHorasSemanal

@@ -1,6 +1,6 @@
 const os = require('os');
 const path = require('path');
-const { spawnSync } = require('child_process');
+const { execFile } = require('child_process');
 
 const { AppError } = require('./errors');
 
@@ -13,18 +13,31 @@ function quoteWindowsArgument(value) {
     return `"${String(value || '').replace(/"/g, '\\"')}"`;
 }
 
-function runWindowsCommand(command, args) {
-    const result = spawnSync(command, args, {
-        encoding: 'utf8',
-        windowsHide: true
-    });
+// Assincrono: com spawnSync o servidor inteiro parava (nenhuma outra
+// requisicao era atendida) enquanto o schtasks rodava. O tempo limite evita que
+// um schtasks travado segure a requisicao para sempre.
+const TEMPO_LIMITE_COMANDO_MS = 30000;
 
-    return {
-        ok: result.status === 0,
-        stdout: result.stdout || '',
-        stderr: result.stderr || '',
-        error: result.error?.message || ''
-    };
+// Nunca rejeita: devolve ok/stdout/stderr para quem chama decidir. `error` so
+// vem preenchido quando o comando nem rodou ate o fim (nao existe, tempo
+// esgotado); codigo de saida diferente de zero e so ok = false, como antes.
+function runWindowsCommand(command, args) {
+    return new Promise((resolve) => {
+        execFile(command, args, {
+            encoding: 'utf8',
+            windowsHide: true,
+            timeout: TEMPO_LIMITE_COMANDO_MS
+        }, (error, stdout, stderr) => {
+            const terminouComCodigo = error && typeof error.code === 'number';
+
+            resolve({
+                ok: !error,
+                stdout: stdout || '',
+                stderr: stderr || '',
+                error: error && !terminouComCodigo ? error.message : ''
+            });
+        });
+    });
 }
 
 function assertAvailable() {
@@ -66,7 +79,7 @@ function buildStatusPayload(extra = {}) {
     };
 }
 
-function queryBackgroundServerTask() {
+async function queryBackgroundServerTask() {
     if (process.platform !== 'win32') {
         return buildStatusPayload({
             available: false,
@@ -74,7 +87,7 @@ function queryBackgroundServerTask() {
         });
     }
 
-    const result = runWindowsCommand('schtasks.exe', [
+    const result = await runWindowsCommand('schtasks.exe', [
         '/Query',
         '/TN',
         TASK_NAME,
@@ -92,7 +105,7 @@ function queryBackgroundServerTask() {
     });
 }
 
-function installBackgroundServerTask() {
+async function installBackgroundServerTask() {
     assertAvailable();
 
     const command = buildServerTaskCommand();
@@ -103,7 +116,7 @@ function installBackgroundServerTask() {
     // precisa vir de ADMIN_PASSWORD (ver backend/auth/auth.js) definida no
     // ambiente da maquina. Criar tarefa como SYSTEM exige privilegio de
     // administrador — por isso o tratamento de "acesso negado" abaixo.
-    const result = runWindowsCommand('schtasks.exe', [
+    const result = await runWindowsCommand('schtasks.exe', [
         '/Create',
         '/TN',
         TASK_NAME,
@@ -129,11 +142,11 @@ function installBackgroundServerTask() {
     return queryBackgroundServerTask();
 }
 
-function uninstallBackgroundServerTask() {
+async function uninstallBackgroundServerTask() {
     assertAvailable();
-    runWindowsCommand('schtasks.exe', ['/End', '/TN', TASK_NAME]);
+    await runWindowsCommand('schtasks.exe', ['/End', '/TN', TASK_NAME]);
 
-    const result = runWindowsCommand('schtasks.exe', [
+    const result = await runWindowsCommand('schtasks.exe', [
         '/Delete',
         '/TN',
         TASK_NAME,
@@ -147,10 +160,10 @@ function uninstallBackgroundServerTask() {
     return queryBackgroundServerTask();
 }
 
-function startBackgroundServerTask() {
+async function startBackgroundServerTask() {
     assertAvailable();
 
-    const result = runWindowsCommand('schtasks.exe', [
+    const result = await runWindowsCommand('schtasks.exe', [
         '/Run',
         '/TN',
         TASK_NAME
@@ -163,10 +176,10 @@ function startBackgroundServerTask() {
     return queryBackgroundServerTask();
 }
 
-function stopBackgroundServerTask() {
+async function stopBackgroundServerTask() {
     assertAvailable();
 
-    const result = runWindowsCommand('schtasks.exe', [
+    const result = await runWindowsCommand('schtasks.exe', [
         '/End',
         '/TN',
         TASK_NAME
@@ -180,6 +193,7 @@ function stopBackgroundServerTask() {
 }
 
 module.exports = {
+    runWindowsCommand,
     installBackgroundServerTask,
     queryBackgroundServerTask,
     startBackgroundServerTask,

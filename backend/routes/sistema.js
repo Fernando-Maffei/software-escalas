@@ -12,9 +12,9 @@ const {
 const router = express.Router();
 
 function handleBackgroundServerAction(action) {
-    return (req, res, next) => {
+    return async (req, res, next) => {
         try {
-            res.json(action());
+            res.json(await action());
         } catch (error) {
             next(error instanceof AppError ? error : new AppError(500, error.message));
         }

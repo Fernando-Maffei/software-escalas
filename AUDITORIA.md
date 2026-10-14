@@ -848,17 +848,24 @@ passou a ser transacional). Trava de aplicacao em vez de `UPDLOCK` nas linhas
 para nao abrir deadlock pela ordem das linhas. Teste de integracao com os dois
 pedidos simultaneos.
 
-**T12 — Parametros sem uso na grade semanal** · `ABERTO`
-`GET /api/banco-horas-semanal` passa `@inicio`/`@fim`, mas le a tabela toda (de
-proposito, para mostrar semanas historicas). Remover os inputs ou comentar.
+**T12 — Parametros sem uso na grade semanal** · `RESOLVIDO`
+`GET /api/banco-horas-semanal` passava `@inicio`/`@fim`, mas lia a tabela toda
+(de proposito, para mostrar semanas historicas).
+**Feito:** inputs removidos e o comentario diz que a leitura completa e
+intencional e onde mexer se um dia pesar. Sem mudanca de comportamento.
 
 **T13 — Um MERGE por dia x colaborador ao gerar a escala** · `ABERTO`
 `services/escala.js` (`ensureEscalaBaseForPeriod`): primeiro acesso a um mes
 com 30 pessoas ~ 660 idas ao banco. Insercao em lote resolve.
 
-**T14 — `spawnSync` dentro de rota** · `ABERTO`
-`lib/background-service.js`: trava o servidor enquanto o `schtasks` roda (so
-admin). Trocar por `execFile` assincrono.
+**T14 — `spawnSync` dentro de rota** · `RESOLVIDO`
+`lib/background-service.js`: o servidor inteiro parava enquanto o `schtasks`
+rodava (so admin).
+**Feito:** `execFile` assincrono com tempo limite de 30 s; as funcoes e a rota
+`/api/sistema` aguardam a promessa. O formato da resposta (`ok`, `stdout`,
+`stderr`, `error`) e o mesmo. Testes unitarios (rodam com o proprio Node, inclusive
+no CI), um deles provando que o event loop segue livre — a versao antiga falha
+nele. Conferido de verdade no Windows com `schtasks /Query`.
 
 **T15 — CI nao roda `analisar:codigo-morto`** · `RESOLVIDO`
 O README diz que o CI roda o mesmo que `npm run verificar`.
