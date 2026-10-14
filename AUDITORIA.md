@@ -778,11 +778,53 @@ aceita no maximo 366 dias (quadro mensal, semana e relatorio detalhado cabem).
 Testes: unitario (contagem das pontas, ano bissexto) e de integracao
 (`limites.test.js`: 367 dias da 400 sem criar linha; 366 passa).
 
-**T2 — Commits sem CI e sem integracao** · `ABERTO`
+**T2 — Commits sem CI e sem integracao** · `RESOLVIDO` (falta so o push)
 91 commits da `main` local nunca subiram; a feature de folga de domingo e o
 driver `mssql` atualizado (T4) nao foram exercitados contra SQL Server real.
-**Proximo passo:** subir o banco de integracao, rodar `npm run test:integracao`
-e dar push antes do proximo deploy.
+**Feito (2026-10-13, Docker temporario, so containers de teste):**
+- Integracao contra SQL Server 2022 CU27 (a imagem fixada no T17; o digest
+  baixado bateu com o registrado): **54/54**, no Node 24 desta maquina e num
+  container `node:22-slim` (o ambiente do CI). Unitarios no Node 22: 190/190.
+- Golden master em duas etapas, com o mesmo roteiro nas tres arvores:
+  - antes da auditoria (`f10c9dc`) x T18 (`f85545c`): so `/saldos` (a data de
+    "hoje": rodado as 22:27, o codigo antigo dizia 14/10 em UTC, o novo 13/10 —
+    T5) e 2 linhas de `escala_dia` do Caio, desligado no roteiro, que o codigo
+    antigo gerava (T18). Todo o resto identico, fora o id: o lote do T13 grava
+    o mesmo que a gravacao linha a linha;
+  - T18 x agora: as 87 respostas da API identicas; em `escala_dia`, 1 linha
+    automatica a menos, que antes so existia porque uma leitura a criou (T8).
+- Instancia de teste (4460) com o compose novo: `init-db.sh` criou o login
+  `escalas_app` (db_owner, nao sysadmin) num volume que antes usava o `sa`; a
+  unica sessao do app no SQL e `escalas_app`; `/api/health` 200 (T7). Robo na
+  instancia, com a CSP do Express e o login restrito: 12/12 nas sementes 2026 e
+  4242.
+**Falta:** dar push da branch para o CI rodar.
+
+**T20 — `npm audit fix` (T4) trouxe driver que exige Node 22** · `RESOLVIDO`
+Achado pelo T2: `tedious` foi de 19.2.1 (Node >= 18.17) para 20.3.7
+(`engines: node >= 22`), que usa `Promise.withResolvers`. No Docker
+(`node:20-slim`) o app nao conectava ("Promise.withResolvers is not a
+function"), e o CI, tambem no Node 20, quebraria. Os testes locais passaram
+porque esta maquina tem Node 24.
+**Feito:** Node 22 em tudo — `node:22-slim`, CI e robo noturno, `engines
+>=22.12` (22.12 e o primeiro 22 com `require` de modulo ES sem flag, que os
+testes usam), README, CONTRIBUTING e guia de instalacao. O Node 20 ja estava sem
+suporte desde abril/2026.
+
+**T21 — Golden master quebrado desde a feature de plantonista** · `RESOLVIDO`
+Desde `e96f6a7` (30/09, antes da auditoria) so plantonista de final de semana
+pode ter folga de domingo; o Beto do roteiro nao era, a API recusava a folga e
+o roteiro parava no passo dela — em qualquer versao.
+**Feito:** o roteiro cria o Beto como plantonista de final de semana.
+
+**T22 — Containers antigos disputam a porta 1433 com o SQL nativo no boot** · `PROPOSTA`
+Com o Docker ligado, `escalas-app`/`escalas-db` (`restart: always`) sobem
+sozinhos no boot. Em 13/10 o `escalas-db` pegou a 1433 antes do
+`MSSQL$SERVIDOR_SQL`, que ficou parado; e o `escalas-app` antigo, com o banco
+antigo de pe, aplicou nele a migration `2026-09-30-plantonista-colaborador.sql`
+(so acrescenta colunas). Nenhum backup foi escrito: foram parados com `kill`.
+Proposta (decisao do Fernando): se a producao agora e o SQL nativo,
+`docker update --restart=no escalas-app escalas-db`.
 
 ### MEDIO
 
