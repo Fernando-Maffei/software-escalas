@@ -85,7 +85,7 @@ uma vez no PowerShell **como Administrador**, habilita o TCP/IP numa porta fixa,
 cria o banco e um login próprio do app e libera a porta 4450 no firewall:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File scriptspreparar-sql-server.ps1
+powershell -ExecutionPolicy Bypass -File scripts\preparar-sql-server.ps1
 ```
 
 ```bash

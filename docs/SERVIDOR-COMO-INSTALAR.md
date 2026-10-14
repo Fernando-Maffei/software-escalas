@@ -34,7 +34,7 @@ responde *"A instância do SQL Server não respondeu por TCP/IP"*.
 Abra o **PowerShell como Administrador**, entre na pasta do projeto e rode:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File scriptspreparar-sql-server.ps1
+powershell -ExecutionPolicy Bypass -File scripts\preparar-sql-server.ps1
 ```
 
 O script pode ser repetido sem estragar nada e faz, nesta ordem:

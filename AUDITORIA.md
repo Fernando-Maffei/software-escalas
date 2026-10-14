@@ -808,9 +808,13 @@ no ultimo dia do mes o relatorio de horas extras abria no mes seguinte (vazio) e
 no domingo a noite a grade pulava de semana.
 **Feito:** `hojeISO()` local em `lib/validation.js`. Teste unitario.
 
-**T6 — Container sem fuso** · `PROPOSTA`
+**T6 — Container sem fuso** · `RESOLVIDO`
 `Dockerfile`/`docker-compose.yml` sem `TZ`: no Docker toda logica de "hoje"
-(inclusive o T5) roda em UTC. Proposta: `TZ: "America/Sao_Paulo"` no servico `app`.
+(inclusive o T5) roda em UTC.
+**Feito:** `TZ: "America/Sao_Paulo"` no servico `app` do `docker-compose.yml` e
+do `docker-compose.teste.yml` (a imagem oficial do Node traz os dados de fuso
+no ICU, sem `tzdata`). O banco continua em UTC: as sessoes ja usam
+`SYSUTCDATETIME`. Vale na proxima subida do container.
 
 **T7 — App usa `sa` e a porta 1433 fica aberta para a rede** · `PROPOSTA`
 `docker-compose.yml`. Proposta: login proprio do app (o
@@ -850,8 +854,9 @@ admin). Trocar por `execFile` assincrono.
 **T15 — CI nao roda `analisar:codigo-morto`** · `ABERTO`
 O README diz que o CI roda o mesmo que `npm run verificar`.
 
-**T16 — Comando quebrado no README** · `ABERTO`
+**T16 — Comando quebrado no README** · `RESOLVIDO`
 `scriptspreparar-sql-server.ps1` (falta a barra).
+**Feito:** corrigido no `README.md` e em `docs/SERVIDOR-COMO-INSTALAR.md`.
 
 **T17 — Imagens Docker em `:latest`** · `ABERTO`
 `mssql/server:2022-latest` e `mssql-tools:latest`: build nao reproduzivel.

@@ -61,6 +61,9 @@ services:
         condition: service_completed_successfully
     environment:
       PORT: "4450"
+      # Sem TZ o container roda em UTC e todo "hoje" do app (escala, banco de
+      # horas, desligamento, horario do backup) vira o dia seguinte as 21h.
+      TZ: "America/Sao_Paulo"
       DB_HOST: "db"
       DB_PORT: "1433"
       DB_DATABASE: "SoftwareEscalas"
