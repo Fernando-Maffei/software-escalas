@@ -47,7 +47,7 @@ router.post('/login', async (req, res, next) => {
         const password = normalizePassword(req.body?.password, 'Senha');
 
         const rateKey = `${getClientIp(req)}|${username.toLowerCase()}`;
-        const limite = loginRateLimiter.check(rateKey);
+        const limite = loginRateLimiter.consume(rateKey);
 
         if (limite.blocked) {
             const minutos = Math.ceil(limite.retryAfterMs / 60000);
@@ -58,7 +58,6 @@ router.post('/login', async (req, res, next) => {
         const user = await findUserByUsername(pool, username);
 
         if (!(await credenciaisValidas(user, password))) {
-            loginRateLimiter.registerFailure(rateKey);
             throw new AppError(401, 'Usuario ou senha invalidos.');
         }
 
@@ -122,7 +121,7 @@ router.post('/trocar-senha', requireAuth, async (req, res, next) => {
         // (ou sequestrada) nao pode trocar a senha e trancar o dono do lado de
         // fora. Mesmo limitador de forca bruta do login, com chave propria.
         const rateKey = `trocar-senha|${getClientIp(req)}|${req.user.id}`;
-        const limite = loginRateLimiter.check(rateKey);
+        const limite = loginRateLimiter.consume(rateKey);
 
         if (limite.blocked) {
             const minutos = Math.ceil(limite.retryAfterMs / 60000);
@@ -133,7 +132,6 @@ router.post('/trocar-senha', requireAuth, async (req, res, next) => {
         const user = await findUserById(pool, req.user.id);
 
         if (!(await credenciaisValidas(user, senhaAtual))) {
-            loginRateLimiter.registerFailure(rateKey);
             throw new AppError(403, 'Senha atual incorreta.');
         }
 
@@ -176,7 +174,7 @@ router.post('/verify-password', requireAuth, async (req, res, next) => {
         }
 
         const rateKey = `verify|${getClientIp(req)}|${req.user.id}`;
-        const limite = loginRateLimiter.check(rateKey);
+        const limite = loginRateLimiter.consume(rateKey);
 
         if (limite.blocked) {
             const minutos = Math.ceil(limite.retryAfterMs / 60000);
@@ -187,7 +185,6 @@ router.post('/verify-password', requireAuth, async (req, res, next) => {
         const user = await findUserById(pool, req.user.id);
 
         if (!(await credenciaisValidas(user, password))) {
-            loginRateLimiter.registerFailure(rateKey);
             throw new AppError(403, 'Senha incorreta.');
         }
 

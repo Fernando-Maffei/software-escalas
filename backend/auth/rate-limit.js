@@ -106,8 +106,26 @@ function createRateLimiter(options = {}) {
         entries.delete(key);
     }
 
+    // Confere E conta a tentativa num passo so, antes de qualquer await. Com
+    // check() no inicio e registerFailure() so depois do scrypt, varias
+    // requisicoes simultaneas passavam todas pelo check antes de a primeira
+    // falha ser contada — o limite de 5 virava "quantas couberem em paralelo".
+    // A tentativa que atinge o limite ainda e atendida (mesma conta de antes:
+    // 5 tentativas, a 6a bloqueia). Quem acerta chama reset().
+    function consume(key) {
+        const situacao = check(key);
+
+        if (situacao.blocked) {
+            return situacao;
+        }
+
+        const { attempts } = registerFailure(key);
+        return { blocked: false, retryAfterMs: 0, attempts };
+    }
+
     return {
         check,
+        consume,
         registerFailure,
         reset,
         size: () => entries.size,

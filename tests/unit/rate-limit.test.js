@@ -100,5 +100,45 @@ module.exports = [
             assert.strictEqual(rl.check('ip1|user').blocked, true);
             assert.strictEqual(rl.check('ip2|user').blocked, false, 'outra chave nao deveria ser afetada');
         }
+    },
+    {
+        // Simula a rota de login: consume() antes do await (o scrypt), sucesso
+        // so se a senha bater. Com check()/registerFailure() separados pelo
+        // await, as 12 passavam pelo portao.
+        name: 'rate-limit consume barra tentativas simultaneas alem do limite',
+        async run() {
+            const relogio = comRelogio();
+            const rl = createRateLimiter({ maxAttempts: 5, now: relogio.now });
+
+            async function tentarLogin() {
+                if (rl.consume('ip|user').blocked) {
+                    return 429;
+                }
+
+                await new Promise((resolve) => setTimeout(resolve, 5));
+                return 401;
+            }
+
+            const status = await Promise.all(Array.from({ length: 12 }, tentarLogin));
+
+            assert.strictEqual(status.filter((codigo) => codigo === 401).length, 5);
+            assert.strictEqual(status.filter((codigo) => codigo === 429).length, 7);
+        }
+    },
+    {
+        name: 'rate-limit consume libera de novo depois do reset (login certo)',
+        run() {
+            const relogio = comRelogio();
+            const rl = createRateLimiter({ maxAttempts: 3, now: relogio.now });
+
+            rl.consume('ip|user');
+            rl.consume('ip|user');
+            rl.reset('ip|user');
+
+            assert.strictEqual(rl.consume('ip|user').blocked, false);
+            assert.strictEqual(rl.consume('ip|user').blocked, false);
+            assert.strictEqual(rl.consume('ip|user').blocked, false, 'a 3a tentativa ainda e atendida');
+            assert.strictEqual(rl.consume('ip|user').blocked, true, 'a 4a bloqueia');
+        }
     }
 ];
