@@ -94,8 +94,13 @@ async function montarCenarioCompleto(cliente) {
         'almoco personalizado'
     );
 
-    // Garante linhas de escala_dia materializadas para o periodo.
-    esperarSucesso(await cliente.get(`/api/escala/dia/${DATAS.segunda}`), 'gerar escala');
+    // Garante linhas de escala_dia materializadas para o periodo. A leitura
+    // (GET /escala/dia) nao grava mais (T8); quem materializa e a rota de
+    // reconstrucao.
+    esperarSucesso(
+        await cliente.post('/api/escala/rebuild', { dataInicio: DATAS.segunda, dataFim: DATAS.segunda }),
+        'gerar escala'
+    );
 }
 
 module.exports = [

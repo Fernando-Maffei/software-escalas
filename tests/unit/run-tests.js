@@ -20,7 +20,9 @@ const suites = [
     ...require('./horasEmCarteira.test.js'),
     ...require('./rate-limit.test.js'),
     ...require('./backgroundService.test.js'),
-    ...require('./escalaGravacaoEmLote.test.js')
+    ...require('./escalaGravacaoEmLote.test.js'),
+    ...require('./transacoes.test.js'),
+    ...require('./escalaLeituraDescartada.test.js')
 ];
 
 let passed = 0;

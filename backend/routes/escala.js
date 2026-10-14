@@ -1,7 +1,7 @@
 const express = require('express');
 
 const { sql, conectar } = require('../db');
-const { withTransaction } = require('../db/transactions');
+const { withTransaction, withTransactionDescartada } = require('../db/transactions');
 const { AppError } = require('../lib/errors');
 const { getSetoresPermitidosRequest, idsPermitidosNumericos } = require('../auth/acesso-setores');
 const {
@@ -89,7 +89,9 @@ router.get('/dia/:dataISO', async (req, res) => {
         ? ensurePositiveInt(req.query.setorId, 'Setor')
         : null;
 
-    const items = await withTransaction(sql, pool, async (tx) => listEscalaDiaByDate(tx, dataISO, {
+    // Leitura: gera a escala do dia numa transacao descartada — a resposta e a
+    // mesma, e nada fica gravado (ver withTransactionDescartada).
+    const items = await withTransactionDescartada(sql, pool, async (tx) => listEscalaDiaByDate(tx, dataISO, {
         setorId
     }));
 
@@ -126,9 +128,10 @@ router.get('/relatorio', async (req, res) => {
         throw new AppError(400, 'Informe dataInicio e dataFim para gerar o relatorio de escala.');
     }
 
-    // A leitura gera a escala do periodo inteiro (ensureEscalaDiaForPeriod) e
-    // qualquer conta, ate a de visualizacao, chama esta rota: um ano basta para
-    // o quadro mensal, a semana e o relatorio detalhado.
+    // A leitura gera a escala do periodo inteiro (ensureEscalaDiaForPeriod),
+    // numa transacao descartada, e qualquer conta, ate a de visualizacao, chama
+    // esta rota: nada fica gravado, mas o trabalho cresce com o periodo. Um ano
+    // basta para o quadro mensal, a semana e o relatorio detalhado.
     const { dataInicio, dataFim } = buildDateRange(req.query.dataInicio, req.query.dataFim, {
         maxDias: MAX_DIAS_RELATORIO
     });
@@ -142,7 +145,7 @@ router.get('/relatorio', async (req, res) => {
         ? normalizeEscalaTipo(req.query.tipo)
         : null;
 
-    const items = await withTransaction(sql, pool, async (tx) => listEscalaReport(tx, {
+    const items = await withTransactionDescartada(sql, pool, async (tx) => listEscalaReport(tx, {
         dataInicio,
         dataFim,
         colaboradorId,

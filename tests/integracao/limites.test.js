@@ -1,6 +1,7 @@
 const assert = require('node:assert/strict');
 
 const { consultar, criarCliente, esperarSucesso, nomeUnico } = require('./apoio');
+const { criarColaborador } = require('./fabrica');
 
 async function linhasDeEscalaEm(ano) {
     const [linha] = await consultar(`
@@ -55,6 +56,41 @@ module.exports = [
 
             // A chave e IP + usuario: o bloqueio nao vaza para outra conta.
             await criarCliente().entrar();
+        }
+    },
+    {
+        // T8: a leitura gerava a escala do dia e deixava as linhas gravadas
+        // (inclusive pela conta de visualizacao). Agora responde igual e nao
+        // grava nada.
+        name: 'ler a escala do dia responde com a escala gerada e nao grava linha',
+        async run() {
+            const cliente = criarCliente();
+            await cliente.entrar();
+            const colaborador = await criarColaborador(cliente);
+            const dia = '2045-05-02';
+
+            const resposta = esperarSucesso(await cliente.get(`/api/escala/dia/${dia}`), 'escala do dia');
+            const dele = resposta.items.find((item) => item.colaboradorId === colaborador.Id);
+
+            assert.equal(dele?.horaInicio, '08:00:00');
+            assert.equal(dele?.tipo, 'normal');
+
+            const [linhas] = await consultar(`SELECT COUNT(*) AS total FROM escala_dia WHERE data = '${dia}'`);
+            assert.equal(linhas.total, 0);
+
+            // A escrita continua materializando o dia.
+            esperarSucesso(
+                await cliente.post('/api/escala/rebuild', {
+                    dataInicio: dia,
+                    dataFim: dia,
+                    colaboradorId: colaborador.Id
+                }),
+                'reconstruir'
+            );
+            const [depois] = await consultar(
+                `SELECT COUNT(*) AS total FROM escala_dia WHERE data = '${dia}' AND colaborador_id = ${Number(colaborador.Id)}`
+            );
+            assert.equal(depois.total, 1);
         }
     }
 ];

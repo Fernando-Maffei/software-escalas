@@ -88,8 +88,8 @@ function criarBancoEscalaFalso({ colaboradores = [], jornada = [], feriados = []
                 .map((dataISO) => ({ Data: dataSql(dataISO) }));
         }
 
-        // Almoco personalizado por dia: o cenario nao tem nenhum.
-        if (texto.includes('FROM AlmocosPersonalizados')) {
+        // Fontes da hidratacao e almoco personalizado: o cenario nao tem nenhum.
+        if (/FROM (AlmocosPersonalizados|Ausencias|plantoes|FolgasDomingo)\b/.test(texto)) {
             return [];
         }
 
@@ -99,9 +99,12 @@ function criarBancoEscalaFalso({ colaboradores = [], jornada = [], feriados = []
 
         if (texto.includes('FROM escala_dia e')) {
             const porId = new Map(colaboradores.map((c) => [c.Id, c]));
+            // Listagem por periodo (listEscalaDiaRows, so ativos) ou de um
+            // colaborador inteiro (syncColaboradorDefaultsToEscalaDia).
             return [...linhas.values()]
-                .filter((linha) => linha.data >= inputs.dataInicio && linha.data <= inputs.dataFim)
-                .filter((linha) => porId.get(linha.colaborador_id)?.Ativo === true)
+                .filter((linha) => !inputs.dataInicio || (linha.data >= inputs.dataInicio && linha.data <= inputs.dataFim))
+                .filter((linha) => !inputs.data || linha.data === inputs.data)
+                .filter((linha) => !texto.includes('c.Ativo = 1') || porId.get(linha.colaborador_id)?.Ativo === true)
                 .filter((linha) => !inputs.colaboradorId || linha.colaborador_id === inputs.colaboradorId)
                 .map((linha) => {
                     const colaborador = porId.get(linha.colaborador_id);
@@ -113,11 +116,14 @@ function criarBancoEscalaFalso({ colaboradores = [], jornada = [], feriados = []
                         setorId: colaborador.SetorId,
                         setorNome: colaborador.SetorNome
                     };
-                });
+                })
+                // ORDER BY e.data, c.Nome, como as consultas de verdade.
+                .sort((a, b) => a.dataISO.localeCompare(b.dataISO) || a.colaboradorNome.localeCompare(b.colaboradorNome));
         }
 
         if (texto.includes('FROM Colaboradores c')) {
-            return colaboradores.filter((c) => !inputs.colaboradorId || c.Id === inputs.colaboradorId);
+            const id = inputs.colaboradorId ?? inputs.id;
+            return colaboradores.filter((c) => !id || c.Id === id);
         }
 
         throw new Error(`Consulta nao prevista no banco falso: ${texto.trim().slice(0, 80)}`);
@@ -127,6 +133,12 @@ function criarBancoEscalaFalso({ colaboradores = [], jornada = [], feriados = []
         comandos,
         // Estado final da tabela, ordenado, para comparar.
         tabela: () => [...linhas.values()].sort((a, b) => a.id - b.id),
+        // Para imitar a transacao descartada: guarda e devolve o estado.
+        instantaneo: () => new Map([...linhas].map(([k, linha]) => [k, { ...linha }])),
+        restaurar(estado) {
+            linhas.clear();
+            estado.forEach((linha, k) => linhas.set(k, { ...linha }));
+        },
         request() {
             const inputs = {};
             const request = {

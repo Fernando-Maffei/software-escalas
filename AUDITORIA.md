@@ -820,10 +820,34 @@ no ICU, sem `tzdata`). O banco continua em UTC: as sessoes ja usam
 `docker-compose.yml`. Proposta: login proprio do app (o
 `scripts/preparar-sql-server.ps1` ja cria um) e `"127.0.0.1:1433:1433"`.
 
-**T8 — GET da escala grava** · `PROPOSTA`
-`GET /api/escala/dia` e `/relatorio` fazem MERGE/DELETE: conta somente-leitura
-gera escrita e locks. Medio prazo: materializar na escrita (ausencia, plantao,
-folga, cadastro) e deixar o GET so ler — o que tambem resolve o T13.
+**T8 — GET da escala grava** · `RESOLVIDO` (a parte de locks fica para depois)
+`GET /api/escala/dia` e `/relatorio` faziam MERGE/DELETE e confirmavam: a conta
+somente-leitura deixava escrita no banco, e o backup crescia com linhas geradas
+so por navegar.
+**Feito:** as duas leituras rodam em `withTransactionDescartada`
+(`db/transactions.js`): o gerador monta a escala dentro da transacao, a resposta
+sai dessas linhas e tudo e desfeito no fim. As escritas (ajuste manual,
+almocos, ausencia, plantao, folga, `/rebuild`) continuam materializando e
+confirmando. `withTransaction` foi reescrita sobre a mesma base e segue igual
+(os 4 testes dela passam tambem contra a versao anterior).
+**Por que e equivalente:** linha automatica ja gravada converge sempre para o que
+o gerador calcula (ele a refaz a cada leitura), e o que precisa ficar e gravado
+pelas rotas de escrita; nenhum outro leitor de `escala_dia` depende das linhas
+que a leitura criava (o conflito de reposicao so olha ajuste manual, o backup so
+copia, o front nao usa o id da linha). Teste unitario com dois mundos — leitura
+gravando x leitura descartada — passando por troca de horario no cadastro,
+ajuste manual, feriado novo, desligamento, jornada semanal nova e reativacao: as
+respostas do mes e do dia batem em todos os passos. Teste de integracao: a
+leitura responde a escala e nao deixa linha; `/rebuild` grava. O
+`backup.test.js` passou a materializar com `/rebuild`.
+**Limite:** dentro da transacao as linhas ainda sao gravadas e desfeitas, entao
+os locks durante a leitura continuam (e cada leitura refaz o trabalho, que o
+T13 deixou barato). Tirar isso exige separar calculo de gravacao no gerador
+inteiro.
+**Golden master:** comparado com uma foto anterior ao T8, vai acusar
+diferencas esperadas so em `escala_dia` (menos linhas) e no `id` das linhas nas
+respostas de `/escala/dia` e `/escala/relatorio`. Para separar dos outros itens,
+gere a foto de antes em `f85545c` (T18) e compare no commit do T8.
 
 **T9 — CSP sem `script-src`** · `ABERTO`
 Ja era a recomendacao 5 da secao 5 (tirar os 26 `onclick`).
