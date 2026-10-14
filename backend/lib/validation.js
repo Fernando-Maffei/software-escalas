@@ -128,10 +128,31 @@ function compareTimes(firstTime, secondTime) {
     return normalizeTime(firstTime).localeCompare(normalizeTime(secondTime));
 }
 
+// "Hoje" no fuso do servidor. new Date().toISOString() da a data em UTC: no
+// Brasil (UTC-3), das 21h a meia-noite ela ja e o dia seguinte.
+function hojeISO(agora = new Date()) {
+    const ano = agora.getFullYear();
+    const mes = String(agora.getMonth() + 1).padStart(2, '0');
+    const dia = String(agora.getDate()).padStart(2, '0');
+    return `${ano}-${mes}-${dia}`;
+}
+
+const MS_POR_DIA = 24 * 60 * 60 * 1000;
+
+// Dias do periodo, contando as duas pontas (2026-01-01..2026-01-01 = 1).
+function contarDiasDoPeriodo(dataInicio, dataFim) {
+    return Math.round((Date.parse(`${dataFim}T00:00:00Z`) - Date.parse(`${dataInicio}T00:00:00Z`)) / MS_POR_DIA) + 1;
+}
+
+// `maxDias` limita o tamanho do periodo. Rotas cuja leitura MATERIALIZA a
+// escala (gera uma linha por colaborador por dia) precisam dele: sem teto, um
+// periodo digitado errado (2020 a 2030) gerava centenas de milhares de linhas
+// numa transacao so.
 function buildDateRange(startDate, endDate, options = {}) {
     const {
         startLabel = 'Data inicial',
-        endLabel = 'Data final'
+        endLabel = 'Data final',
+        maxDias = null
     } = options;
 
     const dataInicio = normalizeIsoDate(startDate, startLabel);
@@ -139,6 +160,10 @@ function buildDateRange(startDate, endDate, options = {}) {
 
     if (dataFim < dataInicio) {
         throw new AppError(400, `${endLabel} deve ser maior ou igual a ${startLabel.toLowerCase()}.`);
+    }
+
+    if (maxDias && contarDiasDoPeriodo(dataInicio, dataFim) > maxDias) {
+        throw new AppError(400, `O periodo pode ter no maximo ${maxDias} dias.`);
     }
 
     return { dataInicio, dataFim };
@@ -294,6 +319,7 @@ module.exports = {
     ensurePositiveInt,
     extractDateString,
     extractTimeString,
+    hojeISO,
     normalizeBoolean,
     normalizeEnum,
     normalizeIsoDate,

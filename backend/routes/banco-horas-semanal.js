@@ -7,6 +7,7 @@ const { getSetoresPermitidosRequest, idsPermitidosNumericos } = require('../auth
 const { parseBalanceInputToMinutes } = require('../services/bancoHoras');
 const {
     ensurePositiveInt,
+    hojeISO,
     normalizeIsoDate,
     normalizeOptionalText
 } = require('../lib/validation');
@@ -46,7 +47,7 @@ function addDaysISO(dateISO, days) {
 }
 
 function todayMondayISO() {
-    return toMondayISO(new Date().toISOString().slice(0, 10));
+    return toMondayISO(hojeISO());
 }
 
 function formatDateLabelISO(dateISO) {
@@ -295,7 +296,7 @@ router.get('/verificar', async (req, res) => {
 
     const dataISO = req.query.data
         ? normalizeIsoDate(req.query.data, 'Data')
-        : new Date().toISOString().slice(0, 10);
+        : hojeISO();
 
     const colaboradores = await listarColaboradoresAtivosVisiveis(pool, req);
     const bases = await carregarBases(pool, dataISO, { ateInclusive: true });
@@ -362,7 +363,7 @@ router.get('/saldos', async (req, res) => {
 
     const dataISO = req.query.data
         ? normalizeIsoDate(req.query.data, 'Data')
-        : new Date().toISOString().slice(0, 10);
+        : hojeISO();
 
     const permitidos = await getSetoresPermitidosRequest(pool, req);
     const idsPermitidos = new Set(idsPermitidosNumericos(permitidos));
@@ -552,7 +553,7 @@ router.delete('/semana/:semana', async (req, res) => {
 router.get('/horas-extras', async (req, res) => {
     const pool = await conectar();
 
-    const hoje = new Date().toISOString().slice(0, 10);
+    const hoje = hojeISO();
     const inicioISO = req.query.inicio
         ? normalizeIsoDate(req.query.inicio, 'Data inicial')
         : `${hoje.slice(0, 7)}-01`;

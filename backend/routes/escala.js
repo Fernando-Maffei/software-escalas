@@ -24,6 +24,8 @@ const {
 
 const router = express.Router();
 
+const MAX_DIAS_RELATORIO = 366;
+
 function parseManualEscalaPayload(req) {
     return {
         colaboradorId: ensurePositiveInt(req.params.colaboradorId, 'Colaborador'),
@@ -124,7 +126,12 @@ router.get('/relatorio', async (req, res) => {
         throw new AppError(400, 'Informe dataInicio e dataFim para gerar o relatorio de escala.');
     }
 
-    const { dataInicio, dataFim } = buildDateRange(req.query.dataInicio, req.query.dataFim);
+    // A leitura gera a escala do periodo inteiro (ensureEscalaDiaForPeriod) e
+    // qualquer conta, ate a de visualizacao, chama esta rota: um ano basta para
+    // o quadro mensal, a semana e o relatorio detalhado.
+    const { dataInicio, dataFim } = buildDateRange(req.query.dataInicio, req.query.dataFim, {
+        maxDias: MAX_DIAS_RELATORIO
+    });
     const colaboradorId = req.query.colaboradorId
         ? ensurePositiveInt(req.query.colaboradorId, 'Colaborador')
         : null;
