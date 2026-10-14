@@ -11,7 +11,7 @@ const { spawnSync } = require('child_process');
 const CONTAINER = 'escalas-integracao-db';
 const PORTA = process.env.INTEGRACAO_DB_PORT || '14339';
 const SENHA = process.env.INTEGRACAO_DB_PASSWORD || 'Integracao!Escalas2026';
-const IMAGEM = 'mcr.microsoft.com/mssql/server:2022-latest';
+const IMAGEM = 'mcr.microsoft.com/mssql/server:2022-CU27-GDR1-ubuntu-22.04';
 const ESPERA_MAXIMA_MS = 120 * 1000;
 
 function docker(args, opcoes = {}) {

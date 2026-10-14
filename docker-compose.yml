@@ -14,7 +14,12 @@ name: app-de-escalas
 services:
   # ---- Banco de dados (SQL Server, edicao Express/gratuita) ----------------
   db:
-    image: mcr.microsoft.com/mssql/server:2022-latest
+    # Versao fixa (era 2022-latest): o build fica reproduzivel e a atualizacao
+    # do SQL Server vira uma decisao. Ao trocar, so para CU MAIS NOVO — o SQL
+    # Server nao abre banco gravado por versao mais nova, entao voltar de CU
+    # deixa o volume db-data sem subir. Mesma tag no ci.yml, no
+    # docker-compose.teste.yml e em scripts/banco-integracao.js.
+    image: mcr.microsoft.com/mssql/server:2022-CU27-GDR1-ubuntu-22.04
     container_name: escalas-db
     environment:
       ACCEPT_EULA: "Y"
@@ -28,7 +33,9 @@ services:
 
   # ---- Cria o banco "SoftwareEscalas" uma vez e sai ------------------------
   db-init:
-    image: mcr.microsoft.com/mssql-tools:latest
+    # A Microsoft so publica "latest" desta imagem (descontinuada); o digest
+    # trava a versao.
+    image: mcr.microsoft.com/mssql-tools@sha256:62556500522072535cb3df2bb5965333dded9be47000473e9e0f84118e248642
     container_name: escalas-db-init
     depends_on:
       - db

@@ -860,12 +860,21 @@ com 30 pessoas ~ 660 idas ao banco. Insercao em lote resolve.
 `lib/background-service.js`: trava o servidor enquanto o `schtasks` roda (so
 admin). Trocar por `execFile` assincrono.
 
-**T15 — CI nao roda `analisar:codigo-morto`** · `ABERTO`
+**T15 — CI nao roda `analisar:codigo-morto`** · `RESOLVIDO`
 O README diz que o CI roda o mesmo que `npm run verificar`.
+**Feito:** passo "Codigo morto" no job de testes do `ci.yml`, na mesma ordem do
+`verificar`.
 
 **T16 — Comando quebrado no README** · `RESOLVIDO`
 `scriptspreparar-sql-server.ps1` (falta a barra).
 **Feito:** corrigido no `README.md` e em `docs/SERVIDOR-COMO-INSTALAR.md`.
 
-**T17 — Imagens Docker em `:latest`** · `ABERTO`
+**T17 — Imagens Docker em `:latest`** · `RESOLVIDO`
 `mssql/server:2022-latest` e `mssql-tools:latest`: build nao reproduzivel.
+**Feito:** SQL Server fixo em `2022-CU27-GDR1-ubuntu-22.04` (no dia, o mesmo
+digest de `2022-latest`, entao nada muda no que e baixado) no `ci.yml`, nos dois
+compose e em `scripts/banco-integracao.js`. `mssql-tools` so publica `latest`
+(imagem descontinuada) e foi fixada por digest. Ao atualizar: so para CU mais
+novo, porque o SQL Server nao abre banco gravado por versao mais nova (comentario
+no `docker-compose.yml`). Fica para depois trocar o `db-init` pelo `sqlcmd` que ja
+vem na imagem do SQL Server e aposentar a `mssql-tools`.

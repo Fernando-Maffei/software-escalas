@@ -42,6 +42,9 @@ jobs:
       - name: Linter
         run: npm run lint
 
+      - name: Codigo morto
+        run: npm run analisar:codigo-morto
+
       - name: Checagem de tipos
         run: npm run typecheck
 
@@ -58,7 +61,7 @@ jobs:
     # SoftwareEscalasIntegracao a cada execucao.
     services:
       mssql:
-        image: mcr.microsoft.com/mssql/server:2022-latest
+        image: mcr.microsoft.com/mssql/server:2022-CU27-GDR1-ubuntu-22.04
         env:
           ACCEPT_EULA: 'Y'
           MSSQL_SA_PASSWORD: 'Integracao!Escalas2026'
