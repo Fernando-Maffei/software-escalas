@@ -19,7 +19,8 @@ const suites = [
     ...require('./htmlSeguro.test.js'),
     ...require('./horasEmCarteira.test.js'),
     ...require('./rate-limit.test.js'),
-    ...require('./backgroundService.test.js')
+    ...require('./backgroundService.test.js'),
+    ...require('./escalaGravacaoEmLote.test.js')
 ];
 
 let passed = 0;

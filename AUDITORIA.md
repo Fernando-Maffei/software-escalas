@@ -854,9 +854,35 @@ pedidos simultaneos.
 **Feito:** inputs removidos e o comentario diz que a leitura completa e
 intencional e onde mexer se um dia pesar. Sem mudanca de comportamento.
 
-**T13 — Um MERGE por dia x colaborador ao gerar a escala** · `ABERTO`
+**T13 — Um MERGE por dia x colaborador ao gerar a escala** · `RESOLVIDO` (falta o golden master)
 `services/escala.js` (`ensureEscalaBaseForPeriod`): primeiro acesso a um mes
-com 30 pessoas ~ 660 idas ao banco. Insercao em lote resolve.
+com 30 pessoas ~ 660 idas ao banco.
+**Feito:** as linhas novas vao para `services/escala-gravacao-em-lote.js`, num
+MERGE de ate 150 linhas por comando (12 parametros por linha; o limite e 2100).
+E MERGE, nao INSERT: uma linha "nova" pode existir no banco sem estar no mapa
+(ver T18) e o indice unico `UX_escala_dia_colaborador_data` recusaria o INSERT.
+A validacao de cada linha ficou numa funcao so (`prepararLinhaEscalaDia`),
+usada tambem pela gravacao de uma linha, e roda no mesmo ponto de antes; a
+gravacao fica para o fim do laco (cada chave e visitada uma vez e todo
+chamador esta numa transacao).
+**Prova:** A/B do `ensureEscalaBaseForPeriod` de antes (HEAD) e de depois num
+banco em memoria (`tests/unit/apoio/banco-escala-falso.js`), 6 cenarios (varios
+lotes, sabado incluido, um colaborador, desligado, feriados, ajuste manual,
+plantao): tabela final, mapa e contadores identicos; um trimestre com 14
+pessoas passou de 779 MERGEs para 7. Testes unitarios do lote. O SQL em si so o
+banco de verdade prova: **rodar o golden master (antes x depois) e a integracao
+antes do merge na main.**
+
+**T18 — Gerador reescreve o historico de colaborador desligado** · `PROPOSTA`
+`services/escala.js`: `listColaboradores` traz tambem os desligados (`Ativo = 0`),
+mas `listEscalaDiaRows` os esconde (`c.Ativo = 1`). Para o gerador, toda linha do
+desligado parece nova e o MERGE cai no `WHEN MATCHED`: ajuste manual e outros
+registros do historico viram a escala padrao a cada vez que o periodo e gerado
+(reproduzido no banco em memoria: ajuste manual 06:00-10:00 virou 07:00-16:00
+normal). Tambem cria linhas para cada dia futuro aberto na escala. Ja era assim
+antes do T13. Proposta: o gerador ignora colaborador desligado — muda
+comportamento (as linhas dele deixam de ser geradas e atualizadas), por isso
+depende de decisao.
 
 **T14 — `spawnSync` dentro de rota** · `RESOLVIDO`
 `lib/background-service.js`: o servidor inteiro parava enquanto o `schtasks`

@@ -5,6 +5,7 @@ const { listJornadaSemanal } = require('./jornada-semanal');
 const { serializePlantaoRecord } = require('./plantoes');
 const { SQL_EQUIPE_PLANTAO } = require('./equipe-plantao');
 const { temFolgaDeDomingo } = require('./plantonista');
+const { mergeEscalaDiaEmLote } = require('./escala-gravacao-em-lote');
 const {
     buildDateRange,
     compareTimes,
@@ -659,24 +660,46 @@ async function findEscalaDiaByColaboradorAndDate(poolOrTx, colaboradorId, dataIS
     return result.recordset[0] ? serializeEscalaDiaRecord(result.recordset[0]) : null;
 }
 
-async function persistEscalaDiaRecord(poolOrTx, record) {
+// Valida e normaliza uma linha de escala_dia para gravar. Usada pela gravacao
+// de uma linha (persistEscalaDiaRecord) e pela em lote: as duas gravam os
+// mesmos valores e recusam o mesmo registro com o mesmo erro.
+function prepararLinhaEscalaDia(record) {
     validateEscalaTimes(record, {
         allowLunchWithoutWork: record.tipo !== 'normal' && record.tipo !== 'plantao' && !record.horaInicio && !record.horaFim
     });
 
+    return {
+        colaboradorId: ensurePositiveInt(record.colaboradorId, 'Colaborador'),
+        data: normalizeIsoDate(record.dataISO, 'Data'),
+        horaInicio: toSqlTime(record.horaInicio, 'Hora inicial'),
+        horaFim: toSqlTime(record.horaFim, 'Hora final'),
+        almocoInicio: toSqlTime(record.almocoInicio, 'Inicio do almoco'),
+        almocoFim: toSqlTime(record.almocoFim, 'Fim do almoco'),
+        tipo: normalizeEscalaTipo(record.tipo),
+        observacao: trimToNull(record.observacao),
+        origemTipo: trimToNull(record.origemTipo),
+        origemId: record.origemId || null,
+        ajusteManual: Boolean(record.ajusteManual),
+        almocoAjustado: Boolean(record.almocoAjustado)
+    };
+}
+
+async function persistEscalaDiaRecord(poolOrTx, record) {
+    const linha = prepararLinhaEscalaDia(record);
+
     const result = await poolOrTx.request()
-        .input('colaboradorId', sql.Int, ensurePositiveInt(record.colaboradorId, 'Colaborador'))
-        .input('data', sql.Date, normalizeIsoDate(record.dataISO, 'Data'))
-        .input('horaInicio', sql.Time, toSqlTime(record.horaInicio, 'Hora inicial'))
-        .input('horaFim', sql.Time, toSqlTime(record.horaFim, 'Hora final'))
-        .input('almocoInicio', sql.Time, toSqlTime(record.almocoInicio, 'Inicio do almoco'))
-        .input('almocoFim', sql.Time, toSqlTime(record.almocoFim, 'Fim do almoco'))
-        .input('tipo', sql.NVarChar(30), normalizeEscalaTipo(record.tipo))
-        .input('observacao', sql.NVarChar(500), trimToNull(record.observacao))
-        .input('origemTipo', sql.NVarChar(30), trimToNull(record.origemTipo))
-        .input('origemId', sql.Int, record.origemId || null)
-        .input('ajusteManual', sql.Bit, Boolean(record.ajusteManual))
-        .input('almocoAjustado', sql.Bit, Boolean(record.almocoAjustado))
+        .input('colaboradorId', sql.Int, linha.colaboradorId)
+        .input('data', sql.Date, linha.data)
+        .input('horaInicio', sql.Time, linha.horaInicio)
+        .input('horaFim', sql.Time, linha.horaFim)
+        .input('almocoInicio', sql.Time, linha.almocoInicio)
+        .input('almocoFim', sql.Time, linha.almocoFim)
+        .input('tipo', sql.NVarChar(30), linha.tipo)
+        .input('observacao', sql.NVarChar(500), linha.observacao)
+        .input('origemTipo', sql.NVarChar(30), linha.origemTipo)
+        .input('origemId', sql.Int, linha.origemId)
+        .input('ajusteManual', sql.Bit, linha.ajusteManual)
+        .input('almocoAjustado', sql.Bit, linha.almocoAjustado)
         .query(`
             MERGE escala_dia AS target
             USING (
@@ -788,6 +811,9 @@ async function ensureEscalaBaseForPeriod(poolOrTx, startISO, endISO, options = {
         skipped: 0,
         deleted: 0
     };
+    // Linhas que ainda nao existiam no mapa; vao para o banco num lote so.
+    const novasLinhas = [];
+    const colaboradoresDasNovas = new Map();
 
     for (const dataISO of iterateIsoDates(startISO, endISO)) {
         const weekday = getDayOfWeek(dataISO);
@@ -850,13 +876,9 @@ async function ensureEscalaBaseForPeriod(poolOrTx, startISO, endISO, options = {
             }
 
             if (!existingRecord) {
-                const created = await persistEscalaDiaRecord(poolOrTx, defaultRecord);
-                existingMap.set(key, serializeEscalaDiaRecord({
-                    ...created,
-                    colaboradorNome: colaborador.Nome,
-                    setorId: colaborador.SetorId ?? null,
-                    setorNome: colaborador.SetorNome ?? null
-                }));
+                // Valida ja (mesmo erro, no mesmo ponto) e grava no lote abaixo.
+                novasLinhas.push(prepararLinhaEscalaDia(defaultRecord));
+                colaboradoresDasNovas.set(key, colaborador);
                 counters.created += 1;
                 continue;
             }
@@ -869,6 +891,24 @@ async function ensureEscalaBaseForPeriod(poolOrTx, startISO, endISO, options = {
             const result = await applyAutomaticEscalaRecord(poolOrTx, existingMap, defaultRecord);
             counters[result.action] = (counters[result.action] || 0) + 1;
         }
+    }
+
+    // Adiar a gravacao para ca nao muda o resultado: cada chave (colaborador +
+    // dia) e visitada uma vez so no laco acima, e o mapa so e lido de novo pela
+    // hidratacao, depois deste ponto. Todo chamador roda numa transacao.
+    const gravadas = await mergeEscalaDiaEmLote(poolOrTx, novasLinhas);
+
+    for (const gravada of gravadas) {
+        const serializada = serializeEscalaDiaRecord(gravada);
+        const key = buildEscalaKey(serializada.colaboradorId, serializada.dataISO);
+        const colaborador = colaboradoresDasNovas.get(key);
+
+        existingMap.set(key, serializeEscalaDiaRecord({
+            ...gravada,
+            colaboradorNome: colaborador.Nome,
+            setorId: colaborador.SetorId ?? null,
+            setorNome: colaborador.SetorNome ?? null
+        }));
     }
 
     return {
