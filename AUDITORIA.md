@@ -873,16 +873,29 @@ pessoas passou de 779 MERGEs para 7. Testes unitarios do lote. O SQL em si so o
 banco de verdade prova: **rodar o golden master (antes x depois) e a integracao
 antes do merge na main.**
 
-**T18 — Gerador reescreve o historico de colaborador desligado** · `PROPOSTA`
+**T18 — Gerador reescreve o historico de colaborador desligado** · `RESOLVIDO`
 `services/escala.js`: `listColaboradores` traz tambem os desligados (`Ativo = 0`),
 mas `listEscalaDiaRows` os esconde (`c.Ativo = 1`). Para o gerador, toda linha do
 desligado parece nova e o MERGE cai no `WHEN MATCHED`: ajuste manual e outros
 registros do historico viram a escala padrao a cada vez que o periodo e gerado
 (reproduzido no banco em memoria: ajuste manual 06:00-10:00 virou 07:00-16:00
 normal). Tambem cria linhas para cada dia futuro aberto na escala. Ja era assim
-antes do T13. Proposta: o gerador ignora colaborador desligado — muda
-comportamento (as linhas dele deixam de ser geradas e atualizadas), por isso
-depende de decisao.
+antes do T13. Proposta aprovada: o gerador ignora colaborador desligado.
+**Feito:** `colaboradorAtivo` filtra a lista do gerador em
+`ensureEscalaBaseForPeriod`, que tambem alimenta a hidratacao (ausencias,
+plantoes, folgas de domingo, almocos — todas pulam quem nao esta na lista), e o
+mapa de `syncPlantaoDiaToEscalaDia` (a rota de plantoes manda todos os
+colaboradores). O historico do desligado fica como esta ate a exclusao
+definitiva; reativado, ele volta a ser gerado. `syncColaboradorDefaultsToEscalaDia`
+ficou como estava: so roda ao editar o cadastro da pessoa e respeita ajuste
+manual. Efeito colateral aceito: regravar o plantao de um dia em que o
+desligado estava na equipe apaga a linha de plantao dele daquele dia (antes
+era apagada e recriada; o banco de horas e outra tabela e nao muda).
+**Prova:** A/B no banco em memoria contra o T13, 6 cenarios: os demais
+colaboradores identicos (tabela e mapa, fora o id substituto) e o historico do
+desligado igual ao de entrada — antes ele ganhava 61 a 74 linhas por trimestre
+aberto. Testes unitarios (historico intacto, nenhuma linha nova) e de
+integracao (ajuste manual sobrevive ao desligamento + geracao do mes).
 
 **T14 — `spawnSync` dentro de rota** · `RESOLVIDO`
 `lib/background-service.js`: o servidor inteiro parava enquanto o `schtasks`

@@ -577,6 +577,17 @@ async function findColaboradorById(poolOrTx, colaboradorId) {
     return result.recordset[0];
 }
 
+// Colaborador desligado (Ativo = 0) nao recebe escala gerada. A leitura da
+// escala ja o esconde (listEscalaDiaRows), entao para o gerador toda linha dele
+// parecia nova: o MERGE sobrescrevia o historico (ajuste manual virava escala
+// padrao) e criava linha em cada dia futuro aberto. O historico fica como
+// estava ate a exclusao definitiva; reativado, ele volta a ser gerado.
+// So 0/false explicito conta como desligado (a coluna e NOT NULL DEFAULT 1).
+function colaboradorAtivo(colaborador) {
+    const ativo = colaborador?.Ativo ?? colaborador?.ativo;
+    return ativo !== false && ativo !== 0;
+}
+
 async function listColaboradores(poolOrTx, options = {}) {
     const { colaboradorId = null } = options;
     const request = poolOrTx.request();
@@ -796,7 +807,9 @@ async function applyAutomaticEscalaRecord(poolOrTx, existingMap, incomingRecord,
 
 async function ensureEscalaBaseForPeriod(poolOrTx, startISO, endISO, options = {}) {
     const { colaboradorId = null, includeSaturday = false } = options;
-    const colaboradores = await listColaboradores(poolOrTx, { colaboradorId });
+    // Esta lista tambem alimenta a hidratacao (ausencias, plantoes, folgas de
+    // domingo, almocos), que pula quem nao esta nela.
+    const colaboradores = (await listColaboradores(poolOrTx, { colaboradorId })).filter(colaboradorAtivo);
     const jornadaSemanalRows = await listJornadaSemanal(poolOrTx, {
         colaboradorId,
         onlyActive: false
@@ -1510,7 +1523,9 @@ async function syncPlantaoDiaToEscalaDia(poolOrTx, dataISO, plantaoRows, colabor
         return;
     }
 
-    const colaboradoresMap = new Map((colaboradores || []).map((item) => [Number(item.Id), item]));
+    // A rota de plantoes manda todos os colaboradores; desligado que ficou na
+    // equipe nao ganha linha (ver colaboradorAtivo).
+    const colaboradoresMap = new Map((colaboradores || []).filter(colaboradorAtivo).map((item) => [Number(item.Id), item]));
 
     await ensureEscalaDiaForPeriod(poolOrTx, dataISO, dataISO, {
         hydrateSources: false

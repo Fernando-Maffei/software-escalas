@@ -88,6 +88,11 @@ function criarBancoEscalaFalso({ colaboradores = [], jornada = [], feriados = []
                 .map((dataISO) => ({ Data: dataSql(dataISO) }));
         }
 
+        // Almoco personalizado por dia: o cenario nao tem nenhum.
+        if (texto.includes('FROM AlmocosPersonalizados')) {
+            return [];
+        }
+
         if (texto.includes('FROM ColaboradorJornadaSemanal')) {
             return jornada.filter((linha) => !inputs.colaboradorId || linha.ColaboradorId === inputs.colaboradorId);
         }

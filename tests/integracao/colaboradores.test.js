@@ -271,5 +271,38 @@ module.exports = [
 
             await tornarPlantonista(cliente, colaborador.Id, 'SEMANA');
         }
+    },
+    {
+        // T18: a leitura da escala esconde o desligado, entao o gerador achava
+        // que as linhas dele eram novas e o MERGE reescrevia o historico (o
+        // ajuste manual virava escala padrao) e criava linha em todo dia aberto.
+        name: 'gerar a escala nao reescreve nem cria linhas de colaborador desligado',
+        async run() {
+            const cliente = criarCliente();
+            await cliente.entrar();
+
+            const colaborador = await criarColaborador(cliente);
+            esperarSucesso(
+                await cliente.put(`/api/escala/dia/2043-03-02/colaborador/${colaborador.Id}`, {
+                    horaInicio: '06:00',
+                    horaFim: '10:00'
+                }),
+                'ajuste manual'
+            );
+            await desligarColaborador(cliente, colaborador.Id);
+
+            esperarSucesso(
+                await cliente.get('/api/escala/relatorio?dataInicio=2043-03-01&dataFim=2043-03-31'),
+                'gerar o mes'
+            );
+
+            const linhas = await consultar(`
+                SELECT CONVERT(CHAR(10), data, 23) AS data, CONVERT(CHAR(5), hora_inicio, 108) AS inicio, ajuste_manual
+                FROM escala_dia
+                WHERE colaborador_id = ${Number(colaborador.Id)} AND data BETWEEN '2043-03-01' AND '2043-03-31'
+            `);
+
+            assert.deepEqual(linhas, [{ data: '2043-03-02', inicio: '06:00', ajuste_manual: true }]);
+        }
     }
 ];
