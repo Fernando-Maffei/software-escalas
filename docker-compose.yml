@@ -26,12 +26,14 @@ services:
       MSSQL_SA_PASSWORD: "${DB_PASSWORD}"
       MSSQL_PID: "Express"
     ports:
-      - "1433:1433"          # opcional: conectar com SSMS/Azure Data Studio de fora
+      # So nesta maquina (SSMS/Azure Data Studio aqui mesmo). Sem o 127.0.0.1
+      # a porta do SQL ficava aberta para a rede inteira.
+      - "127.0.0.1:1433:1433"
     volumes:
       - db-data:/var/opt/mssql   # os dados do banco sobrevivem a reinicios
     restart: always
 
-  # ---- Cria o banco "SoftwareEscalas" uma vez e sai ------------------------
+  # ---- Cria o banco "SoftwareEscalas" e o login do app, e sai --------------
   db-init:
     # A Microsoft so publica "latest" desta imagem (descontinuada); o digest
     # trava a versao.
@@ -41,6 +43,9 @@ services:
       - db
     environment:
       DB_PASSWORD: "${DB_PASSWORD}"
+      # Login proprio do app, criado pelo init-db.sh (dono so do banco do app).
+      APP_DB_USER: "${APP_DB_USER:-escalas_app}"
+      APP_DB_PASSWORD: "${APP_DB_PASSWORD:?Defina APP_DB_PASSWORD no .env (senha do login do app no SQL Server; veja .env.docker.example)}"
     volumes:
       - ./docker/init-db.sh:/init-db.sh:ro
     entrypoint: ["/bin/bash", "/init-db.sh"]
@@ -78,8 +83,9 @@ services:
       DB_HOST: "db"            # nome do servico do banco acima
       DB_PORT: "1433"
       DB_DATABASE: "SoftwareEscalas"
-      DB_USER: "sa"
-      DB_PASSWORD: "${DB_PASSWORD}"
+      # O app nunca usa o sa (ver init-db.sh).
+      DB_USER: "${APP_DB_USER:-escalas_app}"
+      DB_PASSWORD: "${APP_DB_PASSWORD:?Defina APP_DB_PASSWORD no .env (senha do login do app no SQL Server; veja .env.docker.example)}"
       DB_AUTH_TYPE: "sql"
       DB_ENCRYPT: "true"
       DB_TRUST_CERT: "true"

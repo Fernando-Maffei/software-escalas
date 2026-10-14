@@ -32,6 +32,7 @@ services:
       - db
     environment:
       DB_PASSWORD: "Teste!Escalas2026"
+      APP_DB_PASSWORD: "AppTeste!Escalas2026"
     volumes:
       - ./docker/init-db.sh:/init-db.sh:ro
     entrypoint: ["/bin/bash", "/init-db.sh"]
@@ -67,8 +68,10 @@ services:
       DB_HOST: "db"
       DB_PORT: "1433"
       DB_DATABASE: "SoftwareEscalas"
-      DB_USER: "sa"
-      DB_PASSWORD: "Teste!Escalas2026"
+      # Mesmo login restrito da producao (criado pelo init-db.sh), para o robo
+      # exercitar o app com as permissoes de verdade.
+      DB_USER: "escalas_app"
+      DB_PASSWORD: "AppTeste!Escalas2026"
       DB_AUTH_TYPE: "sql"
       DB_ENCRYPT: "true"
       DB_TRUST_CERT: "true"

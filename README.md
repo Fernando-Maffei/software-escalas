@@ -66,6 +66,12 @@ ficar vazio, a senha aparece uma única vez em `docker compose logs app`. Os dad
 ficam em volumes e sobrevivem a reinícios; com `restart: always` os containers
 voltam sozinhos quando a máquina liga.
 
+O app conecta com um login próprio, `escalas_app`, dono só do banco do app (senha
+em `APP_DB_PASSWORD` no `.env`); o `sa` fica só para o passo que cria banco e
+login. A porta 1433 do SQL só aceita conexão desta máquina. Quem já usava o
+Docker com o `sa` segue o passo a passo de atualização em
+[`docs/DOCKER.md`](docs/DOCKER.md).
+
 O app roda **sem root** (usuário `node` da imagem). Ele só grava em `/data` (volume
 `app-data`) e na pasta de backup — que deve ficar dentro de `/data` (ex.:
 `/data/backups`) ou num volume montado. Um passo curto do compose

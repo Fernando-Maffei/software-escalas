@@ -816,9 +816,25 @@ do `docker-compose.teste.yml` (a imagem oficial do Node traz os dados de fuso
 no ICU, sem `tzdata`). O banco continua em UTC: as sessoes ja usam
 `SYSUTCDATETIME`. Vale na proxima subida do container.
 
-**T7 — App usa `sa` e a porta 1433 fica aberta para a rede** · `PROPOSTA`
-`docker-compose.yml`. Proposta: login proprio do app (o
-`scripts/preparar-sql-server.ps1` ja cria um) e `"127.0.0.1:1433:1433"`.
+**T7 — App usa `sa` e a porta 1433 fica aberta para a rede** · `RESOLVIDO` (falta subir de verdade)
+`docker-compose.yml`.
+**Feito:** `docker/init-db.sh` cria, alem do banco, o login `escalas_app`
+(`APP_DB_USER`), dono so de `SoftwareEscalas` (`db_owner`, a mesma permissao do
+`preparar-sql-server.ps1`); o app conecta com ele e o `sa` fica so no `db-init`.
+O script e repetivel: cria ou atualiza a senha do login a partir do `.env`, cria
+ou religa o usuario do banco (`ALTER USER ... WITH LOGIN`, para banco vindo de
+`.bak`), para no primeiro erro (`sqlcmd -b`, e o app nao sobe) e nao interpreta
+`$(` na senha (`-x`); aspas na senha sao escapadas e o nome do login e validado.
+Porta do SQL em `127.0.0.1:1433:1433`. Sem `APP_DB_PASSWORD` o compose recusa
+subir com a mensagem do que falta (`docker compose config` conferido com e sem a
+variavel). A instancia de teste usa o mesmo login restrito. Docs: `.env.docker.example`,
+`docs/DOCKER.md` (com o passo a passo de atualizacao), README e CHANGELOG.
+**Atencao na atualizacao:** `/data/database.local.json`, se a conexao ja foi
+salva pela tela, vence o compose e manteria o `sa` — o passo a passo manda
+conferir.
+**Nao verificado:** o Docker esta parado; falta subir a instancia de teste
+(`npm run teste:subir`) e rodar o robo nela (`npm run e2e:teste`), que exercita
+o app com o login restrito.
 
 **T8 — GET da escala grava** · `RESOLVIDO` (a parte de locks fica para depois)
 `GET /api/escala/dia` e `/relatorio` faziam MERGE/DELETE e confirmavam: a conta
