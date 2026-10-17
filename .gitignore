@@ -16,6 +16,7 @@ docker-compose.override.yml
 backend/config.js
 backend/config/*.json
 *.log
+logs/
 
 # Banco de dados
 *.db

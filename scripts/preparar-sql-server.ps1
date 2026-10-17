@@ -19,7 +19,10 @@ param(
     [string]$Banco = 'SoftwareEscalas',
     [string]$Login = 'escalas_app',
     [int]$PortaApp = 4450,
-    [switch]$SemFirewall
+    [switch]$SemFirewall,
+    # Usada pelo instalar-servidor.ps1, que ja pediu a senha: so vale para
+    # CRIAR o login (se ele ja existe, a senha dele nao muda).
+    [string]$SenhaLogin = ''
 )
 
 $ErrorActionPreference = 'Stop'
@@ -200,7 +203,12 @@ if ($loginExiste -eq 0) {
     $criado = $false
 
     while (-not $criado) {
-        $senha = Read-SenhaNova
+        if ($SenhaLogin) {
+            $senha = $SenhaLogin
+            $SenhaLogin = ''
+        } else {
+            $senha = Read-SenhaNova
+        }
 
         try {
             Invoke-Sql -Servidor $servidorLocal -BancoAlvo 'master' -Parametros @{ login = $Login; senha = $senha } -Comando @'
