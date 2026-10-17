@@ -34,6 +34,17 @@ setembro e pode já ter resolvido parte disso.
 - **Plantonista, Fase 4:** endpoint `/api/folgas-domingo/verificar` e
   legendas dos tipos novos no relatório de escala.
 
+## Ideias para avaliar depois
+
+- **Programa próprio nas máquinas do time (webviewer).** Um `.exe` pequeno
+  (WebView2 ou Tauri) com a tela de conexão com o servidor, abrindo o sistema
+  numa janela própria. Avaliado em 17/10/2026: viável (2 a 4 dias), mas exige
+  certificado de assinatura (sem ele o Windows bloqueia o `.exe`), tratar
+  download/impressão dos PDFs e manter um instalador e atualizações em cada PC.
+  O `CRIAR-ATALHO.cmd` (Edge em modo aplicativo) entrega quase a mesma
+  experiência sem nada disso. Reavaliar se surgir necessidade de modo quiosque,
+  avisos nativos do Windows ou muitos PCs com usuários com dificuldade.
+
 ## Código antigo de referência
 
 As duas branches de setembro foram descartadas porque eram do frontend antigo

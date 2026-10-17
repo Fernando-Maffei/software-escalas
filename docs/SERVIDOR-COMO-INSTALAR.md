@@ -80,6 +80,10 @@ Pode rodar de novo quando quiser: o que já existe é mantido.
    tela de login? Pronto, é só passar o endereço para o time.
 5. **Teste o reinício**: reinicie a máquina **sem fazer login** e abra o
    endereço de outro computador. Tem que funcionar.
+6. **Ícone nas máquinas do time**: passe o arquivo **`CRIAR-ATALHO.cmd`** (está
+   na pasta do app) para cada computador — pendrive, pasta da rede ou e-mail. Dois
+   cliques, digita o endereço do servidor, e aparece o ícone *Central de
+   Escalas*, que abre o sistema em janela própria. Nada é instalado.
 
 Dica: copie a pasta `C:\Backups-Escalas` para fora da máquina de vez em quando
 (pendrive, rede, nuvem). Se o disco morrer, o backup morre junto.
