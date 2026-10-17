@@ -33,13 +33,6 @@ setembro e pode já ter resolvido parte disso.
 
 - **Plantonista, Fase 4:** endpoint `/api/folgas-domingo/verificar` e
   legendas dos tipos novos no relatório de escala.
-- **Botão "início automático" em Configurações** (`backend/lib/background-service.js`):
-  cria a tarefa `CentralDeEscalasServidor` via `schtasks` sem o laço de
-  reinício e com o limite padrão de 72 h de execução. Clicar nele num servidor
-  instalado pelo `INSTALAR-SERVIDOR.cmd` troca a tarefa boa por essa. Alinhar
-  com o instalador ou tirar o botão.
-- **Versão na tela:** o menu lateral mostra `v1.6.0`
-  (`frontend/index.html`), o `package.json` está em `1.6.3`.
 
 ## Código antigo de referência
 

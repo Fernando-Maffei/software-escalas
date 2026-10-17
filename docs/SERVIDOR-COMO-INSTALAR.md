@@ -9,6 +9,17 @@ A ideia: **uma máquina** fica ligada com o sistema, e todo o time acessa pela r
 
 ## Antes de começar (uma vez)
 
+**A máquina:**
+
+- [ ] Windows 10/11 Pro (64 bits) ou Windows Server, com 8 GB de RAM ou mais.
+- [ ] **Nunca dorme:** *Configurações → Sistema → Energia* → suspender e
+      hibernar em **Nunca**. Máquina dormindo = time sem acesso. (Reinício por
+      atualização do Windows não tem problema: o sistema volta sozinho.)
+- [ ] Na rede **por cabo**, se der, e com **IP reservado no roteador**.
+- [ ] Uma conta de **Administrador** e **internet** durante a instalação.
+
+**O que instalar e copiar:**
+
 1. **SQL Server Express** instalado na máquina (gratuito):
    https://www.microsoft.com/pt-br/sql-server/sql-server-downloads → *Express* →
    instalação **Básica**. Não precisa configurar nada nele: o instalador do app faz.
@@ -72,6 +83,28 @@ Pode rodar de novo quando quiser: o que já existe é mantido.
 
 Dica: copie a pasta `C:\Backups-Escalas` para fora da máquina de vez em quando
 (pendrive, rede, nuvem). Se o disco morrer, o backup morre junto.
+
+---
+
+## Dia da virada (trazer o sistema de outra máquina)
+
+Enquanto o servidor novo não entra, a instalação antiga continua valendo.
+No dia:
+
+1. **Antes:** anote os usuários e os setores permitidos de cada um
+   (*Configurações → Usuários*) — o backup não leva contas.
+2. Combine um horário em que ninguém esteja lançando nada.
+3. Na máquina **antiga**: *Configurações → Banco de dados → Gerar backup*, copie
+   o arquivo e **pare o sistema antigo** (para ninguém gravar no lugar errado).
+4. Na máquina **nova**: `INSTALAR-SERVIDOR.cmd`, entre como admin,
+   *Importar Dados* com esse backup e recrie os usuários.
+5. Confira: colaboradores, plantões e banco de horas com os mesmos números de
+   antes; um relatório do mês batendo.
+6. Reinicie o servidor **sem fazer login** e abra de outro computador.
+7. Passe o endereço novo para o time.
+
+Deu errado em algum passo? Religue o sistema antigo — ele está intacto — e
+corrija com calma.
 
 ---
 

@@ -1,6 +1,6 @@
 # Central de Escalas
 
-![Versão](https://img.shields.io/badge/versão-1.6.3-6366f1)
+![Versão](https://img.shields.io/badge/versão-1.7.0-6366f1)
 ![Node](https://img.shields.io/badge/Node-22%2B-3c873a)
 ![Licença](https://img.shields.io/badge/licença-proprietária-lightgrey)
 [![CI](https://github.com/Fernando-Maffei/software-escalas/actions/workflows/ci.yml/badge.svg)](https://github.com/Fernando-Maffei/software-escalas/actions/workflows/ci.yml)
@@ -301,7 +301,7 @@ são afetadas pela atualização.
 
 ## Versionamento
 
-Versão atual: **1.6.3**. O histórico completo fica em [`CHANGELOG.md`](CHANGELOG.md).
+Versão atual: **1.7.0**. O histórico completo fica em [`CHANGELOG.md`](CHANGELOG.md).
 Segue [SemVer](https://semver.org/lang/pt-BR/): correção (`1.0.1`), funcionalidade
 (`1.1.0`), mudança que quebra fluxo (`2.0.0`).
 

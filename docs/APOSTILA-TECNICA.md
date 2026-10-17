@@ -111,7 +111,7 @@ Para cada tecnologia: **o que é**, **para que serve** e **por que/como foi usad
 
 ### Serviço do Windows (schtasks / NSSM)
 - **O que é:** formas de fazer um programa iniciar sozinho junto com o Windows.
-- **Como foi usado aqui:** [`backend/lib/background-service.js`](../backend/lib/background-service.js) registra uma tarefa (`schtasks /SC ONSTART /RU SYSTEM`) para o servidor subir no **boot da máquina, sem login**. Desde o instalador (`scripts/instalar-servidor.ps1`) a tarefa roda `scripts/servidor/rodar-servidor.cmd`, que religa o node se ele cair; o NSSM deixou de ser necessário.
+- **Como foi usado aqui:** o instalador ([`scripts/instalar-servidor.ps1`](../scripts/instalar-servidor.ps1)) registra a tarefa `CentralDeEscalasServidor` (conta SYSTEM, no boot, sem limite de tempo) para o servidor subir **sem ninguém logar**. Ela roda `scripts/servidor/rodar-servidor.cmd`, que religa o node se ele cair. A tela de Configurações só consulta se a tarefa existe ([`backend/lib/background-service.js`](../backend/lib/background-service.js)); o NSSM deixou de ser necessário.
 
 ### Git
 - **O que é:** sistema de controle de versão.
@@ -350,7 +350,7 @@ Estes são os arquivos que sabem **as contas e regras** de escala. As rotas apen
 
 - **`validation.js`** — as "porteiras" de entrada: `ensurePositiveInt`, `normalizeOptionalText`, `normalizeIsoDate`, `normalizeNullableTime`, `validateWorkSchedule`, `normalizeEnum` (que remove acentos e padroniza), etc. Toda rota passa o corpo da requisição por essas funções antes de tocar no banco. **Por quê:** nunca confiar no que chega do cliente.
 - **`errors.js`** — define a classe `AppError` (com `statusCode`, `message`, `details`). É o "idioma de erro" do sistema: qualquer camada lança um `AppError`, e o manipulador central no `server.js` sabe traduzi-lo numa resposta HTTP limpa.
-- **`background-service.js`** — registra/consulta/remove a tarefa do Windows que sobe o servidor no boot (via `schtasks`). Trata o caso de "acesso negado" com uma mensagem clara (precisa rodar como administrador).
+- **`background-service.js`** — consulta (via `schtasks /Query`) se a tarefa do Windows que sobe o servidor no boot existe. Quem cria a tarefa é o `INSTALAR-SERVIDOR.cmd`.
 - **`folder-picker.js`** — abre o seletor nativo de pasta do Windows (para escolher a pasta de backup).
 - **`database-connection-error.js`** — traduz erros técnicos do driver (`mssql`) em mensagens compreensíveis (ex.: "não foi possível alcançar o servidor").
 
