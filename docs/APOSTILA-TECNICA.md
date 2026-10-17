@@ -111,7 +111,7 @@ Para cada tecnologia: **o que é**, **para que serve** e **por que/como foi usad
 
 ### Serviço do Windows (schtasks / NSSM)
 - **O que é:** formas de fazer um programa iniciar sozinho junto com o Windows.
-- **Como foi usado aqui:** [`backend/lib/background-service.js`](../backend/lib/background-service.js) registra uma tarefa (`schtasks /SC ONSTART /RU SYSTEM`) para o servidor subir no **boot da máquina, sem login**. O NSSM é a alternativa mais robusta documentada nos guias.
+- **Como foi usado aqui:** [`backend/lib/background-service.js`](../backend/lib/background-service.js) registra uma tarefa (`schtasks /SC ONSTART /RU SYSTEM`) para o servidor subir no **boot da máquina, sem login**. Desde o instalador (`scripts/instalar-servidor.ps1`) a tarefa roda `scripts/servidor/rodar-servidor.cmd`, que religa o node se ele cair; o NSSM deixou de ser necessário.
 
 ### Git
 - **O que é:** sistema de controle de versão.

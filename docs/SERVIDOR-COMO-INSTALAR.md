@@ -1,216 +1,122 @@
 # Como instalar no servidor central
 
 Este guia é para **quem vai montar a máquina que roda o sistema** (o "servidor").
-O time **não precisa** fazer nada disso — eles só abrem o navegador. Veja `README-TIME.md`.
+O time **não instala nada**: só abre o endereço no navegador (veja `README-TIME.md`).
 
-A ideia: **uma máquina** roda o sistema o tempo todo, e todo o time acessa pela rede.
-
----
-
-## O que a máquina do servidor precisa ter
-
-1. **Node.js 22.12 ou superior** — https://nodejs.org/ (baixe a versão "LTS").
-2. **SQL Server** instalado na própria máquina (o **SQL Server Express**, gratuito,
-   serve). Na instalação, guarde o **nome da instância**.
-3. A **pasta do projeto** copiada para a máquina (ex.: `C:App de escalas`) — fora
-   de pastas sincronizadas (OneDrive, Google Drive). Dentro dela, rode uma vez:
-
-   ```bash
-   npm ci --omit=dev
-   ```
-
-O Docker **não** é necessário neste modelo.
+A ideia: **uma máquina** fica ligada com o sistema, e todo o time acessa pela rede.
 
 ---
 
-## Passo 1 — Preparar o SQL Server e conectar o app
+## Antes de começar (uma vez)
 
-### 1.1 Preparar o SQL Server (uma vez)
+1. **SQL Server Express** instalado na máquina (gratuito):
+   https://www.microsoft.com/pt-br/sql-server/sql-server-downloads → *Express* →
+   instalação **Básica**. Não precisa configurar nada nele: o instalador do app faz.
+2. **A pasta do app** copiada para **`C:\CentralEscalas`**, fora de OneDrive,
+   Google Drive e Dropbox (a sincronização corrompe a instalação).
+   - Veio de um `.zip`? Antes de extrair: botão direito no zip → *Propriedades* →
+     marque **Desbloquear** → OK. Senão o Windows bloqueia os scripts.
+   - Ou, com Git: `git clone https://github.com/Fernando-Maffei/software-escalas.git C:\CentralEscalas`
 
-O app só conversa com o SQL Server por **TCP/IP**, e o SQL Server Express vem com
-o TCP/IP **desabilitado**. Enquanto isso não for ligado, a tela de configuração
-responde *"A instância do SQL Server não respondeu por TCP/IP"*.
+O **Node.js** não precisa ser instalado antes: o instalador oferece instalar se faltar.
 
-Abra o **PowerShell como Administrador**, entre na pasta do projeto e rode:
+---
 
-```powershell
-powershell -ExecutionPolicy Bypass -File scripts\preparar-sql-server.ps1
-```
+## Instalar (um passo)
 
-O script pode ser repetido sem estragar nada e faz, nesta ordem:
+Na pasta `C:\CentralEscalas`, dê **dois cliques em `INSTALAR-SERVIDOR.cmd`** e
+aceite o aviso do Windows (ele pede permissão de Administrador).
 
-1. habilita o TCP/IP da instância na porta fixa **1433** (troque com `-PortaSql`);
-2. liga a autenticação mista (Windows + SQL Server);
-3. reinicia o serviço do SQL Server, se mudou algo;
-4. cria o banco `SoftwareEscalas` e o login `escalas_app`, dono **só desse
-   banco** — ele pede para você criar a senha (o app não usa o `sa`);
-5. libera a porta **4450** do app no firewall do Windows.
+Ele vai pedir duas senhas:
 
-Havendo mais de uma instância, informe qual: `-Instancia NOME`. Outros nomes:
-`-Banco`, `-Login`, `-PortaApp`.
-
-> A porta do SQL Server **não** é liberada no firewall, de propósito: app e banco
-> ficam na mesma máquina, e o time só precisa alcançar o app (porta 4450).
-
-<details>
-<summary>Fazer na mão, sem o script</summary>
-
-1. **SQL Server Configuration Manager** → *Configuração de Rede do SQL Server* →
-   *Protocolos de &lt;instância&gt;* → **TCP/IP** → *Habilitar*. Na aba *Endereços IP*,
-   em **IPAll**, apague *Portas TCP Dinâmicas* e ponha `1433` em *Porta TCP*.
-2. Reinicie o serviço *SQL Server (&lt;instância&gt;)*.
-3. No SSMS (ou `sqlcmd`), crie o banco e o login do app:
-
-   ```sql
-   CREATE DATABASE SoftwareEscalas;
-   CREATE LOGIN escalas_app WITH PASSWORD = 'troque-esta-senha', CHECK_POLICY = ON;
-   USE SoftwareEscalas;
-   CREATE USER escalas_app FOR LOGIN escalas_app;
-   ALTER ROLE db_owner ADD MEMBER escalas_app;
-   ```
-
-</details>
-
-### 1.2 Subir o app e informar a conexão
-
-Na pasta do projeto:
-
-```bash
-npm start
-```
-
-Abra `http://localhost:4450`. Numa máquina ainda sem banco configurado aparece a
-tela **Configuração inicial**. Preencha com o que o script mostrou no final:
-
-| Campo | Valor |
+| Pergunta | O que é |
 |---|---|
-| Servidor / host | `localhost` |
-| Porta | `1433` |
-| Instância | *(vazio — com porta fixa não precisa)* |
-| Nome do banco | `SoftwareEscalas` |
-| Usuário SQL | `escalas_app` |
-| Senha | a que você criou no passo 1.1 |
+| Senha do login `escalas_app` | A senha com que o **app** entra no SQL Server. Ninguém digita ela no dia a dia; fica guardada no `.env` (só administradores leem). Se o login já existe, digite a senha atual dele. |
+| Senha do admin | A senha do usuário **admin** do sistema, para o primeiro login. |
 
-**Testar** e depois **Salvar**. O app cria as tabelas e o administrador na hora. A
-conexão fica gravada em `backend/config/database.local.json` (só nessa máquina,
-fora do Git).
+E faz o resto sozinho, mostrando cada etapa:
 
-### 1.3 Opcional — arquivo `.env`
+1. confere o Node.js (instala pelo `winget` se faltar ou estiver velho);
+2. instala as dependências do app;
+3. prepara o SQL Server: TCP/IP na porta 1433, autenticação mista, banco
+   `SoftwareEscalas` e o login `escalas_app`, dono só desse banco;
+4. grava a configuração (`.env`) — a tela de "Configuração inicial" nem aparece;
+5. liga o **backup automático**: a cada 3 horas e ao desligar, em
+   `C:\Backups-Escalas`, guardando os 240 mais recentes;
+6. registra a tarefa **CentralDeEscalasServidor**, que sobe o sistema **junto
+   com o Windows, sem ninguém logar**, e o religa em 10 s se ele cair;
+7. libera a porta **4450** no firewall, sobe o sistema e confere se respondeu.
 
-Para fixar a senha do primeiro administrador (em vez da aleatória) ou trocar a
-porta do app, copie `.env.example` para `.env` na raiz do projeto **antes** de
-subir pela primeira vez:
+No final aparece o **endereço para o time**, algo como `http://192.168.0.50:4450`.
 
-```
-PORT=4450
-ADMIN_PASSWORD=umaSenhaForte
-```
+Pode rodar de novo quando quiser: o que já existe é mantido.
 
-O servidor lê o `.env` ao iniciar. Ele **não** vai para o Git.
-
-### 1.4 Trazer os dados de outra instalação (ex.: do Docker)
-
-Em **Configurações → Banco de dados → Importar Dados**, escolha o arquivo de
-backup mais recente (`backup-escalas-....json`). Atenção: o backup **não leva
-contas de usuário** — os logins (e os setores permitidos de cada um) precisam ser
-recriados em **Configurações → Usuários**.
-
-Depois de importar, confira em **Configurações → Banco de dados** a **pasta de
-backup** e o backup automático: eles são configurados por máquina.
+> Opções (para quem roda pelo PowerShell): `-Porta 4450`, `-Instancia NOME`
+> (se houver mais de um SQL Server na máquina), `-PastaBackup D:\Backups`.
 
 ---
 
-## Passo 2 — Descobrir e fixar o IP da máquina
+## Depois de instalar
 
-O time vai acessar por esse IP, então ele **não pode mudar**.
+1. **Fixe o IP da máquina.** O time acessa por ele; se mudar, ninguém entra.
+   Peça uma **reserva de DHCP** no roteador (ou configure IP fixo no Windows).
+2. **Entre como `admin`** com a senha que você escolheu e crie os usuários do
+   time em **Configurações → Usuários**.
+3. **Trazendo dados de outra instalação?** Em **Configurações → Banco de dados →
+   Importar Dados**, escolha o backup mais recente (`backup-escalas-....json`).
+   O backup **não leva contas de usuário**: recrie-as no passo 2.
+4. **Teste de outro computador**: abra `http://IP-DO-SERVIDOR:4450`. Apareceu a
+   tela de login? Pronto, é só passar o endereço para o time.
+5. **Teste o reinício**: reinicie a máquina **sem fazer login** e abra o
+   endereço de outro computador. Tem que funcionar.
 
-1. Abra o **Prompt de Comando** e rode:
-
-   ```bash
-   ipconfig
-   ```
-
-   Anote o **"Endereço IPv4"** (algo como `192.168.0.50`).
-
-2. Para o IP não mudar sozinho, peça ao responsável pela rede para **reservar esse IP**
-   no roteador (reserva por DHCP) ou configure um **IP fixo** nas propriedades da rede
-   do Windows. Se não fizer isso, um dia o endereço muda e o time perde o acesso.
-
-A partir daí, o endereço do sistema para o time será:
-
-```
-http://SEU-IP:4450
-```
-
-Ex.: `http://192.168.0.50:4450`
+Dica: copie a pasta `C:\Backups-Escalas` para fora da máquina de vez em quando
+(pendrive, rede, nuvem). Se o disco morrer, o backup morre junto.
 
 ---
 
-## Passo 3 — Liberar a porta no firewall do Windows
+## Atualizar para uma versão nova
 
-O script do passo 1.1 já faz isso. Se você preparou o SQL Server na mão, abra o
-**PowerShell como Administrador** e rode (uma única vez):
+Dois cliques em **`ATUALIZAR-SERVIDOR.cmd`**. Ele:
 
-```powershell
-New-NetFirewallRule -DisplayName "App de Escalas 4450" -Direction Inbound -Protocol TCP -LocalPort 4450 -Action Allow
-```
+1. faz um **backup na hora** (se falhar, para e não mexe em nada);
+2. busca o código novo (`git pull`, se a pasta veio do Git). Se veio de `.zip`,
+   **antes** extraia o zip novo **por cima** de `C:\CentralEscalas` — o `.env`
+   e a pasta `backend\config` não estão no zip e ficam como estão;
+3. para o sistema, atualiza as dependências, sobe de novo e confere.
 
-Sem isso, o servidor sobe mas ninguém da rede consegue abrir.
-
----
-
-## Passo 4 — Deixar o servidor ligado sozinho (Serviço do Windows)
-
-Assim o sistema **sobe junto com o Windows**, sem ninguém precisar abrir nada, e
-**reinicia sozinho** se cair. Usamos uma ferramentinha gratuita chamada **NSSM**.
-
-1. Baixe o NSSM em https://nssm.cc/download e extraia. Use a pasta `win64\nssm.exe`.
-
-2. Abra o **PowerShell como Administrador** e rode (ajuste os caminhos entre aspas):
-
-   ```powershell
-   # caminho do node.exe (confirme com: where.exe node)
-   # caminho da pasta do projeto
-
-   C:\caminho\para\nssm.exe install CentralEscalas "C:\Program Files\nodejs\node.exe" "backend\server.js"
-   C:\caminho\para\nssm.exe set CentralEscalas AppDirectory "C:\App de escalas"
-   C:\caminho\para\nssm.exe set CentralEscalas Start SERVICE_AUTO_START
-   C:\caminho\para\nssm.exe start CentralEscalas
-   ```
-
-3. Pronto. O serviço "CentralEscalas" agora sobe sozinho a cada reinício.
-
-   - **Ver se está rodando:** abra `services.msc` e procure "CentralEscalas".
-   - **Parar:** `C:\caminho\para\nssm.exe stop CentralEscalas`
-   - **Remover:** `C:\caminho\para\nssm.exe remove CentralEscalas confirm`
-
-> **Alternativa sem baixar nada:** dá para usar o **Agendador de Tarefas** do Windows
-> com um gatilho "Ao iniciar o computador" rodando `node backend\server.js` na pasta do
-> projeto, marcando "Executar estando o usuário conectado ou não". O NSSM é melhor porque
-> reinicia sozinho em caso de queda.
+O sistema fica fora do ar por alguns segundos. As mudanças de banco
+(migrations) rodam sozinhas quando ele sobe.
 
 ---
 
-## Passo 5 — Testar
+## No dia a dia
 
-Na própria máquina do servidor, abra o navegador em `http://localhost:4450`.
-Em outro computador da rede, abra `http://SEU-IP:4450`. Se a tela de login aparecer nos
-dois, está tudo certo — é só repassar o endereço para o time.
+| Quero... | Como |
+|---|---|
+| Ver se está rodando | Abrir `http://localhost:4450` no servidor |
+| Ver erros | `C:\CentralEscalas\logs\servidor.log` |
+| Parar | PowerShell como Administrador: `Stop-ScheduledTask CentralDeEscalasServidor` e depois `Get-Process node \| Stop-Process` |
+| Iniciar | `Start-ScheduledTask CentralDeEscalasServidor` (ou reiniciar a máquina) |
+| Backup na hora | Configurações → Banco de dados → Gerar backup |
 
 ---
 
-## Primeiro acesso (senha do admin)
+## Problemas comuns
 
-Na primeira vez que o banco estiver vazio, o sistema cria o usuário **admin** e gera uma
-senha aleatória, mostrada **uma única vez** na tela de configuração inicial (ou no log do
-servidor). Para escolher a senha, defina `ADMIN_PASSWORD` no `.env` antes de subir (passo
-1.3) — rodando como serviço não há console para ler a senha gerada. Anote e troque no
-primeiro login.
+- **"Nenhum SQL Server encontrado"** — instale o SQL Server Express (passo
+  "Antes de começar") e rode de novo.
+- **"A porta 4450 já está em uso"** — já tem outra cópia do app rodando nesta
+  máquina. Feche-a (ou pare o Docker, se usava) e rode de novo.
+- **Outros computadores não abrem, mas no servidor abre** — confira se estão na
+  mesma rede e se o IP é o certo. O firewall já foi liberado pelo instalador.
+- **Instalou, mas não abre nem no servidor** — veja o final do
+  `logs\servidor.log`.
 
 ---
 
 ## Quando for para a nuvem (HTTPS)
 
-Quando o sistema for hospedado na nuvem com endereço `https://...`, o navegador passa a
-mostrar o botão **"Instalar"** automático (PWA completo). Nada precisa mudar no código —
-o `manifest.json` já está pronto para isso.
+Com o sistema num endereço `https://...`, o navegador passa a mostrar o botão
+**"Instalar"** automático (PWA completo). Nada muda no código: o
+`manifest.json` já está pronto.

@@ -218,19 +218,23 @@ está em [`AUDITORIA.md`](AUDITORIA.md).
 
 ## Implantação
 
-O modelo recomendado é **um servidor central na rede**; o time acessa pelo navegador.
-Ele roda direto no Windows, como serviço, ao lado de um SQL Server Express — sobe
-sozinho quando a máquina liga, sem ninguém precisar logar. O Docker
-([`docs/DOCKER.md`](docs/DOCKER.md)) é a alternativa: `restart: always` faz o mesmo
-papel, ao custo da máquina virtual do WSL 2.
+O modelo é **um servidor central na rede**; o time acessa pelo navegador, sem
+instalar nada. Na máquina servidor (Windows, com SQL Server Express instalado e a
+pasta do app em `C:\CentralEscalas`, fora do OneDrive):
 
-- **Montar o servidor** (SQL Server, serviço do Windows, firewall, IP fixo):
-  [`docs/SERVIDOR-COMO-INSTALAR.md`](docs/SERVIDOR-COMO-INSTALAR.md)
-- **Acessar e instalar o app** (para o time, Chrome/Edge):
-  [`docs/README-TIME.md`](docs/README-TIME.md)
+1. dois cliques em **`INSTALAR-SERVIDOR.cmd`**;
+2. responda a senha do banco e a do admin;
+3. passe para o time o endereço que aparece no final (`http://IP:4450`).
 
-Para parar o servidor, pare o serviço do Windows (ou `docker compose down`, se
-estiver no Docker).
+O instalador prepara o SQL Server, grava a configuração, liga o backup
+automático e registra o sistema para subir junto com o Windows, sem ninguém
+logar. Versão nova: dois cliques em **`ATUALIZAR-SERVIDOR.cmd`** (faz backup
+antes). Passo a passo e problemas comuns:
+[`docs/SERVIDOR-COMO-INSTALAR.md`](docs/SERVIDOR-COMO-INSTALAR.md).
+Guia do time (acesso e ícone do app): [`docs/README-TIME.md`](docs/README-TIME.md).
+
+O Docker ([`docs/DOCKER.md`](docs/DOCKER.md)) continua como alternativa, ao custo
+da máquina virtual do WSL 2.
 
 ## Login e primeiro acesso
 
@@ -287,10 +291,10 @@ manuais nem os de segurança.
 
 1. Atualize os arquivos do projeto (`git pull`)
 2. Suba novamente:
+   - **Servidor instalado pelo `INSTALAR-SERVIDOR.cmd`:** dois cliques em
+     `ATUALIZAR-SERVIDOR.cmd` (faz backup, atualiza e confere sozinho)
    - **Com Docker:** `docker compose up -d --build` (o `--build` é o que leva
      as mudanças de backend para dentro da imagem)
-   - **Sem Docker:** pare o servidor, rode `npm install` caso as dependências
-     tenham mudado e inicie de novo com `npm start`
 
 As configurações de banco e backup ficam em `backend/config/`, fora do código, e não
 são afetadas pela atualização.
