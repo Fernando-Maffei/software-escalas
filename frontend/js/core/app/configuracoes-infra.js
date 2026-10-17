@@ -249,13 +249,6 @@ function definirStatusServidorSegundoPlano(variant, message, detail = '') {
     detailNode.textContent = detail;
 }
 
-const BACKGROUND_SERVER_ACTION_ROUTES = {
-    install: 'instalar',
-    start: 'iniciar',
-    stop: 'parar',
-    uninstall: 'desinstalar'
-};
-
 async function chamarApiServidorSegundoPlano(path, options = {}) {
     const response = await fetch(`/api/sistema/servidor-background/${path}`, options);
     const data = await response.json().catch(() => ({}));
@@ -270,7 +263,6 @@ async function chamarApiServidorSegundoPlano(path, options = {}) {
 function renderizarServidorSegundoPlanoStatus(status = {}) {
     const panel = document.getElementById('backgroundServerPanel');
     const urlNode = document.getElementById('backgroundServerRecommendedUrl');
-    const commandNode = document.getElementById('backgroundServerCommand');
 
     if (!panel) {
         return;
@@ -287,14 +279,10 @@ function renderizarServidorSegundoPlanoStatus(status = {}) {
         urlNode.textContent = status.recommendedUrl || '';
     }
 
-    if (commandNode) {
-        commandNode.textContent = status.command || '';
-    }
-
     if (status.installed) {
         definirStatusServidorSegundoPlano(
             'success',
-            'Servidor em segundo plano configurado para iniciar com o Windows.',
+            'Inicio automatico instalado: o servidor sobe com o Windows.',
             `Nome da maquina: ${status.machineName || 'nao informado'}; porta: ${status.port || '4450'}.`
         );
         return;
@@ -302,8 +290,8 @@ function renderizarServidorSegundoPlanoStatus(status = {}) {
 
     definirStatusServidorSegundoPlano(
         'neutral',
-        'Servidor em segundo plano ainda nao configurado.',
-        'Instale a inicializacao automatica nesta maquina servidora para os clientes acessarem sem abrir a tela.'
+        'Inicio automatico nao instalado nesta maquina.',
+        'Na maquina servidora, de dois cliques em INSTALAR-SERVIDOR.cmd (na pasta do app).'
     );
 }
 
@@ -322,47 +310,12 @@ async function carregarServidorSegundoPlanoStatus() {
     }
 }
 
-async function executarAcaoServidorSegundoPlano(action) {
-    const routePath = BACKGROUND_SERVER_ACTION_ROUTES[action];
-
-    if (!routePath) {
-        return;
-    }
-
-    const labels = {
-        install: 'Instalando inicializacao em segundo plano...',
-        start: 'Iniciando servidor em segundo plano...',
-        stop: 'Parando servidor em segundo plano...',
-        uninstall: 'Removendo inicializacao em segundo plano...'
-    };
-
-    definirStatusServidorSegundoPlano('loading', labels[action] || 'Processando...', '');
-
-    try {
-        const status = await chamarApiServidorSegundoPlano(routePath, { method: 'POST' });
-        renderizarServidorSegundoPlanoStatus(status);
-        mostrarToast('Acao concluida.', 'success');
-    } catch (error) {
-        definirStatusServidorSegundoPlano(
-            'error',
-            'Nao foi possivel executar a acao solicitada.',
-            error.message || ''
-        );
-        mostrarToast(error.message || 'Erro ao configurar servidor em segundo plano.', 'error');
-    }
-}
-
 export function inicializarServidorSegundoPlano() {
     const panel = document.getElementById('backgroundServerPanel');
 
     if (!panel) {
         return;
     }
-
-    document.getElementById('instalarServidorSegundoPlanoBtn')?.addEventListener('click', () => executarAcaoServidorSegundoPlano('install'));
-    document.getElementById('iniciarServidorSegundoPlanoBtn')?.addEventListener('click', () => executarAcaoServidorSegundoPlano('start'));
-    document.getElementById('pararServidorSegundoPlanoBtn')?.addEventListener('click', () => executarAcaoServidorSegundoPlano('stop'));
-    document.getElementById('removerServidorSegundoPlanoBtn')?.addEventListener('click', () => executarAcaoServidorSegundoPlano('uninstall'));
 
     carregarServidorSegundoPlanoStatus();
 }

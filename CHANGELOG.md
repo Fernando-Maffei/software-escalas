@@ -2,7 +2,7 @@
 
 Todas as alteracoes relevantes deste projeto serao documentadas neste arquivo.
 
-## [Nao publicado]
+## [1.7.0] - 2026-10-17
 
 ### Adicionado
 - **Instalador do servidor em um passo** (`INSTALAR-SERVIDOR.cmd` -> `scripts/instalar-servidor.ps1`): confere/instala o Node 22, roda `npm ci --omit=dev`, prepara o SQL Server (reaproveita `preparar-sql-server.ps1`), grava o `.env` com o login `escalas_app` (sem a tela de configuracao inicial; a senha do admin sai do `.env` depois do primeiro boot), liga o backup automatico em `C:\Backups-Escalas` e registra a tarefa `CentralDeEscalasServidor` (boot, conta SYSTEM, sem limite de tempo). O node roda dentro de `scripts/servidor/rodar-servidor.cmd`, que o religa em 10 s se cair e grava a saida em `logs/servidor.log`. No fim confere `/api/health` + 401 numa rota de dados e mostra os enderecos da rede. Substitui os passos manuais (NSSM) do guia e o plano de instalador `.exe` (`docs/PLANO-INSTALADOR.md`, removido).

@@ -32,3 +32,6 @@ tests/e2e/.auth/
 *.tmp
 *.temp
 .tmp-*/
+
+# Pacote do servidor gerado com git archive
+*.zip

@@ -8,7 +8,7 @@ module.exports = [
         run() {
             assert.strictEqual(checkAccess({ isAdmin: true, method: 'DELETE', path: '/colaboradores/7' }), null);
             assert.strictEqual(checkAccess({ isAdmin: true, method: 'POST', path: '/configuracao-banco/salvar' }), null);
-            assert.strictEqual(checkAccess({ isAdmin: true, method: 'POST', path: '/sistema/servidor-background/parar' }), null);
+            assert.strictEqual(checkAccess({ isAdmin: true, method: 'GET', path: '/sistema/servidor-background/status' }), null);
         }
     },
     {

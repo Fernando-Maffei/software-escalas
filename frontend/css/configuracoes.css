@@ -328,30 +328,6 @@
     margin-bottom: 0;
 }
 
-.background-server-details {
-    border: 1px solid var(--border);
-    border-radius: 14px;
-    background: var(--card-dark);
-    padding: 12px 14px;
-}
-
-.background-server-details summary {
-    cursor: pointer;
-    color: var(--text);
-    font-size: 13px;
-    font-weight: 700;
-}
-
-.background-server-details code {
-    display: block;
-    margin-top: 10px;
-    color: var(--text-light);
-    font-family: Consolas, 'Courier New', monospace;
-    font-size: 11px;
-    line-height: 1.5;
-    overflow-wrap: anywhere;
-}
-
 .config-form-grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));

@@ -496,37 +496,11 @@ export function renderConfiguracoes() {
                             </small>
                         </div>
 
-                        <details class="background-server-details">
-                            <summary>Detalhes tecnicos da inicializacao</summary>
-                            <code id="backgroundServerCommand"></code>
-                        </details>
-
-                        <div class="config-actions-row">
-                            <button class="config-btn" id="instalarServidorSegundoPlanoBtn" type="button">
-                                <i class="fas fa-toggle-on"></i>
-                                Instalar inicio automatico
-                            </button>
-
-                            <button class="config-btn" id="iniciarServidorSegundoPlanoBtn" type="button">
-                                <i class="fas fa-play"></i>
-                                Iniciar agora
-                            </button>
-
-                            <button class="config-btn" id="pararServidorSegundoPlanoBtn" type="button">
-                                <i class="fas fa-stop"></i>
-                                Parar
-                            </button>
-
-                            <button class="config-btn config-btn-danger" id="removerServidorSegundoPlanoBtn" type="button">
-                                <i class="fas fa-trash-alt"></i>
-                                Remover inicio automatico
-                            </button>
-                        </div>
-
                         <small class="helper-text">
-                            O servidor passa a subir no boot da maquina, sem precisar
-                            que alguem faca login no Windows. Para instalar, abra o
-                            aplicativo como administrador (a tarefa roda na conta SYSTEM).
+                            O inicio automatico e instalado na maquina servidora pelo
+                            INSTALAR-SERVIDOR.cmd (na pasta do app): o servidor sobe
+                            junto com o Windows, sem ninguem fazer login, e volta sozinho
+                            se cair.
                         </small>
                     </div>
 
