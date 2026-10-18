@@ -224,7 +224,9 @@ pasta do app em `C:\CentralEscalas`, fora do OneDrive):
 
 1. dois cliques em **`INSTALAR-SERVIDOR.cmd`**;
 2. responda a senha do banco e a do admin;
-3. passe para o time o endereço que aparece no final (`http://IP:4450`).
+3. passe para o time o endereço que aparece no final (`http://IP:4450`) e o
+   **`CRIAR-ATALHO.cmd`**, que cria em cada computador o ícone que abre o
+   sistema em janela própria (dois cliques, sem instalar nada).
 
 O instalador prepara o SQL Server, grava a configuração, liga o backup
 automático e registra o sistema para subir junto com o Windows, sem ninguém
