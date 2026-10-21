@@ -5,7 +5,7 @@ import { appContent } from '../app.js';
 import { setActiveButton } from '../layout-pagina.js';
 import { paginaDestinoPermitida } from '../permissoes.js';
 import { renderRelatorios } from '../runtime/escala-e-relatorios.js';
-import { renderLancamentoPlantao } from '../runtime/plantao-colaboradores/plantao-regua-e-relatorios.js';
+import { entrarTelaPlantao } from '../runtime/plantao-colaboradores/plantao-regua-e-relatorios.js';
 import { renderCalendario } from './calendario-e-legenda.js';
 import { renderColaboradores } from './colaboradores.js';
 import { renderConfiguracoes } from './configuracoes-tela.js';
@@ -55,7 +55,7 @@ export function carregarPagina(paginaSolicitada) {
             renderEscalaDia();
             break;
         case "lancamentoPlantao":
-            renderLancamentoPlantao();
+            entrarTelaPlantao();
             break;
         case "configuracoes":
             renderConfiguracoes();

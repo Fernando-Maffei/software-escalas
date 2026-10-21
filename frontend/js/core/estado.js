@@ -26,7 +26,8 @@ export const estado = {
     bancoHorasResumo: undefined,
     appBootstrapPromise: null,
     plantaoDataFocoISO: undefined,
-    plantaoSabadoAncoraISO: undefined,
+    plantaoMesISO: undefined,
+    plantaoAbrirDataISO: undefined,
     escalaEditorColaboradorId: undefined,
     escalaWeekCache: undefined,
     escalaLunchDrafts: undefined
