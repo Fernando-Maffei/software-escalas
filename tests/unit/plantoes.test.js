@@ -238,6 +238,9 @@ module.exports = [
                 /Tipo do Lancamento 1/i
             );
             assert.equal(normalizeTipoLancamento('', 'feriado'), 'feriado');
+            assert.equal(normalizeTipoLancamento('cobertura_almoco', 'feriado'), 'cobertura_almoco');
+            // No sabado nao ha cobertura de almoco: o lancamento e sempre plantao.
+            assert.throws(() => normalizeTipoLancamento('cobertura_almoco', 'sabado'), /domingo ou feriado/i);
         }
     },
     {

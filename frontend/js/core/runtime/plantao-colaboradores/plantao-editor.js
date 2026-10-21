@@ -58,33 +58,47 @@ export function normalizarTipoCreditoPlantao(valor) {
     return String(valor || '').trim().toLowerCase() === 'extra' ? 'extra' : 'banco';
 }
 
-// Tipo do lancamento (campo "Tipo"): o plantao regular do dia — que e sempre o
-// proprio tipo do dia (sabado, domingo ou feriado) — ou o horario adicional
-// que cobre o almoco do plantonista. Espelha CK_plantoes_tipo_lancamento.
+// Tipo do lancamento (campo "Tipo"): Plantao ou Cobertura de almoco (horario
+// adicional que cobre o almoco do plantonista). So existe em domingo e
+// feriado; no sabado o lancamento e sempre plantao e o campo nem aparece.
+// No banco o plantao grava o tipo do dia ('domingo'/'feriado'/'sabado'), o
+// que deixa os relatorios agruparem por dia sem outra consulta
+// (CK_plantoes_tipo_lancamento).
 const PLANTAO_TIPO_COBERTURA_ALMOCO = 'cobertura_almoco';
 
-export const PLANTAO_TIPO_LANCAMENTO_META = {
-    sabado: { label: 'Sabado', icone: 'fa-calendar-day' },
-    domingo: { label: 'Domingo', icone: 'fa-calendar-day' },
-    feriado: { label: 'Feriado', icone: 'fa-star' },
-    [PLANTAO_TIPO_COBERTURA_ALMOCO]: {
-        label: 'Cobertura de almoco',
-        icone: 'fa-utensils',
-        ajuda: 'Horario adicional para cobrir o almoco do plantonista.'
-    }
-};
+export const PLANTAO_TIPO_LANCAMENTO_OPCOES = Object.freeze([
+    ['plantao', 'Plantao'],
+    [PLANTAO_TIPO_COBERTURA_ALMOCO, 'Cobertura de almoco']
+]);
+
+function permiteCoberturaAlmocoPlantao(tipoDia) {
+    return tipoDia === 'domingo' || tipoDia === 'feriado';
+}
 
 // Qualquer valor que nao seja cobertura vira o tipo do dia: registro antigo,
 // sem a coluna, e dia que passou a ser feriado depois do lancamento continuam
 // salvando sem o backend recusar a combinacao.
 export function normalizarTipoLancamentoPlantao(valor, tipoDia) {
-    return String(valor || '').trim().toLowerCase() === PLANTAO_TIPO_COBERTURA_ALMOCO
+    const dia = ['sabado', 'domingo', 'feriado'].includes(tipoDia) ? tipoDia : 'sabado';
+
+    return String(valor || '').trim().toLowerCase() === PLANTAO_TIPO_COBERTURA_ALMOCO && permiteCoberturaAlmocoPlantao(dia)
         ? PLANTAO_TIPO_COBERTURA_ALMOCO
-        : (PLANTAO_TIPO_LANCAMENTO_META[tipoDia] ? tipoDia : 'sabado');
+        : dia;
 }
 
-function ajudaTipoLancamentoPlantao(tipo) {
-    return PLANTAO_TIPO_LANCAMENTO_META[tipo]?.ajuda || 'Plantao regular do dia.';
+export function ehCoberturaAlmocoPlantao(valor) {
+    return String(valor || '').trim().toLowerCase() === PLANTAO_TIPO_COBERTURA_ALMOCO;
+}
+
+export function rotuloTipoLancamentoPlantao(valor) {
+    return ehCoberturaAlmocoPlantao(valor) ? 'Cobertura de almoco' : 'Plantao';
+}
+
+// Etiqueta so para a cobertura: o plantao e o caso comum e o dia ja diz o tipo.
+export function etiquetaCoberturaAlmocoPlantao(valor) {
+    return ehCoberturaAlmocoPlantao(valor)
+        ? '<span class="plantao-lancamento-credito plantao-tipo-lancamento--cobertura_almoco"><i class="fas fa-utensils"></i> Cobertura de almoco</span>'
+        : '';
 }
 
 function nomeColaboradorPlantao(colaboradorId) {
@@ -182,9 +196,12 @@ export function capturarRascunhoPlantao(state) {
 
     state.rascunho = state.rascunho || {};
 
+    const tipoLancamento = document.getElementById('plantaoNovoTipoLancamento');
+
     if (inicio) { state.rascunho.horaInicio = inicio.value; }
     if (fim) { state.rascunho.horaFim = fim.value; }
     if (colaborador) { state.rascunho.colaboradorId = Number(colaborador.value || 0); }
+    if (tipoLancamento) { state.rascunho.tipoLancamento = tipoLancamento.value; }
 }
 
 function lerFormularioLancamentoPlantao(state) {
@@ -193,7 +210,10 @@ function lerFormularioLancamentoPlantao(state) {
         horaInicio: document.getElementById('plantaoNovoInicio')?.value || '',
         horaFim: document.getElementById('plantaoNovoFim')?.value || '',
         tipoCredito: normalizarTipoCreditoPlantao(state?.rascunho?.tipoCredito),
-        tipoLancamento: normalizarTipoLancamentoPlantao(state?.rascunho?.tipoLancamento, state?.tipoPlantao)
+        tipoLancamento: normalizarTipoLancamentoPlantao(
+            document.getElementById('plantaoNovoTipoLancamento')?.value ?? state?.rascunho?.tipoLancamento,
+            state?.tipoPlantao
+        )
     };
 }
 
@@ -220,31 +240,6 @@ export function definirTipoCreditoPlantao(tipo) {
 
     if (ajuda) {
         ajuda.textContent = PLANTAO_CREDITO_META[escolhido].ajuda;
-    }
-}
-
-// Mesmo esquema do destino das horas: troca o tipo sem redesenhar o painel.
-export function definirTipoLancamentoPlantao(tipo) {
-    const state = getPlantaoEditorState();
-
-    if (!state) {
-        return;
-    }
-
-    const escolhido = normalizarTipoLancamentoPlantao(tipo, state.tipoPlantao);
-    state.rascunho = state.rascunho || {};
-    state.rascunho.tipoLancamento = escolhido;
-
-    document.querySelectorAll('[data-plantao-tipo-lancamento]').forEach((botao) => {
-        const ativo = botao.getAttribute('data-plantao-tipo-lancamento') === escolhido;
-        botao.classList.toggle('is-active', ativo);
-        botao.setAttribute('aria-pressed', ativo ? 'true' : 'false');
-    });
-
-    const ajuda = document.getElementById('plantaoTipoLancamentoAjuda');
-
-    if (ajuda) {
-        ajuda.textContent = ajudaTipoLancamentoPlantao(escolhido);
     }
 }
 
@@ -414,8 +409,6 @@ function renderLancamentosPlantao(state) {
         const minutos = duracaoLancamentoPlantao(linha);
         const indisponivel = indisponiveis.has(Number(linha.colaboradorId));
         const meta = PLANTAO_CREDITO_META[linha.tipoCredito];
-        const tipoLancamento = normalizarTipoLancamentoPlantao(linha.tipoLancamento, state.tipoPlantao);
-        const metaTipo = PLANTAO_TIPO_LANCAMENTO_META[tipoLancamento];
         const emEdicao = state.editandoIndice === indice;
         const nome = nomeColaboradorPlantao(linha.colaboradorId);
 
@@ -427,9 +420,7 @@ function renderLancamentosPlantao(state) {
                             <span class="plantao-lancamento-credito plantao-credito--${linha.tipoCredito}">
                                 <i class="fas ${meta.icone}"></i> ${escapeHtml(meta.curto)}
                             </span>
-                            <span class="plantao-lancamento-credito plantao-tipo-lancamento--${tipoLancamento}">
-                                <i class="fas ${metaTipo.icone}"></i> ${escapeHtml(metaTipo.label)}
-                            </span>
+                            ${etiquetaCoberturaAlmocoPlantao(normalizarTipoLancamentoPlantao(linha.tipoLancamento, state.tipoPlantao))}
                         </div>
                         <div class="plantao-lancamento-nome">
                             ${escapeHtml(nome)}
@@ -522,9 +513,7 @@ export function renderPlantaoEditor(state) {
     const jaLancado = (estado.plantoesLancados || []).some((item) => item.dataISO === state.dataISO);
     const editando = Number.isInteger(state.editandoIndice);
     const tipoCredito = normalizarTipoCreditoPlantao(state.rascunho?.tipoCredito);
-    const tipoLancamento = normalizarTipoLancamentoPlantao(state.rascunho?.tipoLancamento, tipo);
-    // Num dia so cabem dois tipos: o plantao regular daquele dia e a cobertura.
-    const opcoesTipoLancamento = [tipo, PLANTAO_TIPO_COBERTURA_ALMOCO];
+    const coberturaSelecionada = ehCoberturaAlmocoPlantao(normalizarTipoLancamentoPlantao(state.rascunho?.tipoLancamento, tipo));
 
     editorPanel.style.display = 'block';
     editorTitle.innerText = state.dataFormatada;
@@ -577,21 +566,13 @@ export function renderPlantaoEditor(state) {
                     </div>
                     <small class="helper-text" id="plantaoCreditoAjuda">${escapeHtml(PLANTAO_CREDITO_META[tipoCredito].ajuda)}</small>
 
-                    <span class="plantao-campo-rotulo" id="plantaoTipoLancamentoRotulo">Tipo</span>
-                    <div class="plantao-credito-escolha plantao-tipo-lancamento-escolha" role="group" aria-labelledby="plantaoTipoLancamentoRotulo">
-                        ${opcoesTipoLancamento.map((chave) => `
-                            <button
-                                type="button"
-                                class="plantao-credito-opcao plantao-tipo-lancamento--${chave}${chave === tipoLancamento ? ' is-active' : ''}"
-                                data-plantao-tipo-lancamento="${chave}"
-                                aria-pressed="${chave === tipoLancamento ? 'true' : 'false'}"
-                                ${atributosAcao('definirTipoLancamentoPlantao', chave)}
-                            >
-                                <i class="fas ${PLANTAO_TIPO_LANCAMENTO_META[chave].icone}"></i> ${escapeHtml(PLANTAO_TIPO_LANCAMENTO_META[chave].label)}
-                            </button>
-                        `).join('')}
-                    </div>
-                    <small class="helper-text" id="plantaoTipoLancamentoAjuda">${escapeHtml(ajudaTipoLancamentoPlantao(tipoLancamento))}</small>
+                    ${permiteCoberturaAlmocoPlantao(tipo) ? `
+                        <label for="plantaoNovoTipoLancamento" class="plantao-campo-rotulo">Tipo</label>
+                        <select id="plantaoNovoTipoLancamento" class="form-control">
+                            <option value="${escapeHtml(tipo)}"${coberturaSelecionada ? '' : ' selected'}>Plantao</option>
+                            <option value="${PLANTAO_TIPO_COBERTURA_ALMOCO}"${coberturaSelecionada ? ' selected' : ''}>Cobertura de almoco</option>
+                        </select>
+                    ` : ''}
 
                     <div class="plantao-form-acoes">
                         <button type="button" class="btn-primary" ${atributosAcao('confirmarLancamentoPlantao')}>
@@ -677,6 +658,17 @@ export function renderPlantaoEditor(state) {
         });
     });
 
+    const novoTipoLancamento = document.getElementById('plantaoNovoTipoLancamento');
+
+    novoTipoLancamento?.addEventListener('change', () => {
+        const currentState = getPlantaoEditorState();
+
+        if (currentState) {
+            currentState.rascunho = currentState.rascunho || {};
+            currentState.rascunho.tipoLancamento = novoTipoLancamento.value;
+        }
+    });
+
     novoColaborador?.addEventListener('change', () => {
         const currentState = getPlantaoEditorState();
 
@@ -687,7 +679,7 @@ export function renderPlantaoEditor(state) {
     });
 
     // Enter em qualquer campo do formulario adiciona/salva a linha.
-    [novoInicio, novoFim, novoColaborador].forEach((campo) => {
+    [novoInicio, novoFim, novoColaborador, novoTipoLancamento].forEach((campo) => {
         campo?.addEventListener('keydown', (event) => {
             if (event.key === 'Enter') {
                 event.preventDefault();

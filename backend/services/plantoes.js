@@ -72,7 +72,8 @@ function resolveLegacyTipoCredito(row) {
 }
 
 // Tipo do lancamento (campo "Tipo" da tela): o plantao regular do dia, que
-// sempre e o proprio tipo do dia, ou a cobertura de almoco do plantonista.
+// sempre e o proprio tipo do dia, ou a cobertura de almoco do plantonista —
+// esta so em domingo e feriado.
 // Vazio vira o regular — assim chamadas que nao conhecem o campo continuam
 // gravando o que gravavam antes.
 function normalizeTipoLancamento(value, tipoPlantao, fieldName = 'Tipo do lancamento') {
@@ -84,6 +85,12 @@ function normalizeTipoLancamento(value, tipoPlantao, fieldName = 'Tipo do lancam
 
     if (normalized !== PLANTAO_TIPO_COBERTURA_ALMOCO && normalized !== tipoPlantao) {
         throw new AppError(400, `${fieldName}: a data corresponde a ${tipoPlantao}, nao a ${normalized}.`);
+    }
+
+    // A cobertura existe para o almoco do plantonista de domingo e feriado; no
+    // sabado o lancamento e sempre plantao (a tela nem oferece o campo).
+    if (normalized === PLANTAO_TIPO_COBERTURA_ALMOCO && tipoPlantao === 'sabado') {
+        throw new AppError(400, `${fieldName}: cobertura de almoco so pode ser lancada em domingo ou feriado.`);
     }
 
     return normalized;

@@ -8,7 +8,7 @@ import { atualizarDadosCompartilhados, carregarAusencias, carregarColaboradores,
 import { aplicarDefaultsBancoHorasLancamento } from './banco-horas-lancamento.js';
 import { renderColaboradoresPlantao } from './colaboradores-e-jornada.js';
 import { fecharModalSeguro, formatarDataPtBr, formatarHoraInput, getPlantaoEditorState, isColaboradoresScreenVisible, minutosParaTexto, obterDataISO, setPlantaoEditorState } from './helpers.js';
-import { capturarRascunhoPlantao, carregarBancoHorasResumo, carregarDisponibilidadePlantao, duracaoLancamentoPlantao, lancamentosDoDiaPlantao, normalizarTipoCreditoPlantao, normalizarTipoLancamentoPlantao, PLANTAO_CREDITO_META, PLANTAO_TIPO_LANCAMENTO_META, renderListaColaboradores, renderPlantaoEditor } from './plantao-editor.js';
+import { capturarRascunhoPlantao, carregarBancoHorasResumo, carregarDisponibilidadePlantao, duracaoLancamentoPlantao, lancamentosDoDiaPlantao, ehCoberturaAlmocoPlantao, etiquetaCoberturaAlmocoPlantao, normalizarTipoCreditoPlantao, normalizarTipoLancamentoPlantao, PLANTAO_CREDITO_META, PLANTAO_TIPO_LANCAMENTO_OPCOES, renderListaColaboradores, renderPlantaoEditor } from './plantao-editor.js';
 import { atributosAcao } from '../../../lib/atributos-acao.js';
 
 const PLANTAO_SABADOS_PASSO = 8;
@@ -299,7 +299,7 @@ function filtrarPlantoesLancados(lista, filtros = filtrosPlantoesLancados) {
         }
 
         if (filtros.tipoLancamento !== 'todos'
-            && normalizarTipoLancamentoPlantao(plantao.tipoLancamento, plantao.tipoPlantao) !== filtros.tipoLancamento) {
+            && (ehCoberturaAlmocoPlantao(plantao.tipoLancamento) ? 'cobertura_almoco' : 'plantao') !== filtros.tipoLancamento) {
             return false;
         }
 
@@ -389,9 +389,7 @@ function renderFiltrosPlantoesLancados() {
                 <div class="plantoes-filtro">
                     <label for="plantoesFiltroTipoLancamento">Tipo</label>
                     <select id="plantoesFiltroTipoLancamento" class="form-control">
-                        ${opcoes([['todos', 'Todos']].concat(
-                            Object.entries(PLANTAO_TIPO_LANCAMENTO_META).map(([valor, meta]) => [valor, meta.label])
-                        ), filtros.tipoLancamento)}
+                        ${opcoes([['todos', 'Todos'], ...PLANTAO_TIPO_LANCAMENTO_OPCOES], filtros.tipoLancamento)}
                     </select>
                 </div>
                 <div class="plantoes-filtro">
@@ -529,8 +527,6 @@ function renderPlantoesLancados(filtros) {
             const turnosHtml = ordenados.map((item) => {
                 const chave = normalizarTipoCreditoPlantao(item.tipoCredito);
                 const meta = PLANTAO_CREDITO_META[chave];
-                const tipoLancamento = normalizarTipoLancamentoPlantao(item.tipoLancamento, item.tipoPlantao);
-                const metaTipo = PLANTAO_TIPO_LANCAMENTO_META[tipoLancamento];
 
                 return `
                         <div class="plantao-turno">
@@ -541,9 +537,7 @@ function renderPlantoesLancados(filtros) {
                             <span class="plantao-lancamento-credito plantao-credito--${chave}">
                                 <i class="fas ${meta.icone}"></i> ${escapeHtml(meta.curto)}
                             </span>
-                            <span class="plantao-lancamento-credito plantao-tipo-lancamento--${tipoLancamento}">
-                                <i class="fas ${metaTipo.icone}"></i> ${escapeHtml(metaTipo.label)}
-                            </span>
+                            ${etiquetaCoberturaAlmocoPlantao(item.tipoLancamento)}
                             <div class="plantao-colaboradores">
                                 ${renderColaboradoresPlantao(item.colaboradores)}
                             </div>

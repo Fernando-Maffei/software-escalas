@@ -17,7 +17,7 @@ import { estado } from '../estado.js';
 import { carregarColaboradores, carregarPlantoes, carregarSetores } from './dados-e-modais.js';
 import { normalizeRuntimeToken } from './normalizacao.js';
 import { isColaboradoresScreenVisible } from './plantao-colaboradores/helpers.js';
-import { renderListaColaboradores } from './plantao-colaboradores/plantao-editor.js';
+import { ehCoberturaAlmocoPlantao, normalizarTipoLancamentoPlantao, PLANTAO_TIPO_LANCAMENTO_OPCOES, renderListaColaboradores, rotuloTipoLancamentoPlantao } from './plantao-colaboradores/plantao-editor.js';
 import { ehDataPlantaoValida, renderLancamentoPlantao } from './plantao-colaboradores/plantao-regua-e-relatorios.js';
 import { gerarRelatorioCompleto } from './relatorio-mensal.js';
 import { atributosAcao } from '../../lib/atributos-acao.js';
@@ -72,7 +72,8 @@ function captureRelatoriosStateEscala() {
         plantaoDataInicio: document.getElementById('relatorioPlantaoDataInicio')?.value || '',
         plantaoDataFim: document.getElementById('relatorioPlantaoDataFim')?.value || '',
         plantaoColaborador: document.getElementById('relatorioPlantaoColaborador')?.value || '',
-        plantaoStatus: document.getElementById('relatorioPlantaoStatus')?.value || 'todos'
+        plantaoStatus: document.getElementById('relatorioPlantaoStatus')?.value || 'todos',
+        plantaoTipo: document.getElementById('relatorioPlantaoTipo')?.value || 'todos'
     };
 }
 
@@ -98,6 +99,7 @@ function restoreRelatoriosStateEscala(snapshot) {
     setValue('relatorioPlantaoDataFim', snapshot.plantaoDataFim);
     setValue('relatorioPlantaoColaborador', snapshot.plantaoColaborador);
     setValue('relatorioPlantaoStatus', snapshot.plantaoStatus);
+    setValue('relatorioPlantaoTipo', snapshot.plantaoTipo);
 }
 
 async function refreshRelatoriosViewEscala() {
@@ -208,6 +210,9 @@ function buildPlantaoReportSummary(items) {
     // numero que nao bate com nenhum saldo. Os dois totais vao separados.
     let bancoMinutes = 0;
     let extraMinutes = 0;
+    // Cobertura de almoco em card proprio: e o numero que o controle dos
+    // plantonistas precisa, e ele ja esta dentro de banco/extra acima.
+    let coberturaMinutes = 0;
 
     items.forEach((plantao) => {
         const colaboradoresCount = Array.isArray(plantao.colaboradores) ? plantao.colaboradores.length : 0;
@@ -223,6 +228,10 @@ function buildPlantaoReportSummary(items) {
         } else {
             bancoMinutes += horasEquipe;
         }
+
+        if (plantao.tipoLancamento === 'cobertura_almoco') {
+            coberturaMinutes += horasEquipe;
+        }
     });
 
     return {
@@ -231,7 +240,8 @@ function buildPlantaoReportSummary(items) {
         totalColaboradores: uniqueCollaborators.size,
         horasProgramadas: formatDurationEscala(totalMinutes || 0),
         horasBanco: formatDurationEscala(bancoMinutes || 0),
-        horasExtra: formatDurationEscala(extraMinutes || 0)
+        horasExtra: formatDurationEscala(extraMinutes || 0),
+        horasCobertura: formatDurationEscala(coberturaMinutes || 0)
     };
 }
 
@@ -240,7 +250,8 @@ function getPlantaoReportFiltersFromUI() {
         dataInicio: document.getElementById('relatorioPlantaoDataInicio')?.value || '',
         dataFim: document.getElementById('relatorioPlantaoDataFim')?.value || '',
         colaboradorId: document.getElementById('relatorioPlantaoColaborador')?.value || '',
-        status: document.getElementById('relatorioPlantaoStatus')?.value || 'todos'
+        status: document.getElementById('relatorioPlantaoStatus')?.value || 'todos',
+        tipoLancamento: document.getElementById('relatorioPlantaoTipo')?.value || 'todos'
     };
 }
 
@@ -258,6 +269,10 @@ async function buildPlantaoReportItems(filters) {
             dataISO: toISODateEscala(item.dataISO || item.data_plantao),
             tipoPlantao: item.tipoPlantao || item.tipo_plantao || null,
             tipoCredito: String(item.tipoCredito || item.tipo_credito || '').toLowerCase() === 'extra' ? 'extra' : 'banco',
+            tipoLancamento: normalizarTipoLancamentoPlantao(
+                item.tipoLancamento || item.tipo_lancamento,
+                item.tipoPlantao || item.tipo_plantao
+            ),
             colaboradores: Array.isArray(item.colaboradores) ? item.colaboradores : [],
             horaInicio: item.horaInicio || item.hora_inicio || null,
             horaFim: item.horaFim || item.hora_fim || null,
@@ -271,6 +286,11 @@ async function buildPlantaoReportItems(filters) {
             }
 
             if (filters.colaboradorId && !(plantao.colaboradores || []).some((id) => Number(id) === Number(filters.colaboradorId))) {
+                return false;
+            }
+
+            if (filters.tipoLancamento && filters.tipoLancamento !== 'todos'
+                && (ehCoberturaAlmocoPlantao(plantao.tipoLancamento) ? 'cobertura_almoco' : 'plantao') !== filters.tipoLancamento) {
                 return false;
             }
 
@@ -414,7 +434,7 @@ function gerarHtmlPdfRelatorioPlantoes(items, filters = {}) {
                 <section class="pdf-pagina plantao-export-page">
                     <header class="plantao-export-header">
                         <div>
-                            <h1>Relatorio de Plantoes de Sabado</h1>
+                            <h1>Relatorio de Plantoes</h1>
                             <p>${escapeHtml(formatDatePtBrEscala(filters.dataInicio))} ate ${escapeHtml(formatDatePtBrEscala(filters.dataFim))}</p>
                         </div>
                         <p>Gerado em ${escapeHtml(new Date().toLocaleDateString('pt-BR'))}</p>
@@ -437,7 +457,7 @@ export async function gerarRelatorioPlantoes() {
     try {
         const items = await buildPlantaoReportItems(filters);
 
-        document.getElementById('relatorioTitulo').innerText = `Relatorio de Plantoes de Sabado - ${formatDatePtBrEscala(filters.dataInicio)} ate ${formatDatePtBrEscala(filters.dataFim)}`;
+        document.getElementById('relatorioTitulo').innerText = `Relatorio de Plantoes - ${formatDatePtBrEscala(filters.dataInicio)} ate ${formatDatePtBrEscala(filters.dataFim)}`;
         document.getElementById('relatorioConteudo').innerHTML = renderRelatorioPlantoes(items, filters);
         document.getElementById('relatorioVisualizacao').style.display = 'block';
     } catch (error) {
@@ -551,11 +571,19 @@ function renderRelatorioPlantoes(items, filters = {}) {
                             <span>Horas extras (fora do banco)</span>
                         </div>
                     </div>
+                    <div class="resumo-card-estatistica">
+                        <i class="fas fa-utensils"></i>
+                        <div>
+                            <strong>${escapeHtml(summary.horasCobertura)}</strong>
+                            <span>Cobertura de almoco</span>
+                        </div>
+                    </div>
                 </div>
                 <table class="relatorio-tabela">
                     <thead>
                         <tr>
                             <th>Data</th>
+                            <th>Dia</th>
                             <th>Tipo</th>
                             <th>Horario</th>
                             <th>Destino</th>
@@ -579,11 +607,13 @@ function renderRelatorioPlantoes(items, filters = {}) {
                             const statusLabel = colaboradores.length > 0 ? 'Equipe definida' : 'Sem equipe';
                             const statusClass = colaboradores.length > 0 ? 'badge-folga' : 'badge-ausencia';
                             const extra = plantao.tipoCredito === 'extra';
+                            const cobertura = ehCoberturaAlmocoPlantao(plantao.tipoLancamento);
 
                             return `
                                     <tr>
                                         <td><strong>${escapeHtml(formatDatePtBrEscala(plantao.dataISO))}</strong></td>
                                         <td>${escapeHtml((plantao.tipoPlantao || 'sabado').charAt(0).toUpperCase() + (plantao.tipoPlantao || 'sabado').slice(1))}</td>
+                                        <td>${cobertura ? `<span class="evento-tipo badge-folga">${escapeHtml(rotuloTipoLancamentoPlantao(plantao.tipoLancamento))}</span>` : escapeHtml(rotuloTipoLancamentoPlantao(plantao.tipoLancamento))}</td>
                                         <td>${escapeHtml(formatTimeRangeEscala(plantao.horaInicio, plantao.horaFim))}</td>
                                         <td><span class="evento-tipo ${extra ? 'badge-ausencia' : 'badge-folga'}">${extra ? 'Hora extra' : 'Banco de horas'}</span></td>
                                         <td><span class="evento-tipo ${statusClass}">${escapeHtml(statusLabel)}</span></td>
@@ -637,7 +667,7 @@ export async function renderRelatorios() {
                     <i class="fas fa-table"></i> Escala
                 </button>
                 <button type="button" class="relatorios-aba" data-relatorio-aba="plantoes" role="tab" aria-selected="false">
-                    <i class="fas fa-calendar-check"></i> Plantoes de sabado
+                    <i class="fas fa-calendar-check"></i> Plantoes
                 </button>
             </div>
 
@@ -744,11 +774,11 @@ export async function renderRelatorios() {
                 <div class="relatorio-card" data-relatorio-painel="plantoes">
                     <div class="relatorio-card-header">
                         <i class="fas fa-calendar-check"></i>
-                        <h2>Relatorio de Plantoes de Sabado</h2>
+                        <h2>Relatorio de Plantoes</h2>
                     </div>
                     <div class="relatorio-card-body">
                         <p class="relatorio-descricao">
-                            Consulte plantoes de sabado por periodo, colaborador e status da equipe.
+                            Consulte plantoes de sabado, domingo e feriado por periodo, colaborador, tipo e status da equipe.
                         </p>
                         <div class="relatorio-filtros">
                             <div class="filtro-group">
@@ -771,6 +801,15 @@ export async function renderRelatorios() {
                                     <option value="todos">Todos</option>
                                     <option value="com_equipe">Com equipe</option>
                                     <option value="sem_equipe">Sem equipe</option>
+                                </select>
+                            </div>
+                            <div class="filtro-group">
+                                <label><i class="fas fa-tag"></i> Tipo</label>
+                                <select id="relatorioPlantaoTipo" class="form-control">
+                                    <option value="todos">Todos</option>
+                                    ${PLANTAO_TIPO_LANCAMENTO_OPCOES.map(([valor, rotulo]) => `
+                                        <option value="${escapeHtml(valor)}">${escapeHtml(rotulo)}</option>
+                                    `).join('')}
                                 </select>
                             </div>
                         </div>
