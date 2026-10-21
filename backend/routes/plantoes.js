@@ -3,7 +3,7 @@ const router = express.Router();
 
 const { sql, conectar } = require('../db');
 const { AppError } = require('../lib/errors');
-const { PLANTAO_TIPOS } = require('../lib/dominio');
+const { PLANTAO_TIPOS, PLANTAO_TIPOS_LANCAMENTO } = require('../lib/dominio');
 const {
     buildDisponibilidadeColaborador,
     calculateIntervalMinutes,
@@ -20,6 +20,7 @@ const { colaboradoresVisiveis } = require('../auth/acesso-setores');
 const { SQL_EQUIPE_PLANTAO, gravarEquipePlantao } = require('../services/equipe-plantao');
 const {
     extractDateString,
+    normalizeEnum,
     normalizeIsoDate,
     normalizeNullableTime,
     toSqlTime
@@ -43,7 +44,8 @@ const PLANTAO_COLUNAS = `
             hora_fim,
             observacao,
             tipo_plantao,
-            tipo_credito`;
+            tipo_credito,
+            tipo_lancamento`;
 
 // O dia pode ter MAIS DE UM lancamento (turnos com horarios, pessoas e destinos
 // diferentes), entao a busca por data devolve lista.
@@ -244,6 +246,12 @@ router.get('/', async (req, res) => {
         clauses.push('LOWER(tipo_plantao) = @tipoPlantao');
     }
 
+    // Base dos relatorios por tipo (?tipoLancamento=cobertura_almoco).
+    if (req.query.tipoLancamento) {
+        request.input('tipoLancamento', sql.NVarChar(30), normalizeEnum(req.query.tipoLancamento, 'Tipo do lancamento', PLANTAO_TIPOS_LANCAMENTO));
+        clauses.push('LOWER(tipo_lancamento) = @tipoLancamento');
+    }
+
     const result = await request.query(`
         SELECT ${PLANTAO_COLUNAS}
         FROM plantoes
@@ -359,15 +367,16 @@ router.post('/', async (req, res) => {
                 .input('data_plantao', sql.Date, payload.dataISO)
                 .input('tipoPlantao', sql.NVarChar(30), payload.tipoPlantao)
                 .input('tipoCredito', sql.NVarChar(20), grupo.tipoCredito)
+                .input('tipoLancamento', sql.NVarChar(30), grupo.tipoLancamento)
                 .input('horaInicio', sql.Time, toSqlTime(grupo.horaInicio, 'Hora inicial do plantao'))
                 .input('horaFim', sql.Time, toSqlTime(grupo.horaFim, 'Hora final do plantao'))
                 .input('observacao', sql.NVarChar(500), payload.observacao)
                 .query(`
                     INSERT INTO plantoes (
-                        data_plantao, hora_inicio, hora_fim, observacao, tipo_plantao, tipo_credito
+                        data_plantao, hora_inicio, hora_fim, observacao, tipo_plantao, tipo_credito, tipo_lancamento
                     )
                     OUTPUT INSERTED.*
-                    VALUES (@data_plantao, @horaInicio, @horaFim, @observacao, @tipoPlantao, @tipoCredito)
+                    VALUES (@data_plantao, @horaInicio, @horaFim, @observacao, @tipoPlantao, @tipoCredito, @tipoLancamento)
                 `);
 
             const saved = insertResult.recordset[0];

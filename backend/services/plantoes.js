@@ -1,5 +1,10 @@
 const { AppError } = require('../lib/errors');
-const { PLANTAO_TIPOS, PLANTAO_TIPOS_CREDITO } = require('../lib/dominio');
+const {
+    PLANTAO_TIPO_COBERTURA_ALMOCO,
+    PLANTAO_TIPOS,
+    PLANTAO_TIPOS_CREDITO,
+    PLANTAO_TIPOS_LANCAMENTO
+} = require('../lib/dominio');
 const { isFeriadoNacional } = require('./feriados-nacionais');
 const {
     ensurePositiveInt,
@@ -64,6 +69,32 @@ function resolveLegacyTipoCredito(row) {
         // comportamento historico (antes da coluna existir) era creditar.
         return 'banco';
     }
+}
+
+// Tipo do lancamento (campo "Tipo" da tela): o plantao regular do dia, que
+// sempre e o proprio tipo do dia, ou a cobertura de almoco do plantonista.
+// Vazio vira o regular — assim chamadas que nao conhecem o campo continuam
+// gravando o que gravavam antes.
+function normalizeTipoLancamento(value, tipoPlantao, fieldName = 'Tipo do lancamento') {
+    if (value === undefined || value === null || String(value).trim() === '') {
+        return tipoPlantao;
+    }
+
+    const normalized = normalizeEnum(value, fieldName, PLANTAO_TIPOS_LANCAMENTO);
+
+    if (normalized !== PLANTAO_TIPO_COBERTURA_ALMOCO && normalized !== tipoPlantao) {
+        throw new AppError(400, `${fieldName}: a data corresponde a ${tipoPlantao}, nao a ${normalized}.`);
+    }
+
+    return normalized;
+}
+
+// Linha gravada antes da coluna tipo_lancamento (ou com valor estranho) e o
+// plantao regular do dia — mesma regra da migration que preencheu a coluna.
+function resolveLegacyTipoLancamento(row, tipoPlantao) {
+    const raw = String(row.tipoLancamento ?? row.tipo_lancamento ?? row.TipoLancamento ?? '').trim().toLowerCase();
+
+    return PLANTAO_TIPOS_LANCAMENTO.includes(raw) ? raw : tipoPlantao;
 }
 
 // Tipo do plantao a partir da data. Feriado tem PRIORIDADE (mesmo caindo no fim
@@ -159,12 +190,15 @@ function serializePlantaoRecord(row) {
         row.equipe ?? row.colaboradores ?? row.Colaboradores
     );
 
+    const tipoPlantao = resolveLegacyPlantaoType(row, dataISO);
+
     return {
         id: row.id ?? row.Id ?? null,
         data_plantao: rawDate,
         dataISO,
         colaboradores,
-        tipoPlantao: resolveLegacyPlantaoType(row, dataISO),
+        tipoPlantao,
+        tipoLancamento: resolveLegacyTipoLancamento(row, tipoPlantao),
         tipoCredito: resolveLegacyTipoCredito(row),
         horaInicio: extractTimeString(row.hora_inicio ?? row.HoraInicio ?? row.horaInicio),
         horaFim: extractTimeString(row.hora_fim ?? row.HoraFim ?? row.horaFim),
@@ -230,7 +264,8 @@ function buildPlantaoDiaPayload(body, feriados = null) {
             horaInicio: body.horaInicio,
             horaFim: body.horaFim,
             colaboradores: body.colaboradores,
-            tipoCredito: body.tipoCredito
+            tipoCredito: body.tipoCredito,
+            tipoLancamento: body.tipoLancamento
         }];
 
     const lancamentos = brutos.map((item, indice) => {
@@ -257,6 +292,7 @@ function buildPlantaoDiaPayload(body, feriados = null) {
             horaFim,
             colaboradores,
             tipoCredito: normalizeTipoCredito(item.tipoCredito, `Tipo de credito do ${rotulo}`),
+            tipoLancamento: normalizeTipoLancamento(item.tipoLancamento, tipoPlantao, `Tipo do ${rotulo}`),
             observacao: observacaoDia,
             duracaoMinutos: calculateIntervalMinutes(horaInicio, horaFim, {
                 startLabel: `Hora inicial do ${rotulo}`,
@@ -364,6 +400,7 @@ function montarRelatorioHorasExtras(plantoes, colaboradores, filtros = {}) {
                 plantaoId: plantao.id,
                 dataISO: plantao.dataISO,
                 tipoPlantao: plantao.tipoPlantao,
+                tipoLancamento: plantao.tipoLancamento,
                 horaInicio: plantao.horaInicio,
                 horaFim: plantao.horaFim,
                 minutos,
@@ -395,16 +432,17 @@ function montarRelatorioHorasExtras(plantoes, colaboradores, filtros = {}) {
     };
 }
 
-// Quem compartilha exatamente o mesmo horario E o mesmo destino das horas vira
-// UMA linha, com os colaboradores juntos (a equipe vai para PlantaoColaborador),
-// o que evita inflar o banco quando cinco pessoas fazem o mesmo turno. O
-// tipo_credito entra na chave porque e
-// gravado por linha: agrupar banco com extra perderia a distincao.
+// Quem compartilha exatamente o mesmo horario, o mesmo destino das horas E o
+// mesmo tipo vira UMA linha, com os colaboradores juntos (a equipe vai para
+// PlantaoColaborador), o que evita inflar o banco quando cinco pessoas fazem o
+// mesmo turno. tipo_credito e tipo_lancamento entram na chave porque sao
+// gravados por linha: agrupar banco com extra, ou domingo com cobertura de
+// almoco, perderia a distincao.
 function agruparLancamentosPorHorario(lancamentos) {
     const grupos = new Map();
 
     for (const lancamento of lancamentos) {
-        const chave = `${lancamento.horaInicio}|${lancamento.horaFim}|${lancamento.tipoCredito}`;
+        const chave = `${lancamento.horaInicio}|${lancamento.horaFim}|${lancamento.tipoCredito}|${lancamento.tipoLancamento}`;
         const atual = grupos.get(chave);
 
         if (atual) {
@@ -436,6 +474,7 @@ module.exports = {
     normalizeColaboradores,
     normalizePlantaoType,
     normalizeTipoCredito,
+    normalizeTipoLancamento,
     parseEquipePlantao,
     resolvePlantaoTypeByDate,
     serializePlantaoRecord

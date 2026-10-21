@@ -8,7 +8,7 @@ import { atualizarDadosCompartilhados, carregarAusencias, carregarColaboradores,
 import { aplicarDefaultsBancoHorasLancamento } from './banco-horas-lancamento.js';
 import { renderColaboradoresPlantao } from './colaboradores-e-jornada.js';
 import { fecharModalSeguro, formatarDataPtBr, formatarHoraInput, getPlantaoEditorState, isColaboradoresScreenVisible, minutosParaTexto, obterDataISO, setPlantaoEditorState } from './helpers.js';
-import { capturarRascunhoPlantao, carregarBancoHorasResumo, carregarDisponibilidadePlantao, duracaoLancamentoPlantao, lancamentosDoDiaPlantao, normalizarTipoCreditoPlantao, PLANTAO_CREDITO_META, renderListaColaboradores, renderPlantaoEditor } from './plantao-editor.js';
+import { capturarRascunhoPlantao, carregarBancoHorasResumo, carregarDisponibilidadePlantao, duracaoLancamentoPlantao, lancamentosDoDiaPlantao, normalizarTipoCreditoPlantao, normalizarTipoLancamentoPlantao, PLANTAO_CREDITO_META, PLANTAO_TIPO_LANCAMENTO_META, renderListaColaboradores, renderPlantaoEditor } from './plantao-editor.js';
 import { atributosAcao } from '../../../lib/atributos-acao.js';
 
 const PLANTAO_SABADOS_PASSO = 8;
@@ -250,6 +250,7 @@ const PLANTAO_FILTROS_VAZIOS = Object.freeze({
     dataFim: '',
     colaboradorId: '',
     tipoPlantao: 'todos',
+    tipoLancamento: 'todos',
     tipoCredito: 'todos'
 });
 
@@ -297,6 +298,11 @@ function filtrarPlantoesLancados(lista, filtros = filtrosPlantoesLancados) {
             return false;
         }
 
+        if (filtros.tipoLancamento !== 'todos'
+            && normalizarTipoLancamentoPlantao(plantao.tipoLancamento, plantao.tipoPlantao) !== filtros.tipoLancamento) {
+            return false;
+        }
+
         if (filtros.tipoCredito !== 'todos'
             && normalizarTipoCreditoPlantao(plantao.tipoCredito) !== filtros.tipoCredito) {
             return false;
@@ -334,6 +340,7 @@ function lerFiltrosPlantoesLancadosUI() {
         dataFim: document.getElementById('plantoesFiltroFim')?.value || '',
         colaboradorId: document.getElementById('plantoesFiltroColaborador')?.value || '',
         tipoPlantao: document.getElementById('plantoesFiltroTipo')?.value || 'todos',
+        tipoLancamento: document.getElementById('plantoesFiltroTipoLancamento')?.value || 'todos',
         tipoCredito: document.getElementById('plantoesFiltroCredito')?.value || 'todos'
     };
 }
@@ -377,6 +384,14 @@ function renderFiltrosPlantoesLancados() {
                         ['domingo', 'Domingo'],
                         ['feriado', 'Feriado']
                     ], filtros.tipoPlantao)}
+                    </select>
+                </div>
+                <div class="plantoes-filtro">
+                    <label for="plantoesFiltroTipoLancamento">Tipo</label>
+                    <select id="plantoesFiltroTipoLancamento" class="form-control">
+                        ${opcoes([['todos', 'Todos']].concat(
+                            Object.entries(PLANTAO_TIPO_LANCAMENTO_META).map(([valor, meta]) => [valor, meta.label])
+                        ), filtros.tipoLancamento)}
                     </select>
                 </div>
                 <div class="plantoes-filtro">
@@ -442,7 +457,7 @@ function ligarFiltrosPlantoesLancados() {
         document.getElementById(id)?.addEventListener('change', aplicarFiltrosPlantoesLancados);
     });
 
-    ['plantoesFiltroColaborador', 'plantoesFiltroTipo', 'plantoesFiltroCredito'].forEach((id) => {
+    ['plantoesFiltroColaborador', 'plantoesFiltroTipo', 'plantoesFiltroTipoLancamento', 'plantoesFiltroCredito'].forEach((id) => {
         document.getElementById(id)?.addEventListener('change', aplicarFiltrosPlantoesLancados);
     });
 
@@ -476,7 +491,7 @@ function renderPlantoesLancados(filtros) {
         const validos = filtrarPlantoesLancados(lancados, filtros || filtrosPlantoesLancados);
 
         if (validos.length === 0) {
-            return '<div class="empty-state">Nenhum plantao encontrado com esses filtros. Ajuste o periodo, o colaborador ou o destino das horas.</div>';
+            return '<div class="empty-state">Nenhum plantao encontrado com esses filtros. Ajuste o periodo, o colaborador, o tipo ou o destino das horas.</div>';
         }
 
         const porData = new Map();
@@ -514,6 +529,8 @@ function renderPlantoesLancados(filtros) {
             const turnosHtml = ordenados.map((item) => {
                 const chave = normalizarTipoCreditoPlantao(item.tipoCredito);
                 const meta = PLANTAO_CREDITO_META[chave];
+                const tipoLancamento = normalizarTipoLancamentoPlantao(item.tipoLancamento, item.tipoPlantao);
+                const metaTipo = PLANTAO_TIPO_LANCAMENTO_META[tipoLancamento];
 
                 return `
                         <div class="plantao-turno">
@@ -523,6 +540,9 @@ function renderPlantoesLancados(filtros) {
                             </span>
                             <span class="plantao-lancamento-credito plantao-credito--${chave}">
                                 <i class="fas ${meta.icone}"></i> ${escapeHtml(meta.curto)}
+                            </span>
+                            <span class="plantao-lancamento-credito plantao-tipo-lancamento--${tipoLancamento}">
+                                <i class="fas ${metaTipo.icone}"></i> ${escapeHtml(metaTipo.label)}
                             </span>
                             <div class="plantao-colaboradores">
                                 ${renderColaboradoresPlantao(item.colaboradores)}
@@ -826,7 +846,9 @@ async function abrirEditorPlantao(dataISO, dataFormatada) {
             colaboradorId: 0,
             horaInicio: ultimo?.horaInicio || '',
             horaFim: ultimo?.horaFim || '',
-            tipoCredito: ultimo?.tipoCredito || 'banco'
+            tipoCredito: ultimo?.tipoCredito || 'banco',
+            // A cobertura de almoco e a excecao: o formulario abre no regular.
+            tipoLancamento: resolverTipoPlantaoFront(dataISO) || 'sabado'
         },
         disponibilidade: []
     });
@@ -894,15 +916,18 @@ export async function salvarPlantao(dataISO) {
 
     try {
         estado.plantaoDataFocoISO = dataISO;
+        const tipoPlantao = resolverTipoPlantaoFront(dataISO) || 'sabado';
+
         await API.salvarPlantao({
             dataISO,
-            tipoPlantao: resolverTipoPlantaoFront(dataISO) || 'sabado',
+            tipoPlantao,
             observacao: state.observacao || '',
             lancamentos: state.lancamentos.map((linha) => ({
                 colaboradorId: linha.colaboradorId,
                 horaInicio: linha.horaInicio,
                 horaFim: linha.horaFim,
-                tipoCredito: linha.tipoCredito
+                tipoCredito: linha.tipoCredito,
+                tipoLancamento: normalizarTipoLancamentoPlantao(linha.tipoLancamento, tipoPlantao)
             }))
         });
 

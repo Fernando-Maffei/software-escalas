@@ -384,6 +384,34 @@
     color: #c2410c;
 }
 
+/* Campo "Tipo": reaproveita os botoes do destino das horas. O regular do dia
+   (sabado/domingo/feriado) fica neutro; a cobertura de almoco ganha cor. */
+.plantao-campo-rotulo {
+    display: block;
+    margin-top: 12px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-light);
+}
+
+.plantao-tipo-lancamento-escolha {
+    margin-top: 6px;
+}
+
+.plantao-credito-opcao.is-active.plantao-tipo-lancamento--sabado,
+.plantao-credito-opcao.is-active.plantao-tipo-lancamento--domingo,
+.plantao-credito-opcao.is-active.plantao-tipo-lancamento--feriado {
+    background: var(--primary-soft);
+    border-color: var(--primary);
+    color: var(--text);
+}
+
+.plantao-credito-opcao.is-active.plantao-tipo-lancamento--cobertura_almoco {
+    background: #f0fdf4;
+    border-color: #22c55e;
+    color: #15803d;
+}
+
 .plantao-form-novo .helper-text {
     display: block;
     margin-top: 8px;
@@ -476,6 +504,18 @@
 .plantao-credito--extra {
     background: #fff7ed;
     color: #c2410c;
+}
+
+.plantao-tipo-lancamento--sabado,
+.plantao-tipo-lancamento--domingo,
+.plantao-tipo-lancamento--feriado {
+    background: var(--primary-soft);
+    color: var(--text);
+}
+
+.plantao-tipo-lancamento--cobertura_almoco {
+    background: #f0fdf4;
+    color: #15803d;
 }
 
 .plantao-lancamento-nome {
@@ -1076,6 +1116,13 @@
 [data-theme="dark"] .plantao-credito--extra {
     background: rgba(249, 115, 22, 0.18);
     color: #fdba74;
+}
+
+[data-theme="dark"] .plantao-credito-opcao.is-active.plantao-tipo-lancamento--cobertura_almoco,
+[data-theme="dark"] .plantao-tipo-lancamento--cobertura_almoco {
+    background: rgba(34, 197, 94, 0.18);
+    border-color: #22c55e;
+    color: #86efac;
 }
 
 [data-theme="dark"] .plantao-tipo-chip,

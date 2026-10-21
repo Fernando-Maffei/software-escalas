@@ -2,6 +2,13 @@
 
 Todas as alteracoes relevantes deste projeto serao documentadas neste arquivo.
 
+## [Nao lancado]
+
+### Adicionado
+- **Lancar Plantao: campo "Tipo" em cada lancamento.** Ao lado do destino das horas, cada lancamento escolhe entre o **plantao regular do dia** (Domingo, Feriado ou Sabado, conforme a data) e **Cobertura de almoco** (horario adicional que cobre o almoco do plantonista). O tipo aparece como etiqueta nos lancamentos do editor e em "Plantoes lancados", que ganha o filtro **Tipo**. Editar um lancamento traz o tipo gravado; o tipo nao muda calculo de horas, credito no banco nem a escala do dia.
+- `GET /api/plantoes?tipoLancamento=cobertura_almoco` (combina com `from`/`to`): base para relatorios por tipo.
+- Migration `2026-10-21-plantao-tipo-lancamento.sql`: coluna `plantoes.tipo_lancamento` (`sabado`/`domingo`/`feriado`/`cobertura_almoco`, NOT NULL, CHECK) e indice `(tipo_lancamento, data_plantao)`. Os registros existentes recebem o tipo do dia (`tipo_plantao`): nao ha como saber, pelo que foi gravado, quais eram cobertura de almoco — esses se reclassificam abrindo o dia. Chamada sem o campo grava o plantao regular do dia; backup antigo (sem a coluna) e restaurado da mesma forma.
+
 ## [1.7.0] - 2026-10-17
 
 ### Adicionado
