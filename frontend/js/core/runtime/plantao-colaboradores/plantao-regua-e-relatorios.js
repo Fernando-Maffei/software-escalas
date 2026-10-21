@@ -173,7 +173,7 @@ function construirDiasDoMesPlantao() {
 
 function textoStatusDiaPlantao(item) {
     if (!item.temPlantao) {
-        return 'Pendente';
+        return item.isPast ? 'Nao lancado' : 'Pendente';
     }
 
     if (item.pessoas === 0) {
@@ -729,27 +729,31 @@ export async function renderLancamentoPlantao() {
                     </div>
                 </div>
 
-                <div id="plantaoEditor" class="editor-sidebar" style="display: none;">
-                    <div class="editor-content">
-                        <div class="editor-header">
-                            <div class="editor-header-titulo">
-                                <h3><i class="fas fa-clock"></i> <span id="plantaoDataTitle">Selecione uma data</span></h3>
-                                <div id="plantaoEditorSubtitulo" class="editor-header-chips"></div>
-                            </div>
-                            <button ${atributosAcao('fecharPlantaoEditor')} class="btn-close-editor" aria-label="Fechar painel">
-                                <i class="fas fa-times"></i>
-                            </button>
+            </div>
+
+            <div id="plantaoEditor" class="plantao-modal" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="plantaoDataTitle">
+                <div class="plantao-modal-caixa">
+                    <div class="editor-header">
+                        <div class="editor-header-titulo">
+                            <h3><i class="fas fa-clock"></i> <span id="plantaoDataTitle">Selecione uma data</span></h3>
+                            <div id="plantaoEditorSubtitulo" class="editor-header-chips"></div>
                         </div>
-                        <div id="plantaoEditorContent" class="editor-form">
-                            <div class="editor-empty">
-                                <i class="fas fa-hand-pointer"></i>
-                                <p>Escolha uma data para abrir o plantao, montar os turnos do dia e definir o que vai para o banco de horas.</p>
-                            </div>
-                        </div>
+                        <button ${atributosAcao('cancelarPlantaoEditor')} class="btn-close-editor" aria-label="Fechar" title="Fechar (Esc)">
+                            <i class="fas fa-times"></i>
+                        </button>
                     </div>
+                    <div id="plantaoEditorContent" class="editor-form"></div>
                 </div>
             </div>
         `;
+
+    // Clique no fundo escurecido fecha como o X (com o aviso de alteracoes).
+    document.getElementById('plantaoEditor')?.addEventListener('mousedown', (event) => {
+        if (event.target === event.currentTarget) {
+            cancelarPlantaoEditor();
+        }
+    });
+    ligarEscPlantaoEditor();
 
     document.getElementById('plantaoAnteriorBtn')?.addEventListener('click', () => {
         mudarMesPlantao(-1);
@@ -775,17 +779,12 @@ export async function renderLancamentoPlantao() {
     atualizarContagemPlantoesLancados();
 
     // Aba Pendencias: folgas de domingo sem reposicao e plantoes sem equipe.
-    // "Marcar reposicao" e "Abrir plantao" abrem o dia no mesmo painel lateral
-    // (a folga ja chega com o cartao em edicao).
-    ligarPendenciasPlantao(async (dataISO) => {
-        await openPlantaoEditorFromGrid(dataISO);
-        document.getElementById('plantaoEditor')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-    });
+    // "Marcar reposicao" e "Abrir plantao" abrem o dia na mesma janela do
+    // editor (a folga ja chega com o cartao em edicao).
+    ligarPendenciasPlantao((dataISO) => openPlantaoEditorFromGrid(dataISO));
     carregarPendenciasPlantao();
 
-    // Editar pela lista abre o mesmo painel lateral da regua. O painel e
-    // sticky, mas numa tela estreita ele cai abaixo da lista: sem o scroll
-    // o clique parece nao ter feito nada.
+    // Editar pela lista abre a mesma janela do editor da regua.
     document.getElementById('listaPlantoesLancados')?.addEventListener('click', async (event) => {
         const trigger = event.target.closest('[data-plantao-editar]');
 
@@ -794,12 +793,6 @@ export async function renderLancamentoPlantao() {
         }
 
         await openPlantaoEditorFromGrid(trigger.getAttribute('data-plantao-editar'));
-
-        const editorPanel = document.getElementById('plantaoEditor');
-
-        if (editorPanel && editorPanel.style.display !== 'none') {
-            editorPanel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-        }
     });
 
     document.getElementById('listaSabados')?.addEventListener('click', async (event) => {
@@ -875,23 +868,78 @@ async function abrirEditorPlantao(dataISO, dataFormatada) {
     await carregarDisponibilidadePlantao(state);
     renderPlantaoEditor(state);
     atualizarSabadoSelecionadoPlantao(dataISO);
+    document.getElementById('plantaoNovoColaborador')?.focus();
 }
 
-export function fecharPlantaoEditor() {
+// Ha algo no editor que ainda nao foi para o banco? Compara as linhas e a
+// observacao com o que esta gravado, e conta como pendente a linha em edicao
+// ou o colaborador ja escolhido mas nao adicionado ao dia.
+function plantaoEditorTemAlteracoes(state) {
+    if (!state) {
+        return false;
+    }
+
+    capturarRascunhoPlantao(state);
+
+    const chave = (linhas) => JSON.stringify((linhas || []).map((linha) => [
+        Number(linha.colaboradorId),
+        linha.horaInicio,
+        linha.horaFim,
+        normalizarTipoCreditoPlantao(linha.tipoCredito),
+        normalizarTipoLancamentoPlantao(linha.tipoLancamento, state.tipoPlantao)
+    ].join('|')).sort());
+    const observacaoGravada = (estado.plantoesLancados || [])
+        .find((item) => item.dataISO === state.dataISO && item.observacao)?.observacao || '';
+
+    return chave(state.lancamentos) !== chave(lancamentosDoDiaPlantao(state.dataISO))
+        || String(state.observacao || '').trim() !== String(observacaoGravada).trim()
+        || Number.isInteger(state.editandoIndice)
+        || Number(state.rascunho?.colaboradorId || 0) > 0;
+}
+
+function plantaoEditorAberto() {
+    const editorPanel = document.getElementById('plantaoEditor');
+    return Boolean(editorPanel && editorPanel.style.display !== 'none');
+}
+
+// X, Cancelar, Esc e clique fora: fecham a janela, mas perguntam antes se
+// houver lancamento ainda nao salvo.
+export function cancelarPlantaoEditor() {
+    if (plantaoEditorTemAlteracoes(getPlantaoEditorState())
+        && !window.confirm('Ha alteracoes neste dia que ainda nao foram salvas. Fechar e descartar?')) {
+        return;
+    }
+
+    fecharPlantaoEditor();
+}
+
+let escPlantaoLigado = false;
+
+function ligarEscPlantaoEditor() {
+    if (escPlantaoLigado) {
+        return;
+    }
+
+    escPlantaoLigado = true;
+    document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && plantaoEditorAberto()) {
+            event.preventDefault();
+            cancelarPlantaoEditor();
+        }
+    });
+}
+
+function fecharPlantaoEditor() {
     const editorPanel = document.getElementById('plantaoEditor');
     const editorContent = document.getElementById('plantaoEditorContent');
+    const diaAberto = estado.plantaoDataFocoISO;
 
     estado.plantaoDataFocoISO = null;
     setPlantaoEditorState(null);
     atualizarSabadoSelecionadoPlantao(null);
 
     if (editorContent) {
-        editorContent.innerHTML = `
-                <div class="editor-empty">
-                    <i class="fas fa-hand-pointer"></i>
-                    <p>Escolha uma data para abrir o plantao, montar os turnos do dia e definir o que vai para o banco de horas.</p>
-                </div>
-            `;
+        editorContent.innerHTML = '';
     }
 
     const editorSubtitulo = document.getElementById('plantaoEditorSubtitulo');
@@ -902,6 +950,11 @@ export function fecharPlantaoEditor() {
 
     if (editorPanel) {
         editorPanel.style.display = 'none';
+    }
+
+    // O foco volta para o card do dia, de onde a janela foi aberta.
+    if (diaAberto) {
+        document.querySelector(`[data-plantao-sabado="${diaAberto}"]`)?.focus();
     }
 }
 
@@ -933,7 +986,6 @@ export async function salvarPlantao(dataISO) {
     }
 
     try {
-        estado.plantaoDataFocoISO = dataISO;
         const tipoPlantao = resolverTipoPlantaoFront(dataISO) || 'sabado';
 
         await API.salvarPlantao({
@@ -949,6 +1001,9 @@ export async function salvarPlantao(dataISO) {
             }))
         });
 
+        // Salvou: a janela fecha e a regua mostra o dia ja lancado. Com
+        // erro, ela fica aberta com tudo o que foi digitado.
+        fecharPlantaoEditor();
         await atualizarTudo({ silent: true, source: 'plantao' });
 
         mostrarToast('Plantao salvo com sucesso!', 'success');
@@ -963,8 +1018,8 @@ export async function excluirPlantao(dataISO) {
     }
 
     try {
-        estado.plantaoDataFocoISO = dataISO;
         await API.excluirPlantao(dataISO);
+        fecharPlantaoEditor();
         await atualizarTudo({ silent: true, source: 'plantao' });
 
         mostrarToast('Plantao excluido com sucesso!', 'success');

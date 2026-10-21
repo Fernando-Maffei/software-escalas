@@ -102,10 +102,6 @@
     outline-offset: 2px;
 }
 
-.plantao-dia-card.is-passado {
-    opacity: 0.55;
-}
-
 .plantao-dia-card.is-hoje {
     border-color: var(--primary);
 }
@@ -215,27 +211,55 @@
     border: 1px solid var(--warning);
 }
 
-/* ================= PAINEL DE LANCAMENTO ================= */
-/* Mais largo que os 400px de antes: o painel deixou de ser um checklist e
-   passou a montar turnos (colaborador + horario + destino das horas), entao
-   cada linha precisa caber sem quebrar. Fica grudado no topo ao rolar, porque
-   a regua de datas ao lado e comprida. */
+/* ================= JANELA DO DIA (EDITOR) ================= */
+/* O editor do dia abre numa janela sobre a tela, nao mais numa barra
+   lateral: com a regua de um mes so, a barra ficava espremida num terco da
+   tela e sobrava espaco vazio embaixo da regua. O fundo escurecido rola
+   inteiro (sem rolagem aninhada) e o rodape com Salvar fica grudado embaixo. */
 #plantaoEditor {
-    width: 460px;
-    flex-shrink: 0;
-    align-self: flex-start;
-    position: sticky;
-    top: 16px;
-    background: var(--card);
-    border-radius: 24px;
-    box-shadow: var(--shadow-xl);
-    overflow: hidden;
-    animation: slideIn 0.3s ease;
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    /* Sem padding embaixo: o rodape grudado (bottom: 0) para na borda da
+       tela, e nao 4vh acima dela com conteudo aparecendo por baixo. */
+    padding: 4vh 16px 0;
+    overflow-y: auto;
+    background: rgba(15, 23, 42, 0.55);
 }
 
-#plantaoEditor .editor-content {
-    max-height: calc(100vh - 64px);
-    overflow-y: auto;
+.plantao-modal-caixa {
+    width: min(980px, 100%);
+    margin: 0 auto 4vh;
+    padding: 20px 24px 0;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-xl);
+    animation: fadeIn 0.2s ease;
+}
+
+/* Duas colunas: montar o lancamento a esquerda, o que ja esta no dia a
+   direita. A folga de domingo (so aos domingos) ocupa a largura toda. */
+#plantaoEditor .editor-plantao {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-areas:
+        "form lista"
+        "form obs"
+        "folga folga"
+        "acoes acoes";
+    gap: 0 24px;
+    align-items: start;
+}
+
+.plantao-area-form { grid-area: form; }
+.plantao-area-lista { grid-area: lista; }
+.plantao-area-obs { grid-area: obs; }
+.plantao-area-folga { grid-area: folga; }
+.plantao-area-acoes { grid-area: acoes; }
+
+.plantao-area-folga:empty {
+    display: none;
 }
 
 #plantaoEditor .editor-header {
@@ -567,17 +591,31 @@
 .plantao-total--extra { color: #c2410c; }
 
 #plantaoEditor .editor-actions {
+    position: sticky;
+    bottom: 0;
     display: flex;
     flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
     gap: 8px;
-    padding-top: 16px;
+    margin: 16px -24px 0;
+    padding: 14px 24px;
     border-top: 1px solid var(--border);
+    border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+    background: var(--card);
 }
 
 #plantaoEditor .editor-actions .btn-primary,
 #plantaoEditor .editor-actions .btn-secondary {
-    flex: 1;
+    flex: 0 0 auto;
     justify-content: center;
+}
+
+/* Excluir fica sozinho a esquerda, longe do Salvar. */
+#plantaoEditor .editor-actions .btn-danger-ghost {
+    order: -1;
+    width: auto;
+    margin-right: auto;
 }
 
 /* Excluir o dia inteiro e destrutivo: fica em linha propria e discreto, longe
@@ -887,20 +925,16 @@
 }
 
 /* Responsividade */
+@media (max-width: 860px) {
+    #plantaoEditor .editor-plantao {
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-areas: "form" "lista" "obs" "folga" "acoes";
+    }
+}
+
 @media (max-width: 1200px) {
     .plantao-layout {
         flex-direction: column;
-    }
-    
-    /* Empilhado, o painel deixa de ser barra lateral: sem sticky e sem teto de
-       altura, ele rola junto com a pagina. */
-    #plantaoEditor {
-        width: 100%;
-        position: static;
-    }
-
-    #plantaoEditor .editor-content {
-        max-height: none;
     }
 
     .sabados-header {
@@ -918,9 +952,32 @@
     /* Em telas estreitas os dois botoes de destino nao cabem lado a lado sem
        cortar o texto, e as acoes do rodape viram uma coluna. */
     .plantao-credito-escolha,
-    .plantao-form-acoes,
-    #plantaoEditor .editor-actions {
+    .plantao-form-acoes {
         flex-direction: column;
+    }
+
+    /* No celular a janela ocupa a tela inteira. */
+    #plantaoEditor {
+        padding: 0;
+    }
+
+    .plantao-modal-caixa {
+        min-height: 100%;
+        margin: 0;
+        padding: 16px 16px 0;
+        border: none;
+        border-radius: 0;
+    }
+
+    #plantaoEditor .editor-actions {
+        margin: 16px -16px 0;
+        padding: 12px 16px;
+        border-radius: 0;
+    }
+
+    #plantaoEditor .editor-actions .btn-primary,
+    #plantaoEditor .editor-actions .btn-secondary {
+        flex: 1 1 auto;
     }
 
     .plantao-mes-nav {
@@ -953,9 +1010,13 @@
 
 
 /* Painel editor no tema escuro */
-[data-theme="dark"] #plantaoEditor {
+[data-theme="dark"] .plantao-modal-caixa {
     background: var(--card);
     border-color: var(--border);
+}
+
+[data-theme="dark"] #plantaoEditor .editor-actions {
+    background: var(--card);
 }
 
 [data-theme="dark"] #plantaoEditor .editor-form-group label {

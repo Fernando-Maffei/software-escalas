@@ -535,7 +535,7 @@ export function renderPlantaoEditor(state) {
 
     editorContent.innerHTML = `
             <div class="editor-plantao">
-                <div class="editor-form-group plantao-form-novo${editando ? ' is-editando' : ''}">
+                <div class="editor-form-group plantao-area-form plantao-form-novo${editando ? ' is-editando' : ''}">
                     <label>
                         <i class="fas ${editando ? 'fa-pen' : 'fa-user-plus'}"></i>
                         ${editando ? 'Editando lancamento' : 'Adicionar lancamento'}
@@ -589,21 +589,23 @@ export function renderPlantaoEditor(state) {
                     ${editando ? '' : '<small class="helper-text">Um colaborador por linha. Para um turno com varias pessoas, repita o mesmo horario.</small>'}
                 </div>
 
-                <div class="editor-form-group">
+                <div class="editor-form-group plantao-area-lista">
                     <label><i class="fas fa-list-check"></i> Lancamentos do dia</label>
                     ${renderLancamentosPlantao(state)}
                 </div>
 
-                <div class="editor-form-group">
+                <div class="editor-form-group plantao-area-obs">
                     <label><i class="fas fa-align-left"></i> Observacao</label>
                     <textarea id="plantaoObservacao" class="form-control" rows="2" placeholder="Detalhes opcionais para o dia">${escapeHtml(state.observacao || '')}</textarea>
                 </div>
 
-                <div class="editor-actions">
+                <div class="plantao-area-folga">${renderPainelFolgasDomingo(state.dataISO)}</div>
+
+                <div class="editor-actions plantao-area-acoes">
                     <button type="button" ${atributosAcao('salvarPlantao', state.dataISO)} class="btn-primary">
                         <i class="fas fa-save"></i> ${jaLancado ? 'Salvar alteracoes' : 'Salvar dia'}
                     </button>
-                    <button type="button" ${atributosAcao('fecharPlantaoEditor')} class="btn-secondary">
+                    <button type="button" ${atributosAcao('cancelarPlantaoEditor')} class="btn-secondary">
                         <i class="fas fa-times"></i> Cancelar
                     </button>
                     ${jaLancado ? `
@@ -612,8 +614,6 @@ export function renderPlantaoEditor(state) {
                         </button>
                     ` : ''}
                 </div>
-
-                ${renderPainelFolgasDomingo(state.dataISO)}
             </div>
         `;
 
