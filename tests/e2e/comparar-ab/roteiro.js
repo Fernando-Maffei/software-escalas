@@ -162,8 +162,8 @@ const espera = (ms) => new Promise((r) => setTimeout(r, ms));
     await clicar('[onclick*="fecharEditor"], [data-chamar="fecharEditor"]', true);
 
     await menu('lancamentoPlantao');
-    if (await clicar('[data-plantao-data], .plantao-dia, .regua-plantao button', true)) {await snap('plantao editor');}
-    await clicar('[onclick*="fecharPlantaoEditor"], [data-chamar="fecharPlantaoEditor"]', true);
+    if (await clicar('[data-plantao-sabado], [data-plantao-data], .plantao-dia, .regua-plantao button', true)) {await snap('plantao editor');}
+    await clicar('[data-chamar="cancelarPlantaoEditor"], [onclick*="fecharPlantaoEditor"], [data-chamar="fecharPlantaoEditor"]', true);
 
     await menu('bancoHoras');
     await menu('relatorios');
