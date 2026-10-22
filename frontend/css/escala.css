@@ -4054,17 +4054,36 @@
 :root:not([data-theme="dark"]) .escala-page .escala-daybar-status.is-atencao { color: #b45309; }
 :root:not([data-theme="dark"]) .escala-page .escala-daybar-status.is-critico { color: #dc2626; }
 
-/* ----- Previa da semana (faixa dos 7 dias) ----- */
+/* ----- Faixa de dias (rolavel e arrastavel) ----- */
+/* Seis semanas numa linha so: rola de lado com arrasto do mouse, dedo ou
+   trackpad, parando em cada dia (scroll-snap). As bordas esmaecem para
+   mostrar que ha mais dias dos dois lados. */
 .escala-page .escala-week-strip {
     display: flex;
     gap: 6px;
-    flex-wrap: wrap;
-    padding: 4px 0 8px;
+    padding: 4px 2px 10px;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scroll-snap-type: x proximity;
+    scrollbar-width: thin;
+    cursor: grab;
+    -webkit-mask-image: linear-gradient(to right, transparent 0, #000 24px, #000 calc(100% - 24px), transparent 100%);
+    mask-image: linear-gradient(to right, transparent 0, #000 24px, #000 calc(100% - 24px), transparent 100%);
+}
+
+.escala-page .escala-week-strip.is-arrastando {
+    cursor: grabbing;
+    scroll-snap-type: none;
+    user-select: none;
+}
+
+.escala-page .escala-week-strip.is-arrastando .escala-week-pill {
+    cursor: grabbing;
 }
 
 .escala-page .escala-week-pill {
-    flex: 1 1 0;
-    min-width: 62px;
+    flex: 0 0 76px;
+    scroll-snap-align: center;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -4090,6 +4109,11 @@
 .escala-page .escala-week-pill.is-selected { border-color: var(--accent); background: var(--accent-soft); }
 .escala-page .escala-week-pill.is-selected .wp-num { color: var(--accent); }
 .escala-page .escala-week-pill.is-today .wp-dow { color: var(--accent); opacity: 1; }
+.escala-page .escala-week-pill .wp-dow { white-space: nowrap; }
+/* Domingo abre cada semana: um respiro a esquerda separa as semanas. */
+.escala-page .escala-week-pill.is-domingo { margin-left: 8px; }
+.escala-page .escala-week-pill.is-domingo:first-child { margin-left: 0; }
+.escala-page .escala-week-pill:focus-visible { outline: 2px solid var(--accent-ring); outline-offset: 2px; }
 
 @keyframes escalaWeekPulse { 0%, 100% { opacity: 0.35; } 50% { opacity: 0.9; } }
 @media (prefers-reduced-motion: reduce) { .escala-page .escala-week-pill.is-load .wp-dot { animation: none; } }
