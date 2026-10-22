@@ -16,9 +16,9 @@ Todas as alteracoes relevantes deste projeto serao documentadas neste arquivo.
 - `GET /api/plantoes?tipoLancamento=cobertura_almoco` (combina com `from`/`to`): base para relatorios por tipo.
 - Migration `2026-10-21-plantao-tipo-lancamento.sql`: coluna `plantoes.tipo_lancamento` (`sabado`/`domingo`/`feriado`/`cobertura_almoco`, NOT NULL, CHECK) e indice `(tipo_lancamento, data_plantao)`. Os registros existentes recebem o tipo do dia (`tipo_plantao`): nao ha como saber, pelo que foi gravado, quais eram cobertura de almoco — esses se reclassificam abrindo o dia. Chamada sem o campo grava o plantao regular do dia; backup antigo (sem a coluna) e restaurado da mesma forma.
 
-
 ### Corrigido
 - Exportar PDF de relatorio com tabela (Domingos e feriados, Plantoes) parava com "Attempting to parse an unsupported color function "color"": a listra alternada das tabelas usa color-mix(), que o html2canvas nao entende. Dentro do PDF ela vira cor solida (`pdf-utils.js`). Os estilos do PDF de Domingos e feriados ficam restritos ao proprio PDF, sem mudar a tela enquanto exporta.
+
 ## [1.7.0] - 2026-10-17
 
 ### Adicionado
