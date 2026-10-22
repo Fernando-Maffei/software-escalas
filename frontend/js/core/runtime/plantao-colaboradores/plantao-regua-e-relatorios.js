@@ -735,8 +735,8 @@ export async function renderLancamentoPlantao() {
                 <div class="plantao-modal-caixa">
                     <div class="editor-header">
                         <div class="editor-header-titulo">
-                            <h3><i class="fas fa-clock"></i> <span id="plantaoDataTitle">Selecione uma data</span></h3>
-                            <div id="plantaoEditorSubtitulo" class="editor-header-chips"></div>
+                            <h3 id="plantaoDataTitle">Selecione uma data</h3>
+                            <div id="plantaoEditorSubtitulo" class="plantao-modal-subtitulo"></div>
                         </div>
                         <button ${atributosAcao('cancelarPlantaoEditor')} class="btn-close-editor" aria-label="Fechar" title="Fechar (Esc)">
                             <i class="fas fa-times"></i>

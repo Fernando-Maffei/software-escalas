@@ -9,7 +9,7 @@ import { abrirDesligarColaborador, salvarColaboradorEditor } from './runtime/pla
 import { adicionarSetorRapido, fecharColaboradorEditor } from './app/colaboradores.js';
 import { aplicarAlmocoPeriodoEscala, fecharEditor, salvarEscalaDia } from '../telas/escala-dia-editor.js';
 import { atualizarTudo, cancelarPlantaoEditor, excluirPlantao, salvarPlantao } from './runtime/plantao-colaboradores/plantao-regua-e-relatorios.js';
-import { cancelarEdicaoLancamentoPlantao, confirmarLancamentoPlantao, definirTipoCreditoPlantao, editarLancamentoPlantao, removerLancamentoPlantao } from './runtime/plantao-colaboradores/plantao-editor.js';
+import { cancelarEdicaoLancamentoPlantao, confirmarLancamentoPlantao, editarLancamentoPlantao, mostrarObservacaoPlantao, removerLancamentoPlantao } from './runtime/plantao-colaboradores/plantao-editor.js';
 import { exportarDados } from './app/configuracoes-tela.js';
 import { exportarRelatorioCompleto, fecharRelatorio, resetarSistema } from './app/relatorios-export.js';
 import { exportarRelatorioEscala, gerarRelatorioEscala } from '../telas/escala-relatorio.js';
@@ -25,7 +25,6 @@ const ACOES = Object.freeze({
     cancelarEdicaoLancamentoPlantao,
     cancelarPlantaoEditor,
     confirmarLancamentoPlantao,
-    definirTipoCreditoPlantao,
     editarLancamentoPlantao,
     excluirPlantao,
     exportarDados,
@@ -39,6 +38,7 @@ const ACOES = Object.freeze({
     gerarRelatorioEscala,
     gerarRelatorioPlantoes,
     importarDados,
+    mostrarObservacaoPlantao,
     removerLancamentoPlantao,
     resetarSistema,
     salvarColaboradorEditor,

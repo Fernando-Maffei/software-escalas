@@ -1,5 +1,5 @@
 import { escapeHtml } from '../../../lib/html-seguro.js';
-import { bindPainelFolgasDomingo, renderPainelFolgasDomingo } from '../../../telas/folgas-domingo.js';
+import { bindPainelFolgasDomingo, folgaDomingoPrecisaAbrir, renderPainelFolgasDomingo } from '../../../telas/folgas-domingo.js';
 import { API } from '../../api.js';
 import { formatarHora, mostrarToast } from '../../app/horas-e-resumo.js';
 import { estado } from '../../estado.js';
@@ -43,14 +43,12 @@ export const PLANTAO_CREDITO_META = {
     banco: {
         label: 'Banco de horas',
         curto: 'Banco',
-        icone: 'fa-piggy-bank',
-        ajuda: 'As horas entram como credito no saldo do colaborador.'
+        icone: 'fa-piggy-bank'
     },
     extra: {
         label: 'Hora extra',
         curto: 'Extra',
-        icone: 'fa-money-bill-wave',
-        ajuda: 'As horas nao entram no banco: saem como extra na folha.'
+        icone: 'fa-money-bill-wave'
     }
 };
 
@@ -197,7 +195,9 @@ export function capturarRascunhoPlantao(state) {
     state.rascunho = state.rascunho || {};
 
     const tipoLancamento = document.getElementById('plantaoNovoTipoLancamento');
+    const credito = document.getElementById('plantaoNovoCredito');
 
+    if (credito) { state.rascunho.tipoCredito = normalizarTipoCreditoPlantao(credito.value); }
     if (inicio) { state.rascunho.horaInicio = inicio.value; }
     if (fim) { state.rascunho.horaFim = fim.value; }
     if (colaborador) { state.rascunho.colaboradorId = Number(colaborador.value || 0); }
@@ -209,7 +209,9 @@ function lerFormularioLancamentoPlantao(state) {
         colaboradorId: Number(document.getElementById('plantaoNovoColaborador')?.value || 0),
         horaInicio: document.getElementById('plantaoNovoInicio')?.value || '',
         horaFim: document.getElementById('plantaoNovoFim')?.value || '',
-        tipoCredito: normalizarTipoCreditoPlantao(state?.rascunho?.tipoCredito),
+        tipoCredito: normalizarTipoCreditoPlantao(
+            document.getElementById('plantaoNovoCredito')?.value ?? state?.rascunho?.tipoCredito
+        ),
         tipoLancamento: normalizarTipoLancamentoPlantao(
             document.getElementById('plantaoNovoTipoLancamento')?.value ?? state?.rascunho?.tipoLancamento,
             state?.tipoPlantao
@@ -217,30 +219,19 @@ function lerFormularioLancamentoPlantao(state) {
     };
 }
 
-// Troca o destino das horas sem redesenhar o painel: um render completo aqui
-// roubaria o foco de quem esta no meio do preenchimento.
-export function definirTipoCreditoPlantao(tipo) {
+// A observacao do dia fica recolhida atras de um link ate alguem precisar
+// dela (ou ate o dia ja ter uma): quase todo dia e salvo sem observacao.
+export function mostrarObservacaoPlantao() {
     const state = getPlantaoEditorState();
 
     if (!state) {
         return;
     }
 
-    const escolhido = normalizarTipoCreditoPlantao(tipo);
-    state.rascunho = state.rascunho || {};
-    state.rascunho.tipoCredito = escolhido;
-
-    document.querySelectorAll('[data-plantao-credito]').forEach((botao) => {
-        const ativo = botao.getAttribute('data-plantao-credito') === escolhido;
-        botao.classList.toggle('is-active', ativo);
-        botao.setAttribute('aria-pressed', ativo ? 'true' : 'false');
-    });
-
-    const ajuda = document.getElementById('plantaoCreditoAjuda');
-
-    if (ajuda) {
-        ajuda.textContent = PLANTAO_CREDITO_META[escolhido].ajuda;
-    }
+    capturarRascunhoPlantao(state);
+    state.mostrarObservacao = true;
+    renderPlantaoEditor(state);
+    document.getElementById('plantaoObservacao')?.focus();
 }
 
 export function confirmarLancamentoPlantao() {
@@ -362,41 +353,35 @@ export function removerLancamentoPlantao(indice) {
     renderPlantaoEditor(state);
 }
 
-function renderResumoLancamentosPlantao(state) {
+// Resumo numa linha de texto, ao lado do titulo da lista:
+// "2 lancamentos · 11h 00m em banco · 1h 00m em hora extra".
+function textoResumoLancamentosPlantao(state) {
+    if (state.lancamentos.length === 0) {
+        return '';
+    }
+
     const totais = state.lancamentos.reduce((acumulado, linha) => {
         acumulado[linha.tipoCredito] += duracaoLancamentoPlantao(linha) || 0;
         return acumulado;
     }, { banco: 0, extra: 0 });
-
-    const pessoas = new Set(state.lancamentos.map((linha) => Number(linha.colaboradorId))).size;
-    const parcelas = [];
+    const partes = [`${state.lancamentos.length} lancamento${state.lancamentos.length > 1 ? 's' : ''}`];
 
     if (totais.banco > 0) {
-        parcelas.push(`<span class="plantao-total plantao-total--banco"><i class="fas fa-piggy-bank"></i> ${escapeHtml(minutosParaTexto(totais.banco))} em banco</span>`);
+        partes.push(`${minutosParaTexto(totais.banco)} em banco`);
     }
 
     if (totais.extra > 0) {
-        parcelas.push(`<span class="plantao-total plantao-total--extra"><i class="fas fa-money-bill-wave"></i> ${escapeHtml(minutosParaTexto(totais.extra))} em hora extra</span>`);
+        partes.push(`${minutosParaTexto(totais.extra)} em hora extra`);
     }
 
-    return `
-            <div class="plantao-lancamentos-resumo">
-                <span class="plantao-resumo-contagem">
-                    <i class="fas fa-list-check"></i> ${state.lancamentos.length} lancamento(s) &middot; ${pessoas} pessoa(s)
-                </span>
-                ${parcelas.length > 0 ? `<span class="plantao-resumo-totais">${parcelas.join('')}</span>` : ''}
-            </div>
-        `;
+    return partes.join(' · ');
 }
 
+// Uma linha por pessoa, como uma tabela: horario, nome, destino (e a
+// cobertura de almoco, unica marca colorida), duracao e as acoes.
 function renderLancamentosPlantao(state) {
     if (state.lancamentos.length === 0) {
-        return `
-                <p class="plantao-lancamentos-vazio">
-                    <i class="fas fa-inbox"></i>
-                    Nenhum lancamento ainda. Escolha o colaborador, o horario e o destino das horas acima.
-                </p>
-            `;
+        return '<p class="plantao-vazio">Nenhum lancamento ainda.</p>';
     }
 
     const indisponiveis = new Set(
@@ -409,41 +394,35 @@ function renderLancamentosPlantao(state) {
         const minutos = duracaoLancamentoPlantao(linha);
         const indisponivel = indisponiveis.has(Number(linha.colaboradorId));
         const meta = PLANTAO_CREDITO_META[linha.tipoCredito];
+        const cobertura = ehCoberturaAlmocoPlantao(normalizarTipoLancamentoPlantao(linha.tipoLancamento, state.tipoPlantao));
         const emEdicao = state.editandoIndice === indice;
         const nome = nomeColaboradorPlantao(linha.colaboradorId);
 
         return `
-                <li class="plantao-lancamento${indisponivel ? ' is-indisponivel' : ''}${emEdicao ? ' is-editando' : ''}">
-                    <div class="plantao-lancamento-info">
-                        <div class="plantao-lancamento-topo">
-                            <span class="plantao-lancamento-hora">${escapeHtml(linha.horaInicio)} - ${escapeHtml(linha.horaFim)}</span>
-                            <span class="plantao-lancamento-credito plantao-credito--${linha.tipoCredito}">
-                                <i class="fas ${meta.icone}"></i> ${escapeHtml(meta.curto)}
-                            </span>
-                            ${etiquetaCoberturaAlmocoPlantao(normalizarTipoLancamentoPlantao(linha.tipoLancamento, state.tipoPlantao))}
-                        </div>
-                        <div class="plantao-lancamento-nome">
-                            ${escapeHtml(nome)}
-                            ${indisponivel ? '<small class="status-indisponivel">Indisponivel</small>' : ''}
-                        </div>
-                    </div>
-                    <div class="plantao-lancamento-acoes">
-                        <span class="plantao-lancamento-duracao">${minutos ? escapeHtml(minutosParaTexto(minutos)) : '--'}</span>
-                        <button type="button" class="btn-icon-sm edit" title="Editar lancamento" aria-label="Editar lancamento de ${escapeHtml(nome)}" ${atributosAcao('editarLancamentoPlantao', indice)}>
-                            <i class="fas fa-pen"></i>
+                <li class="plantao-linha${indisponivel ? ' is-indisponivel' : ''}${emEdicao ? ' is-editando' : ''}">
+                    <span class="plantao-linha-hora">${escapeHtml(linha.horaInicio)}–${escapeHtml(linha.horaFim)}</span>
+                    <span class="plantao-linha-nome">
+                        ${escapeHtml(nome)}
+                        ${indisponivel ? '<small class="status-indisponivel">Indisponivel</small>' : ''}
+                    </span>
+                    <span class="plantao-linha-meta">
+                        ${escapeHtml(meta.label)}
+                        ${cobertura ? '<span class="plantao-linha-cobertura"><i class="fas fa-utensils" aria-hidden="true"></i> Cobertura de almoco</span>' : ''}
+                    </span>
+                    <span class="plantao-linha-duracao">${minutos ? escapeHtml(minutosParaTexto(minutos)) : '--'}</span>
+                    <span class="plantao-linha-acoes">
+                        <button type="button" class="plantao-icone-btn" title="Editar" aria-label="Editar lancamento de ${escapeHtml(nome)}" ${atributosAcao('editarLancamentoPlantao', indice)}>
+                            <i class="fas fa-pen" aria-hidden="true"></i>
                         </button>
-                        <button type="button" class="btn-icon-sm delete" title="Remover lancamento" aria-label="Remover lancamento de ${escapeHtml(nome)}" ${atributosAcao('removerLancamentoPlantao', indice)}>
-                            <i class="fas fa-times"></i>
+                        <button type="button" class="plantao-icone-btn is-perigo" title="Remover" aria-label="Remover lancamento de ${escapeHtml(nome)}" ${atributosAcao('removerLancamentoPlantao', indice)}>
+                            <i class="fas fa-times" aria-hidden="true"></i>
                         </button>
-                    </div>
+                    </span>
                 </li>
             `;
     }).join('');
 
-    return `
-            <ul class="plantao-lancamentos">${linhas}</ul>
-            ${renderResumoLancamentosPlantao(state)}
-        `;
+    return `<ul class="plantao-linhas">${linhas}</ul>`;
 }
 
 function renderOpcoesColaboradorPlantao(state) {
@@ -513,109 +492,127 @@ export function renderPlantaoEditor(state) {
     const jaLancado = (estado.plantoesLancados || []).some((item) => item.dataISO === state.dataISO);
     const editando = Number.isInteger(state.editandoIndice);
     const tipoCredito = normalizarTipoCreditoPlantao(state.rascunho?.tipoCredito);
+    const comTipo = permiteCoberturaAlmocoPlantao(tipo);
     const coberturaSelecionada = ehCoberturaAlmocoPlantao(normalizarTipoLancamentoPlantao(state.rascunho?.tipoLancamento, tipo));
+    const mostrarObservacao = Boolean(state.mostrarObservacao || String(state.observacao || '').trim());
+    const painelFolga = renderPainelFolgasDomingo(state.dataISO);
+    // A folga de domingo fica recolhida; abre sozinha quando a pessoa ja
+    // abriu antes, veio das Pendencias para editar uma folga ou tem um
+    // registro de folga pela metade.
+    const folgaAberta = Boolean(state.folgaAberta || folgaDomingoPrecisaAbrir(state.dataISO));
+    const resumo = textoResumoLancamentosPlantao(state);
 
     editorPanel.style.display = 'block';
     editorTitle.innerText = state.dataFormatada;
 
-    // O tipo do dia e detectado pela data e nao e editavel: como campo de
-    // formulario ele so ocupava espaco. Vira etiqueta no cabecalho.
+    // Tipo do dia e situacao numa linha de texto, sem etiquetas.
     const editorSubtitulo = document.getElementById('plantaoEditorSubtitulo');
 
     if (editorSubtitulo) {
         editorSubtitulo.innerHTML = `
-                <span class="plantao-tipo-chip plantao-tipo--${tipo}">
-                    <i class="fas fa-circle"></i> ${escapeHtml(rotuloTipo)}
-                </span>
-                <span class="plantao-estado-chip${jaLancado ? ' is-lancado' : ''}">
-                    ${jaLancado ? 'Plantao lancado' : 'Ainda nao lancado'}
-                </span>
+                <span>${escapeHtml(rotuloTipo)}</span>
+                <span aria-hidden="true">·</span>
+                <span class="${jaLancado ? 'is-lancado' : ''}">${jaLancado ? 'Lancado' : 'Ainda nao lancado'}</span>
             `;
     }
 
     editorContent.innerHTML = `
             <div class="editor-plantao">
-                <div class="editor-form-group plantao-area-form plantao-form-novo${editando ? ' is-editando' : ''}">
-                    <label>
-                        <i class="fas ${editando ? 'fa-pen' : 'fa-user-plus'}"></i>
-                        ${editando ? 'Editando lancamento' : 'Adicionar lancamento'}
-                    </label>
-
-                    <select id="plantaoNovoColaborador" class="form-control">
-                        ${renderOpcoesColaboradorPlantao(state)}
-                    </select>
-
-                    <div class="plantao-novo-horario">
-                        <input type="time" id="plantaoNovoInicio" class="form-control" value="${escapeHtml(state.rascunho?.horaInicio || '')}" aria-label="Hora inicial">
-                        <span>ate</span>
-                        <input type="time" id="plantaoNovoFim" class="form-control" value="${escapeHtml(state.rascunho?.horaFim || '')}" aria-label="Hora final">
-                    </div>
-
-                    <div class="plantao-credito-escolha" role="group" aria-label="Destino das horas">
-                        ${Object.entries(PLANTAO_CREDITO_META).map(([chave, meta]) => `
-                            <button
-                                type="button"
-                                class="plantao-credito-opcao plantao-credito--${chave}${chave === tipoCredito ? ' is-active' : ''}"
-                                data-plantao-credito="${chave}"
-                                aria-pressed="${chave === tipoCredito ? 'true' : 'false'}"
-                                ${atributosAcao('definirTipoCreditoPlantao', chave)}
-                            >
-                                <i class="fas ${meta.icone}"></i> ${escapeHtml(meta.label)}
-                            </button>
-                        `).join('')}
-                    </div>
-                    <small class="helper-text" id="plantaoCreditoAjuda">${escapeHtml(PLANTAO_CREDITO_META[tipoCredito].ajuda)}</small>
-
-                    ${permiteCoberturaAlmocoPlantao(tipo) ? `
-                        <label for="plantaoNovoTipoLancamento" class="plantao-campo-rotulo">Tipo</label>
-                        <select id="plantaoNovoTipoLancamento" class="form-control">
-                            <option value="${escapeHtml(tipo)}"${coberturaSelecionada ? '' : ' selected'}>Plantao</option>
-                            <option value="${PLANTAO_TIPO_COBERTURA_ALMOCO}"${coberturaSelecionada ? ' selected' : ''}>Cobertura de almoco</option>
-                        </select>
-                    ` : ''}
-
-                    <div class="plantao-form-acoes">
-                        <button type="button" class="btn-primary" ${atributosAcao('confirmarLancamentoPlantao')}>
-                            <i class="fas ${editando ? 'fa-check' : 'fa-plus'}"></i>
-                            ${editando ? 'Salvar lancamento' : 'Adicionar ao dia'}
-                        </button>
-                        ${editando ? `
-                            <button type="button" class="btn-secondary" ${atributosAcao('cancelarEdicaoLancamentoPlantao')}>
-                                <i class="fas fa-times"></i> Cancelar edicao
-                            </button>
+                <section class="plantao-novo${editando ? ' is-editando' : ''}" aria-label="${editando ? 'Editar lancamento' : 'Adicionar lancamento'}">
+                    ${editando ? '<p class="plantao-novo-aviso">Editando um lancamento da lista</p>' : ''}
+                    <div class="plantao-novo-campos">
+                        <label class="plantao-campo">
+                            <span>Colaborador</span>
+                            <select id="plantaoNovoColaborador" class="form-control">
+                                ${renderOpcoesColaboradorPlantao(state)}
+                            </select>
+                        </label>
+                        <div class="plantao-campo">
+                            <span id="plantaoNovoHorarioRotulo">Horario</span>
+                            <div class="plantao-novo-horario" role="group" aria-labelledby="plantaoNovoHorarioRotulo">
+                                <input type="time" id="plantaoNovoInicio" class="form-control" value="${escapeHtml(state.rascunho?.horaInicio || '')}" aria-label="Hora inicial">
+                                <span aria-hidden="true">–</span>
+                                <input type="time" id="plantaoNovoFim" class="form-control" value="${escapeHtml(state.rascunho?.horaFim || '')}" aria-label="Hora final">
+                            </div>
+                        </div>
+                        <label class="plantao-campo">
+                            <span>Horas vao para</span>
+                            <select id="plantaoNovoCredito" class="form-control">
+                                ${Object.entries(PLANTAO_CREDITO_META).map(([chave, meta]) => `
+                                    <option value="${chave}"${chave === tipoCredito ? ' selected' : ''}>${escapeHtml(meta.label)}</option>
+                                `).join('')}
+                            </select>
+                        </label>
+                        ${comTipo ? `
+                            <label class="plantao-campo">
+                                <span>Tipo</span>
+                                <select id="plantaoNovoTipoLancamento" class="form-control">
+                                    <option value="${escapeHtml(tipo)}"${coberturaSelecionada ? '' : ' selected'}>Plantao</option>
+                                    <option value="${PLANTAO_TIPO_COBERTURA_ALMOCO}"${coberturaSelecionada ? ' selected' : ''}>Cobertura de almoco</option>
+                                </select>
+                            </label>
                         ` : ''}
                     </div>
+                    <div class="plantao-novo-acoes">
+                        ${editando ? `
+                            <button type="button" class="plantao-link" ${atributosAcao('cancelarEdicaoLancamentoPlantao')}>Cancelar edicao</button>
+                        ` : ''}
+                        <button type="button" class="btn-secondary" title="Um colaborador por linha. Para um turno com varias pessoas, repita o horario." ${atributosAcao('confirmarLancamentoPlantao')}>
+                            <i class="fas ${editando ? 'fa-check' : 'fa-plus'}" aria-hidden="true"></i>
+                            ${editando ? 'Atualizar lancamento' : 'Adicionar'}
+                        </button>
+                    </div>
+                </section>
 
-                    ${editando ? '' : '<small class="helper-text">Um colaborador por linha. Para um turno com varias pessoas, repita o mesmo horario.</small>'}
-                </div>
-
-                <div class="editor-form-group plantao-area-lista">
-                    <label><i class="fas fa-list-check"></i> Lancamentos do dia</label>
+                <section class="plantao-secao" aria-labelledby="plantaoLancamentosTitulo">
+                    <div class="plantao-secao-topo">
+                        <h4 class="plantao-secao-titulo" id="plantaoLancamentosTitulo">Lancamentos do dia</h4>
+                        ${resumo ? `<span class="plantao-secao-resumo">${escapeHtml(resumo)}</span>` : ''}
+                    </div>
                     ${renderLancamentosPlantao(state)}
-                </div>
+                </section>
 
-                <div class="editor-form-group plantao-area-obs">
-                    <label><i class="fas fa-align-left"></i> Observacao</label>
-                    <textarea id="plantaoObservacao" class="form-control" rows="2" placeholder="Detalhes opcionais para o dia">${escapeHtml(state.observacao || '')}</textarea>
-                </div>
-
-                <div class="plantao-area-folga">${renderPainelFolgasDomingo(state.dataISO)}</div>
-
-                <div class="editor-actions plantao-area-acoes">
-                    <button type="button" ${atributosAcao('salvarPlantao', state.dataISO)} class="btn-primary">
-                        <i class="fas fa-save"></i> ${jaLancado ? 'Salvar alteracoes' : 'Salvar dia'}
+                ${mostrarObservacao ? `
+                    <label class="plantao-campo plantao-secao">
+                        <span>Observacao</span>
+                        <textarea id="plantaoObservacao" class="form-control" rows="2" placeholder="Detalhes opcionais para o dia">${escapeHtml(state.observacao || '')}</textarea>
+                    </label>
+                ` : `
+                    <button type="button" class="plantao-link" ${atributosAcao('mostrarObservacaoPlantao')}>
+                        <i class="fas fa-plus" aria-hidden="true"></i> Adicionar observacao
                     </button>
-                    <button type="button" ${atributosAcao('cancelarPlantaoEditor')} class="btn-secondary">
-                        <i class="fas fa-times"></i> Cancelar
-                    </button>
+                `}
+
+                ${painelFolga ? `
+                    <details class="plantao-folga" id="plantaoFolgaDetalhes"${folgaAberta ? ' open' : ''}>
+                        <summary>Folga de domingo</summary>
+                        ${painelFolga}
+                    </details>
+                ` : ''}
+
+                <div class="editor-actions">
                     ${jaLancado ? `
-                        <button type="button" ${atributosAcao('excluirPlantao', state.dataISO)} class="btn-danger-ghost" title="Excluir todos os lancamentos do dia">
-                            <i class="fas fa-trash"></i> Excluir dia
+                        <button type="button" ${atributosAcao('excluirPlantao', state.dataISO)} class="plantao-link plantao-link--perigo" title="Excluir todos os lancamentos do dia">
+                            Excluir dia
                         </button>
                     ` : ''}
+                    <button type="button" ${atributosAcao('cancelarPlantaoEditor')} class="btn-secondary">Cancelar</button>
+                    <button type="button" ${atributosAcao('salvarPlantao', state.dataISO)} class="btn-primary">${jaLancado ? 'Salvar alteracoes' : 'Salvar dia'}</button>
                 </div>
             </div>
         `;
+
+    if (folgaAberta) {
+        state.folgaAberta = true;
+    }
+
+    document.getElementById('plantaoFolgaDetalhes')?.addEventListener('toggle', (event) => {
+        const atual = getPlantaoEditorState();
+
+        if (atual) {
+            atual.folgaAberta = event.currentTarget.open;
+        }
+    });
 
     // Depois do innerHTML: o painel de folga liga os proprios eventos e
     // busca a lista dele. Em dia que nao e domingo ele nao renderiza nada
@@ -679,7 +676,7 @@ export function renderPlantaoEditor(state) {
     });
 
     // Enter em qualquer campo do formulario adiciona/salva a linha.
-    [novoInicio, novoFim, novoColaborador, novoTipoLancamento].forEach((campo) => {
+    [novoInicio, novoFim, novoColaborador, novoTipoLancamento, document.getElementById('plantaoNovoCredito')].forEach((campo) => {
         campo?.addEventListener('keydown', (event) => {
             if (event.key === 'Enter') {
                 event.preventDefault();
