@@ -293,6 +293,13 @@
     border-radius: var(--radius-md, 8px);
 }
 
+/* Tabela curta e principal do relatorio (o rodizio de domingos): mostra
+   todas as linhas, sem rolagem interna; so rola de lado no celular. */
+.relatorio-tabela-scroll--inteira {
+    max-height: none;
+    margin-bottom: 24px;
+}
+
 .relatorio-tabela {
     width: 100%;
     border-collapse: collapse;

@@ -14,6 +14,7 @@ import { exportarDados } from './app/configuracoes-tela.js';
 import { exportarRelatorioCompleto, fecharRelatorio, resetarSistema } from './app/relatorios-export.js';
 import { exportarRelatorioEscala, gerarRelatorioEscala } from '../telas/escala-relatorio.js';
 import { exportarRelatorioPlantoes, gerarRelatorioPlantoes } from './runtime/escala-e-relatorios.js';
+import { exportarRelatorioDomingos, gerarRelatorioDomingos } from './runtime/relatorio-domingos.js';
 import { gerarRelatorioCompleto } from './runtime/relatorio-mensal.js';
 import { importarDados } from './app.js';
 
@@ -29,12 +30,14 @@ const ACOES = Object.freeze({
     excluirPlantao,
     exportarDados,
     exportarRelatorioCompleto,
+    exportarRelatorioDomingos,
     exportarRelatorioEscala,
     exportarRelatorioPlantoes,
     fecharColaboradorEditor,
     fecharEditor,
     fecharRelatorio,
     gerarRelatorioCompleto,
+    gerarRelatorioDomingos,
     gerarRelatorioEscala,
     gerarRelatorioPlantoes,
     importarDados,
