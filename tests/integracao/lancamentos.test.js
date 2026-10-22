@@ -74,6 +74,63 @@ module.exports = [
         }
     },
     {
+        name: 'tipo do lancamento: cobertura de almoco grava, reedita e filtra a listagem',
+        async run() {
+            const cliente = criarCliente();
+            await cliente.entrar();
+
+            const plantonista = await criarColaborador(cliente);
+            const cobertura = await criarColaborador(cliente);
+
+            const dia = await lancarPlantao(cliente, '2027-02-07', [
+                { horaInicio: '08:00', horaFim: '18:00', colaboradores: [plantonista.Id], tipoCredito: 'banco' },
+                {
+                    horaInicio: '12:00',
+                    horaFim: '13:00',
+                    colaboradores: [cobertura.Id],
+                    tipoCredito: 'banco',
+                    tipoLancamento: 'cobertura_almoco'
+                }
+            ]);
+
+            assert.equal(dia.tipoPlantao, 'domingo');
+            assert.deepEqual(dia.lancamentos.map((item) => item.tipoLancamento).sort(), [
+                'cobertura_almoco',
+                'domingo'
+            ]);
+            // O tipo nao mexe no credito: cobertura em banco credita como antes.
+            assert.deepEqual(await movimentos(cobertura.Id), [{ OrigemTipo: 'plantao', Minutos: 60 }]);
+
+            // Reeditar o dia sem mudar o tipo mantem a classificacao.
+            await lancarPlantao(cliente, '2027-02-07', [
+                {
+                    horaInicio: '08:00',
+                    horaFim: '18:00',
+                    colaboradores: [plantonista.Id],
+                    tipoCredito: 'banco',
+                    tipoLancamento: 'domingo'
+                },
+                {
+                    horaInicio: '12:00',
+                    horaFim: '13:30',
+                    colaboradores: [cobertura.Id],
+                    tipoCredito: 'banco',
+                    tipoLancamento: 'cobertura_almoco'
+                }
+            ]);
+
+            const filtrados = esperarSucesso(
+                await cliente.get('/api/plantoes?from=2027-02-07&to=2027-02-07&tipoLancamento=cobertura_almoco'),
+                'listar coberturas'
+            );
+            assert.equal(filtrados.length, 1);
+            assert.deepEqual(filtrados[0].colaboradores, [cobertura.Id]);
+            assert.match(filtrados[0].horaFim, /^13:30/);
+
+            esperarSucesso(await cliente.delete('/api/plantoes/2027-02-07'), 'excluir plantao');
+        }
+    },
+    {
         name: 'plantao recusa colaborador ausente no dia',
         async run() {
             const cliente = criarCliente();

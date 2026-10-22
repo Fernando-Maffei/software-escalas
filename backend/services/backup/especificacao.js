@@ -45,6 +45,7 @@ const {
     AUSENCIA_TIPOS,
     PLANTAO_TIPOS,
     PLANTAO_TIPOS_CREDITO: PLANTAO_CREDITOS,
+    PLANTAO_TIPOS_LANCAMENTO,
     TIPOS_PLANTONISTA_VALORES
 } = require('../../lib/dominio');
 const SEMANAL_STATUS = Object.freeze(['auto', 'confirmado']);
@@ -209,6 +210,11 @@ const TABELAS_BACKUP = Object.freeze([
                 max: 20,
                 apelidos: ['tipoCredito', 'TipoCredito'],
                 enumeracao: PLANTAO_CREDITOS
+            }),
+            col('tipo_lancamento', TIPO.TEXTO, {
+                max: 30,
+                apelidos: ['tipoLancamento', 'TipoLancamento'],
+                enumeracao: PLANTAO_TIPOS_LANCAMENTO
             })
         ]
     },

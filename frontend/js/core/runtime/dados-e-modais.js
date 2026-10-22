@@ -153,6 +153,8 @@ function mapPlantao(item) {
         tipoPlantao: item.tipoPlantao || item.tipo_plantao || null,
         // Registro antigo (antes da coluna tipo_credito) sempre creditava.
         tipoCredito: String(item.tipoCredito || item.tipo_credito || '').toLowerCase() === 'extra' ? 'extra' : 'banco',
+        // Sem o campo (registro antigo), as telas tratam como o plantao do dia.
+        tipoLancamento: item.tipoLancamento || item.tipo_lancamento || null,
         colaboradores: Array.isArray(item.colaboradores) ? item.colaboradores : [],
         horaInicio: item.horaInicio || item.hora_inicio || null,
         horaFim: item.horaFim || item.hora_fim || null,

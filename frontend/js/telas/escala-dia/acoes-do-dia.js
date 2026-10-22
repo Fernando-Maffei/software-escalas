@@ -164,8 +164,8 @@ export function abrirPlantaoDaEscala() {
         return;
     }
 
-    estado.plantaoSabadoAncoraISO = dataISO;
-    estado.plantaoDataFocoISO = dataISO;
+    // A tela de plantoes abre no mes deste dia, com ele ja no painel.
+    estado.plantaoAbrirDataISO = dataISO;
 
     carregarPagina('lancamentoPlantao');
 }

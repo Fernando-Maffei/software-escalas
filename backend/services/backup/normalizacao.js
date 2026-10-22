@@ -191,6 +191,12 @@ const AJUSTES_POR_TABELA = Object.freeze({
                 linha.tipo_plantao = 'feriado';
             }
         }
+
+        // Backup anterior a 2026-10-21 nao tinha tipo_lancamento (NOT NULL no
+        // banco): vira o plantao regular do dia, como na migration.
+        if (!linha.tipo_lancamento) {
+            linha.tipo_lancamento = String(linha.tipo_plantao).toLowerCase();
+        }
     },
     Feriados(linha) {
         linha.Tipo = linha.Tipo || 'municipal';

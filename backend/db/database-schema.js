@@ -42,7 +42,8 @@ const SCHEMA_SCRIPT_PATHS = Object.freeze([
     path.join(__dirname, '..', '..', 'database', 'migrations', '2026-09-22-escala-dia-tipos-plantonista.sql'),
     path.join(__dirname, '..', '..', 'database', 'migrations', '2026-09-23-folgas-domingo.sql'),
     path.join(__dirname, '..', '..', 'database', 'migrations', '2026-09-28-plantao-colaborador.sql'),
-    path.join(__dirname, '..', '..', 'database', 'migrations', '2026-09-30-plantonista-colaborador.sql')
+    path.join(__dirname, '..', '..', 'database', 'migrations', '2026-09-30-plantonista-colaborador.sql'),
+    path.join(__dirname, '..', '..', 'database', 'migrations', '2026-10-21-plantao-tipo-lancamento.sql')
 ]);
 
 const EXAMPLE_SEED_SCRIPT_PATH = path.join(__dirname, '..', '..', 'database', 'seeds', 'dados-exemplo.sql');

@@ -4,6 +4,7 @@ import { aguardarLayoutRelatorioPdf, baixarPdfSemPreview, criarContainerTemporar
 import { mostrarToast } from '../app/horas-e-resumo.js';
 import { estado } from '../estado.js';
 import { carregarAusencias, carregarColaboradores, carregarFeriadosLocais } from './dados-e-modais.js';
+import { ehCoberturaAlmocoPlantao } from './plantao-colaboradores/plantao-editor.js';
 
 const MESES_PT_BR = [
     'Janeiro', 'Fevereiro', 'Marco', 'Abril', 'Maio', 'Junho',
@@ -329,7 +330,11 @@ async function construirDadosRelatorioMensal(mes, ano) {
         }
 
         const horario = montarHorarioRelatorio(plantao.horaInicio || plantao.hora_inicio, plantao.horaFim || plantao.hora_fim);
-        const credito = rotuloCreditoPlantao(plantao.tipoCredito || plantao.tipo_credito);
+        // A cobertura de almoco sai junto do destino das horas ("Banco de
+        // horas · Cobertura de almoco") em todo lugar que o relatorio mostra o
+        // plantao; o plantao comum continua so com o destino.
+        const cobertura = ehCoberturaAlmocoPlantao(plantao.tipoLancamento || plantao.tipo_lancamento);
+        const credito = rotuloCreditoPlantao(plantao.tipoCredito || plantao.tipo_credito) + (cobertura ? ' · Cobertura de almoco' : '');
 
         (Array.isArray(plantao.colaboradores) ? plantao.colaboradores : []).forEach((idEquipe) => {
             const colaboradorEquipe = (estado.colaboradores || []).find((entry) => Number(entry.Id) === Number(idEquipe));

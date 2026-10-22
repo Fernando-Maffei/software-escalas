@@ -17,6 +17,12 @@ const PLANTAO_TIPOS = Object.freeze(['sabado', 'domingo', 'feriado']);
 // (CK_plantoes_tipo_credito).
 const PLANTAO_TIPOS_CREDITO = Object.freeze(['banco', 'extra']);
 
+// Tipo de cada lancamento do plantao (CK_plantoes_tipo_lancamento): o plantao
+// regular do dia (mesmo valor do tipo do dia) ou o horario adicional que cobre
+// o almoco do plantonista.
+const PLANTAO_TIPO_COBERTURA_ALMOCO = 'cobertura_almoco';
+const PLANTAO_TIPOS_LANCAMENTO = Object.freeze([...PLANTAO_TIPOS, PLANTAO_TIPO_COBERTURA_ALMOCO]);
+
 // Tipo de plantonista do colaborador (Colaboradores.TipoPlantonista). So vale
 // com IsPlantonista = 1; fora disso o banco exige NULL
 // (CK_Colaboradores_TipoPlantonista).
@@ -32,5 +38,7 @@ module.exports = {
     AUSENCIA_PERIODOS,
     AUSENCIA_TIPOS,
     PLANTAO_TIPOS,
-    PLANTAO_TIPOS_CREDITO
+    PLANTAO_TIPOS_CREDITO,
+    PLANTAO_TIPO_COBERTURA_ALMOCO,
+    PLANTAO_TIPOS_LANCAMENTO
 };

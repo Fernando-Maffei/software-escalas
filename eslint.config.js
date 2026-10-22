@@ -39,7 +39,11 @@ module.exports = [
             'tests/e2e/relatorio/**',
             'tests/e2e/resultados/**',
             'tests/e2e/.auth/**',
-            'out/**'
+            'out/**',
+            // Pasta local do Claude Code: skills instaladas (com scripts
+            // proprios) e os worktrees de outras branches. Nao e codigo do
+            // projeto e nao vai para o git.
+            '.claude/**'
         ]
     },
     js.configs.recommended,

@@ -9,6 +9,7 @@ const {
     normalizeColaboradores,
     normalizePlantaoType,
     normalizeTipoCredito,
+    normalizeTipoLancamento,
     resolvePlantaoTypeByDate,
     serializePlantaoRecord
 } = require('../../backend/services/plantoes');
@@ -203,6 +204,66 @@ module.exports = [
             assert.deepEqual(grupos[1].colaboradores, [5]);
             assert.equal(grupos[1].tipoCredito, 'extra');
             assert.deepEqual(grupos[2].colaboradores, [1]);
+        }
+    },
+    {
+        // Campo "Tipo": vazio e o plantao regular do dia; a cobertura de almoco
+        // vale em qualquer dia; um regular de outro dia e recusado.
+        name: 'buildPlantaoDiaPayload resolves tipoLancamento per shift',
+        run() {
+            const payload = buildPlantaoDiaPayload({
+                dataISO: '2026-10-25',
+                lancamentos: [
+                    { colaboradorId: 1, horaInicio: '08:00', horaFim: '18:00' },
+                    { colaboradorId: 2, horaInicio: '12:00', horaFim: '13:00', tipoLancamento: 'COBERTURA_ALMOCO' }
+                ]
+            });
+
+            assert.equal(payload.tipoPlantao, 'domingo');
+            assert.equal(payload.lancamentos[0].tipoLancamento, 'domingo');
+            assert.equal(payload.lancamentos[1].tipoLancamento, 'cobertura_almoco');
+
+            assert.throws(
+                () => buildPlantaoDiaPayload({
+                    dataISO: '2026-10-25',
+                    lancamentos: [{ colaboradorId: 1, horaInicio: '08:00', horaFim: '18:00', tipoLancamento: 'sabado' }]
+                }),
+                /corresponde a domingo/i
+            );
+            assert.throws(
+                () => buildPlantaoDiaPayload({
+                    dataISO: '2026-10-25',
+                    lancamentos: [{ colaboradorId: 1, horaInicio: '08:00', horaFim: '18:00', tipoLancamento: 'almoco' }]
+                }),
+                /Tipo do Lancamento 1/i
+            );
+            assert.equal(normalizeTipoLancamento('', 'feriado'), 'feriado');
+            assert.equal(normalizeTipoLancamento('cobertura_almoco', 'feriado'), 'cobertura_almoco');
+            // No sabado nao ha cobertura de almoco: o lancamento e sempre plantao.
+            assert.throws(() => normalizeTipoLancamento('cobertura_almoco', 'sabado'), /domingo ou feriado/i);
+        }
+    },
+    {
+        // Mesmo horario e destino, tipos diferentes: duas linhas, senao a
+        // cobertura de almoco se misturaria ao plantao do dia.
+        name: 'agruparLancamentosPorHorario keeps tipoLancamento apart',
+        run() {
+            const grupos = agruparLancamentosPorHorario([
+                { horaInicio: '12:00', horaFim: '13:00', colaboradores: [2], tipoCredito: 'banco', tipoLancamento: 'domingo' },
+                { horaInicio: '12:00', horaFim: '13:00', colaboradores: [3], tipoCredito: 'banco', tipoLancamento: 'cobertura_almoco' }
+            ]);
+
+            assert.equal(grupos.length, 2);
+            assert.deepEqual(grupos.map((grupo) => grupo.tipoLancamento), ['domingo', 'cobertura_almoco']);
+        }
+    },
+    {
+        // Registro gravado antes da coluna tipo_lancamento e o plantao do dia.
+        name: 'serializePlantaoRecord defaults tipoLancamento to the day type',
+        run() {
+            assert.equal(serializePlantaoRecord({ data_plantao: '2026-10-25', tipo_plantao: 'domingo' }).tipoLancamento, 'domingo');
+            assert.equal(serializePlantaoRecord({ data_plantao: '2026-10-25', tipo_lancamento: 'cobertura_almoco' }).tipoLancamento, 'cobertura_almoco');
+            assert.equal(serializePlantaoRecord({ data_plantao: '2026-10-25', tipo_lancamento: 'lixo' }).tipoLancamento, 'domingo');
         }
     },
     {

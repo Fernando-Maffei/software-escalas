@@ -110,22 +110,26 @@ export function renderScaleEmptyMessageEscala(dataISO) {
     renderScaleMessageEscala({ label, icon, title, description });
 }
 
-// ===== Previa da semana (faixa dos 7 dias) =====
-// Uma unica chamada ao relatorio traz a semana inteira. O dia selecionado
-// sempre usa o estado ao vivo (fica correto ate enquanto se arrasta o
-// almoco); os demais dias usam o cache da semana. Nao aplica filtro de
-// setor: a faixa e uma visao geral do dia inteiro.
-function getWeekBoundsEscala(dataISO) {
+// ===== Faixa de dias (rolavel) =====
+// Seis semanas em volta do dia aberto, numa faixa que se arrasta para o lado
+// (mouse, dedo ou trackpad). Uma unica chamada ao relatorio traz a faixa
+// inteira. O dia selecionado sempre usa o estado ao vivo (fica correto ate
+// enquanto se arrasta o almoco); os demais dias usam o cache. Nao aplica
+// filtro de setor: a faixa e uma visao geral do dia inteiro.
+const FAIXA_DIAS_ANTES = 21;
+const FAIXA_DIAS_DEPOIS = 21;
+const MESES_CURTOS_ESCALA = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+
+function getFaixaDiasEscala(dataISO) {
     const iso = toISODateEscala(dataISO) || toISODateEscala(new Date());
-    const weekday = getIsoDayOfWeekEscala(iso);
-    const start = shiftIsoDateEscala(iso, -weekday);
+    const start = shiftIsoDateEscala(iso, -FAIXA_DIAS_ANTES);
     const days = [];
 
-    for (let index = 0; index < 7; index += 1) {
+    for (let index = 0; index <= FAIXA_DIAS_ANTES + FAIXA_DIAS_DEPOIS; index += 1) {
         days.push(shiftIsoDateEscala(start, index));
     }
 
-    return { start, end: days[6], days };
+    return { start, end: days[days.length - 1], days };
 }
 
 function getWeekStatusEscala(coverage) {
@@ -145,14 +149,19 @@ function getWeekStatusEscala(coverage) {
     return 'ok';
 }
 
-async function ensureWeekDataEscala(weekStart, weekEnd, { force = false } = {}) {
+// O cache vale para qualquer faixa que caiba dentro do periodo ja buscado:
+// clicar num dia proximo recentra a faixa sem nova chamada.
+function cacheCobreFaixaEscala(start, end) {
     const cache = estado.escalaWeekCache;
+    return Boolean(cache && cache.start && cache.start <= start && cache.end >= end);
+}
 
-    if (!force && cache && cache.key === weekStart) {
-        return cache.byDay;
+async function ensureWeekDataEscala(start, end, { force = false } = {}) {
+    if (!force && cacheCobreFaixaEscala(start, end)) {
+        return estado.escalaWeekCache.byDay;
     }
 
-    const payload = await API.getEscalaRelatorio({ dataInicio: weekStart, dataFim: weekEnd });
+    const payload = await API.getEscalaRelatorio({ dataInicio: start, dataFim: end });
     const items = Array.isArray(payload?.items) ? payload.items : [];
     const byDay = {};
 
@@ -166,7 +175,7 @@ async function ensureWeekDataEscala(weekStart, weekEnd, { force = false } = {}) 
         (byDay[dia] = byDay[dia] || []).push(item);
     });
 
-    estado.escalaWeekCache = { key: weekStart, byDay };
+    estado.escalaWeekCache = { start, end, byDay };
     return byDay;
 }
 
@@ -178,6 +187,83 @@ const WEEK_STATUS_LABEL_ESCALA = {
     load: 'carregando'
 };
 
+// Arrastar com o mouse rola a faixa; o clique que encerra um arrasto nao
+// abre o dia. No toque e no trackpad a rolagem e a nativa do navegador.
+let faixaArrastou = false;
+
+function ligarArrastoFaixaEscala(container) {
+    if (container.dataset.arrastoLigado === '1') {
+        return;
+    }
+
+    container.dataset.arrastoLigado = '1';
+    let inicioX = 0;
+    let inicioScroll = 0;
+    let pressionado = false;
+
+    container.addEventListener('pointerdown', (event) => {
+        if (event.pointerType !== 'mouse' || event.button !== 0) {
+            return;
+        }
+
+        pressionado = true;
+        faixaArrastou = false;
+        inicioX = event.clientX;
+        inicioScroll = container.scrollLeft;
+    });
+
+    container.addEventListener('pointermove', (event) => {
+        if (!pressionado) {
+            return;
+        }
+
+        const deslocamento = event.clientX - inicioX;
+
+        if (!faixaArrastou && Math.abs(deslocamento) > 5) {
+            faixaArrastou = true;
+            container.classList.add('is-arrastando');
+        }
+
+        if (faixaArrastou) {
+            container.scrollLeft = inicioScroll - deslocamento;
+        }
+    });
+
+    const soltar = () => {
+        pressionado = false;
+        container.classList.remove('is-arrastando');
+    };
+
+    container.addEventListener('pointerup', soltar);
+    container.addEventListener('pointerleave', soltar);
+
+    // Captura: barra o clique do arrasto antes de chegar ao botao do dia.
+    container.addEventListener('click', (event) => {
+        if (faixaArrastou) {
+            event.preventDefault();
+            event.stopPropagation();
+            faixaArrastou = false;
+        }
+    }, true);
+}
+
+// Centraliza o dia aberto so quando ele muda; os redesenhos ao vivo (a cada
+// ajuste no dia) mantem a rolagem onde a pessoa deixou. Guardado no proprio
+// elemento: voltar para a tela cria uma faixa nova, que precisa centralizar.
+function posicionarFaixaEscala(container, iso, scrollAnterior) {
+    if (container.dataset.diaCentrado === iso) {
+        container.scrollLeft = scrollAnterior;
+        return;
+    }
+
+    container.dataset.diaCentrado = iso;
+    const selecionado = container.querySelector('.escala-week-pill.is-selected');
+
+    if (selecionado) {
+        container.scrollLeft = selecionado.offsetLeft - ((container.clientWidth - selecionado.offsetWidth) / 2);
+    }
+}
+
 function renderWeekStripPillsEscala(dataISO, byDay) {
     const container = document.getElementById('escalaWeekStrip');
 
@@ -186,12 +272,13 @@ function renderWeekStripPillsEscala(dataISO, byDay) {
     }
 
     const iso = toISODateEscala(dataISO) || toISODateEscala(new Date());
-    const { days } = getWeekBoundsEscala(iso);
+    const { days } = getFaixaDiasEscala(iso);
     const todayISO = toISODateEscala(new Date());
     const liveState = getCurrentScaleState();
     const liveISO = toISODateEscala(liveState.dataISO);
+    const scrollAnterior = container.scrollLeft;
 
-    container.innerHTML = days.map((dia) => {
+    container.innerHTML = days.map((dia, indice) => {
         let status = 'load';
 
         if (dia === liveISO) {
@@ -203,7 +290,11 @@ function renderWeekStripPillsEscala(dataISO, byDay) {
         }
 
         const dow = (DIA_LABELS[getIsoDayOfWeekEscala(dia)] || '').slice(0, 3);
-        const dayNum = Number(dia.split('-')[2]);
+        const [, mes, diaDoMes] = dia.split('-').map(Number);
+        const dayNum = diaDoMes;
+        // Numa faixa de seis semanas o mes muda: o primeiro dia de cada mes
+        // (e o primeiro da faixa) mostra qual e.
+        const mesCurto = diaDoMes === 1 || indice === 0 ? MESES_CURTOS_ESCALA[mes - 1] : '';
         const classes = ['escala-week-pill', `is-${status}`];
 
         if (dia === iso) {
@@ -214,12 +305,19 @@ function renderWeekStripPillsEscala(dataISO, byDay) {
             classes.push('is-today');
         }
 
-        return `<button type="button" class="${classes.join(' ')}" data-dia="${dia}" title="${dow} ${dayNum} - ${WEEK_STATUS_LABEL_ESCALA[status] || ''}">
-                <span class="wp-dow">${dow}</span>
+        if (getIsoDayOfWeekEscala(dia) === 0) {
+            classes.push('is-domingo');
+        }
+
+        return `<button type="button" class="${classes.join(' ')}" data-dia="${dia}" title="${formatDatePtBrEscala(dia)} - ${WEEK_STATUS_LABEL_ESCALA[status] || ''}" aria-label="${formatDatePtBrEscala(dia)}, ${WEEK_STATUS_LABEL_ESCALA[status] || ''}"${dia === iso ? ' aria-current="date"' : ''}>
+                <span class="wp-dow">${dow}${mesCurto ? ` · ${mesCurto}` : ''}</span>
                 <span class="wp-num">${dayNum}</span>
                 <span class="wp-dot" aria-hidden="true"></span>
             </button>`;
     }).join('');
+
+    ligarArrastoFaixaEscala(container);
+    posicionarFaixaEscala(container, iso, scrollAnterior);
 
     container.querySelectorAll('[data-dia]').forEach((button) => {
         button.addEventListener('click', () => {
@@ -239,9 +337,8 @@ export function refreshWeekStripLiveEscala() {
         return;
     }
 
-    const { start } = getWeekBoundsEscala(iso);
-    const cache = estado.escalaWeekCache;
-    const byDay = (cache && cache.key === start) ? cache.byDay : null;
+    const { start, end } = getFaixaDiasEscala(iso);
+    const byDay = cacheCobreFaixaEscala(start, end) ? estado.escalaWeekCache.byDay : null;
     renderWeekStripPillsEscala(iso, byDay);
 }
 
@@ -253,17 +350,22 @@ export async function renderWeekStripEscala(dataISO, { force = false } = {}) {
     }
 
     const iso = toISODateEscala(dataISO) || toISODateEscala(new Date());
-    const { start, end } = getWeekBoundsEscala(iso);
-    const cache = estado.escalaWeekCache;
-    const cachedByDay = (cache && cache.key === start) ? cache.byDay : null;
+    const { start, end } = getFaixaDiasEscala(iso);
+    const cachedByDay = cacheCobreFaixaEscala(start, end) ? estado.escalaWeekCache.byDay : null;
 
     // Render imediato (cache ou placeholder), depois hidrata com o fetch.
     renderWeekStripPillsEscala(iso, cachedByDay);
 
     try {
-        const byDay = await ensureWeekDataEscala(start, end, { force });
+        // Busca uma margem extra dos dois lados: os proximos cliques perto
+        // daqui recentram a faixa sem nova chamada.
+        const byDay = await ensureWeekDataEscala(
+            shiftIsoDateEscala(start, -FAIXA_DIAS_ANTES),
+            shiftIsoDateEscala(end, FAIXA_DIAS_DEPOIS),
+            { force: force || !cachedByDay }
+        );
         renderWeekStripPillsEscala(iso, byDay);
     } catch (error) {
-        // A previa e apoio: se o fetch falhar, a tela do dia continua util.
+        // A faixa e apoio: se o fetch falhar, a tela do dia continua util.
     }
 }

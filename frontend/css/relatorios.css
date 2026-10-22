@@ -268,10 +268,11 @@
     transform: rotate(90deg);
 }
 
+/* O relatorio rola junto com a pagina: sem altura maxima nem barra de
+   rolagem propria (com as das tabelas dentro, eram duas ou tres barras
+   aninhadas na mesma tela). */
 .relatorio-conteudo {
     padding: 28px;
-    max-height: 780px;
-    overflow: auto;
 }
 
 /* Tabelas de relatório */
@@ -284,13 +285,17 @@
     border-bottom: 2px solid var(--border);
 }
 
-/* Wrapper de rolagem: em telas estreitas rola na horizontal (em vez de
-   espremer as colunas) e em tabelas longas rola na vertical — e é este
-   contexto de rolagem que faz o cabeçalho sticky (abaixo) funcionar. */
+/* Wrapper das tabelas: so rola na horizontal, em telas estreitas (em vez de
+   espremer as colunas). Na vertical a tabela mostra todas as linhas e rola
+   com a pagina. */
 .relatorio-tabela-scroll {
-    overflow: auto;
-    max-height: 60vh;
+    overflow-x: auto;
     border-radius: var(--radius-md, 8px);
+}
+
+/* Espaco entre a tabela do rodizio e a de dias (Domingos e feriados). */
+.relatorio-tabela-scroll--inteira {
+    margin-bottom: 24px;
 }
 
 .relatorio-tabela {

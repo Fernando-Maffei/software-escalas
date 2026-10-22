@@ -663,6 +663,15 @@ function ligarLista(dataISO) {
 }
 
 // Liga os eventos depois que o painel do plantao trocou o innerHTML.
+// A janela do plantao mostra este painel recolhido. Ele precisa abrir sozinho
+// quando ha algo em andamento aqui: uma folga vinda das Pendencias para
+// editar, um cartao em edicao ou um registro novo ja comecado.
+export function folgaDomingoPrecisaAbrir(dataISO) {
+    return abrirEdicaoDaFolgaId !== null
+        || Boolean(edicao && edicao.dataISO === dataISO)
+        || (rascunho.dataISO === dataISO && rascunho.colaboradorId !== '');
+}
+
 export function bindPainelFolgasDomingo(dataISO) {
     const bloco = document.querySelector('[data-folga-domingo-data]');
 

@@ -41,210 +41,214 @@
     font-size: 13px;
 }
 
-.sabados-nav {
-    display: flex;
-    gap: 10px;
+/* Regua de um mes: cabecalho com setas e o resumo, grade de cards compactos.
+   Cores so por tokens do tema, entao o tema escuro nao precisa de regra
+   propria. */
+.plantao-mes-header {
     flex-wrap: wrap;
-    justify-content: flex-end;
+    gap: var(--space-3);
 }
 
-/* A regua empilha um bloco por mes; a grade de cards vive dentro de cada um. */
-.sabados-regua {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-5);
-}
-
-.plantao-mes-titulo {
+.plantao-mes-nav {
     display: flex;
     align-items: center;
-    gap: var(--space-3);
-    margin: 0 0 var(--space-3);
-    font-size: var(--text-xs);
-    font-weight: var(--weight-semibold);
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: var(--text-light);
+    gap: var(--space-2);
 }
 
-/* A linha ocupa a sobra da largura e separa os meses sem custar altura. */
-.plantao-mes-titulo::after {
-    content: "";
-    flex: 1;
-    height: 1px;
-    background: var(--border);
+.plantao-mes-nav h3 {
+    min-width: 170px;
+    justify-content: center;
+    text-align: center;
 }
 
-.plantao-mes-contagem {
-    order: 3;
-    padding: 2px var(--space-2);
-    border-radius: var(--radius-pill);
-    background: var(--card-dark);
-    border: 1px solid var(--border);
+.plantao-mes-seta {
+    padding: 6px 10px;
+}
+
+.plantao-mes-resumo {
+    font-size: var(--text-sm);
     color: var(--text-light);
     font-variant-numeric: tabular-nums;
-    letter-spacing: 0;
 }
 
-.sabados-grid {
+.plantao-dias-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
-    gap: 12px;
+    grid-template-columns: repeat(auto-fill, minmax(112px, 1fr));
+    gap: var(--space-2);
 }
 
-.sabado-card {
-    background: var(--card-dark);
-    border-radius: 16px;
-    /* Antes 16px vertical: o card ficava com 205px de altura para ~137px de
-       conteudo, muito esguio (106x205). Reduzido para adensar a grade. */
-    padding: 10px 8px;
-    text-align: center;
-    cursor: pointer;
-    transition: var(--transition);
-    border: 2px solid transparent;
-    position: relative;
-    overflow: hidden;
+.plantao-dia-card {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
     width: 100%;
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    background: var(--card);
+    color: var(--text);
     font: inherit;
+    text-align: left;
+    cursor: pointer;
+    transition: border-color 0.15s ease, background 0.15s ease;
 }
 
-.sabado-card:hover {
-    transform: translateY(-3px);
-    box-shadow: var(--shadow-md);
+.plantao-dia-card:hover {
     border-color: var(--primary);
 }
 
-.sabado-card.passado {
-    background: linear-gradient(180deg, #f8fafc 0%, var(--card-dark) 100%);
+.plantao-dia-card:focus-visible {
+    outline: 2px solid var(--accent-ring);
+    outline-offset: 2px;
 }
 
-.sabado-card.lancado {
-    background: var(--primary-soft);
+.plantao-dia-card.is-hoje {
     border-color: var(--primary);
 }
 
-.sabado-card.hoje {
-    box-shadow: 0 0 0 2px rgba(29, 99, 237, 0.18);
-}
-
-.sabado-card.is-active {
+.plantao-dia-card.is-active {
     border-color: var(--primary);
-    transform: translateY(-4px);
-    box-shadow: var(--shadow-lg);
+    box-shadow: 0 0 0 2px var(--accent-ring);
+    opacity: 1;
 }
 
-/* Distincao visual por tipo: faixa no topo (inset, sem mexer no layout) e o
-   rotulo colorido. Sabado = neutro; Domingo = indigo; Feriado = ambar (pill). */
-.sabado-card--domingo { box-shadow: inset 0 3px 0 #6366f1; }
-.sabado-card--feriado { box-shadow: inset 0 3px 0 #d97706; }
+.plantao-dia-card--feriado {
+    background: var(--warning-soft);
+}
 
-.sabado-card--domingo .sabado-tipo { color: #4f46e5; font-weight: 700; }
+.plantao-dia-topo {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--space-1);
+}
 
-.sabado-card--feriado .sabado-tipo {
-    background: #fde68a;
-    color: #92400e;
-    border-radius: var(--radius-full);
-    padding: 2px 8px;
-    font-weight: 700;
-    max-width: 100%;
+.plantao-dia-numero {
+    font-size: 20px;
+    font-weight: var(--weight-semibold);
+    line-height: 1.1;
+    font-variant-numeric: tabular-nums;
+}
+
+.plantao-dia-semana {
+    font-size: var(--text-xs);
+    color: var(--text-light);
+}
+
+.plantao-dia-card--feriado .plantao-dia-numero,
+.plantao-dia-card--feriado .plantao-dia-semana,
+.plantao-dia-card--feriado .plantao-dia-feriado {
+    color: var(--warning-text);
+}
+
+.plantao-dia-feriado {
+    min-height: 15px;
     overflow: hidden;
+    font-size: 11px;
+    color: var(--text-light);
     text-overflow: ellipsis;
     white-space: nowrap;
 }
 
-.sabado-card-badges {
+.plantao-dia-status {
     display: flex;
-    justify-content: space-between;
-    gap: 6px;
-    min-height: 18px;
-    margin-bottom: 4px;
-}
-
-.sabado-dia {
-    font-size: 28px;
-    font-weight: 700;
-    color: var(--text);
-    line-height: 1;
-}
-
-.sabado-tipo {
-    margin-top: 6px;
-    font-size: 11px;
-    font-weight: 700;
-    color: var(--primary-dark);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-}
-
-.sabado-status {
-    margin-top: 6px;
-    font-size: 11px;
+    align-items: center;
+    gap: 5px;
+    font-size: var(--text-xs);
     color: var(--text-light);
 }
 
-.badge-plantao {
-    position: absolute;
-    top: -5px;
-    right: -5px;
+.plantao-dia-cobertura {
+    margin-left: auto;
+    color: var(--success);
+}
+
+.plantao-dia-ponto {
+    display: inline-block;
+    flex-shrink: 0;
+    width: 8px;
+    height: 8px;
+    border: 1px solid var(--text-light);
+    border-radius: 50%;
+}
+
+.plantao-dia-card.is-lancado .plantao-dia-ponto,
+.plantao-dia-ponto.is-lancado {
+    border-color: var(--success);
     background: var(--success);
-    color: white;
-    font-size: 10px;
-    padding: 2px 6px;
-    border-radius: 20px;
-    font-weight: 600;
 }
 
-.sabado-card .badge-plantao {
-    position: static;
-    background: #1d63ed;
-    font-size: 9px;
-    padding: 3px 8px;
+.plantao-dia-card.is-sem-equipe .plantao-dia-ponto {
+    border-color: var(--warning);
+    background: var(--warning);
 }
 
-.badge-historico {
+.plantao-dias-legenda {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-4);
+    margin-top: var(--space-4);
+    font-size: var(--text-xs);
+    color: var(--text-light);
+}
+
+.plantao-dias-legenda > span {
     display: inline-flex;
     align-items: center;
-    justify-content: center;
-    padding: 3px 8px;
-    border-radius: 999px;
-    background: #e2e8f0;
-    color: #3a4a5f;
-    font-size: 9px;
-    font-weight: 700;
-    letter-spacing: 0.3px;
+    gap: 5px;
 }
 
-/* ================= PAINEL DE LANCAMENTO ================= */
-/* Mais largo que os 400px de antes: o painel deixou de ser um checklist e
-   passou a montar turnos (colaborador + horario + destino das horas), entao
-   cada linha precisa caber sem quebrar. Fica grudado no topo ao rolar, porque
-   a regua de datas ao lado e comprida. */
+.plantao-dias-legenda .fa-utensils {
+    color: var(--success);
+}
+
+.plantao-dia-legenda-feriado {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 3px;
+    background: var(--warning-soft);
+    border: 1px solid var(--warning);
+}
+
+/* ================= JANELA DO DIA (EDITOR) ================= */
+/* O editor do dia abre numa janela sobre a tela. Visual enxuto de proposito:
+   uma coluna, campos de adicionar numa linha, lista como tabela, so o Salvar
+   em azul cheio e o que e eventual (observacao, folga de domingo) recolhido.
+   Cores so por tokens do tema, entao o tema escuro vem junto. O fundo
+   escurecido rola inteiro (sem rolagem aninhada) e o rodape fica grudado. */
 #plantaoEditor {
-    width: 460px;
-    flex-shrink: 0;
-    align-self: flex-start;
-    position: sticky;
-    top: 16px;
-    background: var(--card);
-    border-radius: 24px;
-    box-shadow: var(--shadow-xl);
-    overflow: hidden;
-    animation: slideIn 0.3s ease;
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    /* Sem padding embaixo: o rodape grudado (bottom: 0) para na borda da
+       tela, e nao acima dela com conteudo aparecendo por baixo. */
+    padding: 6vh 16px 0;
+    overflow-y: auto;
+    background: rgba(15, 23, 42, 0.55);
 }
 
-#plantaoEditor .editor-content {
-    max-height: calc(100vh - 64px);
-    overflow-y: auto;
+.plantao-modal-caixa {
+    width: min(760px, 100%);
+    margin: 0 auto 6vh;
+    padding: 24px 24px 0;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-xl);
+    animation: fadeIn 0.2s ease;
 }
 
 #plantaoEditor .editor-header {
     align-items: flex-start;
+    margin: 0 0 20px;
+    padding: 0 0 16px;
+    border-bottom: 1px solid var(--border);
+    border-radius: 0;
+    background: none;
 }
 
 .editor-header-titulo {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
     min-width: 0;
 }
 
@@ -252,85 +256,90 @@
     margin: 0;
     padding: 0;
     border-bottom: none;
-    font-size: 18px;
+    font-size: var(--text-xl);
+    font-variant-numeric: tabular-nums;
 }
 
-.editor-header-chips {
+.plantao-modal-subtitulo {
     display: flex;
     flex-wrap: wrap;
     gap: 6px;
+    margin-top: 4px;
+    font-size: var(--text-sm);
+    color: var(--text-light);
 }
 
-.plantao-tipo-chip,
-.plantao-estado-chip {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 3px 10px;
-    border-radius: 999px;
-    font-size: 11px;
-    font-weight: 700;
-    letter-spacing: 0.3px;
+.plantao-modal-subtitulo .is-lancado {
+    color: var(--success);
+    font-weight: var(--weight-semibold);
+}
+
+#plantaoEditor .btn-close-editor {
+    background: transparent;
+    color: var(--text-light);
+}
+
+#plantaoEditor .btn-close-editor:hover {
     background: var(--card-dark);
-    border: 1px solid var(--border);
     color: var(--text);
+    transform: none;
 }
 
-.plantao-tipo-chip i { font-size: 7px; }
-.plantao-tipo--sabado i { color: var(--primary); }
-.plantao-tipo--domingo i { color: #4f46e5; }
-.plantao-tipo--feriado i { color: #d97706; }
-
-.plantao-estado-chip {
-    background: #f1f5f9;
-    color: #64748b;
-}
-
-.plantao-estado-chip.is-lancado {
-    background: #dcfce7;
-    border-color: #86efac;
-    color: #15803d;
-}
-
-#plantaoEditor .editor-form-group label {
-    font-size: 11px;
-    margin-bottom: 8px;
+#plantaoEditor .editor-plantao {
     display: flex;
-    align-items: center;
-    gap: 8px;
+    flex-direction: column;
+    gap: 20px;
 }
 
-#plantaoEditor .editor-form-group label i {
-    font-size: 14px;
-    color: var(--primary);
-}
-
-#plantaoEditor select.form-control,
 #plantaoEditor select,
-#plantaoEditor textarea.form-control {
+#plantaoEditor textarea {
     width: 100%;
 }
 
-/* ---- Formulario de adicionar/editar um lancamento ---- */
-.plantao-form-novo {
+/* ---- Adicionar / editar um lancamento ---- */
+.plantao-novo {
     padding: 16px;
-    border-radius: 18px;
-    background: var(--card-dark);
     border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    background: var(--card-dark);
 }
 
-/* Em edicao o bloco muda de cor para deixar claro que o botao "Salvar
-   lancamento" altera uma linha existente em vez de criar outra. */
-.plantao-form-novo.is-editando {
-    background: var(--primary-soft);
+.plantao-novo.is-editando {
     border-color: var(--primary);
+}
+
+.plantao-novo-aviso {
+    margin: 0 0 10px;
+    font-size: var(--text-xs);
+    font-weight: var(--weight-semibold);
+    color: var(--primary);
+}
+
+/* Grade 2 x 2: numa linha so os quatro campos espremiam o horario. */
+.plantao-novo-campos {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px 16px;
+}
+
+.plantao-campo {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 0;
+    margin: 0;
+}
+
+.plantao-campo > span {
+    font-size: var(--text-xs);
+    font-weight: var(--weight-semibold);
+    color: var(--text-light);
 }
 
 .plantao-novo-horario {
     display: flex;
     align-items: center;
-    gap: 8px;
-    margin-top: 10px;
+    gap: 6px;
 }
 
 .plantao-novo-horario input[type="time"] {
@@ -338,124 +347,194 @@
     min-width: 0;
 }
 
-.plantao-novo-horario span {
-    font-size: 12px;
+.plantao-novo-horario > span {
     color: var(--text-light);
-    flex-shrink: 0;
 }
 
-.plantao-credito-escolha {
-    display: flex;
-    gap: 8px;
-    margin-top: 10px;
-}
-
-.plantao-credito-opcao {
-    flex: 1;
+.plantao-novo-acoes {
     display: flex;
     align-items: center;
-    justify-content: center;
-    gap: 6px;
-    padding: 10px 8px;
-    border-radius: 12px;
-    border: 1px solid var(--border);
-    background: var(--card);
-    color: var(--text-light);
-    font-size: 12px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.2s ease;
-}
-
-.plantao-credito-opcao:hover {
-    border-color: var(--primary);
-    color: var(--text);
-}
-
-.plantao-credito-opcao.is-active.plantao-credito--banco {
-    background: #eff6ff;
-    border-color: #3b82f6;
-    color: #1d4ed8;
-}
-
-.plantao-credito-opcao.is-active.plantao-credito--extra {
-    background: #fff7ed;
-    border-color: #f97316;
-    color: #c2410c;
-}
-
-.plantao-form-novo .helper-text {
-    display: block;
-    margin-top: 8px;
-    font-size: 11px;
-    color: var(--text-light);
-    line-height: 1.4;
-}
-
-.plantao-form-acoes {
-    display: flex;
-    gap: 8px;
+    justify-content: flex-end;
+    gap: 12px;
     margin-top: 12px;
 }
 
-.plantao-form-acoes .btn-primary,
-.plantao-form-acoes .btn-secondary {
-    flex: 1;
-    justify-content: center;
-}
-
-/* ---- Lista de lancamentos do dia ---- */
-.plantao-lancamentos {
-    list-style: none;
-    margin: 0;
-    padding: 0;
+/* ---- Lancamentos do dia: uma tabela simples ---- */
+.plantao-secao-topo {
     display: flex;
-    flex-direction: column;
-    gap: 8px;
-}
-
-.plantao-lancamento {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 10px;
-    padding: 10px 12px;
-    border-radius: 14px;
-    background: var(--card-dark);
-    border: 1px solid var(--border);
-}
-
-.plantao-lancamento.is-editando {
-    border-color: var(--primary);
-    box-shadow: 0 0 0 2px var(--primary-soft);
-}
-
-.plantao-lancamento.is-indisponivel {
-    border-style: dashed;
-    background: #fef2f2;
-}
-
-.plantao-lancamento-info {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    min-width: 0;
-}
-
-.plantao-lancamento-topo {
-    display: flex;
-    align-items: center;
-    gap: 8px;
     flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 4px 12px;
+    margin-bottom: 8px;
 }
 
-.plantao-lancamento-hora {
-    font-size: 13px;
-    font-weight: 700;
-    color: var(--primary);
+.plantao-secao-titulo {
+    margin: 0;
+    font-size: var(--text-base);
+    font-weight: var(--weight-semibold);
+    color: var(--text);
+}
+
+.plantao-secao-resumo {
+    font-size: var(--text-xs);
+    color: var(--text-light);
     font-variant-numeric: tabular-nums;
 }
 
+.plantao-linhas {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+}
+
+.plantao-linha {
+    display: grid;
+    grid-template-columns: 104px minmax(0, 1fr) auto 64px auto;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 8px 8px 12px;
+    font-size: var(--text-sm);
+}
+
+.plantao-linha + .plantao-linha {
+    border-top: 1px solid var(--border);
+}
+
+.plantao-linha.is-editando {
+    background: var(--accent-soft);
+}
+
+.plantao-linha-hora {
+    font-weight: var(--weight-semibold);
+    font-variant-numeric: tabular-nums;
+}
+
+.plantao-linha-nome {
+    color: var(--text);
+    overflow-wrap: anywhere;
+}
+
+.plantao-linha-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2px 10px;
+    font-size: var(--text-xs);
+    color: var(--text-light);
+}
+
+.plantao-linha-cobertura {
+    color: var(--success);
+    font-weight: var(--weight-semibold);
+    white-space: nowrap;
+}
+
+.plantao-linha-duracao {
+    font-size: var(--text-xs);
+    color: var(--text-light);
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+.plantao-linha-acoes {
+    display: flex;
+    gap: 2px;
+}
+
+.plantao-icone-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border: none;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--text-light);
+    cursor: pointer;
+}
+
+.plantao-icone-btn:hover {
+    background: var(--card-dark);
+    color: var(--text);
+}
+
+.plantao-icone-btn.is-perigo:hover {
+    color: var(--danger);
+}
+
+.plantao-icone-btn:focus-visible,
+.plantao-link:focus-visible,
+.plantao-folga > summary:focus-visible {
+    outline: 2px solid var(--accent-ring);
+    outline-offset: 2px;
+}
+
+.plantao-vazio {
+    margin: 0;
+    padding: 16px;
+    border: 1px dashed var(--border);
+    border-radius: var(--radius-md);
+    text-align: center;
+    font-size: var(--text-sm);
+    color: var(--text-light);
+}
+
+/* Acao de texto: observacao, cancelar edicao, excluir dia. */
+.plantao-link {
+    display: inline-flex;
+    align-items: center;
+    align-self: flex-start;
+    gap: 6px;
+    padding: 4px 0;
+    border: none;
+    background: none;
+    color: var(--primary);
+    font: inherit;
+    font-size: var(--text-sm);
+    font-weight: var(--weight-semibold);
+    cursor: pointer;
+}
+
+.plantao-link:hover {
+    text-decoration: underline;
+}
+
+.plantao-link--perigo {
+    color: var(--danger);
+}
+
+/* ---- Folga de domingo, recolhida ---- */
+.plantao-folga {
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+}
+
+.plantao-folga > summary {
+    padding: 12px 14px;
+    font-size: var(--text-sm);
+    font-weight: var(--weight-semibold);
+    color: var(--text);
+    cursor: pointer;
+}
+
+.plantao-folga[open] > summary {
+    border-bottom: 1px solid var(--border);
+}
+
+.plantao-folga .folga-domingo-bloco {
+    margin: 0;
+    padding: 14px;
+}
+
+/* O resumo do <details> ja e o titulo do painel. */
+.plantao-folga .folga-domingo-bloco > label {
+    display: none;
+}
+
+/* Etiquetas da lista "Plantoes lancados" (fora da janela). */
 .plantao-lancamento-credito {
     display: inline-flex;
     align-items: center;
@@ -478,95 +557,39 @@
     color: #c2410c;
 }
 
-.plantao-lancamento-nome {
-    font-size: 13px;
-    font-weight: 600;
-    color: var(--text);
-    overflow-wrap: anywhere;
+.plantao-tipo-lancamento--cobertura_almoco {
+    background: #f0fdf4;
+    color: #15803d;
 }
 
-.plantao-lancamento-acoes {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    flex-shrink: 0;
-}
-
-.plantao-lancamento-duracao {
-    font-size: 12px;
-    font-weight: 600;
-    color: var(--text-light);
-    font-variant-numeric: tabular-nums;
-}
-
-.plantao-lancamentos-vazio {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 16px;
-    border-radius: 14px;
-    border: 1px dashed var(--border);
-    background: var(--card-dark);
-    color: var(--text-light);
-    font-size: 12px;
-    line-height: 1.5;
-}
-
-.plantao-lancamentos-vazio i {
-    font-size: 18px;
-    color: var(--text-light);
-    flex-shrink: 0;
-}
-
-.plantao-lancamentos-resumo {
-    margin-top: 10px;
-    padding: 10px 12px;
-    border-radius: 14px;
-    background: var(--primary-soft);
-    border: 1px solid var(--border);
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    font-size: 12px;
-    font-weight: 600;
-    color: var(--primary-dark);
-}
-
-.plantao-resumo-totais {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-}
-
-.plantao-total {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    padding: 3px 9px;
-    border-radius: 999px;
-    font-size: 11px;
-    background: var(--card);
-}
-
-.plantao-total--banco { color: #1d4ed8; }
-.plantao-total--extra { color: #c2410c; }
-
+/* ---- Rodape: Excluir a esquerda, Cancelar e Salvar a direita ---- */
 #plantaoEditor .editor-actions {
+    position: sticky;
+    bottom: 0;
     display: flex;
     flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
     gap: 8px;
-    padding-top: 16px;
+    margin: 4px -24px 0;
+    padding: 14px 24px;
     border-top: 1px solid var(--border);
+    border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+    background: var(--card);
 }
 
 #plantaoEditor .editor-actions .btn-primary,
 #plantaoEditor .editor-actions .btn-secondary {
-    flex: 1;
+    flex: 0 0 auto;
     justify-content: center;
 }
 
-/* Excluir o dia inteiro e destrutivo: fica em linha propria e discreto, longe
-   do "Salvar" para nao ser clicado por engano. */
+#plantaoEditor .editor-actions .plantao-link--perigo {
+    align-self: center;
+    margin-right: auto;
+}
+
+/* Remover um registro de folga de domingo: destrutivo, entao discreto. */
 .btn-danger-ghost {
     width: 100%;
     display: flex;
@@ -876,17 +899,6 @@
     .plantao-layout {
         flex-direction: column;
     }
-    
-    /* Empilhado, o painel deixa de ser barra lateral: sem sticky e sem teto de
-       altura, ele rola junto com a pagina. */
-    #plantaoEditor {
-        width: 100%;
-        position: static;
-    }
-
-    #plantaoEditor .editor-content {
-        max-height: none;
-    }
 
     .sabados-header {
         align-items: flex-start;
@@ -896,25 +908,68 @@
 }
 
 @media (max-width: 768px) {
-    .sabados-grid {
-        grid-template-columns: repeat(3, 1fr);
+    .plantao-dias-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
     }
 
-    /* Em telas estreitas os dois botoes de destino nao cabem lado a lado sem
-       cortar o texto, e as acoes do rodape viram uma coluna. */
-    .plantao-credito-escolha,
-    .plantao-form-acoes,
+    .plantao-novo-campos {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .plantao-novo-acoes .btn-secondary {
+        flex: 1;
+        justify-content: center;
+    }
+
+    /* Na tela estreita a linha vira dois andares: horario e duracao em
+       cima, nome e destino embaixo, acoes a direita. */
+    .plantao-linha {
+        grid-template-columns: minmax(0, 1fr) auto auto;
+        grid-template-areas:
+            "hora duracao acoes"
+            "nome nome acoes"
+            "meta meta acoes";
+        row-gap: 2px;
+    }
+
+    .plantao-linha-hora { grid-area: hora; }
+    .plantao-linha-nome { grid-area: nome; }
+    .plantao-linha-meta { grid-area: meta; }
+    .plantao-linha-duracao { grid-area: duracao; }
+    .plantao-linha-acoes { grid-area: acoes; }
+
+    /* No celular a janela ocupa a tela inteira. */
+    #plantaoEditor {
+        padding: 0;
+    }
+
+    .plantao-modal-caixa {
+        min-height: 100%;
+        min-height: 100dvh;
+        margin: 0;
+        padding: 16px 16px 0;
+        border: none;
+        border-radius: 0;
+    }
+
     #plantaoEditor .editor-actions {
-        flex-direction: column;
+        margin: 16px -16px 0;
+        padding: 12px 16px;
+        border-radius: 0;
     }
 
-    .sabados-nav {
+    #plantaoEditor .editor-actions .btn-primary,
+    #plantaoEditor .editor-actions .btn-secondary {
+        flex: 1 1 auto;
+    }
+
+    .plantao-mes-nav {
         width: 100%;
     }
 
-    .sabados-nav .btn-secondary {
+    .plantao-mes-nav h3 {
         flex: 1;
-        justify-content: center;
+        min-width: 0;
     }
 }
 
@@ -936,47 +991,15 @@
     color: var(--primary);
 }
 
-[data-theme="dark"] .sabado-card {
-    background: var(--card-dark);
-    color: var(--text);
-    border-color: var(--border);
-}
-
-[data-theme="dark"] .sabado-card.passado {
-    background: linear-gradient(180deg, rgba(18, 30, 46, 0.9) 0%, var(--card-dark) 100%);
-}
-
-[data-theme="dark"] .sabado-card:hover {
-    border-color: var(--primary);
-    background: var(--card);
-}
-
-[data-theme="dark"] .sabado-card.lancado {
-    background: var(--primary-soft);
-    border-color: var(--primary);
-}
-
-[data-theme="dark"] .sabado-dia {
-    color: var(--text);
-}
-
-[data-theme="dark"] .badge-historico {
-    background: #263243;
-    color: #cbd5e1;
-}
 
 /* Painel editor no tema escuro */
-[data-theme="dark"] #plantaoEditor {
+[data-theme="dark"] .plantao-modal-caixa {
     background: var(--card);
     border-color: var(--border);
 }
 
-[data-theme="dark"] #plantaoEditor .editor-form-group label {
-    color: var(--text);
-}
-
-[data-theme="dark"] #plantaoEditor .editor-form-group label i {
-    color: var(--primary);
+[data-theme="dark"] #plantaoEditor .editor-actions {
+    background: var(--card);
 }
 
 /* Lista de plantões lançados no tema escuro */
@@ -1030,44 +1053,6 @@
 }
 
 /* ---- Painel de lancamento no tema escuro ---- */
-[data-theme="dark"] .plantao-form-novo,
-[data-theme="dark"] .plantao-lancamento,
-[data-theme="dark"] .plantao-lancamentos-vazio {
-    background: var(--card-dark);
-    border-color: var(--border);
-}
-
-[data-theme="dark"] .plantao-form-novo.is-editando {
-    background: var(--primary-soft);
-    border-color: var(--primary);
-}
-
-[data-theme="dark"] .plantao-lancamento.is-indisponivel {
-    background: rgba(239, 68, 68, 0.12);
-}
-
-[data-theme="dark"] .plantao-lancamento-nome {
-    color: var(--text);
-}
-
-[data-theme="dark"] .plantao-credito-opcao {
-    background: var(--card);
-    border-color: var(--border);
-    color: var(--text-light);
-}
-
-[data-theme="dark"] .plantao-credito-opcao.is-active.plantao-credito--banco {
-    background: rgba(59, 130, 246, 0.18);
-    border-color: #3b82f6;
-    color: #93c5fd;
-}
-
-[data-theme="dark"] .plantao-credito-opcao.is-active.plantao-credito--extra {
-    background: rgba(249, 115, 22, 0.18);
-    border-color: #f97316;
-    color: #fdba74;
-}
-
 [data-theme="dark"] .plantao-credito--banco {
     background: rgba(59, 130, 246, 0.18);
     color: #93c5fd;
@@ -1078,31 +1063,11 @@
     color: #fdba74;
 }
 
-[data-theme="dark"] .plantao-tipo-chip,
-[data-theme="dark"] .plantao-estado-chip {
-    background: var(--card-dark);
-    border-color: var(--border);
-    color: var(--text-light);
-}
-
-[data-theme="dark"] .plantao-estado-chip.is-lancado {
+[data-theme="dark"] .plantao-tipo-lancamento--cobertura_almoco {
     background: rgba(34, 197, 94, 0.18);
     border-color: #22c55e;
     color: #86efac;
 }
-
-[data-theme="dark"] .plantao-lancamentos-resumo {
-    background: var(--primary-soft);
-    border-color: var(--border);
-    color: var(--text);
-}
-
-[data-theme="dark"] .plantao-total {
-    background: var(--card);
-}
-
-[data-theme="dark"] .plantao-total--banco { color: #93c5fd; }
-[data-theme="dark"] .plantao-total--extra { color: #fdba74; }
 
 [data-theme="dark"] .plantao-turno {
     background: var(--card);

@@ -118,6 +118,11 @@ module.exports = [
                 payload.data.plantoes.map((linha) => linha.tipo_plantao),
                 ['sabado', 'domingo', 'feriado', 'feriado']
             );
+            // Nem tipo_lancamento (coluna NOT NULL): vira o plantao do dia.
+            assert.deepEqual(
+                payload.data.plantoes.map((linha) => linha.tipo_lancamento),
+                ['sabado', 'domingo', 'feriado', 'feriado']
+            );
         }
     },
     {
