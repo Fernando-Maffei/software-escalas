@@ -18,6 +18,7 @@ Todas as alteracoes relevantes deste projeto serao documentadas neste arquivo.
 
 ### Corrigido
 - Exportar PDF de relatorio com tabela (Domingos e feriados, Plantoes) parava com "Attempting to parse an unsupported color function "color"": a listra alternada das tabelas usa color-mix(), que o html2canvas nao entende. Dentro do PDF ela vira cor solida (`pdf-utils.js`). Os estilos do PDF de Domingos e feriados ficam restritos ao proprio PDF, sem mudar a tela enquanto exporta.
+- Relatorios sem barras de rolagem aninhadas: a caixa do relatorio (max 780px) e as tabelas (max 60vh) tinham rolagem vertical propria, com duas ou tres barras na mesma tela. Agora o relatorio rola com a pagina; as tabelas so rolam de lado em tela estreita.
 
 ## [1.7.0] - 2026-10-17
 
