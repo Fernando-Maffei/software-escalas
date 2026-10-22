@@ -216,23 +216,27 @@ function gerarHtmlPdfRelatorioDomingos(relatorio, filtros) {
                 <meta charset="UTF-8">
                 <title>${TITULO_RELATORIO_DOMINGOS}</title>
                 <style>
-                    * { box-sizing: border-box; margin: 0; padding: 0; }
-                    body { width: 1200px; padding: 16px; background: #ffffff; color: #0f172a; font-family: Arial, sans-serif; }
-                    .pdf-pagina { width: 1168px; padding: 18px; background: #ffffff; }
-                    header { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 2px solid #dbeafe; }
-                    h1 { color: #1e3a5f; font-size: 28px; }
-                    header p { color: #64748b; font-size: 13px; font-weight: 700; }
-                    h4 { margin: 18px 0 8px; color: #1e3a5f; font-size: 16px; }
-                    .relatorio-total { margin-bottom: 6px; padding: 10px 12px; border-radius: 10px; background: #eef2ff; color: #312e81; font-size: 14px; }
-                    .relatorio-descricao { color: #64748b; font-size: 12px; margin-bottom: 6px; }
-                    .relatorio-tabela { width: 100%; border-collapse: collapse; }
-                    .relatorio-tabela th, .relatorio-tabela td { border: 1px solid #dbe3ef; padding: 7px 10px; font-size: 12px; text-align: left; }
-                    .relatorio-tabela th { background: #e2e8f0; font-weight: 800; }
-                    .empty-state { padding: 24px; border: 1px dashed #cbd5e1; border-radius: 12px; color: #64748b; text-align: center; }
+                    /* Tudo dentro de .pdf-domingos: o container do PDF entra na
+                       pagina enquanto exporta, e um seletor solto (body, *,
+                       .relatorio-tabela) mudaria a tela do relatorio nesse meio. */
+                    .pdf-domingos { width: 1168px; padding: 18px; background: #ffffff; color: #0f172a; font-family: Arial, sans-serif; }
+                    .pdf-domingos * { box-sizing: border-box; }
+                    .pdf-domingos header { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 2px solid #dbeafe; }
+                    .pdf-domingos h1 { margin: 0; color: #1e3a5f; font-size: 28px; }
+                    .pdf-domingos header p { margin: 0; color: #64748b; font-size: 13px; font-weight: 700; }
+                    .pdf-domingos h4 { margin: 18px 0 8px; padding: 0 0 6px; border-bottom: 1px solid #dbe3ef; color: #1e3a5f; font-size: 16px; }
+                    .pdf-domingos .relatorio-total { margin-bottom: 6px; padding: 10px 12px; border-radius: 10px; background: #eef2ff; color: #312e81; font-size: 14px; }
+                    .pdf-domingos .relatorio-descricao { margin: 0 0 6px; color: #64748b; font-size: 12px; }
+                    .pdf-domingos .relatorio-tabela-scroll { max-height: none; overflow: visible; }
+                    .pdf-domingos .relatorio-tabela { width: 100%; border-collapse: collapse; }
+                    .pdf-domingos .relatorio-tabela th,
+                    .pdf-domingos .relatorio-tabela td { position: static; border: 1px solid #dbe3ef; padding: 7px 10px; color: #0f172a; font-size: 12px; text-align: left; box-shadow: none; }
+                    .pdf-domingos .relatorio-tabela th { background: #e2e8f0; font-weight: 800; }
+                    .pdf-domingos .empty-state { padding: 24px; border: 1px dashed #cbd5e1; border-radius: 12px; color: #64748b; text-align: center; }
                 </style>
             </head>
             <body>
-                <section class="pdf-pagina">
+                <section class="pdf-pagina pdf-domingos">
                     <header>
                         <h1>Domingos e feriados trabalhados</h1>
                         <p>Gerado em ${escapeHtml(new Date().toLocaleDateString('pt-BR'))}</p>

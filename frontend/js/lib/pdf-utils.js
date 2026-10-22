@@ -1,7 +1,16 @@
+// O html2canvas nao entende color-mix(): o navegador entrega a cor calculada
+// como color(srgb ...) e a exportacao para com "unsupported color function".
+// A zebra das tabelas de relatorio (relatorios.css) usa color-mix; dentro do
+// PDF ela vira uma cor solida equivalente. O seletor e mais especifico que o
+// da tela, entao vale so aqui.
+const ESTILO_COMPATIVEL_HTML2CANVAS = `<style>
+    [data-relatorio-pdf] .relatorio-tabela tbody tr:nth-child(even) td { background: #f8fafc; }
+</style>`;
+
 export function criarContainerTemporarioRelatorioPdf(html, options = {}) {
     const parser = new DOMParser().parseFromString(html, 'text/html');
     const container = document.createElement('div');
-    const estilos = Array.from(parser.querySelectorAll('style'))
+    const estilos = ESTILO_COMPATIVEL_HTML2CANVAS + Array.from(parser.querySelectorAll('style'))
         .map((style) => style.outerHTML)
         .join('');
     const containerWidth = Math.max(Number(options.width) || 1500, 1200);
