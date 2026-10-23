@@ -3,8 +3,9 @@ const assert = require('node:assert/strict');
 const { criarCliente, esperarSucesso, nomeUnico } = require('./apoio');
 const { criarColaborador, criarSetor, lancarAusencia, lancarPlantao, registrarFolgaDomingo } = require('./fabrica');
 
-// Conta comum que so enxerga um setor, com dados de dois setores no banco.
-async function montarCenario() {
+// Conta que so enxerga um setor, com dados de dois setores no banco. Comum
+// (so leitura) por padrao; `isAdmin` para testar gravacoes.
+async function montarCenario({ isAdmin = false } = {}) {
     const admin = criarCliente();
     await admin.entrar();
 
@@ -25,7 +26,7 @@ async function montarCenario() {
 
     const username = nomeUnico('setorial').replace(/\s+/g, '-');
     const senha = 'Setorial!Teste1';
-    const criado = esperarSucesso(await admin.post('/api/usuarios', { username, senha }), 'criar usuario');
+    const criado = esperarSucesso(await admin.post('/api/usuarios', { username, senha, isAdmin }), 'criar usuario');
     esperarSucesso(
         await admin.put(`/api/usuarios/${criado.usuario.id}`, { setoresPermitidos: [setorVisivel.Id] }),
         'limitar setores'
@@ -33,6 +34,14 @@ async function montarCenario() {
 
     const leitor = criarCliente();
     await leitor.entrar(username, senha);
+
+    // Admin criado por outra pessoa nasce com senha provisoria (API bloqueada).
+    if (isAdmin) {
+        esperarSucesso(
+            await leitor.post('/api/auth/trocar-senha', { senhaAtual: senha, novaSenha: senha }),
+            'trocar senha provisoria'
+        );
+    }
 
     return { leitor, visivel, oculto };
 }
@@ -85,6 +94,79 @@ module.exports = [
                 'folgas'
             );
             assert.deepEqual([...ids(folgas.items, 'colaboradorId')], [visivel.Id]);
+        }
+    },
+    {
+        // A tela de lancamentos do mes e geral: pede ?escopo=lancamentos e ve e
+        // lanca para todos os setores. O parametro nao abre as outras leituras.
+        name: 'tela de lancamentos ve e lanca para colaborador de outro setor',
+        async run() {
+            const { leitor, visivel, oculto } = await montarCenario({ isAdmin: true });
+            const ids = (lista, campo) => new Set(lista.map((item) => Number(item[campo])));
+
+            const limitada = esperarSucesso(await leitor.get('/api/colaboradores'), 'colaboradores');
+            assert.equal(ids(limitada, 'Id').has(oculto.Id), false);
+
+            const geral = esperarSucesso(
+                await leitor.get('/api/colaboradores?escopo=lancamentos'),
+                'colaboradores geral'
+            );
+            assert.ok(ids(geral, 'Id').has(visivel.Id));
+            assert.ok(ids(geral, 'Id').has(oculto.Id));
+            const doOculto = geral.find((item) => Number(item.Id) === oculto.Id);
+            assert.equal(doOculto.Nome, oculto.Nome);
+            assert.equal('TrabalhoInicio' in doOculto, false, 'escopo geral nao traz o horario do cadastro');
+
+            const diretorio = esperarSucesso(
+                await leitor.get('/api/colaboradores?escopo=lancamentos&incluirInativos=1'),
+                'diretorio geral'
+            );
+            assert.ok(ids(diretorio, 'Id').has(oculto.Id));
+
+            const ausenciasGerais = esperarSucesso(
+                await leitor.get('/api/ausencias?data=2027-04-06&escopo=lancamentos'),
+                'ausencias geral'
+            );
+            assert.ok(ids(ausenciasGerais, 'ColaboradorId').has(visivel.Id));
+            assert.ok(ids(ausenciasGerais, 'ColaboradorId').has(oculto.Id));
+
+            const lancada = esperarSucesso(
+                await leitor.post('/api/ausencias', {
+                    colaboradorId: oculto.Id,
+                    tipo: 'folga',
+                    dataInicio: '2027-04-08',
+                    dataFim: '2027-04-08',
+                    periodoTipo: 'dia_inteiro'
+                }),
+                'lancar para outro setor'
+            ).data;
+            esperarSucesso(
+                await leitor.put(`/api/ausencias/${lancada.Id}`, {
+                    colaboradorId: oculto.Id,
+                    tipo: 'folga',
+                    dataInicio: '2027-04-09',
+                    dataFim: '2027-04-09',
+                    periodoTipo: 'dia_inteiro'
+                }),
+                'editar lancamento de outro setor'
+            );
+            esperarSucesso(await leitor.delete(`/api/ausencias/${lancada.Id}`), 'excluir lancamento de outro setor');
+
+            // Sem o escopo, e nas telas que seguem limitadas, nada muda.
+            const ausencias = esperarSucesso(await leitor.get('/api/ausencias?data=2027-04-06'), 'ausencias');
+            assert.equal(ids(ausencias, 'ColaboradorId').has(oculto.Id), false);
+            assert.equal((await leitor.get(`/api/colaboradores/${oculto.Id}?escopo=lancamentos`)).status, 404);
+            assert.equal((await leitor.get(`/api/ausencias/colaborador/${oculto.Id}?escopo=lancamentos`)).status, 404);
+            const resumo = esperarSucesso(await leitor.get('/api/banco-horas/resumo?escopo=lancamentos'), 'resumo');
+            assert.equal(ids(resumo.items, 'colaboradorId').has(oculto.Id), false);
+            const plantoes = esperarSucesso(
+                await leitor.get('/api/plantoes?from=2027-04-01&to=2027-04-30&escopo=lancamentos'),
+                'plantoes'
+            );
+            assert.equal(
+                plantoes.some((item) => item.colaboradores.includes(oculto.Id)),
+                false
+            );
         }
     }
 ];

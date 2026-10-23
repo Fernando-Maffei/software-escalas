@@ -10,6 +10,7 @@ import { getMeusSetores } from '../core/meus-setores.js';
 import { carregarBancoHorasResumo } from '../core/runtime/plantao-colaboradores/plantao-editor.js';
 import { escapeHtml } from '../lib/html-seguro.js';
 import { aguardarLayoutRelatorioPdf, baixarPdfSemPreview, criarContainerTemporarioRelatorioPdf, criarPdfMultipaginasComCanvas, lockPdfViewportOverflow, renderizarPaginaPdfEmCanvas } from '../lib/pdf-utils.js';
+import { abrirDetalhe, atualizarDetalhe, botaoInfo, fecharDetalhe, htmlDetalhe } from './banco-horas-detalhe.js';
 
 let dadosBanco = { colaboradores: [], semanas: [], periodo: null };
 let limiteSemanas = 7; // quantas semanas mostrar (0 = todas)
@@ -283,12 +284,12 @@ function renderVerificar(resposta, alvo) {
         return;
     }
 
-    const linhas = itens.map((item) => {
+    const linhas = itens.map((item, indice) => {
         if (item.semBase) {
             return `
                     <tr class="bh-sem-base">
                         <td>${escapeHtml(item.nome)}</td>
-                        <td colspan="5">Sem lancamento manual ate essa data</td>
+                        <td colspan="6">Sem lancamento manual ate essa data</td>
                     </tr>
                 `;
         }
@@ -306,6 +307,7 @@ function renderVerificar(resposta, alvo) {
                     <td class="${item.descontoMinutos > 0 ? 'bh-desconto' : ''}">${item.descontoMinutos > 0 ? `-${escapeHtml(item.descontoFormatado)}` : '0:00'}</td>
                     <td class="bh-resultado ${negativo ? 'negativo' : 'positivo'}">${escapeHtml(item.resultadoFormatado)}</td>
                     <td class="bh-sugestao">${sugestao}</td>
+                    <td class="bh-td-info">${botaoInfo(`data-verificar="${indice}"`)}</td>
                 </tr>
             `;
     }).join('');
@@ -326,6 +328,7 @@ function renderVerificar(resposta, alvo) {
                             <th>Desconto</th>
                             <th>Em carteira</th>
                             <th>Sugestao</th>
+                            <th class="bh-th-info"></th>
                         </tr>
                     </thead>
                     <tbody>${linhas}</tbody>
@@ -333,6 +336,63 @@ function renderVerificar(resposta, alvo) {
             </div>
             ${avisos}
         `;
+
+    alvo.querySelectorAll('.bh-info[data-verificar]').forEach((botao) => {
+        botao.addEventListener('click', () => {
+            const item = itens[Number(botao.dataset.verificar)];
+            abrirDetalhe(botao, htmlDetalhe({
+                titulo: `${item.nome} · em carteira em ${labelData(resposta.data)}`,
+                anteriorRotulo: `Saldo base (semana ${labelData(item.semanaBase)})`,
+                anteriorFormatado: item.baseFormatado,
+                detalhes: item.detalhes,
+                resultadoRotulo: 'Em carteira',
+                resultadoFormatado: item.resultadoFormatado
+            }));
+        });
+    });
+}
+
+// "i" de uma celula da grade: o backend refaz a conta da semana (de segunda a
+// domingo) so para essa pessoa e devolve cada lancamento com a data.
+async function abrirDetalheCelula(botao) {
+    const colaboradorId = Number(botao.dataset.col);
+    const semanaISO = botao.dataset.semana;
+    abrirDetalhe(botao, '<div class="bh-detalhe-carregando"><i class="fas fa-spinner fa-spin"></i> Calculando...</div>');
+
+    try {
+        const dados = await API.getBancoHorasSemanalDetalhe({ colaboradorId, semana: semanaISO });
+        const titulo = `${dados.nome} · semana de ${labelData(dados.semana)}`;
+
+        if (dados.semBase) {
+            atualizarDetalhe(botao, `
+                    <div class="bh-detalhe-titulo">${escapeHtml(titulo)}</div>
+                    <div class="bh-detalhe-rodape">Primeira semana lancada desta pessoa: nao ha semana anterior para calcular. O valor foi digitado na grade.</div>
+                `);
+            return;
+        }
+
+        const lancado = dados.lancado;
+        let rodape = '';
+        if (lancado && lancado.minutos !== dados.calculadoMinutos) {
+            rodape = `Na grade esta <strong>${escapeHtml(lancado.formatado)}</strong>: o valor foi ajustado a mao (diferenca de ${escapeHtml(formatRelogio(lancado.minutos - dados.calculadoMinutos))}).`;
+        } else if (lancado) {
+            rodape = lancado.status === 'auto'
+                ? 'Valor gerado automaticamente, aguardando confirmacao.'
+                : 'Valor da grade confere com o calculo.';
+        }
+
+        atualizarDetalhe(botao, htmlDetalhe({
+            titulo,
+            anteriorRotulo: `Saldo anterior (semana ${labelData(dados.semanaAnterior)})`,
+            anteriorFormatado: dados.anteriorFormatado,
+            detalhes: dados.detalhes,
+            resultadoRotulo: 'Calculado',
+            resultadoFormatado: dados.calculadoFormatado,
+            rodape
+        }));
+    } catch (error) {
+        atualizarDetalhe(botao, `<div class="bh-erro"><i class="fas fa-triangle-exclamation"></i> ${escapeHtml(error.message || 'Falha ao calcular.')}</div>`);
+    }
 }
 
 async function carregar() {
@@ -419,6 +479,7 @@ function renderTabela() {
                             value="${escapeHtml(valor)}"
                             data-col="${colaborador.id}"
                             data-semana="${semana.semanaSegunda}">
+                        ${celula ? botaoInfo(`data-col="${colaborador.id}" data-semana="${semana.semanaSegunda}"`) : ''}
                     </td>
                 `;
         }).join('');
@@ -475,6 +536,10 @@ function renderTabela() {
                 input.blur();
             }
         });
+    });
+
+    wrap.querySelectorAll('.bh-info[data-semana]').forEach((botao) => {
+        botao.addEventListener('click', () => abrirDetalheCelula(botao));
     });
 
     wrap.querySelectorAll('.bh-nota').forEach((input) => {
@@ -727,9 +792,9 @@ function renderModalGerar(preview) {
     const bloqueados = comBase.filter((item) => item.jaConfirmado).length;
     const geraveis = comBase.filter((item) => !item.jaConfirmado);
 
-    const linhas = comBase.map((item) => `
+    const linhas = comBase.map((item, indice) => `
             <tr class="${item.jaConfirmado ? 'bh-modal-bloqueado' : ''}">
-                <td>${escapeHtml(item.nome)}</td>
+                <td>${escapeHtml(item.nome)} ${botaoInfo(`data-gerar="${indice}"`)}</td>
                 <td>${escapeHtml(item.anteriorFormatado)}</td>
                 <td class="bh-plantao">${item.plantaoMinutos > 0 ? `+${escapeHtml(item.plantaoFormatado)}` : '0:00'}</td>
                 <td class="bh-desconto">${item.descontoMinutos > 0 ? `-${escapeHtml(item.descontoFormatado)}` : '0:00'}</td>
@@ -748,7 +813,7 @@ function renderModalGerar(preview) {
                     <button type="button" class="bh-modal-fechar" aria-label="Fechar"><i class="fas fa-times"></i></button>
                 </div>
                 <div class="bh-modal-body">
-                    <p class="bh-modal-info">Cada proposta = saldo da semana anterior + plantoes − folgas/ausencias. Os valores entram em <strong>amarelo</strong> para voce validar.</p>
+                    <p class="bh-modal-info">Cada proposta = saldo da semana anterior + plantoes − folgas/ausencias de segunda a domingo, ate ${escapeHtml(labelData(addDiasISO(preview.semana, -1)))} (o que cai na segunda ${escapeHtml(labelData(preview.semana))} entra na semana seguinte). Clique no <i class="fas fa-circle-info"></i> para ver cada lancamento. Os valores entram em <strong>amarelo</strong> para voce validar.</p>
                     ${comBase.length === 0
                     ? '<div class="bh-vazio">Nenhum colaborador com semana anterior para gerar.</div>'
                     : `<div class="banco-horas-tabela-wrap">
@@ -779,6 +844,19 @@ function renderModalGerar(preview) {
             fecharModalGerar();
         }
     });
+    overlay.querySelectorAll('.bh-info[data-gerar]').forEach((botao) => {
+        botao.addEventListener('click', () => {
+            const item = comBase[Number(botao.dataset.gerar)];
+            abrirDetalhe(botao, htmlDetalhe({
+                titulo: `${item.nome} · semana de ${labelData(preview.semana)}`,
+                anteriorRotulo: `Saldo anterior (semana ${labelData(item.semanaAnterior)})`,
+                anteriorFormatado: item.anteriorFormatado,
+                detalhes: item.detalhes,
+                resultadoRotulo: 'Proposto',
+                resultadoFormatado: item.propostoFormatado
+            }));
+        });
+    });
     const btnConfirmar = overlay.querySelector('.bh-modal-confirmar');
     if (btnConfirmar) {
         btnConfirmar.addEventListener('click', () => aplicarGeracao(preview.semana));
@@ -798,6 +876,7 @@ async function aplicarGeracao(semanaISO) {
 }
 
 function fecharModalGerar() {
+    fecharDetalhe();
     const existente = document.getElementById('bhModalGerar');
     if (existente) {
         existente.remove();

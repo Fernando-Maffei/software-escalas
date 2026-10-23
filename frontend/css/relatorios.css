@@ -688,8 +688,7 @@
 
 .dia-folgas,
 .dia-ferias,
-.dia-ausencias,
-.dia-plantoes {
+.dia-ausencias {
     display: flex;
     flex-direction: column;
     gap: 5px;
@@ -723,17 +722,6 @@
     line-height: 1.35;
     background: var(--danger-soft);
     color: var(--danger);
-    padding: 6px 8px;
-    border-radius: 6px;
-    white-space: normal;
-    overflow: hidden;
-}
-
-.plantao-tag {
-    font-size: 13px;
-    line-height: 1.35;
-    background: var(--warning-soft, #fef3c7);
-    color: var(--warning, #92400e);
     padding: 6px 8px;
     border-radius: 6px;
     white-space: normal;
@@ -901,8 +889,7 @@
 
     .folga-tag,
     .ferias-tag,
-    .ausencia-tag,
-    .plantao-tag {
+    .ausencia-tag {
         font-size: 11px;
         padding: 4px 6px;
     }

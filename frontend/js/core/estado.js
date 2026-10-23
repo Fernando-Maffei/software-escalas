@@ -5,6 +5,10 @@
 export const estado = {
     colaboradores: [],
     ausencias: [],
+    // Listas da tela de lancamentos (Calendario e modal), que e geral: sem o
+    // teto de setor da conta. As outras telas leem as duas de cima.
+    colaboradoresLancamentos: [],
+    ausenciasLancamentos: [],
     setores: [],
     feriadosLocais: [],
     feriados: [],

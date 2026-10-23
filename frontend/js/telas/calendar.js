@@ -157,7 +157,7 @@ function nomeColaboradorCalendario(colaboradorId) {
         return { nome: registro.nome, ativo: registro.ativo !== false };
     }
 
-    const colaborador = (estado.colaboradores || [])
+    const colaborador = (estado.colaboradoresLancamentos || [])
         .find((item) => Number(item.Id ?? item.id) === Number(colaboradorId));
 
     return colaborador
@@ -245,7 +245,8 @@ export function gerarCalendario(mes, ano) {
             cell.appendChild(tag);
         });
 
-        const ausenciasDoDia = (estado.ausencias || []).filter((ausencia) => {
+        // Calendario de lancamentos e geral: lista sem o teto de setor.
+        const ausenciasDoDia = (estado.ausenciasLancamentos || []).filter((ausencia) => {
             const inicio = extrairDataISO(ausencia.DataInicio || ausencia.dataInicio);
             const fim = extrairDataISO(ausencia.DataFim || ausencia.dataFim);
 

@@ -490,6 +490,136 @@
     white-space: nowrap;
 }
 
+/* ---- "i": de onde veio o valor ---- */
+.bh-td-celula {
+    position: relative;
+}
+
+.bh-info {
+    border: none;
+    background: transparent;
+    color: var(--primary);
+    padding: 0 2px;
+    font-size: 12px;
+    line-height: 1;
+    cursor: pointer;
+    opacity: 0.55;
+    transition: opacity 0.15s;
+}
+
+.bh-info:hover,
+.bh-info:focus-visible {
+    opacity: 1;
+}
+
+.bh-td-celula .bh-info {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    font-size: 11px;
+}
+
+.bh-td-info,
+.bh-th-info {
+    width: 28px;
+    text-align: center;
+}
+
+.bh-detalhe-popover {
+    position: fixed;
+    z-index: 1100;
+    width: min(380px, calc(100vw - 16px));
+    max-height: min(480px, calc(100vh - 16px));
+    overflow-y: auto;
+    background: var(--card);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-xl);
+    padding: var(--space-3) var(--space-4);
+    font-size: 13px;
+}
+
+.bh-detalhe-titulo {
+    font-weight: 700;
+    margin-bottom: 2px;
+}
+
+.bh-detalhe-janela {
+    color: var(--text-secondary);
+    font-size: 12px;
+    margin-bottom: var(--space-2);
+}
+
+.bh-detalhe-linha {
+    display: flex;
+    justify-content: space-between;
+    gap: var(--space-3);
+    padding: 4px 0;
+    font-variant-numeric: tabular-nums;
+}
+
+.bh-detalhe-secao {
+    display: flex;
+    justify-content: space-between;
+    margin-top: var(--space-2);
+    padding-top: var(--space-2);
+    border-top: 1px solid var(--border);
+    font-weight: 600;
+}
+
+.bh-detalhe-secao.is-credito strong { color: var(--success); }
+.bh-detalhe-secao.is-desconto strong { color: var(--danger); }
+
+.bh-detalhe-lista {
+    list-style: none;
+    margin: 4px 0 0;
+    padding: 0;
+}
+
+.bh-detalhe-lista li {
+    display: grid;
+    grid-template-columns: 96px 1fr auto;
+    gap: var(--space-2);
+    padding: 3px 0;
+    font-variant-numeric: tabular-nums;
+}
+
+.bh-detalhe-lista li.bh-detalhe-vazio {
+    display: block;
+    color: var(--text-lighter);
+    font-style: italic;
+}
+
+.bh-detalhe-data small {
+    color: var(--text-secondary);
+}
+
+.bh-detalhe-valor {
+    font-weight: 600;
+    text-align: right;
+}
+
+.bh-detalhe-resultado {
+    margin-top: var(--space-2);
+    padding-top: var(--space-2);
+    border-top: 2px solid var(--border);
+    font-weight: 700;
+}
+
+.bh-detalhe-rodape {
+    margin-top: var(--space-2);
+    padding: 6px 8px;
+    border-radius: var(--radius-sm);
+    background: var(--bg-soft);
+    color: var(--text-secondary);
+    font-size: 12px;
+}
+
+.bh-detalhe-carregando {
+    color: var(--text-secondary);
+}
+
 @media (max-width: 640px) {
     .banco-horas-toolbar {
         flex-direction: column;

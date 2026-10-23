@@ -15,7 +15,7 @@ const {
 } = require('./bancoHoras');
 const { serializePlantaoRecord } = require('./plantoes');
 const { SQL_EQUIPE_PLANTAO } = require('./equipe-plantao');
-const { extractDateString } = require('../lib/validation');
+const { extractDateString, extractTimeString } = require('../lib/validation');
 
 const PLANTAO_COLUNAS_CREDITO = `id, data_plantao, ${SQL_EQUIPE_PLANTAO}, hora_inicio, hora_fim, tipo_credito`;
 
@@ -34,10 +34,39 @@ function semanaISO(valor) {
     return valor instanceof Date ? valor.toISOString().slice(0, 10) : String(valor).slice(0, 10);
 }
 
+function addDiasISO(dataISO, dias) {
+    const data = new Date(`${dataISO}T00:00:00Z`);
+    data.setUTCDate(data.getUTCDate() + dias);
+    return data.toISOString().slice(0, 10);
+}
+
+// Janela que o lancamento de uma semana cobre: da semana base (inclusive) ate
+// o DOMINGO anterior a semana alvo. Cada linha da grade e o saldo de abertura
+// da segunda; o que acontece na propria segunda ja e da semana seguinte.
+// Antes a janela ia ate a segunda alvo inclusive, e uma folga na segunda
+// descontava na semana anterior (e de novo na seguinte).
+function fimDaJanelaSemanal(alvoISO) {
+    return addDiasISO(alvoISO, -1);
+}
+
+const ROTULOS_AUSENCIA = { folga: 'Folga', ausencia: 'Ausencia', ferias: 'Ferias' };
+const ROTULOS_SUBTIPO = { medico: 'Atestado', particular: 'Particular', compensacao: 'Compensacao', outro: 'Outro' };
+
+// Ausencias vem do SQL com TIME como Date; plantoes ja vem como texto.
+function hhmm(hora) {
+    return String(extractTimeString(hora) || '').slice(0, 5);
+}
+
+function descreverAusencia(tipo, subtipo) {
+    const rotulo = ROTULOS_AUSENCIA[tipo] || 'Ausencia';
+    return ROTULOS_SUBTIPO[subtipo] ? `${rotulo} (${ROTULOS_SUBTIPO[subtipo]})` : rotulo;
+}
+
 // Desconto de uma ausencia dentro da janela [inicioISO, fimISO] (inclusive).
 // Espelha a regra de calculateAusenciaDebitMinutes, mas limitado a janela,
 // para nao descontar de novo o que ja estava no saldo manual da semana base.
-// Retorna { minutos, aviso }.
+// Retorna { minutos, aviso, item }; `item` (so quando desconta algo) diz de
+// onde veio o valor, para o "i" da tela.
 function calcularDescontoNaJanela(ausencia, colaborador, inicioISO, fimISO) {
     const tipo = String(ausencia.Tipo || '').trim().toLowerCase();
     const subtipo = normalizeSubtipo(ausencia.Subtipo);
@@ -60,7 +89,18 @@ function calcularDescontoNaJanela(ausencia, colaborador, inicioISO, fimISO) {
         }
 
         try {
-            return { minutos: calculateIntervalMinutes(ausencia.HoraInicio, ausencia.HoraFim), aviso: null };
+            const minutos = calculateIntervalMinutes(ausencia.HoraInicio, ausencia.HoraFim);
+            return {
+                minutos,
+                aviso: null,
+                item: {
+                    dataInicio: dataISO,
+                    dataFim: dataISO,
+                    descricao: `${descreverAusencia(tipo, subtipo)} ${hhmm(ausencia.HoraInicio)}-${hhmm(ausencia.HoraFim)}`,
+                    minutos,
+                    formatado: minutosParaRelogio(minutos)
+                }
+            };
         } catch (error) {
             return { minutos: 0, aviso: `Ausencia ${ausencia.Id}: ${error.message}` };
         }
@@ -90,7 +130,22 @@ function calcularDescontoNaJanela(ausencia, colaborador, inicioISO, fimISO) {
     const dias = Math.floor(
         (new Date(`${janelaFim}T00:00:00Z`).getTime() - new Date(`${janelaInicio}T00:00:00Z`).getTime()) / umDia
     ) + 1;
-    return { minutos: minutosDia * dias, aviso: null };
+    const minutos = minutosDia * dias;
+    return {
+        minutos,
+        aviso: null,
+        item: minutos > 0
+            ? {
+                dataInicio: janelaInicio,
+                dataFim: janelaFim,
+                descricao: dias > 1
+                    ? `${descreverAusencia(tipo, subtipo)} - ${dias} dias x ${minutosParaRelogio(minutosDia)}`
+                    : descreverAusencia(tipo, subtipo),
+                minutos,
+                formatado: minutosParaRelogio(minutos)
+            }
+            : null
+    };
 }
 
 // Credito de plantao para um colaborador na janela [inicioISO, fimISO]:
@@ -98,6 +153,7 @@ function calcularDescontoNaJanela(ausencia, colaborador, inicioISO, fimISO) {
 function calcularCreditoPlantaoNaJanela(plantoes, colaboradorId, inicioISO, fimISO) {
     let minutos = 0;
     const avisos = [];
+    const itens = [];
 
     for (const plantao of plantoes) {
         const dataISO = plantao.dataISO;
@@ -123,13 +179,22 @@ function calcularCreditoPlantaoNaJanela(plantoes, colaboradorId, inicioISO, fimI
         }
 
         try {
-            minutos += calculateIntervalMinutes(plantao.horaInicio, plantao.horaFim);
+            const duracao = calculateIntervalMinutes(plantao.horaInicio, plantao.horaFim);
+            minutos += duracao;
+            itens.push({
+                dataInicio: dataISO,
+                dataFim: dataISO,
+                descricao: `Plantao ${hhmm(plantao.horaInicio)}-${hhmm(plantao.horaFim)}`,
+                minutos: duracao,
+                formatado: minutosParaRelogio(duracao)
+            });
         } catch (error) {
             avisos.push(`Plantao ${plantao.id}: ${error.message}`);
         }
     }
 
-    return { minutos, avisos };
+    itens.sort((a, b) => (a.dataInicio < b.dataInicio ? -1 : a.dataInicio > b.dataInicio ? 1 : 0));
+    return { minutos, avisos, itens };
 }
 
 // Colaboradores ativos que a conta logada pode ver, por nome.
@@ -220,20 +285,35 @@ function calcularSaldo(colaborador, base, movimentacao, fimISO, avisos) {
     credito.avisos.forEach((aviso) => avisos.push(aviso));
 
     let descontoMinutos = 0;
+    const descontos = [];
 
     for (const ausencia of movimentacao.ausenciasPorColaborador.get(colaborador.Id) || []) {
-        const { minutos, aviso } = calcularDescontoNaJanela(ausencia, colaborador, base.semanaSegunda, fimISO);
+        const { minutos, aviso, item } = calcularDescontoNaJanela(ausencia, colaborador, base.semanaSegunda, fimISO);
         descontoMinutos += minutos;
+
+        if (item) {
+            descontos.push(item);
+        }
 
         if (aviso) {
             avisos.push(aviso);
         }
     }
 
+    descontos.sort((a, b) => (a.dataInicio < b.dataInicio ? -1 : a.dataInicio > b.dataInicio ? 1 : 0));
+
     return {
         plantaoMinutos: credito.minutos,
         descontoMinutos,
-        resultadoMinutos: base.minutos + credito.minutos - descontoMinutos
+        resultadoMinutos: base.minutos + credito.minutos - descontoMinutos,
+        // De onde veio cada valor (o "i" da tela): a janela somada e cada
+        // plantao/ausencia com a data.
+        detalhes: {
+            janelaInicio: base.semanaSegunda,
+            janelaFim: fimISO,
+            creditos: credito.itens,
+            descontos
+        }
     };
 }
 
@@ -244,6 +324,7 @@ module.exports = {
     calcularSaldo,
     carregarBases,
     carregarMovimentacao,
+    fimDaJanelaSemanal,
     listarColaboradoresAtivosVisiveis,
     minutosParaRelogio,
     semanaISO
