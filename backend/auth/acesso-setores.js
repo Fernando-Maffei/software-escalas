@@ -56,6 +56,15 @@ async function colaboradoresVisiveis(pool, req) {
     return new Set(result.recordset.map((linha) => Number(linha.Id)));
 }
 
+// A tela de lancamentos do mes (Calendario: ferias, folgas e ausencias) e
+// geral: qualquer conta ve e lanca para todos os colaboradores. Ela pede isso
+// explicitamente com ?escopo=lancamentos, e so as listas que ela consome
+// (GET /colaboradores e GET /ausencias) aceitam o parametro. Escala do Dia,
+// Banco de Horas e Dashboard nao o mandam e seguem limitadas pelo teto.
+function escopoLancamentos(req) {
+    return String(req.query?.escopo || '') === 'lancamentos';
+}
+
 // Falha com 404 (e nao 403) para nao confirmar sequer que o colaborador existe.
 function exigirColaboradorVisivel(visiveis, colaboradorId) {
     if (visiveis && !visiveis.has(Number(colaboradorId))) {
@@ -65,6 +74,7 @@ function exigirColaboradorVisivel(visiveis, colaboradorId) {
 
 module.exports = {
     colaboradoresVisiveis,
+    escopoLancamentos,
     exigirColaboradorVisivel,
     getSetoresPermitidosRequest,
     idsPermitidosNumericos

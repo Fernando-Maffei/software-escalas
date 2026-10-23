@@ -72,12 +72,16 @@ export function gerarLegendaMensal() {
     }
 
     // 🔥 CORREÇÃO: Processar ausências com os tipos corretos
-    if (estado.ausencias && estado.ausencias.length > 0 && estado.colaboradores.length > 0) {
-        estado.ausencias.forEach(a => {
+    // Legenda do calendario de lancamentos: lista geral, sem o teto de setor.
+    const ausencias = estado.ausenciasLancamentos || [];
+    const colaboradores = estado.colaboradoresLancamentos || [];
+
+    if (ausencias.length > 0 && colaboradores.length > 0) {
+        ausencias.forEach(a => {
             if (a.DataInicio && a.DataFim) {
                 const dataInicio = new Date(a.DataInicio);
                 const dataFim = new Date(a.DataFim);
-                const colaborador = estado.colaboradores.find(c => c.Id === (a.colaboradorId || a.ColaboradorId));
+                const colaborador = colaboradores.find(c => c.Id === (a.colaboradorId || a.ColaboradorId));
 
                 if (!colaborador) {
                     return;

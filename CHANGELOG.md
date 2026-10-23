@@ -16,6 +16,9 @@ Todas as alteracoes relevantes deste projeto serao documentadas neste arquivo.
 - `GET /api/plantoes?tipoLancamento=cobertura_almoco` (combina com `from`/`to`): base para relatorios por tipo.
 - Migration `2026-10-21-plantao-tipo-lancamento.sql`: coluna `plantoes.tipo_lancamento` (`sabado`/`domingo`/`feriado`/`cobertura_almoco`, NOT NULL, CHECK) e indice `(tipo_lancamento, data_plantao)`. Os registros existentes recebem o tipo do dia (`tipo_plantao`): nao ha como saber, pelo que foi gravado, quais eram cobertura de almoco — esses se reclassificam abrindo o dia. Chamada sem o campo grava o plantao regular do dia; backup antigo (sem a coluna) e restaurado da mesma forma.
 
+### Alterado
+- **Lancamentos do mes sem o filtro de setor.** O Calendario e a janela de lancamentos (ferias, folgas e ausencias) mostram e lancam para todos os colaboradores, qualquer que seja o setor permitido da conta. O teto de setores e o "Meus setores" continuam valendo na Escala do Dia, no Banco de Horas e no Dashboard. No backend, `GET /api/colaboradores` e `GET /api/ausencias` aceitam `?escopo=lancamentos`, que so a tela de lancamentos manda; nesse escopo a lista de colaboradores traz so id, nome, situacao e setor (sem horarios). Para a conta sem teto nada muda e nao ha requisicao a mais.
+
 ### Corrigido
 - Exportar PDF de relatorio com tabela (Domingos e feriados, Plantoes) parava com "Attempting to parse an unsupported color function "color"": a listra alternada das tabelas usa color-mix(), que o html2canvas nao entende. Dentro do PDF ela vira cor solida (`pdf-utils.js`). Os estilos do PDF de Domingos e feriados ficam restritos ao proprio PDF, sem mudar a tela enquanto exporta.
 - Relatorios sem barras de rolagem aninhadas: a caixa do relatorio (max 780px) e as tabelas (max 60vh) tinham rolagem vertical propria, com duas ou tres barras na mesma tela. Agora o relatorio rola com a pagina; as tabelas so rolam de lado em tela estreita.

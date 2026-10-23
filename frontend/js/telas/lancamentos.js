@@ -19,6 +19,7 @@ Contratos preservados por outros arquivos (nao renomear):
 import { API } from '../core/api.js';
 import { mostrarToast } from '../core/app/horas-e-resumo.js';
 import { estado } from '../core/estado.js';
+import { temRestricaoDeSetor } from '../core/meus-setores.js';
 import { carregarAusencias, carregarColaboradores, carregarFeriadosLocais } from '../core/runtime/dados-e-modais.js';
 import { aplicarDefaultsBancoHorasLancamento, preencherBancoHorasLancamento, resetBancoHorasLancamento } from '../core/runtime/plantao-colaboradores/banco-horas-lancamento.js';
 import { atualizarTudo, salvarAusencia } from '../core/runtime/plantao-colaboradores/plantao-regua-e-relatorios.js';
@@ -212,7 +213,8 @@ setEdicao(null);
 /* ================= DADOS ================= */
 
 // Nomes de TODOS os colaboradores, inclusive desligados. Sem isso, todo
-// lancamento de quem saiu da equipe virava um card "Desconhecido".
+// lancamento de quem saiu da equipe virava um card "Desconhecido". Escopo
+// geral: a tela de lancamentos nao passa pelo teto de setor da conta.
 export function carregarDiretorioColaboradores(forcar = false) {
     const fresco = Date.now() - diretorioCarregadoEm < DIRETORIO_TTL_MS;
 
@@ -228,12 +230,12 @@ export function carregarDiretorioColaboradores(forcar = false) {
         let lista = [];
 
         try {
-            const dados = await API.getColaboradores({ incluirInativos: 1 });
+            const dados = await API.getColaboradores({ incluirInativos: 1, escopo: 'lancamentos' });
             lista = Array.isArray(dados) ? dados : [];
         } catch (error) {
             // Sem permissao ou backend fora: caimos na lista ja carregada.
             console.warn('[lancamentos] diretorio completo indisponivel:', error.message);
-            lista = Array.isArray(estado.colaboradores) ? estado.colaboradores : [];
+            lista = Array.isArray(estado.colaboradoresLancamentos) ? estado.colaboradoresLancamentos : [];
         }
 
         diretorioColaboradores.clear();
@@ -270,7 +272,7 @@ export function resolverColaborador(id) {
         return registro;
     }
 
-    const daLista = (estado.colaboradores || [])
+    const daLista = (estado.colaboradoresLancamentos || [])
         .find((item) => Number(item.Id ?? item.id) === numero);
 
     if (daLista) {
@@ -297,11 +299,11 @@ async function carregarFeriadosNacionaisDoAno() {
 async function garantirDados(forcar = false) {
     const tarefas = [carregarDiretorioColaboradores(forcar)];
 
-    if (forcar || !Array.isArray(estado.colaboradores) || estado.colaboradores.length === 0) {
+    if (forcar || !Array.isArray(estado.colaboradoresLancamentos) || estado.colaboradoresLancamentos.length === 0) {
         tarefas.push(carregarColaboradores());
     }
 
-    if (forcar || !Array.isArray(estado.ausencias)) {
+    if (forcar || !Array.isArray(estado.ausenciasLancamentos)) {
         tarefas.push(carregarAusencias());
     }
 
@@ -320,7 +322,7 @@ function ausenciasDoPeriodo() {
     const { inicio, fim } = periodoAtivo();
     const termo = normalizarTexto(state.busca);
 
-    return (estado.ausencias || [])
+    return (estado.ausenciasLancamentos || [])
         .map((item) => {
             const inicioItem = toISODate(item.DataInicio ?? item.dataInicio);
             const fimItem = toISODate(item.DataFim ?? item.dataFim) || inicioItem;
@@ -690,7 +692,7 @@ function preencherSelectColaboradores(selecionado = '') {
         return;
     }
 
-    const ativos = (estado.colaboradores || [])
+    const ativos = (estado.colaboradoresLancamentos || [])
         .slice()
         .sort((a, b) => String(a.Nome || a.nome || '')
             .localeCompare(String(b.Nome || b.nome || ''), 'pt-BR'));
@@ -879,7 +881,7 @@ function abrirEdicaoLancamento(tipo, id) {
     }
 
     const alvo = Number(id);
-    const item = (estado.ausencias || [])
+    const item = (estado.ausenciasLancamentos || [])
         .find((registro) => Number(registro.id ?? registro.Id) === alvo);
 
     if (!item) {
@@ -941,7 +943,7 @@ function excluirLancamento(tipo, id) {
 
         descricao = `${item.Nome || item.nome} - ${formatarDataBR(item.Data ?? item.data)}`;
     } else {
-        const item = (estado.ausencias || [])
+        const item = (estado.ausenciasLancamentos || [])
             .find((registro) => Number(registro.id ?? registro.Id) === alvo);
 
         if (!item) {
@@ -1056,7 +1058,7 @@ function editarLancamento(tipo, id) {
         return;
     }
 
-    const item = (estado.ausencias || []).find((ausencia) => Number(ausencia.id || ausencia.Id) === Number(id));
+    const item = (estado.ausenciasLancamentos || []).find((ausencia) => Number(ausencia.id || ausencia.Id) === Number(id));
 
     if (!item) {
         return;
@@ -1280,13 +1282,22 @@ export async function carregarListagensComFiltro(dataISO, filtrarPorData) {
 
 // Erro de rede/servidor propaga: carregarColaboradores (core/runtime/dados-e-modais.js)
 // chama esta funcao, avisa o usuario e mantem os ultimos dados.
+// Traz tambem a lista geral da tela de lancamentos (sem teto de setor); para
+// a conta sem teto e a mesma lista, sem segunda requisicao.
 export async function buscarColaboradoresComDiretorio() {
-    const dados = await API.getColaboradores();
+    const restrito = temRestricaoDeSetor();
+    const [dados, dadosGerais] = await Promise.all([
+        API.getColaboradores(),
+        restrito ? API.getColaboradores({ escopo: 'lancamentos' }) : null
+    ]);
     const lista = Array.isArray(dados) ? dados : [];
 
     estado.colaboradores = lista;
     // Binding compartilhado declarado em app.js.
     estado.colaboradores = lista;
+    estado.colaboradoresLancamentos = restrito
+        ? (Array.isArray(dadosGerais) ? dadosGerais : [])
+        : lista;
 
     // O diretorio completo (com desligados) acompanha, respeitando o TTL.
     await carregarDiretorioColaboradores();

@@ -15,6 +15,7 @@ const suites = [
     ...require('./backupRetencao.test.js'),
     ...require('./migracoes.test.js'),
     ...require('./permissoes.test.js'),
+    ...require('./acessoSetores.test.js'),
     ...require('./auth.test.js'),
     ...require('./servidor.test.js'),
     ...require('./htmlSeguro.test.js'),
