@@ -2,6 +2,8 @@ import { inicializarCalendario } from '../../telas/calendar.js';
 import { appContent } from '../app.js';
 import { estado } from '../estado.js';
 import { usuarioEhAdmin } from '../permissoes.js';
+import { escapeHtml } from '../../lib/html-seguro.js';
+import { iconeTipoLancamento } from '../../lib/tipos-lancamento.js';
 
 export function gerarLegendaMensal() {
     const container = document.getElementById("legendaMensalContent");
@@ -133,28 +135,28 @@ export function gerarLegendaMensal() {
         <div class="legenda-resumo">
             <div class="legenda-cards">
                 <div class="legenda-card feriado">
-                    <i class="fas fa-calendar-day"></i>
+                    ${iconeTipoLancamento('feriado')}
                     <div>
                         <strong>${totalFeriados}</strong>
                         <span>Feriados</span>
                     </div>
                 </div>
                 <div class="legenda-card ferias">
-                    <i class="fas fa-umbrella-beach"></i>
+                    ${iconeTipoLancamento('ferias')}
                     <div>
                         <strong>${totalFerias}</strong>
                         <span>Férias</span>
                     </div>
                 </div>
                 <div class="legenda-card folga">
-                    <i class="fas fa-leaf"></i>
+                    ${iconeTipoLancamento('folga')}
                     <div>
                         <strong>${totalFolgas}</strong>
                         <span>Folgas</span>
                     </div>
                 </div>
                 <div class="legenda-card ausencia">
-                    <i class="fas fa-exclamation-triangle"></i>
+                    ${iconeTipoLancamento('ausencia')}
                     <div>
                         <strong>${totalAusencias}</strong>
                         <span>Ausências</span>
@@ -186,19 +188,19 @@ export function gerarLegendaMensal() {
             html += `<div class="legenda-dia-eventos">`;
 
             eventos.feriados.forEach(f => {
-                html += `<span class="legenda-evento feriado-tag">📅 ${f}</span>`;
+                html += `<span class="legenda-evento feriado-tag">${iconeTipoLancamento('feriado')} ${escapeHtml(f)}</span>`;
             });
 
             eventos.ferias.forEach(f => {
-                html += `<span class="legenda-evento ferias-tag">🏖️ ${f}</span>`;
+                html += `<span class="legenda-evento ferias-tag">${iconeTipoLancamento('ferias')} ${escapeHtml(f)}</span>`;
             });
 
             eventos.folgas.forEach(f => {
-                html += `<span class="legenda-evento folga-tag">🌸 ${f}</span>`;
+                html += `<span class="legenda-evento folga-tag">${iconeTipoLancamento('folga')} ${escapeHtml(f)}</span>`;
             });
 
             eventos.ausencias.forEach(a => {
-                html += `<span class="legenda-evento ausencia-tag">⚠️ ${a}</span>`;
+                html += `<span class="legenda-evento ausencia-tag">${iconeTipoLancamento('ausencia')} ${escapeHtml(a)}</span>`;
             });
 
             html += `</div></div>`;

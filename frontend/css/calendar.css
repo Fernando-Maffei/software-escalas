@@ -84,9 +84,11 @@
   letter-spacing: 0.5px;
 }
 
+/* minmax(0, 1fr): as 7 colunas ficam iguais. Com 1fr puro um nome comprido
+   alargava a coluna e, no celular, o calendario vazava para fora do cartao. */
 #calendar {
   display: grid;
-  grid-template-columns: repeat(7, 1fr);
+  grid-template-columns: repeat(7, minmax(0, 1fr));
   gap: 8px;
 }
 
@@ -229,6 +231,68 @@
     border-left-color: #bd3333;
     color: #500606;
     background: #f1a7a7;
+}
+
+/* Icone do tipo (lib/tipos-lancamento.js) dentro da etiqueta: herda a cor da
+   etiqueta, fica um pouco menor que o nome e sempre ao lado dele (o nome
+   quebra linha, o icone nao fica sozinho em cima). */
+#calendar .ausencia-tag,
+#calendar .holiday-tag {
+    display: flex;
+    align-items: baseline;
+    gap: 4px;
+}
+
+#calendar .ausencia-tag > span,
+#calendar .holiday-tag > span {
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+.ausencia-tag .tipo-icone,
+.holiday-tag .tipo-icone {
+    flex-shrink: 0;
+    font-size: 0.9em;
+    opacity: 0.85;
+}
+
+@media (max-width: 1200px) {
+    #calendar .day {
+        padding: 10px 8px;
+    }
+}
+
+/* Celular: a coluna do dia tem ~30px. A etiqueta vira so o icone, que e o que
+   cabe e ainda identifica o tipo pela forma e pela cor. */
+@media (max-width: 560px) {
+    #calendar {
+        gap: 4px;
+    }
+
+    #calendar .day {
+        min-height: 84px;
+        padding: 8px 3px;
+        border-radius: 10px;
+    }
+
+    #calendar .ausencia-tag,
+    #calendar .holiday-tag {
+        justify-content: center;
+        padding: 2px 0;
+        border-left-width: 2px;
+    }
+
+    #calendar .ausencia-tag > span,
+    #calendar .holiday-tag > span {
+        display: none;
+    }
+
+    #calendar .ausencia-tag .tipo-icone,
+    #calendar .holiday-tag .tipo-icone {
+        opacity: 1;
+    }
 }
 
 /* MUNICIPAL */

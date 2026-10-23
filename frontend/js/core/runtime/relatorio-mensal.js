@@ -1,4 +1,5 @@
 import { escapeHtml } from '../../lib/html-seguro.js';
+import { iconeTipoLancamento } from '../../lib/tipos-lancamento.js';
 import { buscarFeriadosNacionais } from '../api.js';
 import { aguardarLayoutRelatorioPdf, baixarPdfSemPreview, criarContainerTemporarioRelatorioPdf, criarPdfMultipaginasComCanvas, lockPdfViewportOverflow, renderizarPaginaPdfEmCanvas } from '../../lib/pdf-utils.js';
 import { mostrarToast } from '../app/horas-e-resumo.js';
@@ -378,14 +379,14 @@ function gerarHtmlVisualizacaoRelatorioMensal(dados) {
         html += `<div class="dia-numero">${dia}</div>`;
 
         if (isFeriado) {
-            html += `<div class="dia-feriado" title="${escapeHtml(eventos.feriado)}">📅 ${escapeHtml(eventos.feriado)}</div>`;
+            html += `<div class="dia-feriado" title="${escapeHtml(eventos.feriado)}">${iconeTipoLancamento('feriado')} ${escapeHtml(eventos.feriado)}</div>`;
         }
 
         if (folgasDia.length > 0) {
             html += '<div class="dia-folgas">';
             folgasDia.slice(0, 3).forEach((nome) => {
                 const nomeCurto = nome.length > 18 ? `${nome.substring(0, 15)}...` : nome;
-                html += `<span class="folga-tag" title="${escapeHtml(nome)}">🌸 ${escapeHtml(nomeCurto)}</span>`;
+                html += `<span class="folga-tag" title="${escapeHtml(nome)}">${iconeTipoLancamento('folga')} ${escapeHtml(nomeCurto)}</span>`;
             });
             if (folgasDia.length > 3) {
                 html += `<span class="mais-tag">+${folgasDia.length - 3}</span>`;
@@ -397,7 +398,7 @@ function gerarHtmlVisualizacaoRelatorioMensal(dados) {
             html += '<div class="dia-ferias">';
             feriasDia.slice(0, 3).forEach((nome) => {
                 const nomeCurto = nome.length > 18 ? `${nome.substring(0, 15)}...` : nome;
-                html += `<span class="ferias-tag" title="${escapeHtml(nome)}">🏖️ ${escapeHtml(nomeCurto)}</span>`;
+                html += `<span class="ferias-tag" title="${escapeHtml(nome)}">${iconeTipoLancamento('ferias')} ${escapeHtml(nomeCurto)}</span>`;
             });
             if (feriasDia.length > 3) {
                 html += `<span class="mais-tag">+${feriasDia.length - 3}</span>`;
@@ -409,7 +410,7 @@ function gerarHtmlVisualizacaoRelatorioMensal(dados) {
             html += '<div class="dia-ausencias">';
             ausenciasDia.slice(0, 3).forEach((nome) => {
                 const nomeCurto = nome.length > 18 ? `${nome.substring(0, 15)}...` : nome;
-                html += `<span class="ausencia-tag" title="${escapeHtml(nome)}">⚠️ ${escapeHtml(nomeCurto)}</span>`;
+                html += `<span class="ausencia-tag" title="${escapeHtml(nome)}">${iconeTipoLancamento('ausencia')} ${escapeHtml(nomeCurto)}</span>`;
             });
             if (ausenciasDia.length > 3) {
                 html += `<span class="mais-tag">+${ausenciasDia.length - 3}</span>`;
@@ -438,7 +439,7 @@ function gerarHtmlVisualizacaoRelatorioMensal(dados) {
 
                 <div class="calendario-resumo">
                     ${renderResumoTabelaRelatorio({
-                    titulo: '📅 Feriados',
+                    titulo: `${iconeTipoLancamento('feriado')} Feriados`,
                     items: feriados,
                     headers: ['Feriado', 'Data', 'Tipo'],
                     emptyLabel: 'Nenhum feriado no periodo',
@@ -451,7 +452,7 @@ function gerarHtmlVisualizacaoRelatorioMensal(dados) {
                         `
                 })}
                     ${renderResumoTabelaRelatorio({
-                    titulo: '🏖️ Ferias',
+                    titulo: `${iconeTipoLancamento('ferias')} Ferias`,
                     items: ferias,
                     headers: ['Colaborador', 'Periodo'],
                     emptyLabel: 'Nenhuma ferias no periodo',
@@ -463,7 +464,7 @@ function gerarHtmlVisualizacaoRelatorioMensal(dados) {
                         `
                 })}
                     ${renderResumoTabelaRelatorio({
-                    titulo: '🌸 Folgas',
+                    titulo: `${iconeTipoLancamento('folga')} Folgas`,
                     items: folgas,
                     headers: ['Colaborador', 'Data'],
                     emptyLabel: 'Nenhuma folga no periodo',
@@ -475,7 +476,7 @@ function gerarHtmlVisualizacaoRelatorioMensal(dados) {
                         `
                 })}
                     ${renderResumoTabelaRelatorio({
-                    titulo: '⚠️ Ausencias',
+                    titulo: `${iconeTipoLancamento('ausencia')} Ausencias`,
                     items: ausencias,
                     headers: ['Colaborador', 'Data'],
                     emptyLabel: 'Nenhuma ausencia no periodo',
@@ -807,24 +808,24 @@ function gerarHtmlPdfRelatorioMensalExpandido(dados) {
 
         if (isFeriado) {
             const nomeFeriado = eventos.feriado.length > 26 ? `${eventos.feriado.substring(0, 23)}...` : eventos.feriado;
-            linhaAtual += `<div class="dia-feriado" title="${escapeHtml(eventos.feriado)}">${escapeHtml(nomeFeriado)}</div>`;
+            linhaAtual += `<div class="dia-feriado" title="${escapeHtml(eventos.feriado)}">${iconeTipoLancamento('feriado')} ${escapeHtml(nomeFeriado)}</div>`;
         }
 
         linhaAtual += '<div class="dia-eventos">';
 
         folgasVisiveis.forEach((item) => {
             const nome = item.nome.length > 20 ? `${item.nome.substring(0, 17)}...` : item.nome;
-            linhaAtual += `<div class="evento-tag folga-tag" title="${escapeHtml(item.nome + rotuloDetalhe(item))}">Folga: ${escapeHtml(nome)}${escapeHtml(rotuloDetalhe(item))}</div>`;
+            linhaAtual += `<div class="evento-tag folga-tag" title="${escapeHtml(item.nome + rotuloDetalhe(item))}">${iconeTipoLancamento('folga')} ${escapeHtml(nome)}${escapeHtml(rotuloDetalhe(item))}</div>`;
         });
 
         feriasVisiveis.forEach((item) => {
             const nome = item.nome.length > 20 ? `${item.nome.substring(0, 17)}...` : item.nome;
-            linhaAtual += `<div class="evento-tag ferias-tag" title="${escapeHtml(item.nome + rotuloDetalhe(item))}">Ferias: ${escapeHtml(nome)}${escapeHtml(rotuloDetalhe(item))}</div>`;
+            linhaAtual += `<div class="evento-tag ferias-tag" title="${escapeHtml(item.nome + rotuloDetalhe(item))}">${iconeTipoLancamento('ferias')} ${escapeHtml(nome)}${escapeHtml(rotuloDetalhe(item))}</div>`;
         });
 
         ausenciasVisiveis.forEach((item) => {
             const nome = item.nome.length > 20 ? `${item.nome.substring(0, 17)}...` : item.nome;
-            linhaAtual += `<div class="evento-tag ausencia-tag" title="${escapeHtml(item.nome + rotuloDetalhe(item))}">Ausencia: ${escapeHtml(nome)}${escapeHtml(rotuloDetalhe(item))}</div>`;
+            linhaAtual += `<div class="evento-tag ausencia-tag" title="${escapeHtml(item.nome + rotuloDetalhe(item))}">${iconeTipoLancamento('ausencia')} ${escapeHtml(nome)}${escapeHtml(rotuloDetalhe(item))}</div>`;
         });
 
         if (totalRegistrosDia > itensExibidos) {
@@ -866,16 +867,16 @@ function gerarHtmlPdfRelatorioMensalExpandido(dados) {
                     <div class="cabecalho-secundario">
                         <h2>Resumo do mes</h2>
                         <div class="resumo-metricas">
-                            <div class="metrica-card"><strong>${feriados.length}</strong><span>Feriados</span></div>
-                            <div class="metrica-card"><strong>${ferias.length}</strong><span>Ferias</span></div>
-                            <div class="metrica-card"><strong>${folgas.length}</strong><span>Folgas</span></div>
-                            <div class="metrica-card"><strong>${ausencias.length}</strong><span>Ausencias</span></div>
+                            <div class="metrica-card"><strong>${feriados.length}</strong><span>${iconeTipoLancamento('feriado')} Feriados</span></div>
+                            <div class="metrica-card"><strong>${ferias.length}</strong><span>${iconeTipoLancamento('ferias')} Ferias</span></div>
+                            <div class="metrica-card"><strong>${folgas.length}</strong><span>${iconeTipoLancamento('folga')} Folgas</span></div>
+                            <div class="metrica-card"><strong>${ausencias.length}</strong><span>${iconeTipoLancamento('ausencia')} Ausencias</span></div>
                         </div>
                     </div>
 
                     <div class="listas-grid">
                         <div class="lista-card">
-                            <h3>Feriados</h3>
+                            <h3>${iconeTipoLancamento('feriado')} Feriados</h3>
                             ${feriados.length > 0 ? `
                                 <table>
                                     <thead>
@@ -896,7 +897,7 @@ function gerarHtmlPdfRelatorioMensalExpandido(dados) {
                         </div>
 
                         <div class="lista-card">
-                            <h3>Ferias</h3>
+                            <h3>${iconeTipoLancamento('ferias')} Ferias</h3>
                             ${ferias.length > 0 ? `
                                 <table>
                                     <thead>
@@ -916,7 +917,7 @@ function gerarHtmlPdfRelatorioMensalExpandido(dados) {
                         </div>
 
                         <div class="lista-card">
-                            <h3>Folgas</h3>
+                            <h3>${iconeTipoLancamento('folga')} Folgas</h3>
                             ${folgas.length > 0 ? `
                                 <table>
                                     <thead>
@@ -936,7 +937,7 @@ function gerarHtmlPdfRelatorioMensalExpandido(dados) {
                         </div>
 
                         <div class="lista-card">
-                            <h3>Ausencias</h3>
+                            <h3>${iconeTipoLancamento('ausencia')} Ausencias</h3>
                             ${ausencias.length > 0 ? `
                                 <table>
                                     <thead>

@@ -1,6 +1,7 @@
 import { mostrarToast } from '../../core/app/horas-e-resumo.js';
 import { estado } from '../../core/estado.js';
 import { escapeHtml } from '../../lib/html-seguro.js';
+import { iconeTipoLancamento } from '../../lib/tipos-lancamento.js';
 import { abrirEditorNaEscala } from '../escala-dia-editor.js';
 import { ehTipoSemTrabalho, formatDurationEscala, formatMinutesToTimeEscala, formatTimeInputEscala, getTimeMinutesEscala, TIPO_LABELS } from '../escala-dia-shared.js';
 import { atualizarBotaoRestaurarAlmocosEscala } from './acoes-do-dia.js';
@@ -50,15 +51,15 @@ function renderDayContextEscala(state) {
     ];
 
     if (ferias > 0) {
-        fatos.push(`<span class="escala-fato escala-fato-ferias"><i class="fas fa-umbrella-beach"></i> ${ferias} de ferias</span>`);
+        fatos.push(`<span class="escala-fato escala-fato-ferias">${iconeTipoLancamento('ferias')} ${ferias} de ferias</span>`);
     }
 
     if (ausencias > 0) {
-        fatos.push(`<span class="escala-fato escala-fato-ausencia"><i class="fas fa-user-slash"></i> ${ausencias} ausencia${ausencias === 1 ? '' : 's'}</span>`);
+        fatos.push(`<span class="escala-fato escala-fato-ausencia">${iconeTipoLancamento('ausencia')} ${ausencias} ausencia${ausencias === 1 ? '' : 's'}</span>`);
     }
 
     if (folgas > 0) {
-        fatos.push(`<span class="escala-fato escala-fato-folga"><i class="fas fa-mug-hot"></i> ${folgas} de folga</span>`);
+        fatos.push(`<span class="escala-fato escala-fato-folga">${iconeTipoLancamento('folga')} ${folgas} de folga</span>`);
     }
 
     fatosEl.innerHTML = fatos.join('');

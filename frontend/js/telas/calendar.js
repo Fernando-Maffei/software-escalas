@@ -1,6 +1,8 @@
 import { buscarFeriadosNacionais } from '../core/api.js';
 import { estado } from '../core/estado.js';
 import { usuarioEhAdmin } from '../core/permissoes.js';
+import { escapeHtml } from '../lib/html-seguro.js';
+import { iconeTipoLancamento } from '../lib/tipos-lancamento.js';
 import { abrirModalLancamento, carregarDiretorioColaboradores, carregarListagens, carregarListagensComFiltro, resolverColaborador as resolverColaboradorLancamento } from './lancamentos.js';
 
 const cacheFeriadosPorAno = new Map();
@@ -240,7 +242,7 @@ export function gerarCalendario(mes, ano) {
             cell.classList.add('holiday');
             const tag = document.createElement('div');
             tag.className = `holiday-tag ${feriado.classe}`;
-            tag.textContent = feriado.rotulo;
+            tag.innerHTML = `${iconeTipoLancamento('feriado')}<span>${escapeHtml(feriado.rotulo)}</span>`;
             tag.title = feriado.titulo;
             cell.appendChild(tag);
         });
@@ -268,11 +270,11 @@ export function gerarCalendario(mes, ano) {
         colaboradoresUnicos.forEach((info) => {
             const tag = document.createElement('div');
             tag.className = `ausencia-tag ${info.tipo}${info.ativo ? '' : ' inativo'}`;
-            tag.textContent = info.nome;
+            tag.innerHTML = `${iconeTipoLancamento(info.tipo)}<span>${escapeHtml(info.nome)}</span>`;
 
-            if (!info.ativo) {
-                tag.title = `${info.nome} — colaborador desligado`;
-            }
+            // Em coluna estreita o nome sai cortado com reticencias: o title
+            // mostra inteiro.
+            tag.title = info.ativo ? info.nome : `${info.nome} — colaborador desligado`;
 
             cell.appendChild(tag);
         });

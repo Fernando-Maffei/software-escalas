@@ -1,6 +1,7 @@
 import { estado } from '../../core/estado.js';
 import { formatarDataBR } from '../../core/runtime/relatorio-mensal.js';
 import { escapeHtml } from '../../lib/html-seguro.js';
+import { iconeTipoLancamento } from '../../lib/tipos-lancamento.js';
 import { toISODate } from './datas-e-jornada.js';
 
 export async function buscarProximosEventos() {
@@ -102,7 +103,7 @@ export function gerarEventItem(evento) {
                 <div class="event-title">${escapeHtml(evento.titulo)}</div>
                 <div class="event-subtitle">${escapeHtml(evento.subtitulo)}</div>
             </div>
-            <span class="event-badge ${badgeClass}">${badgeText}</span>
+            <span class="event-badge ${badgeClass}">${iconeTipoLancamento(badgeClass)} ${badgeText}</span>
         </div>
     `;
 }
