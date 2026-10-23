@@ -195,6 +195,7 @@ export const API = {
     salvarBancoHorasSemanalCelula: (data) => API.put('/banco-horas-semanal/celula', data),
     salvarBancoHorasSemanalNota: (data) => API.put('/banco-horas-semanal/nota', data),
     verificarBancoHorasSemanal: (params = {}) => API.get('/banco-horas-semanal/verificar', params),
+    getBancoHorasSemanalDetalhe: (params = {}) => API.get('/banco-horas-semanal/detalhe', params),
     getBancoHorasSaldosSemanais: (params = {}) => API.get('/banco-horas-semanal/saldos', params),
     gerarBancoHorasSemana: (data) => API.post('/banco-horas-semanal/gerar-semana', data),
     confirmarBancoHorasSemana: (data) => API.put('/banco-horas-semanal/confirmar-semana', data),
