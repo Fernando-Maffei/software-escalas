@@ -12,6 +12,7 @@ const suites = [
     ...require('./acesso-setores.test.js'),
     ...require('./backup.test.js'),
     ...require('./usuarios.test.js'),
+    ...require('./usuarios-seguranca.test.js'),
     ...require('./limites.test.js'),
     ...require('./migracoes.test.js')
 ];

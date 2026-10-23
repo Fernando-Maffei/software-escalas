@@ -171,7 +171,7 @@ App de escalas/
 │       │   ├── escala-relatorio/ + escala-relatorio.js
 │       │   ├── dashboard/
 │       │   ├── banco-horas.js, lancamentos.js, calendar.js
-│       │   └── configuracoes-backup.js / configuracoes-usuarios.js
+│       │   └── configuracoes-backup.js / usuarios/ (tela de usuarios)
 │       └── lib/                ← utilitários sem tela
 │           └── pdf-utils.js, escala-report-utils.js, html-seguro.js (escapeHtml único)
 │
@@ -497,7 +497,7 @@ Caminhos relativos a `frontend/js/`.
 | `telas/escala-relatorio.js` (~1.822 linhas) + `lib/escala-report-utils.js` | Geração dos relatórios de escala (mensal, por escala). |
 | `lib/pdf-utils.js` | Helpers de PDF (jsPDF/canvas) usados pelos relatórios. |
 | `telas/configuracoes-backup.js` | A tela de configuração de **banco e backup** (testar/salvar conexão, gerar/restaurar backup, carregar exemplos). |
-| `telas/configuracoes-usuarios.js` | A tela de gestão de **usuários** (admin). |
+| `telas/usuarios/` | A tela de gestão de **usuários** (admin): `index.js` monta a tela; lista, painéis, diálogos e seletor de setores em arquivos próprios. |
 | `core/permissoes.js` | Aplica no front-end o que o perfil pode ver/fazer (esconde botões que o usuário comum não usa). |
 | `core/estado.js` | O **estado compartilhado** entre telas (listas carregadas da API, seleções, caches usados por mais de um módulo). Estado de um módulo só fica dentro dele. |
 | `core/acoes-html.js` | As funções chamadas por atributos `onclick="..."` dos templates — as únicas publicadas em `window`, porque um atributo `on*` só enxerga o escopo global. |

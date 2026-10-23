@@ -35,9 +35,9 @@ const SELETORES_BLOQUEADOS = [
     '#salvarConfiguracaoBackupBtn',
     '#backupDirectory',
     '#modalTrocarSenha',
-    // A propria conta na tela de Usuarios (a linha marcada "(voce)"): definir
-    // ou resetar a senha dela derruba a sessao do robo e o tranca para fora.
-    '.usuario-linha:has(strong small)',
+    // A propria conta na tela de Usuarios (o card marcado "voce"): limitar os
+    // setores dela esconderia do robo os dados das outras telas.
+    '.usr-cartao[data-propria]',
     '#trocarSenhaScreen',
     '#loginScreen',
     '#setupScreen',

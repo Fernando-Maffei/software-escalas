@@ -1,5 +1,5 @@
 import { escapeHtml } from '../../lib/html-seguro.js';
-import { inicializarUsuariosTela } from '../../telas/configuracoes-usuarios.js';
+import { inicializarUsuariosTela } from '../../telas/usuarios/index.js';
 import { appContent } from '../app.js';
 
 /* ===========================
@@ -87,7 +87,7 @@ export function mostrarToast(mensagem, tipo = "success") {
 
 // Tela de Usuarios (antes era uma aba dentro de Configuracoes; virou item
 // proprio no menu, admin-only). O conteudo em si e montado por
-// inicializarUsuariosTela() em configuracoes-usuarios.js, que popula o
+// inicializarUsuariosTela() em telas/usuarios/index.js, que popula o
 // #usuariosCardConteudo. A visibilidade e navegacao ja sao filtradas por
 // permissoes.js (o item some e a rota cai no calendario para nao-admin).
 export function renderUsuarios() {
@@ -101,12 +101,8 @@ export function renderUsuarios() {
             <p>Contas e acessos ao sistema</p>
         </div>
 
-        <div class="configuracoes-grid">
-            <div class="config-card config-card-wide" data-config-section="usuarios">
-                <div class="config-card-body" id="usuariosCardConteudo">
-                    <p class="config-descricao">Carregando usuarios...</p>
-                </div>
-            </div>
+        <div class="usr-tela" id="usuariosCardConteudo" data-config-section="usuarios">
+            <p class="usr-aviso">Carregando usuarios...</p>
         </div>
     `;
 
