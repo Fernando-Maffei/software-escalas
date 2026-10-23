@@ -15,7 +15,7 @@ const {
     syncAusenciaToEscalaDia
 } = require('../services/escala');
 const { withTransaction } = require('../db/transactions');
-const { colaboradoresVisiveis, exigirColaboradorVisivel } = require('../auth/acesso-setores');
+const { colaboradoresVisiveis, escopoLancamentos, exigirColaboradorVisivel } = require('../auth/acesso-setores');
 const {
     buildDateRange,
     ensurePositiveInt,
@@ -273,7 +273,9 @@ router.get('/', async (req, res) => {
         ${clauses.length > 0 ? `WHERE ${clauses.join(' AND ')}` : ''}
         ORDER BY DataInicio DESC, Id DESC
     `);
-    const visiveis = await colaboradoresVisiveis(pool, req);
+    // A tela de lancamentos e geral (ver escopoLancamentos); as outras leituras
+    // de ausencias (Dashboard, Escala do Dia) seguem limitadas pelo teto.
+    const visiveis = escopoLancamentos(req) ? null : await colaboradoresVisiveis(pool, req);
 
     res.json(visiveis ? result.recordset.filter((linha) => visiveis.has(Number(linha.ColaboradorId))) : result.recordset);
 });

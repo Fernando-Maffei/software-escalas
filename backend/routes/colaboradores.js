@@ -5,6 +5,7 @@ const { sql, conectar } = require('../db');
 const { AppError } = require('../lib/errors');
 const {
     colaboradoresVisiveis,
+    escopoLancamentos,
     exigirColaboradorVisivel,
     getSetoresPermitidosRequest,
     idsPermitidosNumericos
@@ -102,13 +103,18 @@ function normalizeNullableId(value, fieldName) {
     return ensurePositiveInt(value, fieldName);
 }
 
+// So o que a tela de lancamentos usa (select, nome nos cards e no
+// calendario): no escopo geral a conta limitada ve colaboradores de outros
+// setores, mas nao os horarios e demais dados do cadastro deles.
+const COLUNAS_ESCOPO_LANCAMENTOS = 'c.Id, c.Nome, c.Ativo, c.SetorId';
+
 function buildColaboradorSelectQuery(options = {}) {
-    const { whereClause = '', single = false } = options;
+    const { whereClause = '', single = false, colunas = 'c.*' } = options;
     const topClause = single ? 'TOP 1' : '';
 
     return `
         SELECT ${topClause}
-            c.*,
+            ${colunas},
             s.Nome AS SetorNome
         FROM Colaboradores c
         LEFT JOIN Setores s ON s.Id = c.SetorId
@@ -143,8 +149,10 @@ router.get('/', async (req, res) => {
 
     // Controle de acesso por setor: a conta so ve colaboradores dos setores que
     // tem permissao. Como as telas (Escala, Dashboard, Plantao) derivam desta
-    // lista, filtrar aqui ja as limita. Vazio = sem restricao (ve todos).
-    const permitidos = await getSetoresPermitidosRequest(pool, req);
+    // lista, filtrar aqui ja as limita. Vazio = sem restricao (ve todos). A
+    // tela de lancamentos pede o escopo geral e nao passa pelo teto.
+    const geral = escopoLancamentos(req);
+    const permitidos = geral ? [] : await getSetoresPermitidosRequest(pool, req);
 
     if (permitidos.length) {
         const ids = idsPermitidosNumericos(permitidos);
@@ -169,7 +177,8 @@ router.get('/', async (req, res) => {
     }
 
     const query = buildColaboradorSelectQuery({
-        whereClause: clauses.length > 0 ? `WHERE ${clauses.join(' AND ')}` : ''
+        whereClause: clauses.length > 0 ? `WHERE ${clauses.join(' AND ')}` : '',
+        colunas: geral ? COLUNAS_ESCOPO_LANCAMENTOS : undefined
     });
     const result = await request.query(query);
 
