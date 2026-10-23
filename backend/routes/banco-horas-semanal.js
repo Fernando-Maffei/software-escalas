@@ -3,7 +3,12 @@ const router = express.Router();
 
 const { sql, conectar } = require('../db');
 const { AppError } = require('../lib/errors');
-const { getSetoresPermitidosRequest, idsPermitidosNumericos } = require('../auth/acesso-setores');
+const {
+    colaboradoresVisiveis,
+    exigirColaboradorVisivel,
+    getSetoresPermitidosRequest,
+    idsPermitidosNumericos
+} = require('../auth/acesso-setores');
 const { parseBalanceInputToMinutes } = require('../services/bancoHoras');
 const {
     ensurePositiveInt,
@@ -18,6 +23,7 @@ const {
     calcularSaldo,
     carregarBases,
     carregarMovimentacao,
+    fimDaJanelaSemanal,
     listarColaboradoresAtivosVisiveis,
     minutosParaRelogio,
     semanaISO
@@ -344,6 +350,7 @@ router.get('/verificar', async (req, res) => {
             descontoFormatado: minutosParaRelogio(saldo.descontoMinutos),
             resultadoMinutos: saldo.resultadoMinutos,
             resultadoFormatado: minutosParaRelogio(saldo.resultadoMinutos),
+            detalhes: saldo.detalhes,
             sugestaoDias: saldo.resultadoMinutos > 0 ? Math.floor(saldo.resultadoMinutos / FOLGA_MINUTOS) : 0
         };
     });
@@ -399,13 +406,16 @@ router.get('/saldos', async (req, res) => {
 // POST /api/banco-horas-semanal/gerar-semana
 // Body: { semana, aplicar }. Calcula o lancamento proposto de cada colaborador
 // para a semana alvo = saldo da semana anterior + plantoes − folgas/ausencias
-// da janela [semana anterior, alvo]. aplicar=false => so preview (para a modal).
+// de segunda a domingo: [semana anterior, vespera do alvo]. O que cai na
+// propria segunda alvo entra so na semana seguinte (fimDaJanelaSemanal).
+// aplicar=false => so preview (para a modal).
 // aplicar=true => grava os valores como 'auto' (amarelo), sem tocar em celula
 // ja 'confirmado'.
 router.post('/gerar-semana', async (req, res) => {
     const pool = await conectar();
 
     const alvoISO = toMondayISO(req.body?.semana);
+    const fimJanelaISO = fimDaJanelaSemanal(alvoISO);
     const aplicar = req.body?.aplicar === true;
 
     const colaboradores = await listarColaboradoresAtivosVisiveis(pool, req);
@@ -418,7 +428,7 @@ router.post('/gerar-semana', async (req, res) => {
         .query('SELECT ColaboradorId, Status FROM BancoHorasSemanal WHERE SemanaSegunda = @alvo');
     const statusAlvo = new Map(alvoResult.recordset.map((row) => [Number(row.ColaboradorId), row.Status]));
 
-    const movimentacao = await carregarMovimentacao(pool, anteriores, alvoISO);
+    const movimentacao = await carregarMovimentacao(pool, anteriores, fimJanelaISO);
     const avisos = [];
 
     const itens = colaboradores.map((colaborador) => {
@@ -434,7 +444,7 @@ router.post('/gerar-semana', async (req, res) => {
             };
         }
 
-        const saldo = calcularSaldo(colaborador, anterior, movimentacao, alvoISO, avisos);
+        const saldo = calcularSaldo(colaborador, anterior, movimentacao, fimJanelaISO, avisos);
 
         return {
             colaboradorId: colaborador.Id,
@@ -449,6 +459,7 @@ router.post('/gerar-semana', async (req, res) => {
             descontoFormatado: minutosParaRelogio(saldo.descontoMinutos),
             propostoMinutos: saldo.resultadoMinutos,
             propostoFormatado: minutosParaRelogio(saldo.resultadoMinutos),
+            detalhes: saldo.detalhes,
             jaConfirmado
         };
     });
@@ -493,6 +504,70 @@ router.post('/gerar-semana', async (req, res) => {
         aplicado: aplicar,
         gravados,
         itens,
+        avisos
+    });
+});
+
+// GET /api/banco-horas-semanal/detalhe?colaboradorId=&semana=
+// O "i" de uma celula da grade: refaz a conta do Gerar semana so para essa
+// pessoa e essa semana (saldo anterior + plantoes − descontos, de segunda a
+// domingo) e devolve cada lancamento com a data, junto do valor gravado na
+// celula. Quando os dois diferem, a celula foi ajustada a mao.
+router.get('/detalhe', async (req, res) => {
+    const pool = await conectar();
+
+    const colaboradorId = ensurePositiveInt(req.query.colaboradorId, 'Colaborador');
+    const alvoISO = toMondayISO(req.query.semana);
+    exigirColaboradorVisivel(await colaboradoresVisiveis(pool, req), colaboradorId);
+
+    const colaboradorResult = await pool.request()
+        .input('id', sql.Int, colaboradorId)
+        .query('SELECT * FROM Colaboradores WHERE Id = @id');
+    const colaborador = colaboradorResult.recordset[0];
+
+    if (!colaborador) {
+        throw new AppError(404, 'Colaborador nao encontrado.');
+    }
+
+    const celulaResult = await pool.request()
+        .input('colaboradorId', sql.Int, colaboradorId)
+        .input('semana', sql.Date, alvoISO)
+        .query(`
+            SELECT Minutos, Status FROM BancoHorasSemanal
+            WHERE ColaboradorId = @colaboradorId AND SemanaSegunda = @semana
+        `);
+    const celula = celulaResult.recordset[0];
+    const lancado = celula
+        ? { minutos: Number(celula.Minutos), formatado: minutosParaRelogio(celula.Minutos), status: celula.Status || 'confirmado' }
+        : null;
+
+    const todas = await carregarBases(pool, alvoISO, { ateInclusive: false });
+    const anterior = todas.get(colaborador.Id) || null;
+    const resposta = { colaboradorId, nome: colaborador.Nome, semana: alvoISO, lancado };
+
+    if (!anterior) {
+        res.json({ ...resposta, semBase: true, avisos: [] });
+        return;
+    }
+
+    const fimJanelaISO = fimDaJanelaSemanal(alvoISO);
+    const movimentacao = await carregarMovimentacao(pool, new Map([[colaborador.Id, anterior]]), fimJanelaISO);
+    const avisos = [];
+    const saldo = calcularSaldo(colaborador, anterior, movimentacao, fimJanelaISO, avisos);
+
+    res.json({
+        ...resposta,
+        semBase: false,
+        semanaAnterior: anterior.semanaSegunda,
+        anteriorMinutos: anterior.minutos,
+        anteriorFormatado: minutosParaRelogio(anterior.minutos),
+        plantaoMinutos: saldo.plantaoMinutos,
+        plantaoFormatado: minutosParaRelogio(saldo.plantaoMinutos),
+        descontoMinutos: saldo.descontoMinutos,
+        descontoFormatado: minutosParaRelogio(saldo.descontoMinutos),
+        calculadoMinutos: saldo.resultadoMinutos,
+        calculadoFormatado: minutosParaRelogio(saldo.resultadoMinutos),
+        detalhes: saldo.detalhes,
         avisos
     });
 });
