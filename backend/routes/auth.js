@@ -21,6 +21,7 @@ const {
 } = require('../auth/auth');
 
 const { createRateLimiter } = require('../auth/rate-limit');
+const { validarSenhaForte } = require('../auth/regras-conta');
 const { getClientIp } = require('../lib/ip-cliente');
 
 const router = express.Router();
@@ -110,7 +111,7 @@ router.post('/trocar-senha', requireAuth, async (req, res, next) => {
             throw new AppError(403, 'A senha da conta de visualizacao e alterada apenas pelo administrador.');
         }
 
-        const novaSenha = normalizePassword(req.body?.novaSenha, 'Nova senha');
+        const novaSenha = validarSenhaForte(req.body?.novaSenha, { username: req.user.username, campo: 'Nova senha' });
         const senhaAtual = String(req.body?.senhaAtual || '');
 
         if (!senhaAtual) {

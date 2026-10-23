@@ -30,7 +30,7 @@ import './telas/banco-horas.js';
 import './telas/lancamentos.js';
 import './lib/escala-report-utils.js';
 import './telas/configuracoes-backup.js';
-import './telas/configuracoes-usuarios.js';
+import './telas/usuarios/index.js';
 import './lib/pdf-utils.js';
 import './telas/escala-dia-shared.js';
 import './telas/escala-dia/estado-e-layout.js';

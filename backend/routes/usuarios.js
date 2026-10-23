@@ -11,8 +11,6 @@ const {
     findUserByUsername,
     generateRandomPassword,
     listUsers,
-    normalizePassword,
-    normalizeUsername,
     requireAdmin,
     revokeUserSessions,
     travarAdministradores,
@@ -20,12 +18,68 @@ const {
     updateUserPassword,
     updateUserSetoresPermitidos
 } = require('../auth/auth');
+const { validarNovoUsername, validarSenhaForte } = require('../auth/regras-conta');
 
 const router = express.Router();
 
 // Toda a gestao de contas e exclusiva de administradores. O requireAuth
 // global (server.js) ja rodou antes deste router.
 router.use(requireAdmin);
+
+// As respostas trazem senha temporaria e dados de acesso: nada de cache em
+// navegador ou proxy.
+router.use((req, res, next) => {
+    res.set('Cache-Control', 'no-store');
+    next();
+});
+
+// Violacao do indice unico UX_Usuarios_Username (dois cadastros do mesmo
+// nome ao mesmo tempo passam pela checagem previa).
+const ERROS_CHAVE_DUPLICADA = new Set([2601, 2627]);
+
+function ehChaveDuplicada(error) {
+    return ERROS_CHAVE_DUPLICADA.has(Number(error?.number ?? error?.originalError?.info?.number));
+}
+
+const SQL_INT_MAX = 2147483647;
+const MAX_SETORES_POR_CONTA = 100;
+
+// Setores permitidos vindos do corpo: lista de ids de setores que EXISTEM.
+// Antes qualquer texto era gravado e um id errado deixava a conta sem ver
+// ninguem (falha fechada, mas silenciosa). Devolve os ids em texto, no mesmo
+// formato que auth.js grava.
+async function validarSetoresPermitidos(pool, valor) {
+    if (!Array.isArray(valor)) {
+        throw new AppError(400, 'Setores permitidos devem ser uma lista.');
+    }
+
+    const ids = Array.from(new Set(valor.map((item) => Number(item))));
+
+    if (ids.some((id) => !Number.isInteger(id) || id <= 0 || id > SQL_INT_MAX)) {
+        throw new AppError(400, 'Setor permitido invalido.');
+    }
+
+    if (ids.length > MAX_SETORES_POR_CONTA) {
+        throw new AppError(400, `No maximo ${MAX_SETORES_POR_CONTA} setores por conta.`);
+    }
+
+    if (!ids.length) {
+        return [];
+    }
+
+    const request = pool.request();
+    const params = ids.map((id, indice) => {
+        request.input(`setor${indice}`, sql.Int, id);
+        return `@setor${indice}`;
+    });
+    const result = await request.query(`SELECT Id FROM Setores WHERE Id IN (${params.join(', ')})`);
+
+    if (result.recordset.length !== ids.length) {
+        throw new AppError(400, 'Um dos setores escolhidos nao existe mais. Recarregue a tela.');
+    }
+
+    return ids.map(String);
+}
 
 // Recusa tirar o ultimo administrador ativo. Roda DENTRO da transacao que vai
 // gravar, depois da trava: o papel do alvo e relido ali, porque outra
@@ -73,11 +127,10 @@ router.get('/', async (req, res, next) => {
 
 router.post('/', async (req, res, next) => {
     try {
-        const username = normalizeUsername(req.body?.username);
+        const username = validarNovoUsername(req.body?.username);
         const isAdmin = req.body?.isAdmin === true;
-        const senhaInformada = String(req.body?.senha || '');
-        const senhaGerada = !senhaInformada;
-        const senha = senhaGerada ? generateRandomPassword() : normalizePassword(senhaInformada);
+        const senhaInformada = typeof req.body?.senha === 'string' ? req.body.senha : '';
+        const senha = senhaInformada ? validarSenhaForte(senhaInformada, { username }) : generateRandomPassword();
 
         const pool = await conectar();
         const existente = await findUserByUsername(pool, username);
@@ -86,23 +139,45 @@ router.post('/', async (req, res, next) => {
             throw new AppError(400, 'Ja existe um usuario com esse nome.');
         }
 
-        const usuario = await createUser(pool, {
-            username,
-            password: senha,
-            // Conta de administrador e pessoal: a senha definida por outra
-            // pessoa e provisoria e o dono troca no primeiro acesso. Conta
-            // de visualizacao e compartilhada pela equipe — forcar a troca
-            // faria a primeira pessoa a entrar trancar todas as outras.
-            deveTrocarSenha: isAdmin,
-            isAdmin
+        // Setores ja na criacao, na mesma transacao: se a gravacao do teto
+        // falhasse depois do INSERT, a conta nasceria vendo todos os setores.
+        const setoresPermitidos = req.body?.setoresPermitidos === undefined
+            ? []
+            : await validarSetoresPermitidos(pool, req.body.setoresPermitidos);
+
+        const usuario = await withTransaction(sql, pool, async (tx) => {
+            const criado = await createUser(tx, {
+                username,
+                password: senha,
+                // Conta de administrador e pessoal: a senha definida por outra
+                // pessoa e provisoria e o dono troca no primeiro acesso. Conta
+                // de visualizacao e compartilhada pela equipe — forcar a troca
+                // faria a primeira pessoa a entrar trancar todas as outras.
+                deveTrocarSenha: isAdmin,
+                isAdmin
+            });
+
+            if (setoresPermitidos.length) {
+                await updateUserSetoresPermitidos(tx, criado.id, setoresPermitidos);
+                return findUserById(tx, criado.id);
+            }
+
+            return criado;
+        }).catch((error) => {
+            if (ehChaveDuplicada(error)) {
+                throw new AppError(400, 'Ja existe um usuario com esse nome.');
+            }
+
+            throw error;
         });
 
         res.status(201).json({
             success: true,
             message: 'Usuario criado com sucesso.',
             usuario: toPublicUser(usuario),
-            // Exibida uma unica vez para o administrador repassar ao usuario.
-            senhaTemporaria: senha
+            // So a senha GERADA volta, exibida uma unica vez para o
+            // administrador repassar; a digitada ele ja conhece.
+            senhaTemporaria: senhaInformada ? null : senha
         });
     } catch (error) {
         next(error);
@@ -136,6 +211,13 @@ router.put('/:id', async (req, res, next) => {
             throw new AppError(400, 'Voce nao pode desativar ou remover a administracao da propria conta.');
         }
 
+        // A propria senha so muda por "Minha senha" (/api/auth/trocar-senha),
+        // que exige a senha atual: uma sessao de admin esquecida aberta nao
+        // pode trocar a senha do dono por aqui e tranca-lo do lado de fora.
+        if (isSelf && (querResetarSenha || querDefinirSenha)) {
+            throw new AppError(400, 'Para alterar a propria senha, use "Minha senha".');
+        }
+
         /** @type {{ ativo?: boolean, isAdmin?: boolean }} */
         const flags = {};
 
@@ -152,7 +234,11 @@ router.put('/:id', async (req, res, next) => {
         // Senha definida explicitamente pelo administrador (diferente do reset,
         // que gera uma aleatoria). Vale como esta e nao exige troca no primeiro
         // acesso — quem definiu ja escolheu a senha final.
-        const novaSenha = querDefinirSenha ? normalizePassword(req.body.novaSenha, 'Nova senha') : null;
+        const novaSenha = querDefinirSenha
+            ? validarSenhaForte(req.body.novaSenha, { username: alvo.username, campo: 'Nova senha' })
+            : null;
+        const querMudarSetores = req.body?.setoresPermitidos !== undefined;
+        const setoresPermitidos = querMudarSetores ? await validarSetoresPermitidos(pool, req.body.setoresPermitidos) : null;
         let senhaTemporaria = null;
 
         await withTransaction(sql, pool, async (tx) => {
@@ -166,8 +252,8 @@ router.put('/:id', async (req, res, next) => {
             // campo vem no corpo, para nao zerar a permissao numa atualizacao de
             // flags. Nao derruba a sessao: a imposicao no backend le o teto
             // fresco do banco a cada request.
-            if (Array.isArray(req.body?.setoresPermitidos)) {
-                await updateUserSetoresPermitidos(tx, alvo.id, req.body.setoresPermitidos);
+            if (setoresPermitidos) {
+                await updateUserSetoresPermitidos(tx, alvo.id, setoresPermitidos);
             }
 
             if (novaSenha) {
