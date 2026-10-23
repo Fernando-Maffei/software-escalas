@@ -24,6 +24,7 @@ import { carregarAusencias, carregarColaboradores, carregarFeriadosLocais } from
 import { aplicarDefaultsBancoHorasLancamento, preencherBancoHorasLancamento, resetBancoHorasLancamento } from '../core/runtime/plantao-colaboradores/banco-horas-lancamento.js';
 import { atualizarTudo, salvarAusencia } from '../core/runtime/plantao-colaboradores/plantao-regua-e-relatorios.js';
 import { escapeHtml } from '../lib/html-seguro.js';
+import { metaTipoLancamento } from '../lib/tipos-lancamento.js';
 import { carregarFeriados as carregarFeriadosNacionais } from './calendar.js';
 
 /* ================= ESTADO ================= */
@@ -163,18 +164,6 @@ function normalizarTexto(valor) {
         .normalize('NFD')
         .replace(/\p{Diacritic}/gu, '')
         .toLowerCase();
-}
-
-const TIPOS = {
-    folga: { icone: 'fa-mug-hot', texto: 'Folga' },
-    ausencia: { icone: 'fa-triangle-exclamation', texto: 'Ausencia' },
-    ferias: { icone: 'fa-umbrella-beach', texto: 'Ferias' },
-    feriado: { icone: 'fa-calendar-day', texto: 'Feriado' }
-};
-
-function metaTipo(tipo) {
-    const chave = String(tipo || '').toLowerCase();
-    return TIPOS[chave] || { icone: 'fa-calendar-day', texto: chave || 'Lancamento' };
 }
 
 // Subtipos que valem um chip no card. Ficam de fora, de proposito:
@@ -347,7 +336,7 @@ function ausenciasDoPeriodo() {
         .filter((item) => item.inicio && item.fim && item.fim >= inicio && item.inicio <= fim)
         .filter((item) => !termo
             || normalizarTexto(item.colaborador.nome).includes(termo)
-            || normalizarTexto(metaTipo(item.tipo).texto).includes(termo))
+            || normalizarTexto(metaTipoLancamento(item.tipo).texto).includes(termo))
         .sort((a, b) => a.inicio.localeCompare(b.inicio)
             || a.colaborador.nome.localeCompare(b.colaborador.nome, 'pt-BR'));
 }
@@ -433,7 +422,7 @@ function feriadosDoPeriodo() {
 /* ================= RENDER ================= */
 
 function cardPessoal(item) {
-    const meta = metaTipo(item.tipo);
+    const meta = metaTipoLancamento(item.tipo);
     const dias = diferencaEmDias(item.inicio, item.fim);
     const porHora = item.periodoTipo === 'horas' && item.horaInicio && item.horaFim;
 
@@ -555,7 +544,7 @@ function cardFeriado(registro) {
     return `
             <article class="lc-card lc-card--feriado${emEdicao ? ' is-editing' : ''}${registro.duplicado ? ' is-duplicado' : ''}" data-tipo="feriado">
                 <div class="lc-card-top">
-                    <span class="lc-card-avatar" aria-hidden="true"><i class="fas ${!editavel ? 'fa-globe' : abrangencia.icone}"></i></span>
+                    <span class="lc-card-avatar" aria-hidden="true"><i class="fas ${metaTipoLancamento('feriado').icone}"></i></span>
                     <div class="lc-card-ident">
                         <h5>${escapeHtml(registro.nome)}</h5>
                         <div class="lc-card-chips">${chips.join('')}</div>
