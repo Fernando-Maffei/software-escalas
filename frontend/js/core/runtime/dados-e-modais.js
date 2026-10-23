@@ -2,6 +2,7 @@ import { abrirModalLancamento, buscarColaboradoresComDiretorio, cancelarEdicaoLa
 import { API } from '../api.js';
 import { mostrarToast } from '../app/horas-e-resumo.js';
 import { estado } from '../estado.js';
+import { temRestricaoDeSetor } from '../meus-setores.js';
 import { __refreshVisibleViews } from './escala-e-relatorios.js';
 import { normalizeRuntimeAusenciaTipo, normalizeRuntimePeriodoTipo } from './normalizacao.js';
 import { atualizarTudo } from './plantao-colaboradores/plantao-regua-e-relatorios.js';
@@ -217,19 +218,33 @@ export function carregarTiposEscala() {
     });
 }
 
+// Duas listas: estado.ausencias respeita o teto de setor da conta (Dashboard,
+// Escala do Dia) e estado.ausenciasLancamentos e a da tela de lancamentos,
+// que e geral. Conta sem teto recebe a mesma lista nas duas, sem segunda
+// requisicao.
 export function carregarAusencias() {
     return withInFlight('ausencias', async () => {
         let lista;
+        let geral;
 
         try {
-            const data = await API.getAusencias();
+            const restrito = temRestricaoDeSetor();
+            const [data, dataGeral] = await Promise.all([
+                API.getAusencias(),
+                restrito ? API.getAusencias({ escopo: 'lancamentos' }) : null
+            ]);
             lista = Array.isArray(data) ? data.map(mapAusencia) : [];
+            geral = restrito
+                ? (Array.isArray(dataGeral) ? dataGeral.map(mapAusencia) : [])
+                : lista;
         } catch (error) {
             lista = falhaAoCarregar('as ausencias', error, estado.ausencias);
+            geral = estado.ausenciasLancamentos;
         }
 
         estado.ausencias = lista;
         estado.ausencias = lista;
+        estado.ausenciasLancamentos = geral;
         return lista;
     });
 }

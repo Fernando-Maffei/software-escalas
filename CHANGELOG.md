@@ -20,6 +20,7 @@ Todas as alteracoes relevantes deste projeto serao documentadas neste arquivo.
 
 ### Alterado
 - **Relatorio mensal so com os lancamentos do Calendario** (ferias, folgas, ausencias e feriados). Os plantoes e as horas extras sairam do calendario, do resumo e do PDF: aparecem no relatorio de escala e no de plantoes.
+- **Lancamentos do mes sem o filtro de setor.** O Calendario e a janela de lancamentos (ferias, folgas e ausencias) mostram e lancam para todos os colaboradores, qualquer que seja o setor permitido da conta. O teto de setores e o "Meus setores" continuam valendo na Escala do Dia, no Banco de Horas e no Dashboard. No backend, `GET /api/colaboradores` e `GET /api/ausencias` aceitam `?escopo=lancamentos`, que so a tela de lancamentos manda; nesse escopo a lista de colaboradores traz so id, nome, situacao e setor (sem horarios). Para a conta sem teto nada muda e nao ha requisicao a mais.
 
 ### Corrigido
 - **Banco de Horas: "Gerar semana" soma de segunda a domingo.** A conta ia da segunda da semana anterior ate a segunda da semana gerada, inclusive: uma folga lancada numa segunda descontava na semana anterior (e de novo na seguinte). Agora a semana de 02/11 soma de 26/10 a 01/11, e o que cai na propria segunda 02/11 entra so na semana de 09/11.
