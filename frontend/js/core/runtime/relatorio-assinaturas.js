@@ -217,7 +217,7 @@ export async function gerarRelatorioAssinaturas() {
 }
 
 // Folha A4 em retrato com as medidas da folha feita no Word (margens de
-// 2,54 cm, Aptos 14/12/11): vai para um iframe fora da tela e e impressa de
+// 2,54 cm, Aptos 14/12/11), mais a linha de assinatura acima de cada nome: vai para um iframe fora da tela e e impressa de
 // la, entao sai so o relatorio (sem menu, botoes nem tema). Cada folha
 // comeca numa pagina. O titulo vira o nome do arquivo em "Salvar como PDF".
 function gerarHtmlImpressaoAssinaturas(relatorio, filtros) {
@@ -240,7 +240,7 @@ function gerarHtmlImpressaoAssinaturas(relatorio, filtros) {
         .folha-datas li { font-size: 12pt; font-weight: 700; line-height: 25pt; }
         .folha-local { margin: 24pt 0 0; font-size: 11pt; }
         .folha-assinaturas { margin: 20pt 0 0; padding: 0; list-style: none; }
-        .folha-assinaturas li { padding-top: 28pt; font-size: 11pt; line-height: 15pt; break-inside: avoid; page-break-inside: avoid; }
+        .folha-assinaturas li { width: max-content; min-width: 9cm; max-width: 100%; margin-top: 34pt; padding-top: 3pt; border-top: 1px solid #000000; font-size: 11pt; line-height: 15pt; break-inside: avoid; page-break-inside: avoid; }
     </style>
 </head>
 <body>

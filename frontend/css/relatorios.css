@@ -401,8 +401,15 @@
     margin-top: 20pt;
 }
 
+/* Linha para assinar acima de cada nome: no minimo 9 cm, ou a largura do
+   nome quando ele e maior. */
 .folha-assinatura .folha-assinaturas li {
-    padding-top: 28pt;
+    width: max-content;
+    min-width: 9cm;
+    max-width: 100%;
+    margin-top: 34pt;
+    padding-top: 3pt;
+    border-top: 1px solid #000000;
     font-size: 11pt;
     line-height: 15pt;
 }
