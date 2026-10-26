@@ -234,13 +234,10 @@ export function mostrarObservacaoPlantao() {
     document.getElementById('plantaoObservacao')?.focus();
 }
 
-export function confirmarLancamentoPlantao() {
-    const state = getPlantaoEditorState();
-
-    if (!state) {
-        return;
-    }
-
+// Valida a linha do formulario e a poe na lista do dia (ou atualiza a linha
+// em edicao). Devolve false, com o aviso na tela, quando ela nao pode entrar.
+// Usada pelo "Adicionar" e pelo salvar do dia (linha preenchida e esquecida).
+export function aplicarFormularioLancamentoPlantao(state) {
     capturarRascunhoPlantao(state);
 
     const nova = lerFormularioLancamentoPlantao(state);
@@ -248,22 +245,22 @@ export function confirmarLancamentoPlantao() {
 
     if (!nova.colaboradorId) {
         mostrarToast('Escolha o colaborador.', 'error');
-        return;
+        return false;
     }
 
     if (!nova.horaInicio || !nova.horaFim) {
         mostrarToast('Informe a hora inicial e a final.', 'error');
-        return;
+        return false;
     }
 
     if (nova.horaFim <= nova.horaInicio) {
         mostrarToast('A hora final precisa ser maior que a inicial.', 'error');
-        return;
+        return false;
     }
 
     if (conflitoDeLancamentoPlantao(state.lancamentos, nova, editando)) {
         mostrarToast(nomeColaboradorPlantao(nova.colaboradorId) + ' ja tem um lancamento que cruza esse horario.', 'error');
-        return;
+        return false;
     }
 
     if (editando === null) {
@@ -285,6 +282,16 @@ export function confirmarLancamentoPlantao() {
         tipoCredito: nova.tipoCredito,
         tipoLancamento: nova.tipoLancamento
     };
+
+    return true;
+}
+
+export function confirmarLancamentoPlantao() {
+    const state = getPlantaoEditorState();
+
+    if (!state || !aplicarFormularioLancamentoPlantao(state)) {
+        return;
+    }
 
     renderPlantaoEditor(state);
     document.getElementById('plantaoNovoColaborador')?.focus();
@@ -657,7 +664,12 @@ export function renderPlantaoEditor(state) {
 
                 capturarRascunhoPlantao(ultimoState);
                 await carregarDisponibilidadePlantao(ultimoState);
-                renderPlantaoEditor(ultimoState);
+
+                // A janela pode ter sido fechada (ou outro dia aberto)
+                // enquanto a busca corria.
+                if (getPlantaoEditorState() === ultimoState) {
+                    renderPlantaoEditor(ultimoState);
+                }
             }, 400);
         });
     });
