@@ -454,10 +454,17 @@ function renderOpcoesColaboradorPlantao(state) {
 }
 
 export async function carregarDisponibilidadePlantao(state) {
+    // O servidor so filtra por horario com o intervalo completo (so uma das
+    // pontas volta 400). Enquanto o usuario preenche a segunda hora, vale a
+    // disponibilidade do dia inteiro.
+    const horaInicio = state.rascunho?.horaInicio || '';
+    const horaFim = state.rascunho?.horaFim || '';
+    const intervaloCompleto = Boolean(horaInicio && horaFim);
+
     try {
         const response = await API.getPlantaoDisponibilidade(state.dataISO, {
-            horaInicio: state.rascunho?.horaInicio || undefined,
-            horaFim: state.rascunho?.horaFim || undefined
+            horaInicio: intervaloCompleto ? horaInicio : undefined,
+            horaFim: intervaloCompleto ? horaFim : undefined
         });
 
         state.disponibilidade = Array.isArray(response?.colaboradores) ? response.colaboradores : [];
