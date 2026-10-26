@@ -40,6 +40,13 @@ function buildColaboradorPayload(body, fallback = {}) {
         throw new AppError(400, 'Nome e obrigatorio.');
     }
 
+    // Opcional: Nome continua sendo o que as telas mostram; o nome completo
+    // vai para relatorios oficiais e documentos de assinatura. Sem o campo na
+    // chamada, a edicao mantem o que estava gravado.
+    const nomeCompleto = body.nomeCompleto !== undefined
+        ? normalizeOptionalText(body.nomeCompleto, 'Nome completo', { maxLength: 300 })
+        : normalizeOptionalText(fallback.NomeCompleto ?? fallback.nomeCompleto, 'Nome completo', { maxLength: 300 });
+
     let trabalhoInicio = body.trabalhoInicio !== undefined
         ? normalizeNullableTime(body.trabalhoInicio, 'Inicio do trabalho')
         : extractTimeString(fallback.TrabalhoInicio || fallback.trabalhoInicio);
@@ -84,6 +91,7 @@ function buildColaboradorPayload(body, fallback = {}) {
 
     return {
         nome,
+        nomeCompleto,
         setorId,
         tipoEscalaId,
         isPlantonista: plantonista.isPlantonista,
@@ -104,9 +112,10 @@ function normalizeNullableId(value, fieldName) {
 }
 
 // So o que a tela de lancamentos usa (select, nome nos cards e no
-// calendario): no escopo geral a conta limitada ve colaboradores de outros
-// setores, mas nao os horarios e demais dados do cadastro deles.
-const COLUNAS_ESCOPO_LANCAMENTOS = 'c.Id, c.Nome, c.Ativo, c.SetorId';
+// calendario) e o nome completo dos documentos de assinatura: no escopo geral
+// a conta limitada ve colaboradores de outros setores, mas nao os horarios e
+// demais dados do cadastro deles.
+const COLUNAS_ESCOPO_LANCAMENTOS = 'c.Id, c.Nome, c.NomeCompleto, c.Ativo, c.SetorId';
 
 function buildColaboradorSelectQuery(options = {}) {
     const { whereClause = '', single = false, colunas = 'c.*' } = options;
@@ -298,6 +307,7 @@ router.post('/', async (req, res) => {
 
         const result = await tx.request()
             .input('nome', sql.NVarChar(300), payload.nome)
+            .input('nomeCompleto', sql.NVarChar(300), payload.nomeCompleto)
             .input('setorId', sql.Int, payload.setorId)
             .input('trabalhoInicio', sql.Time, toSqlTime(payload.trabalhoInicio, 'Inicio do trabalho'))
             .input('trabalhoFim', sql.Time, toSqlTime(payload.trabalhoFim, 'Fim do trabalho'))
@@ -307,9 +317,9 @@ router.post('/', async (req, res) => {
             .input('isPlantonista', sql.Bit, payload.isPlantonista)
             .input('tipoPlantonista', sql.NVarChar(20), payload.tipoPlantonista)
             .query(`
-                INSERT INTO Colaboradores (Nome, SetorId, TrabalhoInicio, TrabalhoFim, AlmocoInicio, AlmocoFim, TipoEscalaId, IsPlantonista, TipoPlantonista)
+                INSERT INTO Colaboradores (Nome, NomeCompleto, SetorId, TrabalhoInicio, TrabalhoFim, AlmocoInicio, AlmocoFim, TipoEscalaId, IsPlantonista, TipoPlantonista)
                 OUTPUT INSERTED.*
-                VALUES (@nome, @setorId, @trabalhoInicio, @trabalhoFim, @almocoInicio, @almocoFim, @tipoEscalaId, @isPlantonista, @tipoPlantonista)
+                VALUES (@nome, @nomeCompleto, @setorId, @trabalhoInicio, @trabalhoFim, @almocoInicio, @almocoFim, @tipoEscalaId, @isPlantonista, @tipoPlantonista)
             `);
         const colaboradorSalvo = result.recordset[0];
 
@@ -347,6 +357,7 @@ router.put('/:id', async (req, res) => {
         const result = await tx.request()
             .input('id', sql.Int, id)
             .input('nome', sql.NVarChar(300), payload.nome)
+            .input('nomeCompleto', sql.NVarChar(300), payload.nomeCompleto)
             .input('setorId', sql.Int, payload.setorId)
             .input('trabalhoInicio', sql.Time, toSqlTime(payload.trabalhoInicio, 'Inicio do trabalho'))
             .input('trabalhoFim', sql.Time, toSqlTime(payload.trabalhoFim, 'Fim do trabalho'))
@@ -358,6 +369,7 @@ router.put('/:id', async (req, res) => {
             .query(`
                 UPDATE Colaboradores
                 SET Nome = @nome,
+                    NomeCompleto = @nomeCompleto,
                     SetorId = @setorId,
                     TrabalhoInicio = @trabalhoInicio,
                     TrabalhoFim = @trabalhoFim,

@@ -435,8 +435,14 @@ export async function abrirEditorColaboradores(id) {
     editorContent.innerHTML = `
             <div class="editor-colaborador">
                 <div class="editor-form-group">
-                    <label><i class="fas fa-user"></i> Nome</label>
-                    <input type="text" id="editorNome" value="${escapeHtml(colaborador?.Nome || '')}" placeholder="Nome completo" class="form-control">
+                    <label for="editorNome"><i class="fas fa-user"></i> Nome / Apelido</label>
+                    <input type="text" id="editorNome" value="${escapeHtml(colaborador?.Nome || '')}" placeholder="Como aparece nas telas e na escala" maxlength="300" class="form-control">
+                </div>
+
+                <div class="editor-form-group">
+                    <label for="editorNomeCompleto"><i class="fas fa-id-card"></i> Nome completo</label>
+                    <input type="text" id="editorNomeCompleto" value="${escapeHtml(colaborador?.NomeCompleto || '')}" placeholder="Ex.: Fernando da Silva Santos" maxlength="300" class="form-control">
+                    <small class="helper-text">Usado nos relatorios oficiais e documentos para assinatura. Em branco, vale o Nome / Apelido.</small>
                 </div>
 
                 <div class="editor-form-group">
@@ -517,6 +523,7 @@ export async function abrirEditorColaborador(id) {
 
 export async function salvarColaboradorEditor(id) {
     const nome = document.getElementById('editorNome')?.value?.trim();
+    const nomeCompleto = document.getElementById('editorNomeCompleto')?.value?.trim() || '';
     const setorId = document.getElementById('editorSetorId')?.value || null;
     const trabalhoInicio = document.getElementById('editorTrabInicio')?.value || null;
     const trabalhoFim = document.getElementById('editorTrabFim')?.value || null;
@@ -558,6 +565,7 @@ export async function salvarColaboradorEditor(id) {
             : null;
         const body = {
             nome,
+            nomeCompleto,
             setorId,
             trabalhoInicio,
             trabalhoFim,

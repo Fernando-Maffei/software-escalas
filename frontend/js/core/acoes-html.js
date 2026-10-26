@@ -15,6 +15,7 @@ import { exportarRelatorioCompleto, fecharRelatorio, resetarSistema } from './ap
 import { exportarRelatorioEscala, gerarRelatorioEscala } from '../telas/escala-relatorio.js';
 import { exportarRelatorioPlantoes, gerarRelatorioPlantoes } from './runtime/escala-e-relatorios.js';
 import { exportarRelatorioDomingos, gerarRelatorioDomingos } from './runtime/relatorio-domingos.js';
+import { gerarRelatorioAssinaturas, imprimirRelatorioAssinaturas } from './runtime/relatorio-assinaturas.js';
 import { gerarRelatorioCompleto } from './runtime/relatorio-mensal.js';
 import { importarDados } from './app.js';
 
@@ -36,11 +37,13 @@ const ACOES = Object.freeze({
     fecharColaboradorEditor,
     fecharEditor,
     fecharRelatorio,
+    gerarRelatorioAssinaturas,
     gerarRelatorioCompleto,
     gerarRelatorioDomingos,
     gerarRelatorioEscala,
     gerarRelatorioPlantoes,
     importarDados,
+    imprimirRelatorioAssinaturas,
     mostrarObservacaoPlantao,
     removerLancamentoPlantao,
     resetarSistema,

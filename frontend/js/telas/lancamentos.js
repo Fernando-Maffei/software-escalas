@@ -239,6 +239,7 @@ export function carregarDiretorioColaboradores(forcar = false) {
             diretorioColaboradores.set(id, {
                 id,
                 nome: colaborador.Nome || colaborador.nome || `Colaborador #${id}`,
+                nomeCompleto: colaborador.NomeCompleto || colaborador.nomeCompleto || '',
                 ativo: !(colaborador.Ativo === 0 || colaborador.Ativo === false),
                 setor: colaborador.SetorNome || colaborador.setorNome || ''
             });
@@ -265,7 +266,7 @@ export function resolverColaborador(id) {
         .find((item) => Number(item.Id ?? item.id) === numero);
 
     if (daLista) {
-        return { id: numero, nome: daLista.Nome || daLista.nome, ativo: true, setor: '' };
+        return { id: numero, nome: daLista.Nome || daLista.nome, nomeCompleto: daLista.NomeCompleto || '', ativo: true, setor: '' };
     }
 
     // Registro orfao de verdade: o colaborador foi excluido em definitivo.

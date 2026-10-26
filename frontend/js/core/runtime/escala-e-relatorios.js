@@ -19,6 +19,7 @@ import { normalizeRuntimeToken } from './normalizacao.js';
 import { isColaboradoresScreenVisible } from './plantao-colaboradores/helpers.js';
 import { ehCoberturaAlmocoPlantao, normalizarTipoLancamentoPlantao, PLANTAO_TIPO_LANCAMENTO_OPCOES, renderListaColaboradores, rotuloTipoLancamentoPlantao } from './plantao-colaboradores/plantao-editor.js';
 import { ehDataPlantaoValida, renderLancamentoPlantao } from './plantao-colaboradores/plantao-regua-e-relatorios.js';
+import { gerarRelatorioAssinaturas, renderPainelRelatorioAssinaturas } from './relatorio-assinaturas.js';
 import { gerarRelatorioDomingos, renderPainelRelatorioDomingos } from './relatorio-domingos.js';
 import { gerarRelatorioCompleto } from './relatorio-mensal.js';
 import { atributosAcao } from '../../lib/atributos-acao.js';
@@ -80,7 +81,11 @@ function captureRelatoriosStateEscala() {
         plantaoTipo: document.getElementById('relatorioPlantaoTipo')?.value || 'todos',
         domingosInicio: document.getElementById('relatorioDomingosInicio')?.value || '',
         domingosFim: document.getElementById('relatorioDomingosFim')?.value || '',
-        domingosColaborador: document.getElementById('relatorioDomingosColaborador')?.value || ''
+        domingosColaborador: document.getElementById('relatorioDomingosColaborador')?.value || '',
+        assinaturaMes: document.getElementById('relatorioAssinaturaMes')?.value || '',
+        assinaturaAno: document.getElementById('relatorioAssinaturaAno')?.value || '',
+        assinaturaTipo: document.getElementById('relatorioAssinaturaTipo')?.value || '',
+        assinaturaCidade: document.getElementById('relatorioAssinaturaCidade')?.value || ''
     };
 }
 
@@ -110,6 +115,10 @@ function restoreRelatoriosStateEscala(snapshot) {
     setValue('relatorioDomingosInicio', snapshot.domingosInicio);
     setValue('relatorioDomingosFim', snapshot.domingosFim);
     setValue('relatorioDomingosColaborador', snapshot.domingosColaborador);
+    setValue('relatorioAssinaturaMes', snapshot.assinaturaMes);
+    setValue('relatorioAssinaturaAno', snapshot.assinaturaAno);
+    setValue('relatorioAssinaturaTipo', snapshot.assinaturaTipo);
+    setValue('relatorioAssinaturaCidade', snapshot.assinaturaCidade);
 }
 
 async function refreshRelatoriosViewEscala() {
@@ -127,6 +136,11 @@ async function refreshRelatoriosViewEscala() {
     restoreRelatoriosStateEscala(snapshot);
 
     const reportKey = normalizeRuntimeToken(snapshot.reportTitle);
+
+    if (reportKey.includes('assinatura')) {
+        await gerarRelatorioAssinaturas();
+        return;
+    }
 
     if (reportKey.includes('domingos')) {
         await gerarRelatorioDomingos();
@@ -687,6 +701,9 @@ export async function renderRelatorios() {
                 <button type="button" class="relatorios-aba" data-relatorio-aba="domingos" role="tab" aria-selected="false">
                     <i class="fas fa-calendar-week"></i> Domingos e feriados
                 </button>
+                <button type="button" class="relatorios-aba" data-relatorio-aba="assinaturas" role="tab" aria-selected="false">
+                    <i class="fas fa-file-signature"></i> Assinaturas
+                </button>
             </div>
 
             <div class="relatorios-grid">
@@ -843,6 +860,8 @@ export async function renderRelatorios() {
                 </div>
 
                 ${renderPainelRelatorioDomingos(buildPlantaoColaboradorOptions())}
+
+                ${renderPainelRelatorioAssinaturas()}
             </div>
 
             <div id="relatorioVisualizacao" class="relatorio-visualizacao" style="display: none;">
