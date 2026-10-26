@@ -1,9 +1,9 @@
-// Relatorio "Lancamentos para assinatura": as folhas de escala que o time
-// imprime para o colaborador assinar, montadas a partir dos lancamentos do mes.
-// Puro (sem DOM, sem API) para poder ser testado no runner unitario; quem le
-// os registros e desenha a tela e core/runtime/relatorio-assinaturas.js.
+// Relatorio "Lancamentos para assinatura": as folhas de escala de plantao que
+// o time imprime para o colaborador assinar, montadas a partir dos plantoes do
+// mes. Puro (sem DOM, sem API) para poder ser testado no runner unitario; quem
+// le os registros e desenha a tela e core/runtime/relatorio-assinaturas.js.
 //
-// Uma folha por tipo de lancamento, no formato da folha feita a mao:
+// Duas folhas, no formato da folha feita a mao:
 //
 //   Escala de Sabados das 8h as 12h e 9h as 13h de Novembro de 2026
 //   07/11/2026 -> Luis, Vinicius, Deborah, Joao Vitor
@@ -11,33 +11,24 @@
 //   Jales, 26 de Outubro de 2026.
 //   NOMES COMPLETOS (um por linha, com espaco para assinar)
 //
-// Nas linhas de data vai o Nome/Apelido; na lista de assinaturas, o nome
-// completo (ou o Nome, quando ele nao foi preenchido).
+// e a de domingos e feriados, igual. Nas linhas de data vai o Nome/Apelido; na
+// lista de assinaturas, o nome completo (ou o Nome, quando ele nao foi
+// preenchido). So plantao entra: folga, ferias, ausencia e cobertura de almoco
+// ficam de fora.
 //
-// Cada pessoa aparece uma vez por data em cada folha: dois turnos do mesmo
-// tipo no mesmo dia nao repetem o nome. Ferias de varios dias sao uma linha
-// com o periodo recortado ao mes. Tipos diferentes no mesmo dia (plantao e
-// cobertura de almoco, folga e plantao) saem cada um na sua folha.
+// Cada pessoa aparece uma vez por data: dois turnos no mesmo dia nao repetem o
+// nome.
 
-// Ordem das folhas. `horarioNoTitulo`: o horario do turno vai para o titulo
-// ("das 8h as 12h"), como na folha de sabados; nos outros tipos o detalhe
-// (subtipo, parcial) vai entre parenteses ao lado do nome.
-/** @type {Readonly<Record<string, {rotulo: string, titulo: string, horarioNoTitulo?: boolean}>>} */
-const TIPOS = Object.freeze({
-    plantao_sabado: { rotulo: 'Plantão de sábado', titulo: 'Escala de Sábados', horarioNoTitulo: true },
-    plantao_domingo: { rotulo: 'Plantão de domingo', titulo: 'Escala de Domingos', horarioNoTitulo: true },
-    plantao_feriado: { rotulo: 'Plantão de feriado', titulo: 'Escala de Feriados', horarioNoTitulo: true },
-    plantao_cobertura_almoco: { rotulo: 'Cobertura de almoço', titulo: 'Escala de Cobertura de Almoço', horarioNoTitulo: true },
-    folga: { rotulo: 'Folga', titulo: 'Folgas' },
-    ferias: { rotulo: 'Férias', titulo: 'Férias' },
-    ausencia: { rotulo: 'Ausência', titulo: 'Ausências' },
-    folga_domingo: { rotulo: 'Folga de domingo', titulo: 'Folgas de Domingo' },
-    reposicao_domingo: { rotulo: 'Reposição de folga de domingo', titulo: 'Reposições de Folga de Domingo', horarioNoTitulo: true }
+// Ordem das folhas e os tipos de lancamento de plantao de cada uma.
+/** @type {Readonly<Record<string, {rotulo: string, titulo: string, tipos: string[]}>>} */
+const FOLHAS = Object.freeze({
+    sabados: { rotulo: 'Sábados', titulo: 'Escala de Sábados', tipos: ['sabado'] },
+    domingos_feriados: { rotulo: 'Domingos e feriados', titulo: 'Escala de Domingos e Feriados', tipos: ['domingo', 'feriado'] }
 });
 
-// Para o filtro "Tipo" da tela: [chave, rotulo].
+// Para o filtro "Folha" da tela: [chave, rotulo].
 export const TIPOS_FOLHA_ASSINATURA = Object.freeze(
-    Object.entries(TIPOS).map(([chave, tipo]) => Object.freeze([chave, tipo.rotulo]))
+    Object.entries(FOLHAS).map(([chave, folha]) => Object.freeze([chave, folha.rotulo]))
 );
 
 const MESES = [
@@ -69,14 +60,6 @@ function formatarData(dataISO) {
     return ano && mes && dia ? `${dia}/${mes}/${ano}` : '--';
 }
 
-function textoDoPeriodo(inicioISO, fimISO) {
-    if (inicioISO === fimISO) {
-        return formatarData(inicioISO);
-    }
-
-    return `${formatarData(inicioISO)} a ${formatarData(fimISO)}`;
-}
-
 // "08:00-12:00" -> "8h às 12h"; "08:30-12:00" -> "8h30 às 12h".
 function horaCurta(hora) {
     const [h, m] = String(hora).split(':');
@@ -98,85 +81,43 @@ function juntarComE(itens) {
 
 const ehFaixaDeHorario = (valor) => /^\d{2}:\d{2}-\d{2}:\d{2}$/.test(String(valor || ''));
 
-// Lancamentos normalizados: um por (periodo, colaborador, tipo).
-function coletarLancamentos(dados) {
-    const { inicioISO, fimISO } = dados;
-    const lancamentos = new Map();
+function folhaDoTipo(tipoLancamento) {
+    return Object.keys(FOLHAS).find((chave) => FOLHAS[chave].tipos.includes(tipoLancamento)) || null;
+}
 
-    const adicionar = ({ colaboradorId, tipo, inicio, fim = inicio, horario = '', detalhe = '' }) => {
-        const id = Number(colaboradorId);
+// Escalas normalizadas: uma por (folha, data, colaborador), com os horarios
+// dos turnos em que a pessoa esta naquele dia.
+function coletarEscalas(dados) {
+    const escalas = new Map();
 
-        if (!TIPOS[tipo] || !Number.isFinite(id) || !inicio || fim < inicioISO || inicio > fimISO) {
+    (dados.plantoes || []).forEach((plantao) => {
+        const folha = folhaDoTipo(plantao.tipoLancamento);
+        const dataISO = plantao.dataISO;
+
+        if (!folha || !dataISO || dataISO < dados.inicioISO || dataISO > dados.fimISO) {
             return;
         }
 
-        const inicioNoMes = inicio < inicioISO ? inicioISO : inicio;
-        const fimNoMes = fim > fimISO ? fimISO : fim;
-        const chave = `${inicioNoMes}|${fimNoMes}|${id}|${tipo}`;
-
-        if (!lancamentos.has(chave)) {
-            lancamentos.set(chave, {
-                colaboradorId: id,
-                tipo,
-                inicioISO: inicioNoMes,
-                fimISO: fimNoMes,
-                horarios: new Set(),
-                detalhes: new Set()
-            });
-        }
-
-        const lancamento = lancamentos.get(chave);
-
-        if (ehFaixaDeHorario(horario)) {
-            lancamento.horarios.add(horario);
-        }
-
-        if (detalhe) {
-            lancamento.detalhes.add(detalhe);
-        }
-    };
-
-    (dados.ausencias || []).forEach((item) => {
-        adicionar({
-            colaboradorId: item.colaboradorId,
-            tipo: item.tipo,
-            inicio: item.inicioISO,
-            fim: item.fimISO || item.inicioISO,
-            detalhe: item.detalhe
-        });
-    });
-
-    (dados.plantoes || []).forEach((plantao) => {
         (plantao.colaboradores || []).forEach((colaboradorId) => {
-            adicionar({
-                colaboradorId,
-                tipo: `plantao_${plantao.tipoLancamento}`,
-                inicio: plantao.dataISO,
-                horario: plantao.horario
-            });
+            const id = Number(colaboradorId);
+
+            if (!Number.isFinite(id)) {
+                return;
+            }
+
+            const chave = `${folha}|${dataISO}|${id}`;
+
+            if (!escalas.has(chave)) {
+                escalas.set(chave, { folha, dataISO, colaboradorId: id, horarios: new Set() });
+            }
+
+            if (ehFaixaDeHorario(plantao.horario)) {
+                escalas.get(chave).horarios.add(plantao.horario);
+            }
         });
     });
 
-    (dados.folgasDomingo || []).forEach((folga) => {
-        adicionar({
-            colaboradorId: folga.colaboradorId,
-            tipo: 'folga_domingo',
-            inicio: folga.dataDomingo,
-            detalhe: folga.dataReposicao ? `reposição em ${formatarData(folga.dataReposicao)}` : 'reposição a definir'
-        });
-
-        if (folga.dataReposicao) {
-            adicionar({
-                colaboradorId: folga.colaboradorId,
-                tipo: 'reposicao_domingo',
-                inicio: folga.dataReposicao,
-                horario: folga.horarioReposicao,
-                detalhe: `domingo ${formatarData(folga.dataDomingo)}`
-            });
-        }
-    });
-
-    return [...lancamentos.values()];
+    return [...escalas.values()];
 }
 
 /**
@@ -186,18 +127,14 @@ function coletarLancamentos(dados) {
  * @param {string} dados.inicioISO  primeiro dia do mes (YYYY-MM-DD)
  * @param {string} dados.fimISO     ultimo dia do mes
  * @param {string} dados.rotuloMes  "Novembro de 2026"
- * @param {string} [dados.tipo]     so a folha deste tipo (vazio = todas)
- * @param {Array<{colaboradorId:number, tipo:string, inicioISO:string, fimISO?:string, detalhe?:string}>} [dados.ausencias]
- *        folga / ferias / ausencia (tipo ja normalizado), detalhe pronto
- *        (subtipo, "Parcial 08:00-12:00")
+ * @param {string} [dados.folha]    so esta folha (sabados / domingos_feriados; vazio = as duas)
  * @param {Array<{dataISO:string, tipoLancamento:string, colaboradores:number[], horario?:string}>} [dados.plantoes]
  *        tipoLancamento ja normalizado: sabado / domingo / feriado / cobertura_almoco;
  *        horario "HH:MM-HH:MM"
- * @param {Array<{colaboradorId:number, dataDomingo:string, dataReposicao?:string, horarioReposicao?:string}>} [dados.folgasDomingo]
  * @param {(id:number) => {apelido:string, nomeCompleto?:string}} dados.nomeDe
  */
 export function montarFolhasAssinatura(dados) {
-    const lancamentos = coletarLancamentos(dados).filter((item) => !dados.tipo || item.tipo === dados.tipo);
+    const escalas = coletarEscalas(dados).filter((item) => !dados.folha || item.folha === dados.folha);
     const nomes = new Map();
     const nomeDe = (id) => {
         if (!nomes.has(id)) {
@@ -210,54 +147,40 @@ export function montarFolhasAssinatura(dados) {
     };
     const primeiroHorario = (item) => [...item.horarios].sort()[0] || '';
 
-    const folhas = Object.entries(TIPOS).flatMap(([chave, tipo]) => {
-        const itens = lancamentos.filter((item) => item.tipo === chave);
+    const folhas = Object.entries(FOLHAS).flatMap(([chave, folha]) => {
+        const itens = escalas.filter((item) => item.folha === chave);
 
         if (itens.length === 0) {
             return [];
         }
 
         const horarios = [...new Set(itens.flatMap((item) => [...item.horarios]))].sort();
-        const textoHorarios = tipo.horarioNoTitulo && horarios.length ? ` das ${juntarComE(horarios.map(textoDoHorario))}` : '';
-        const porPeriodo = new Map();
+        const textoHorarios = horarios.length ? ` das ${juntarComE(horarios.map(textoDoHorario))}` : '';
+        const datasISO = [...new Set(itens.map((item) => item.dataISO))].sort();
 
-        itens.forEach((item) => {
-            const periodo = `${item.inicioISO}|${item.fimISO}`;
-
-            if (!porPeriodo.has(periodo)) {
-                porPeriodo.set(periodo, []);
-            }
-
-            porPeriodo.get(periodo).push(item);
-        });
-
-        const datas = [...porPeriodo.entries()]
-            .sort(([a], [b]) => a.localeCompare(b))
-            .map(([periodo, doPeriodo]) => {
-                const [inicioISO, fimISO] = periodo.split('|');
-                const pessoas = [...doPeriodo].sort((a, b) => (
+        const datas = datasISO.map((dataISO) => {
+            const pessoas = itens
+                .filter((item) => item.dataISO === dataISO)
+                .sort((a, b) => (
                     primeiroHorario(a).localeCompare(primeiroHorario(b))
                     || nomeDe(a.colaboradorId).apelido.localeCompare(nomeDe(b.colaboradorId).apelido, 'pt-BR')
                 ));
 
-                return {
-                    inicioISO,
-                    data: textoDoPeriodo(inicioISO, fimISO),
-                    nomes: pessoas.map((item) => {
-                        const { apelido } = nomeDe(item.colaboradorId);
-                        return item.detalhes.size ? `${apelido} (${[...item.detalhes].join(', ')})` : apelido;
-                    })
-                };
-            });
+            return {
+                dataISO,
+                data: formatarData(dataISO),
+                nomes: pessoas.map((item) => nomeDe(item.colaboradorId).apelido)
+            };
+        });
 
         const assinaturas = [...new Set(itens.map((item) => item.colaboradorId))]
             .map((id) => nomeDe(id).assinatura)
             .sort((a, b) => a.localeCompare(b, 'pt-BR'));
 
         return [{
-            tipo: chave,
-            rotulo: tipo.rotulo,
-            titulo: `${tipo.titulo}${textoHorarios} de ${dados.rotuloMes}`,
+            folha: chave,
+            rotulo: folha.rotulo,
+            titulo: `${folha.titulo}${textoHorarios} de ${dados.rotuloMes}`,
             datas,
             assinaturas
         }];
@@ -267,8 +190,8 @@ export function montarFolhasAssinatura(dados) {
         folhas,
         totais: {
             folhas: folhas.length,
-            lancamentos: lancamentos.length,
-            colaboradores: new Set(lancamentos.map((item) => item.colaboradorId)).size
+            escalas: escalas.length,
+            colaboradores: new Set(escalas.map((item) => item.colaboradorId)).size
         }
     };
 }
