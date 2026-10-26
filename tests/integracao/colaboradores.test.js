@@ -1,6 +1,6 @@
 const assert = require('node:assert/strict');
 
-const { consultar, criarCliente, esperarSucesso } = require('./apoio');
+const { consultar, criarCliente, esperarSucesso, nomeUnico } = require('./apoio');
 const {
     DATAS,
     criarColaborador,
@@ -82,6 +82,60 @@ module.exports = [
                 lista.map((item) => item.Id),
                 [criado.Id]
             );
+        }
+    },
+    {
+        // Nome completo e opcional e nao mexe no Nome que as telas usam.
+        name: 'nome completo e gravado, editado, mantido quando nao enviado e limpo com vazio',
+        async run() {
+            const cliente = criarCliente();
+            await cliente.entrar();
+
+            const semNomeCompleto = await criarColaborador(cliente, { nome: nomeUnico('Fernando') });
+            assert.equal(semNomeCompleto.NomeCompleto, null);
+
+            const criado = await criarColaborador(cliente, {
+                nome: nomeUnico('Beto'),
+                nomeCompleto: '  Roberto da Silva Santos  '
+            });
+            assert.equal(criado.NomeCompleto, 'Roberto da Silva Santos');
+
+            const editado = esperarSucesso(
+                await cliente.put(`/api/colaboradores/${criado.Id}`, {
+                    nomeCompleto: 'Roberto Carlos da Silva Santos'
+                }),
+                'editar nome completo'
+            );
+            assert.equal(editado.data.NomeCompleto, 'Roberto Carlos da Silva Santos');
+            assert.equal(editado.data.Nome, criado.Nome);
+
+            const outraEdicao = esperarSucesso(
+                await cliente.put(`/api/colaboradores/${criado.Id}`, { nome: `${criado.Nome} B` }),
+                'editar so o nome'
+            );
+            assert.equal(outraEdicao.data.NomeCompleto, 'Roberto Carlos da Silva Santos');
+
+            const lido = esperarSucesso(await cliente.get(`/api/colaboradores/${criado.Id}`), 'ler colaborador');
+            assert.equal(lido.NomeCompleto, 'Roberto Carlos da Silva Santos');
+
+            // O escopo geral (diretorio da tela de lancamentos e do relatorio
+            // de assinaturas) traz o nome completo, mas segue sem o horario.
+            const diretorio = esperarSucesso(
+                await cliente.get('/api/colaboradores?escopo=lancamentos&incluirInativos=1'),
+                'diretorio geral'
+            );
+            const doDiretorio = diretorio.find((item) => item.Id === criado.Id);
+            assert.equal(doDiretorio.NomeCompleto, 'Roberto Carlos da Silva Santos');
+            assert.equal('TrabalhoInicio' in doDiretorio, false);
+
+            const limpo = esperarSucesso(
+                await cliente.put(`/api/colaboradores/${criado.Id}`, { nomeCompleto: '   ' }),
+                'limpar nome completo'
+            );
+            assert.equal(limpo.data.NomeCompleto, null);
+
+            const longo = await cliente.put(`/api/colaboradores/${criado.Id}`, { nomeCompleto: 'x'.repeat(301) });
+            assert.equal(longo.status, 400);
         }
     },
     {

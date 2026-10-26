@@ -114,7 +114,9 @@ const TABELAS_BACKUP = Object.freeze([
                 max: 20,
                 apelidos: ['tipoPlantonista'],
                 enumeracao: TIPOS_PLANTONISTA_VALORES
-            })
+            }),
+            // Opcional; backup anterior a coluna restaura sem nome completo.
+            col('NomeCompleto', TIPO.TEXTO, { max: 300, apelidos: ['nomeCompleto'] })
         ],
         jornada: true
     },

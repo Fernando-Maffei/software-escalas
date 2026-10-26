@@ -346,6 +346,39 @@
     white-space: nowrap;
 }
 
+/* Lancamentos para assinatura: a coluna de assinatura e um campo em branco
+   com altura para assinar; o primeiro lancamento de cada dia ganha uma linha
+   mais forte para separar as datas. A folha impressa tem estilo proprio
+   (core/runtime/relatorio-assinaturas.js). */
+.relatorio-assinaturas-tabela .col-data {
+    width: 16%;
+    white-space: nowrap;
+}
+
+.relatorio-assinaturas-tabela .col-assinatura {
+    width: 30%;
+    min-width: 200px;
+}
+
+.relatorio-assinaturas-tabela td {
+    height: 44px;
+}
+
+.relatorio-assinaturas-tabela td.col-assinatura {
+    border-left: 1px dashed var(--border);
+}
+
+.relatorio-assinaturas-tabela td small {
+    display: block;
+    margin-top: 2px;
+    color: var(--text-light);
+    font-size: 12px;
+}
+
+.relatorio-assinaturas-tabela tr.novo-dia td {
+    border-top: 2px solid var(--border);
+}
+
 .relatorio-tabela tr.feriado {
     background: var(--danger-soft);
 }
