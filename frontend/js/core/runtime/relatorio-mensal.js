@@ -72,7 +72,7 @@ function montarHorarioRelatorio(inicio, fim) {
     return horaInicio || horaFim || '';
 }
 
-export function montarDetalheAusenciaRelatorio(item) {
+function montarDetalheAusenciaRelatorio(item) {
     const subtipo = String(item.Subtipo || item.subtipo || '').trim().toLowerCase();
     const parcial = String(item.PeriodoTipo || item.periodoTipo || '').trim().toLowerCase() === 'horas';
     const horario = parcial
@@ -86,7 +86,7 @@ export function montarDetalheAusenciaRelatorio(item) {
     };
 }
 
-export function textoDetalheRelatorio(detalhe) {
+function textoDetalheRelatorio(detalhe) {
     const partes = [];
 
     if (detalhe.subtipo) {

@@ -66,92 +66,63 @@ module.exports = [
         }
     },
     {
-        // Dois turnos do mesmo tipo no mesmo dia nao repetem o nome; tipos
-        // diferentes saem cada um na sua folha, na ordem fixa dos tipos.
-        name: 'montarFolhasAssinatura: uma folha por tipo, sem nome repetido na mesma data',
+        // Domingo e feriado dividem uma folha so, em ordem de data; cobertura
+        // de almoco nao e plantao de fim de semana e fica fora.
+        name: 'montarFolhasAssinatura: domingos e feriados juntos numa folha, cobertura de almoco fora',
         run() {
             const relatorio = montarFolhasAssinatura({
                 ...NOVEMBRO,
-                ausencias: [
-                    { colaboradorId: 2, tipo: 'folga', inicioISO: '2026-11-09', fimISO: '2026-11-09' }
-                ],
+                plantoes: [
+                    { dataISO: '2026-11-20', tipoLancamento: 'feriado', colaboradores: [3], horario: '08:00-12:00' },
+                    { dataISO: '2026-11-08', tipoLancamento: 'domingo', colaboradores: [1, 4], horario: '08:00-12:00' },
+                    { dataISO: '2026-11-07', tipoLancamento: 'sabado', colaboradores: [2], horario: '08:00-12:00' },
+                    { dataISO: '2026-11-09', tipoLancamento: 'cobertura_almoco', colaboradores: [2], horario: '12:00-13:00' }
+                ]
+            });
+
+            assert.deepEqual(relatorio.folhas.map((folha) => folha.folha), ['sabados', 'domingos_feriados']);
+            assert.deepEqual(resumoDe(relatorio.folhas[1]), {
+                titulo: 'Escala de Domingos e Feriados das 8h às 12h de Novembro de 2026',
+                datas: ['08/11/2026 -> Fernando, Luis', '20/11/2026 -> Débora'],
+                assinaturas: ['DÉBORA SOUZA LIMA', 'FERNANDO DA SILVA SANTOS', 'LUÍS HENRIQUE GOMES']
+            });
+            assert.deepEqual(relatorio.totais, { folhas: 2, escalas: 4, colaboradores: 4 });
+        }
+    },
+    {
+        // Dois turnos no mesmo dia nao repetem o nome; plantao fora do mes
+        // nao entra.
+        name: 'montarFolhasAssinatura: sem nome repetido na mesma data e so o mes pedido',
+        run() {
+            const { folhas } = montarFolhasAssinatura({
+                ...NOVEMBRO,
                 plantoes: [
                     { dataISO: '2026-11-07', tipoLancamento: 'sabado', colaboradores: [1], horario: '08:00-12:00' },
                     { dataISO: '2026-11-07', tipoLancamento: 'sabado', colaboradores: [1], horario: '13:00-17:00' },
-                    { dataISO: '2026-11-07', tipoLancamento: 'cobertura_almoco', colaboradores: [1], horario: '12:00-13:00' }
+                    { dataISO: '2026-10-31', tipoLancamento: 'sabado', colaboradores: [2], horario: '08:00-12:00' },
+                    { dataISO: '2026-12-05', tipoLancamento: 'sabado', colaboradores: [3], horario: '08:00-12:00' }
                 ]
             });
 
-            assert.deepEqual(relatorio.folhas.map((folha) => folha.tipo), ['plantao_sabado', 'plantao_cobertura_almoco', 'folga']);
-            assert.deepEqual(relatorio.folhas[0].datas.map((linha) => linha.nomes), [['Fernando']]);
-            assert.equal(relatorio.folhas[0].titulo, 'Escala de Sábados das 8h às 12h e 13h às 17h de Novembro de 2026');
-            assert.equal(relatorio.folhas[2].titulo, 'Folgas de Novembro de 2026');
-            assert.deepEqual(relatorio.totais, { folhas: 3, lancamentos: 3, colaboradores: 2 });
-        }
-    },
-    {
-        // Ferias de varios dias sao uma linha so, com o periodo recortado ao
-        // mes; o detalhe vai entre parenteses; o que nao toca o mes fica fora.
-        name: 'montarFolhasAssinatura: ausencias com periodo recortado ao mes e detalhe',
-        run() {
-            const { folhas } = montarFolhasAssinatura({
-                ...NOVEMBRO,
-                ausencias: [
-                    { colaboradorId: 1, tipo: 'ferias', inicioISO: '2026-10-20', fimISO: '2026-11-04' },
-                    { colaboradorId: 3, tipo: 'ausencia', inicioISO: '2026-11-10', fimISO: '2026-11-10', detalhe: 'Atestado - Parcial 08:00-12:00' },
-                    { colaboradorId: 2, tipo: 'folga', inicioISO: '2026-12-01', fimISO: '2026-12-01' }
-                ]
+            assert.deepEqual(resumoDe(folhas[0]), {
+                titulo: 'Escala de Sábados das 8h às 12h e 13h às 17h de Novembro de 2026',
+                datas: ['07/11/2026 -> Fernando'],
+                assinaturas: ['FERNANDO DA SILVA SANTOS']
             });
-
-            assert.deepEqual(folhas.map(resumoDe), [
-                {
-                    titulo: 'Férias de Novembro de 2026',
-                    datas: ['01/11/2026 a 04/11/2026 -> Fernando'],
-                    assinaturas: ['FERNANDO DA SILVA SANTOS']
-                },
-                {
-                    titulo: 'Ausências de Novembro de 2026',
-                    datas: ['10/11/2026 -> Débora (Atestado - Parcial 08:00-12:00)'],
-                    assinaturas: ['DÉBORA SOUZA LIMA']
-                }
-            ]);
         }
     },
     {
-        name: 'montarFolhasAssinatura: folga de domingo e a reposicao em folhas proprias',
-        run() {
-            const { folhas } = montarFolhasAssinatura({
-                ...NOVEMBRO,
-                folgasDomingo: [
-                    { colaboradorId: 4, dataDomingo: '2026-11-08', dataReposicao: '2026-11-21', horarioReposicao: '08:00-12:00' },
-                    { colaboradorId: 2, dataDomingo: '2026-11-15' }
-                ]
-            });
-
-            assert.deepEqual(folhas.map(resumoDe), [
-                {
-                    titulo: 'Folgas de Domingo de Novembro de 2026',
-                    datas: ['08/11/2026 -> Luis (reposição em 21/11/2026)', '15/11/2026 -> Jean (reposição a definir)'],
-                    assinaturas: ['JEAN', 'LUÍS HENRIQUE GOMES']
-                },
-                {
-                    titulo: 'Reposições de Folga de Domingo das 8h às 12h de Novembro de 2026',
-                    datas: ['21/11/2026 -> Luis (domingo 08/11/2026)'],
-                    assinaturas: ['LUÍS HENRIQUE GOMES']
-                }
-            ]);
-        }
-    },
-    {
-        name: 'montarFolhasAssinatura: filtro de tipo, colaborador sem cadastro e mes vazio',
+        name: 'montarFolhasAssinatura: filtro de folha, colaborador sem cadastro e mes vazio',
         run() {
             const dados = {
                 ...NOVEMBRO,
-                ausencias: [{ colaboradorId: 2, tipo: 'folga', inicioISO: '2026-11-09', fimISO: '2026-11-09' }],
-                plantoes: [{ dataISO: '2026-11-07', tipoLancamento: 'sabado', colaboradores: [99], horario: '08:30-12:00' }]
+                plantoes: [
+                    { dataISO: '2026-11-07', tipoLancamento: 'sabado', colaboradores: [99], horario: '08:30-12:00' },
+                    { dataISO: '2026-11-08', tipoLancamento: 'domingo', colaboradores: [2], horario: '08:00-12:00' }
+                ]
             };
 
-            const soSabados = montarFolhasAssinatura({ ...dados, tipo: 'plantao_sabado' });
+            const soSabados = montarFolhasAssinatura({ ...dados, folha: 'sabados' });
             assert.deepEqual(soSabados.folhas.map(resumoDe), [{
                 titulo: 'Escala de Sábados das 8h30 às 12h de Novembro de 2026',
                 datas: ['07/11/2026 -> Colaborador #99'],
@@ -159,22 +130,15 @@ module.exports = [
             }]);
 
             const vazio = montarFolhasAssinatura({ ...NOVEMBRO });
-            assert.deepEqual(vazio, { folhas: [], totais: { folhas: 0, lancamentos: 0, colaboradores: 0 } });
+            assert.deepEqual(vazio, { folhas: [], totais: { folhas: 0, escalas: 0, colaboradores: 0 } });
         }
     },
     {
-        name: 'TIPOS_FOLHA_ASSINATURA lista os tipos na ordem das folhas',
+        name: 'TIPOS_FOLHA_ASSINATURA lista as duas folhas na ordem',
         run() {
-            assert.deepEqual(TIPOS_FOLHA_ASSINATURA.map(([chave]) => chave), [
-                'plantao_sabado',
-                'plantao_domingo',
-                'plantao_feriado',
-                'plantao_cobertura_almoco',
-                'folga',
-                'ferias',
-                'ausencia',
-                'folga_domingo',
-                'reposicao_domingo'
+            assert.deepEqual(TIPOS_FOLHA_ASSINATURA.map((item) => [...item]), [
+                ['sabados', 'Sábados'],
+                ['domingos_feriados', 'Domingos e feriados']
             ]);
         }
     }

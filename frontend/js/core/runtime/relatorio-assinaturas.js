@@ -1,11 +1,11 @@
 // Relatorio "Lancamentos para assinatura" (aba da tela de Relatorios): as
-// folhas de escala do mes — uma por tipo de lancamento — para o colaborador
-// assinar, no formato da folha que o time fazia a mao. As folhas saem de
+// folhas de escala de plantao do mes — sabados, e domingos e feriados — para o
+// colaborador assinar, no formato da folha que o time fazia a mao. As folhas saem de
 // lib/lancamentos-assinatura.js; aqui ficam filtros, leitura, tela e
 // impressao.
 //
-// Le os registros de verdade pelas mesmas rotas das outras telas, no escopo
-// da conta (o teto de setor vale para os tres tipos): o Nome/Apelido vai nas
+// Le os plantoes pela mesma rota da tela de plantoes, no escopo da conta (o
+// teto de setor vale): o Nome/Apelido vai nas
 // linhas de data e o nome completo do cadastro na lista de assinaturas.
 import { atributosAcao } from '../../lib/atributos-acao.js';
 import { escapeHtml } from '../../lib/html-seguro.js';
@@ -14,9 +14,7 @@ import { carregarDiretorioColaboradores, resolverColaborador } from '../../telas
 import { API } from '../api.js';
 import { mostrarToast } from '../app/horas-e-resumo.js';
 import { gerarOptionsMeses } from '../app/relatorios-export.js';
-import { normalizeRuntimeAusenciaTipo } from './normalizacao.js';
 import { normalizarTipoLancamentoPlantao } from './plantao-colaboradores/plantao-editor.js';
-import { montarDetalheAusenciaRelatorio, textoDetalheRelatorio } from './relatorio-mensal.js';
 
 const TITULO_RELATORIO_ASSINATURAS = 'Lançamentos para assinatura';
 
@@ -51,7 +49,7 @@ export function renderPainelRelatorioAssinaturas() {
                 </div>
                 <div class="relatorio-card-body">
                     <p class="relatorio-descricao">
-                        Folhas de escala do mês para assinatura: uma por tipo de lançamento, com as datas e os colaboradores, o local e a data, e o nome completo de cada um para assinar.
+                        Folhas de escala de plantão do mês para assinatura: uma de sábados e uma de domingos e feriados, com as datas e os colaboradores, o local e a data, e o nome completo de cada um para assinar.
                     </p>
                     <div class="relatorio-filtros">
                         <div class="filtro-group">
@@ -64,9 +62,9 @@ export function renderPainelRelatorioAssinaturas() {
                             </div>
                         </div>
                         <div class="filtro-group">
-                            <label for="relatorioAssinaturaTipo"><i class="fas fa-tag"></i> Tipo</label>
-                            <select id="relatorioAssinaturaTipo" class="form-control">
-                                <option value="">Todos (uma folha por tipo)</option>
+                            <label for="relatorioAssinaturaFolha"><i class="fas fa-tag"></i> Folha</label>
+                            <select id="relatorioAssinaturaFolha" class="form-control">
+                                <option value="">As duas folhas</option>
                                 ${TIPOS_FOLHA_ASSINATURA.map(([valor, rotulo]) => `
                                     <option value="${escapeHtml(valor)}">${escapeHtml(rotulo)}</option>
                                 `).join('')}
@@ -105,7 +103,7 @@ function lerFiltrosAssinaturas() {
     return {
         mes,
         ano,
-        tipo: document.getElementById('relatorioAssinaturaTipo')?.value || '',
+        folha: document.getElementById('relatorioAssinaturaFolha')?.value || '',
         cidade,
         ...periodoDoMes(mes, ano)
     };
@@ -128,12 +126,10 @@ function faixaHorario(inicio, fim) {
 }
 
 async function montarDadosRelatorioAssinaturas(filtros) {
-    // Diretorio recarregado: inclui desligados (lancamento antigo de quem ja
+    // Diretorio recarregado: inclui desligados (plantao antigo de quem ja
     // saiu continua com nome) e pega o nome completo recem-editado.
-    const [ausencias, plantoes, folgas] = await Promise.all([
-        API.getAusencias({ dataInicio: filtros.inicioISO, dataFim: filtros.fimISO }),
+    const [plantoes] = await Promise.all([
         API.getPlantoes({ from: filtros.inicioISO, to: filtros.fimISO }),
-        API.getFolgasDomingo({ dataInicio: filtros.inicioISO, dataFim: filtros.fimISO }),
         carregarDiretorioColaboradores(true)
     ]);
 
@@ -141,29 +137,16 @@ async function montarDadosRelatorioAssinaturas(filtros) {
         inicioISO: filtros.inicioISO,
         fimISO: filtros.fimISO,
         rotuloMes: filtros.rotulo,
-        tipo: filtros.tipo,
+        folha: filtros.folha,
         nomeDe: (id) => {
             const colaborador = resolverColaborador(id);
             return { apelido: colaborador.nome, nomeCompleto: colaborador.nomeCompleto };
         },
-        ausencias: (Array.isArray(ausencias) ? ausencias : []).map((item) => ({
-            colaboradorId: item.ColaboradorId,
-            tipo: normalizeRuntimeAusenciaTipo(item.Tipo),
-            inicioISO: dataIso(item.DataInicio),
-            fimISO: dataIso(item.DataFim),
-            detalhe: textoDetalheRelatorio(montarDetalheAusenciaRelatorio(item))
-        })),
         plantoes: (Array.isArray(plantoes) ? plantoes : []).map((item) => ({
             dataISO: dataIso(item.dataISO || item.data_plantao),
             tipoLancamento: normalizarTipoLancamentoPlantao(item.tipoLancamento, item.tipoPlantao),
             colaboradores: Array.isArray(item.colaboradores) ? item.colaboradores : [],
             horario: faixaHorario(item.horaInicio, item.horaFim)
-        })),
-        folgasDomingo: (Array.isArray(folgas?.items) ? folgas.items : []).map((item) => ({
-            colaboradorId: item.colaboradorId,
-            dataDomingo: item.dataDomingo,
-            dataReposicao: item.dataReposicao,
-            horarioReposicao: faixaHorario(item.reposicaoHoraInicio, item.reposicaoHoraFim)
         }))
     });
 }
@@ -194,13 +177,13 @@ function renderFolhas(relatorio, filtros) {
 }
 
 function textoTotais(relatorio) {
-    const { folhas, lancamentos, colaboradores } = relatorio.totais;
-    return `${folhas} folha(s) · ${lancamentos} lançamento(s) de ${colaboradores} colaborador(es)`;
+    const { folhas, escalas, colaboradores } = relatorio.totais;
+    return `${folhas} folha(s) · ${escalas} escala(s) de ${colaboradores} colaborador(es)`;
 }
 
 function renderRelatorioAssinaturas(relatorio, filtros) {
     if (relatorio.folhas.length === 0) {
-        return '<div class="empty-state">Nenhum lançamento no mês selecionado.</div>';
+        return '<div class="empty-state">Nenhum plantão de sábado, domingo ou feriado no mês selecionado.</div>';
     }
 
     return `
@@ -235,8 +218,8 @@ export async function gerarRelatorioAssinaturas() {
 
 // Folha A4 em retrato com as medidas da folha feita no Word (margens de
 // 2,54 cm, Aptos 14/12/11): vai para um iframe fora da tela e e impressa de
-// la, entao sai so o relatorio (sem menu, botoes nem tema). Cada tipo comeca
-// numa pagina. O titulo vira o nome do arquivo em "Salvar como PDF".
+// la, entao sai so o relatorio (sem menu, botoes nem tema). Cada folha
+// comeca numa pagina. O titulo vira o nome do arquivo em "Salvar como PDF".
 function gerarHtmlImpressaoAssinaturas(relatorio, filtros) {
     const nomeArquivo = `Escala_Assinaturas_${filtros.inicioISO.slice(0, 7)}`;
 
@@ -313,7 +296,7 @@ export async function imprimirRelatorioAssinaturas() {
         const relatorio = await montarDadosRelatorioAssinaturas(filtros);
 
         if (relatorio.folhas.length === 0) {
-            mostrarToast(`Nenhum lançamento em ${filtros.rotulo} para imprimir.`, 'warning');
+            mostrarToast(`Nenhum plantão de sábado, domingo ou feriado em ${filtros.rotulo} para imprimir.`, 'warning');
             return;
         }
 

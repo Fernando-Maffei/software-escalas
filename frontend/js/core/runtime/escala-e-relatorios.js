@@ -84,7 +84,7 @@ function captureRelatoriosStateEscala() {
         domingosColaborador: document.getElementById('relatorioDomingosColaborador')?.value || '',
         assinaturaMes: document.getElementById('relatorioAssinaturaMes')?.value || '',
         assinaturaAno: document.getElementById('relatorioAssinaturaAno')?.value || '',
-        assinaturaTipo: document.getElementById('relatorioAssinaturaTipo')?.value || '',
+        assinaturaFolha: document.getElementById('relatorioAssinaturaFolha')?.value || '',
         assinaturaCidade: document.getElementById('relatorioAssinaturaCidade')?.value || ''
     };
 }
@@ -117,7 +117,7 @@ function restoreRelatoriosStateEscala(snapshot) {
     setValue('relatorioDomingosColaborador', snapshot.domingosColaborador);
     setValue('relatorioAssinaturaMes', snapshot.assinaturaMes);
     setValue('relatorioAssinaturaAno', snapshot.assinaturaAno);
-    setValue('relatorioAssinaturaTipo', snapshot.assinaturaTipo);
+    setValue('relatorioAssinaturaFolha', snapshot.assinaturaFolha);
     setValue('relatorioAssinaturaCidade', snapshot.assinaturaCidade);
 }
 
