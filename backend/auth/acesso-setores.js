@@ -59,7 +59,8 @@ async function colaboradoresVisiveis(pool, req) {
 // A tela de lancamentos do mes (Calendario: ferias, folgas e ausencias) e
 // geral: qualquer conta ve e lanca para todos os colaboradores. Ela pede isso
 // explicitamente com ?escopo=lancamentos, e so as listas que ela consome
-// (GET /colaboradores e GET /ausencias) aceitam o parametro. Escala do Dia,
+// (GET /colaboradores e GET /ausencias) aceitam o parametro. O relatorio
+// Mensal completo le as mesmas listas e e geral pelo mesmo motivo. Escala do Dia,
 // Banco de Horas e Dashboard nao o mandam e seguem limitadas pelo teto.
 function escopoLancamentos(req) {
     return String(req.query?.escopo || '') === 'lancamentos';

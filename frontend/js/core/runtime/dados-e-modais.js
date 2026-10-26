@@ -219,8 +219,8 @@ export function carregarTiposEscala() {
 }
 
 // Duas listas: estado.ausencias respeita o teto de setor da conta (Dashboard,
-// Escala do Dia) e estado.ausenciasLancamentos e a da tela de lancamentos,
-// que e geral. Conta sem teto recebe a mesma lista nas duas, sem segunda
+// Escala do Dia) e estado.ausenciasLancamentos e a da tela de lancamentos e
+// do relatorio Mensal completo, que sao gerais. Conta sem teto recebe a mesma lista nas duas, sem segunda
 // requisicao.
 export function carregarAusencias() {
     return withInFlight('ausencias', async () => {
