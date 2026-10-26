@@ -29,6 +29,7 @@ const {
     agruparLancamentosPorHorario,
     buildPlantaoDiaPayload,
     generateUpcomingSaturdays,
+    lancamentosForaDoAlcance,
     normalizePlantaoType,
     resolvePlantaoTypeByDate,
     serializePlantaoRecord
@@ -326,17 +327,68 @@ router.get('/:dataISO', async (req, res) => {
     });
 });
 
+// O dia e reescrito inteiro a cada gravacao: casar linha por linha com o que
+// ja existia daria o mesmo resultado por muito mais codigo, e a tela sempre
+// manda o dia completo. `dia` = { dataISO, tipoPlantao, observacao }.
+async function regravarDiaPlantao(tx, dia, anteriores, grupos) {
+    for (const anterior of anteriores) {
+        await deletePlantaoMovements(tx, anterior.id);
+        await deleteEscalaDiaByOrigin(tx, 'plantao', anterior.id);
+    }
+
+    await tx.request()
+        .input('data_plantao', sql.Date, dia.dataISO)
+        .query('DELETE FROM plantoes WHERE data_plantao = @data_plantao');
+
+    const salvos = [];
+
+    for (const grupo of grupos) {
+        const insertResult = await tx.request()
+            .input('data_plantao', sql.Date, dia.dataISO)
+            .input('tipoPlantao', sql.NVarChar(30), dia.tipoPlantao)
+            .input('tipoCredito', sql.NVarChar(20), grupo.tipoCredito)
+            .input('tipoLancamento', sql.NVarChar(30), grupo.tipoLancamento)
+            .input('horaInicio', sql.Time, toSqlTime(grupo.horaInicio, 'Hora inicial do plantao'))
+            .input('horaFim', sql.Time, toSqlTime(grupo.horaFim, 'Hora final do plantao'))
+            .input('observacao', sql.NVarChar(500), dia.observacao)
+            .query(`
+                INSERT INTO plantoes (
+                    data_plantao, hora_inicio, hora_fim, observacao, tipo_plantao, tipo_credito, tipo_lancamento
+                )
+                OUTPUT INSERTED.*
+                VALUES (@data_plantao, @horaInicio, @horaFim, @observacao, @tipoPlantao, @tipoCredito, @tipoLancamento)
+            `);
+
+        const saved = insertResult.recordset[0];
+
+        await gravarEquipePlantao(tx, saved.id, grupo.colaboradores);
+        saved.equipe = grupo.colaboradores;
+        saved.duracaoMinutos = grupo.duracaoMinutos;
+        salvos.push(saved);
+    }
+
+    for (const saved of salvos) {
+        await syncPlantaoMovements(tx, saved);
+    }
+
+    const colaboradoresResult = await tx.request().query('SELECT * FROM Colaboradores');
+    await syncPlantaoDiaToEscalaDia(tx, dia.dataISO, salvos, colaboradoresResult.recordset);
+
+    return salvos;
+}
+
 router.post('/', async (req, res) => {
     const pool = await conectar();
     const feriados = await loadFeriadosSet(pool);
     const payload = buildPlantaoDiaPayload(req.body, feriados);
-    const grupos = agruparLancamentosPorHorario(payload.lancamentos);
-    const colaboradoresDoDia = [...new Set(grupos.flatMap((grupo) => grupo.colaboradores))];
+    const gruposEnviados = agruparLancamentosPorHorario(payload.lancamentos);
+    const colaboradoresDoDia = [...new Set(gruposEnviados.flatMap((grupo) => grupo.colaboradores))];
+    const visiveis = await colaboradoresVisiveis(pool, req);
 
     const result = await withTransaction(sql, pool, async (tx) => {
         await ensureColaboradoresExist(tx, colaboradoresDoDia);
 
-        for (const grupo of grupos) {
+        for (const grupo of gruposEnviados) {
             await assertColaboradoresDisponiveis(tx, {
                 dataISO: payload.dataISO,
                 horaInicio: grupo.horaInicio,
@@ -348,55 +400,28 @@ router.post('/', async (req, res) => {
         const anteriores = await findPlantoesByDate(tx, payload.dataISO);
         const action = anteriores.length > 0 ? 'updated' : 'created';
 
-        // O dia e reescrito inteiro a cada gravacao: casar linha por linha com o
-        // que ja existia daria o mesmo resultado por muito mais codigo, e a tela
-        // sempre manda o dia completo.
-        for (const anterior of anteriores) {
-            await deletePlantaoMovements(tx, anterior.id);
-            await deleteEscalaDiaByOrigin(tx, 'plantao', anterior.id);
-        }
+        // Conta com teto de setor: quem ela nao enxerga continua no dia como
+        // estava (ver lancamentosForaDoAlcance). A disponibilidade so e
+        // conferida para o que ela mandou; o resto ja estava gravado.
+        const mantidos = lancamentosForaDoAlcance(
+            anteriores.map((row) => serializePlantaoRecord(row)),
+            visiveis,
+            payload.tipoPlantao,
+            colaboradoresDoDia
+        );
+        const grupos = mantidos.length > 0
+            ? agruparLancamentosPorHorario([...payload.lancamentos, ...mantidos])
+            : gruposEnviados;
 
-        await tx.request()
-            .input('data_plantao', sql.Date, payload.dataISO)
-            .query('DELETE FROM plantoes WHERE data_plantao = @data_plantao');
-
-        const salvos = [];
-
-        for (const grupo of grupos) {
-            const insertResult = await tx.request()
-                .input('data_plantao', sql.Date, payload.dataISO)
-                .input('tipoPlantao', sql.NVarChar(30), payload.tipoPlantao)
-                .input('tipoCredito', sql.NVarChar(20), grupo.tipoCredito)
-                .input('tipoLancamento', sql.NVarChar(30), grupo.tipoLancamento)
-                .input('horaInicio', sql.Time, toSqlTime(grupo.horaInicio, 'Hora inicial do plantao'))
-                .input('horaFim', sql.Time, toSqlTime(grupo.horaFim, 'Hora final do plantao'))
-                .input('observacao', sql.NVarChar(500), payload.observacao)
-                .query(`
-                    INSERT INTO plantoes (
-                        data_plantao, hora_inicio, hora_fim, observacao, tipo_plantao, tipo_credito, tipo_lancamento
-                    )
-                    OUTPUT INSERTED.*
-                    VALUES (@data_plantao, @horaInicio, @horaFim, @observacao, @tipoPlantao, @tipoCredito, @tipoLancamento)
-                `);
-
-            const saved = insertResult.recordset[0];
-
-            await gravarEquipePlantao(tx, saved.id, grupo.colaboradores);
-            saved.equipe = grupo.colaboradores;
-            saved.duracaoMinutos = grupo.duracaoMinutos;
-            salvos.push(saved);
-        }
-
-        for (const saved of salvos) {
-            await syncPlantaoMovements(tx, saved);
-        }
-
-        const colaboradoresResult = await tx.request().query('SELECT * FROM Colaboradores');
-        await syncPlantaoDiaToEscalaDia(tx, payload.dataISO, salvos, colaboradoresResult.recordset);
+        const salvos = await regravarDiaPlantao(tx, payload, anteriores, grupos);
 
         return {
             action,
-            lancamentos: salvos.map((saved) => hydratePlantaoDuration(serializePlantaoRecord(saved)))
+            // A resposta mostra so a parte da equipe que a conta pode ver.
+            lancamentos: filtrarEquipesVisiveis(
+                salvos.map((saved) => hydratePlantaoDuration(serializePlantaoRecord(saved))),
+                visiveis
+            )
         };
     });
 
@@ -418,12 +443,30 @@ router.post('/', async (req, res) => {
 router.delete('/:dataISO', async (req, res) => {
     const pool = await conectar();
     const dataISO = normalizeIsoDate(req.params.dataISO, 'Data do plantao');
+    const visiveis = await colaboradoresVisiveis(pool, req);
 
     await withTransaction(sql, pool, async (tx) => {
         const existentes = await findPlantoesByDate(tx, dataISO);
+        const registros = existentes.map((row) => serializePlantaoRecord(row));
 
-        if (existentes.length === 0) {
+        // Dia em que a conta nao enxerga ninguem e, para ela, um dia sem
+        // plantao (o GET tambem responde 404).
+        if (existentes.length === 0 || filtrarEquipesVisiveis(registros, visiveis).length === 0) {
             throw new AppError(404, 'Plantao nao encontrado.');
+        }
+
+        // Conta com teto de setor exclui so a parte da equipe que ela ve; os
+        // turnos de quem ela nao enxerga continuam no dia.
+        const tipoPlantao = registros.find((item) => item.tipoPlantao)?.tipoPlantao || null;
+        const mantidos = lancamentosForaDoAlcance(registros, visiveis, tipoPlantao);
+
+        if (mantidos.length > 0) {
+            await regravarDiaPlantao(tx, {
+                dataISO,
+                tipoPlantao,
+                observacao: registros.find((item) => item.observacao)?.observacao ?? null
+            }, existentes, agruparLancamentosPorHorario(mantidos));
+            return;
         }
 
         // Excluir o dia derruba TODOS os turnos daquela data.
