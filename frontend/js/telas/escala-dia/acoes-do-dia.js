@@ -2,8 +2,9 @@ import { API } from '../../core/api.js';
 import { mostrarToast } from '../../core/app/horas-e-resumo.js';
 import { carregarPagina } from '../../core/app/modais-e-navegacao.js';
 import { estado } from '../../core/estado.js';
+import { dataPlantaoValidaComFeriados, ehDataPlantaoValida } from '../../core/runtime/plantao-colaboradores/plantao-regua-e-relatorios.js';
 import { abrirEditorNaEscala } from '../escala-dia-editor.js';
-import { formatDatePtBrEscala, getIsoDayOfWeekEscala, toISODateEscala } from '../escala-dia-shared.js';
+import { formatDatePtBrEscala, toISODateEscala } from '../escala-dia-shared.js';
 import { abrirModalLancamento } from '../lancamentos.js';
 import { carregarEscalaDiaEscala, getScaleEditorRecordEscala } from './editor-lateral.js';
 import { getCurrentScaleState } from './estado-e-layout.js';
@@ -22,17 +23,35 @@ export function shiftIsoDateEscala(dataISO, deltaDays) {
     return toISODateEscala(nextDate);
 }
 
-export async function carregarEscalaSelecionadaEscala(dataISO) {
+export async function carregarEscalaSelecionadaEscala(dataISO, opcoes = {}) {
     const normalized = toISODateEscala(dataISO) || toISODateEscala(new Date());
     estado.dataEscalaSelecionada = normalized;
-    await carregarEscalaDiaEscala(normalized);
+    await carregarEscalaDiaEscala(normalized, opcoes);
     atualizarAcoesCabecalhoEscala();
 }
 
+// Depois de gravar algo que so mexe na escala do dia (horario, almoco), basta
+// reler o dia. Antes cada ajuste chamava atualizarTudo, que recarregava
+// colaboradores, setores, ausencias, feriados, plantoes e o banco de horas —
+// nada disso muda com um ajuste da escala.
+export function recarregarDiaAbertoEscala() {
+    return carregarEscalaSelecionadaEscala(obterDataSelecionadaEscala());
+}
+
+function marcarBotaoPlantaoEscala(botao, permitido) {
+    botao.disabled = !permitido;
+    botao.title = permitido
+        ? 'Abrir o plantao do dia selecionado'
+        : 'Selecione um sabado, domingo ou feriado para abrir o plantao';
+    botao.classList.toggle('is-disabled', !permitido);
+}
+
+// Plantao existe em sabado, domingo e feriado (a mesma regra da tela de
+// plantoes). O botao so aceitava sabado: no domingo do plantonista, ou num
+// feriado, nao havia como ir da escala para o plantao do dia.
 export function atualizarAcoesCabecalhoEscala() {
     const botaoPlantao = document.getElementById('btnAbrirPlantaoEscala');
     const dataISO = obterDataSelecionadaEscala();
-    const isSaturday = getIsoDayOfWeekEscala(dataISO) === 6;
 
     atualizarBotaoReporDomingoEscala(dataISO);
 
@@ -40,11 +59,17 @@ export function atualizarAcoesCabecalhoEscala() {
         return;
     }
 
-    botaoPlantao.disabled = !isSaturday;
-    botaoPlantao.title = isSaturday
-        ? 'Abrir o plantao do sabado selecionado'
-        : 'Selecione um sabado para abrir o plantao';
-    botaoPlantao.classList.toggle('is-disabled', !isSaturday);
+    marcarBotaoPlantaoEscala(botaoPlantao, ehDataPlantaoValida(dataISO));
+
+    // Feriado nacional de outro ano pode ainda nao estar na lista: confere
+    // (uma busca por ano, com cache) e so entao libera.
+    if (botaoPlantao.disabled) {
+        dataPlantaoValidaComFeriados(dataISO).then((valida) => {
+            if (valida && obterDataSelecionadaEscala() === dataISO) {
+                marcarBotaoPlantaoEscala(botaoPlantao, true);
+            }
+        });
+    }
 }
 
 // "Repor domingo": grava o dia aberto como o dia da reposicao de uma folga de
@@ -156,11 +181,11 @@ export function abrirLancamentoPessoalEscala() {
     abrirModalLancamento('pessoal', dataISO, true);
 }
 
-export function abrirPlantaoDaEscala() {
+export async function abrirPlantaoDaEscala() {
     const dataISO = obterDataSelecionadaEscala();
 
-    if (getIsoDayOfWeekEscala(dataISO) !== 6) {
-        mostrarToast('Selecione um sabado para abrir o plantao.', 'warning');
+    if (!(await dataPlantaoValidaComFeriados(dataISO))) {
+        mostrarToast('Selecione um sabado, domingo ou feriado para abrir o plantao.', 'warning');
         return;
     }
 
