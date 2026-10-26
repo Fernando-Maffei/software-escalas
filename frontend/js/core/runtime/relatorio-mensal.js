@@ -197,17 +197,20 @@ async function construirDadosRelatorioMensal(mes, ano) {
     // Os carregadores nao lancam: em falha avisam o usuario e devolvem os
     // ultimos dados (core/runtime/dados-e-modais.js); a checagem abaixo
     // avisa se mesmo assim faltar dado.
-    if (!Array.isArray(estado.colaboradores) || estado.colaboradores.length === 0) {
+    // O relatorio e geral, como a tela de lancamentos: le as listas do escopo
+    // geral (estado.*Lancamentos), que ignoram o teto de setor da conta.
+    // Conta sem teto recebe nelas as mesmas listas de sempre.
+    if (!Array.isArray(estado.colaboradoresLancamentos) || estado.colaboradoresLancamentos.length === 0) {
         await carregarColaboradores();
     }
 
-    if (!Array.isArray(estado.ausencias) || estado.ausencias.length === 0) {
+    if (!Array.isArray(estado.ausenciasLancamentos) || estado.ausenciasLancamentos.length === 0) {
         await carregarAusencias();
     }
 
     // Se mesmo apos a tentativa de recarga nao houver colaboradores, avisa
     // em vez de gerar um relatorio vazio que parece correto.
-    if (!Array.isArray(estado.colaboradores) || estado.colaboradores.length === 0) {
+    if (!Array.isArray(estado.colaboradoresLancamentos) || estado.colaboradoresLancamentos.length === 0) {
         mostrarToast('Nao foi possivel carregar os colaboradores. O relatorio pode sair incompleto.', 'error');
     }
 
@@ -235,7 +238,7 @@ async function construirDadosRelatorioMensal(mes, ano) {
         }
     });
 
-    (Array.isArray(estado.ausencias) ? estado.ausencias : []).forEach((item) => {
+    (Array.isArray(estado.ausenciasLancamentos) ? estado.ausenciasLancamentos : []).forEach((item) => {
         const dataInicioISO = obterDataIsoRelatorio(item.DataInicio || item.dataInicio);
         const dataFimISO = obterDataIsoRelatorio(item.DataFim || item.dataFim);
 
@@ -248,7 +251,7 @@ async function construirDadosRelatorioMensal(mes, ano) {
         }
 
         const colaboradorId = Number(item.ColaboradorId || item.colaboradorId);
-        const colaborador = (estado.colaboradores || []).find((entry) => Number(entry.Id) === colaboradorId);
+        const colaborador = (estado.colaboradoresLancamentos || []).find((entry) => Number(entry.Id) === colaboradorId);
 
         const tipo = String(item.Tipo || item.tipo || '').toLowerCase();
 
