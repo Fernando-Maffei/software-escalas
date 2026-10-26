@@ -1,15 +1,15 @@
-// Relatorio "Lancamentos para assinatura" (aba da tela de Relatorios): todos
-// os lancamentos do mes — folgas, ferias, ausencias, plantoes e folgas de
-// domingo — numa folha para o colaborador conferir e assinar. As linhas saem
-// de lib/lancamentos-assinatura.js; aqui ficam filtros, leitura, tela e
+// Relatorio "Lancamentos para assinatura" (aba da tela de Relatorios): as
+// folhas de escala do mes — uma por tipo de lancamento — para o colaborador
+// assinar, no formato da folha que o time fazia a mao. As folhas saem de
+// lib/lancamentos-assinatura.js; aqui ficam filtros, leitura, tela e
 // impressao.
 //
 // Le os registros de verdade pelas mesmas rotas das outras telas, no escopo
-// da conta (o teto de setor vale para os tres tipos), e mostra o nome
-// completo do cadastro, ou o Nome quando ele ainda nao foi preenchido.
+// da conta (o teto de setor vale para os tres tipos): o Nome/Apelido vai nas
+// linhas de data e o nome completo do cadastro na lista de assinaturas.
 import { atributosAcao } from '../../lib/atributos-acao.js';
 import { escapeHtml } from '../../lib/html-seguro.js';
-import { montarLancamentosAssinatura, periodoDoMes } from '../../lib/lancamentos-assinatura.js';
+import { dataPorExtenso, montarFolhasAssinatura, periodoDoMes, TIPOS_FOLHA_ASSINATURA } from '../../lib/lancamentos-assinatura.js';
 import { carregarDiretorioColaboradores, resolverColaborador } from '../../telas/lancamentos.js';
 import { API } from '../api.js';
 import { mostrarToast } from '../app/horas-e-resumo.js';
@@ -19,6 +19,26 @@ import { normalizarTipoLancamentoPlantao } from './plantao-colaboradores/plantao
 import { montarDetalheAusenciaRelatorio, textoDetalheRelatorio } from './relatorio-mensal.js';
 
 const TITULO_RELATORIO_ASSINATURAS = 'Lançamentos para assinatura';
+
+// A cidade do fecho ("Jales, 26 de Outubro de 2026.") fica lembrada neste
+// navegador: o sistema nao tem cadastro de endereco.
+const CHAVE_CIDADE = 'relatorioAssinaturaCidade';
+
+function lerCidadeSalva() {
+    try {
+        return localStorage.getItem(CHAVE_CIDADE) || '';
+    } catch (erro) {
+        return '';
+    }
+}
+
+function salvarCidade(cidade) {
+    try {
+        localStorage.setItem(CHAVE_CIDADE, cidade);
+    } catch (erro) {
+        // Armazenamento bloqueado: a cidade so nao fica lembrada.
+    }
+}
 
 export function renderPainelRelatorioAssinaturas() {
     const hoje = new Date();
@@ -31,7 +51,7 @@ export function renderPainelRelatorioAssinaturas() {
                 </div>
                 <div class="relatorio-card-body">
                     <p class="relatorio-descricao">
-                        Folgas, férias, ausências, plantões e folgas de domingo do mês, um por linha, com o nome completo e um campo para a assinatura do colaborador.
+                        Folhas de escala do mês para assinatura: uma por tipo de lançamento, com as datas e os colaboradores, o local e a data, e o nome completo de cada um para assinar.
                     </p>
                     <div class="relatorio-filtros">
                         <div class="filtro-group">
@@ -42,6 +62,19 @@ export function renderPainelRelatorioAssinaturas() {
                                 </select>
                                 <input type="number" id="relatorioAssinaturaAno" class="form-control" value="${hoje.getFullYear()}" min="2020" max="2035" aria-label="Ano">
                             </div>
+                        </div>
+                        <div class="filtro-group">
+                            <label for="relatorioAssinaturaTipo"><i class="fas fa-tag"></i> Tipo</label>
+                            <select id="relatorioAssinaturaTipo" class="form-control">
+                                <option value="">Todos (uma folha por tipo)</option>
+                                ${TIPOS_FOLHA_ASSINATURA.map(([valor, rotulo]) => `
+                                    <option value="${escapeHtml(valor)}">${escapeHtml(rotulo)}</option>
+                                `).join('')}
+                            </select>
+                        </div>
+                        <div class="filtro-group">
+                            <label for="relatorioAssinaturaCidade"><i class="fas fa-map-marker-alt"></i> Cidade</label>
+                            <input type="text" id="relatorioAssinaturaCidade" class="form-control" value="${escapeHtml(lerCidadeSalva())}" placeholder="Ex.: Jales" maxlength="80">
                         </div>
                     </div>
                     <div class="relatorio-actions">
@@ -66,7 +99,16 @@ function lerFiltrosAssinaturas() {
         return null;
     }
 
-    return { mes, ano, ...periodoDoMes(mes, ano) };
+    const cidade = document.getElementById('relatorioAssinaturaCidade')?.value?.trim() || '';
+    salvarCidade(cidade);
+
+    return {
+        mes,
+        ano,
+        tipo: document.getElementById('relatorioAssinaturaTipo')?.value || '',
+        cidade,
+        ...periodoDoMes(mes, ano)
+    };
 }
 
 function dataIso(valor) {
@@ -95,12 +137,14 @@ async function montarDadosRelatorioAssinaturas(filtros) {
         carregarDiretorioColaboradores(true)
     ]);
 
-    return montarLancamentosAssinatura({
+    return montarFolhasAssinatura({
         inicioISO: filtros.inicioISO,
         fimISO: filtros.fimISO,
+        rotuloMes: filtros.rotulo,
+        tipo: filtros.tipo,
         nomeDe: (id) => {
             const colaborador = resolverColaborador(id);
-            return colaborador.nomeCompleto || colaborador.nome;
+            return { apelido: colaborador.nome, nomeCompleto: colaborador.nomeCompleto };
         },
         ausencias: (Array.isArray(ausencias) ? ausencias : []).map((item) => ({
             colaboradorId: item.ColaboradorId,
@@ -124,59 +168,48 @@ async function montarDadosRelatorioAssinaturas(filtros) {
     });
 }
 
-// A mesma tabela serve a tela e a folha impressa; so o estilo muda.
-function renderTabelaAssinaturas(relatorio) {
-    if (relatorio.linhas.length === 0) {
-        return '<div class="empty-state">Nenhum lançamento no mês selecionado.</div>';
-    }
+function textoLocalEData(filtros) {
+    const data = dataPorExtenso(new Date());
+    return filtros.cidade ? `${filtros.cidade}, ${data}.` : `${data}.`;
+}
 
-    let dataAnterior = null;
+// A mesma folha serve a tela e a impressao; so o estilo muda.
+function renderFolhas(relatorio, filtros) {
+    const localEData = textoLocalEData(filtros);
 
-    return `
-            <table class="relatorio-tabela relatorio-assinaturas-tabela">
-                <thead>
-                    <tr>
-                        <th class="col-data">Data</th>
-                        <th class="col-colaborador">Colaborador</th>
-                        <th class="col-tipo">Tipo de lançamento</th>
-                        <th class="col-assinatura">Assinatura</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    ${relatorio.linhas.map((linha) => {
-                        const novoDia = dataAnterior !== null && linha.inicioISO !== dataAnterior;
-                        dataAnterior = linha.inicioISO;
-
-                        return `
-                            <tr class="${novoDia ? 'novo-dia' : ''}">
-                                <td class="col-data">${escapeHtml(linha.data)}</td>
-                                <td class="col-colaborador">${escapeHtml(linha.nome)}</td>
-                                <td class="col-tipo">
-                                    ${escapeHtml(linha.rotulo)}
-                                    ${linha.detalhe ? `<small>${escapeHtml(linha.detalhe)}</small>` : ''}
-                                </td>
-                                <td class="col-assinatura"></td>
-                            </tr>
-                        `;
-                    }).join('')}
-                </tbody>
-            </table>
-        `;
+    return relatorio.folhas.map((folha) => `
+            <section class="folha-assinatura" aria-label="${escapeHtml(folha.titulo)}">
+                <h1 class="folha-titulo">${escapeHtml(folha.titulo)}</h1>
+                <ul class="folha-datas">
+                    ${folha.datas.map((linha) => `
+                        <li>${escapeHtml(linha.data)} &rarr; ${escapeHtml(linha.nomes.join(', '))}</li>
+                    `).join('')}
+                </ul>
+                <p class="folha-local">${escapeHtml(localEData)}</p>
+                <ul class="folha-assinaturas">
+                    ${folha.assinaturas.map((nome) => `<li>${escapeHtml(nome)}</li>`).join('')}
+                </ul>
+            </section>
+        `).join('');
 }
 
 function textoTotais(relatorio) {
-    const { lancamentos, colaboradores } = relatorio.totais;
-    return `${lancamentos} lançamento(s) de ${colaboradores} colaborador(es)`;
+    const { folhas, lancamentos, colaboradores } = relatorio.totais;
+    return `${folhas} folha(s) · ${lancamentos} lançamento(s) de ${colaboradores} colaborador(es)`;
 }
 
 function renderRelatorioAssinaturas(relatorio, filtros) {
+    if (relatorio.folhas.length === 0) {
+        return '<div class="empty-state">Nenhum lançamento no mês selecionado.</div>';
+    }
+
     return `
             <div class="relatorio-tabela-container">
                 <div class="relatorio-total">
                     Mês: <strong>${escapeHtml(filtros.rotulo)}</strong> &middot; ${escapeHtml(textoTotais(relatorio))}
                 </div>
-                <div class="relatorio-tabela-scroll">
-                    ${renderTabelaAssinaturas(relatorio)}
+                <div class="folhas-assinatura">
+                    ${renderFolhas(relatorio, filtros)}
                 </div>
             </div>
         `;
@@ -200,11 +233,12 @@ export async function gerarRelatorioAssinaturas() {
     }
 }
 
-// Folha A4 em retrato, com estilo proprio: vai para um iframe fora da tela e
-// e impressa de la, entao sai so o relatorio (sem menu, botoes nem tema).
-// O titulo vira o nome do arquivo quando se escolhe "Salvar como PDF".
+// Folha A4 em retrato com as medidas da folha feita no Word (margens de
+// 2,54 cm, Aptos 14/12/11): vai para um iframe fora da tela e e impressa de
+// la, entao sai so o relatorio (sem menu, botoes nem tema). Cada tipo comeca
+// numa pagina. O titulo vira o nome do arquivo em "Salvar como PDF".
 function gerarHtmlImpressaoAssinaturas(relatorio, filtros) {
-    const nomeArquivo = `Lancamentos_Assinatura_${filtros.inicioISO.slice(0, 7)}`;
+    const nomeArquivo = `Escala_Assinaturas_${filtros.inicioISO.slice(0, 7)}`;
 
     return `<!DOCTYPE html>
 <html lang="pt-BR">
@@ -212,45 +246,22 @@ function gerarHtmlImpressaoAssinaturas(relatorio, filtros) {
     <meta charset="UTF-8">
     <title>${escapeHtml(nomeArquivo)}</title>
     <style>
-        @page { size: A4 portrait; margin: 14mm 12mm 16mm; }
-        @page { @bottom-right { content: "Página " counter(page) " de " counter(pages); font: 9px Arial, sans-serif; color: #64748b; } }
+        @page { size: A4 portrait; margin: 25.4mm; }
         * { box-sizing: border-box; }
         html, body { margin: 0; padding: 0; background: #ffffff; }
-        body { color: #0f172a; font-family: Arial, Helvetica, sans-serif; font-size: 11px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-        header { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; margin-bottom: 10px; padding-bottom: 8px; border-bottom: 2px solid #1e3a5f; }
-        h1 { margin: 0 0 2px; color: #1e3a5f; font-size: 18px; }
-        header p { margin: 0; color: #475569; font-size: 11px; }
-        .periodo { text-align: right; }
-        .periodo strong { display: block; color: #0f172a; font-size: 15px; }
-        .resumo { margin: 0 0 8px; color: #475569; font-size: 10px; }
-        table { width: 100%; border-collapse: collapse; table-layout: fixed; }
-        thead { display: table-header-group; }
-        tr { page-break-inside: avoid; break-inside: avoid; }
-        th, td { border: 1px solid #94a3b8; padding: 5px 7px; text-align: left; vertical-align: middle; }
-        th { background: #e2e8f0; font-size: 10px; text-transform: uppercase; letter-spacing: 0.03em; }
-        td { height: 11mm; font-size: 11px; }
-        tr.novo-dia td { border-top: 2px solid #475569; }
-        .col-data { width: 17%; white-space: nowrap; }
-        .col-colaborador { width: 33%; }
-        .col-tipo { width: 22%; }
-        .col-assinatura { width: 28%; }
-        td small { display: block; margin-top: 2px; color: #64748b; font-size: 9px; }
-        .empty-state { padding: 24px; border: 1px dashed #94a3b8; color: #475569; text-align: center; }
+        body { color: #000000; font-family: Aptos, Calibri, Arial, Helvetica, sans-serif; font-size: 11pt; }
+        .folha-assinatura { break-after: page; page-break-after: always; }
+        .folha-assinatura:last-child { break-after: auto; page-break-after: auto; }
+        .folha-titulo { margin: 0 0 25pt; font-size: 14pt; font-weight: 700; line-height: 1.2; text-align: center; }
+        .folha-datas { margin: 0; padding: 0; list-style: none; }
+        .folha-datas li { font-size: 12pt; font-weight: 700; line-height: 25pt; }
+        .folha-local { margin: 24pt 0 0; font-size: 11pt; }
+        .folha-assinaturas { margin: 20pt 0 0; padding: 0; list-style: none; }
+        .folha-assinaturas li { padding-top: 28pt; font-size: 11pt; line-height: 15pt; break-inside: avoid; page-break-inside: avoid; }
     </style>
 </head>
 <body>
-    <header>
-        <div>
-            <h1>Lançamentos do mês</h1>
-            <p>Conferência e assinatura dos colaboradores</p>
-        </div>
-        <div class="periodo">
-            <strong>${escapeHtml(filtros.rotulo)}</strong>
-            <p>Emitido em ${escapeHtml(new Date().toLocaleDateString('pt-BR'))}</p>
-        </div>
-    </header>
-    <p class="resumo">${escapeHtml(textoTotais(relatorio))}</p>
-    ${renderTabelaAssinaturas(relatorio)}
+    ${renderFolhas(relatorio, filtros)}
 </body>
 </html>`;
 }
@@ -301,7 +312,7 @@ export async function imprimirRelatorioAssinaturas() {
     try {
         const relatorio = await montarDadosRelatorioAssinaturas(filtros);
 
-        if (relatorio.linhas.length === 0) {
+        if (relatorio.folhas.length === 0) {
             mostrarToast(`Nenhum lançamento em ${filtros.rotulo} para imprimir.`, 'warning');
             return;
         }
