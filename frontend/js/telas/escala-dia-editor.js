@@ -1,17 +1,16 @@
 import { API } from '../core/api.js';
 import { mostrarToast } from '../core/app/horas-e-resumo.js';
 import { estado } from '../core/estado.js';
-import { carregarAusencias, carregarColaboradores, carregarPlantoes, carregarSetores } from '../core/runtime/dados-e-modais.js';
-import { atualizarTudo } from '../core/runtime/plantao-colaboradores/plantao-regua-e-relatorios.js';
+import { carregarAusencias, carregarColaboradores, carregarSetores } from '../core/runtime/dados-e-modais.js';
 import { escapeHtml } from '../lib/html-seguro.js';
 import { toISODateEscala } from './escala-dia-shared.js';
-import { abrirLancamentoPessoalEscala, abrirPlantaoDaEscala, atualizarAcoesCabecalhoEscala, carregarEscalaSelecionadaEscala, obterDataSelecionadaEscala, reporDomingoDaEscala, restaurarAlmocosCadastroDiaEscala, shiftIsoDateEscala } from './escala-dia/acoes-do-dia.js';
+import { abrirLancamentoPessoalEscala, abrirPlantaoDaEscala, atualizarAcoesCabecalhoEscala, carregarEscalaSelecionadaEscala, obterDataSelecionadaEscala, recarregarDiaAbertoEscala, reporDomingoDaEscala, restaurarAlmocosCadastroDiaEscala, shiftIsoDateEscala } from './escala-dia/acoes-do-dia.js';
 import { bindScrollHeightAutoEscala, renderScaleHeaderEscala } from './escala-dia/cabecalho-e-cobertura.js';
 import { renderScaleEditorEscala } from './escala-dia/editor-lateral.js';
 import { aplicarDensidadeEscala, getCurrentScaleState, getScaleSortModeEscala, lerDensidadeEscalaSalva, setScaleSortModeEscala } from './escala-dia/estado-e-layout.js';
 import { getScaleSectorSelectionEscala, renderScaleSectorTabsEscala } from './escala-dia/filtros-setor.js';
 import { renderScaleRowsEscala } from './escala-dia/linhas-timeline.js';
-import { renderScaleEmptyMessageEscala, renderWeekStripEscala } from './escala-dia/mensagens-e-semana.js';
+import { renderScaleEmptyMessageEscala } from './escala-dia/mensagens-e-semana.js';
 
 function ensureScaleSidebarToggleEscala() {
     const sidebar = document.getElementById('sidebarEditor');
@@ -89,7 +88,14 @@ function bindScaleOutsideSelectionEscala() {
     });
 }
 
+// Clique repetido em "Salvar" mandava o mesmo PUT de novo (e dois avisos).
+let salvandoEscalaDia = false;
+
 export async function salvarEscalaDia(colaboradorId) {
+    if (salvandoEscalaDia) {
+        return;
+    }
+
     const state = getCurrentScaleState();
     const currentRecord = (state.items || []).find((item) => Number(item.colaboradorId) === Number(colaboradorId)) || {};
     const payload = {
@@ -100,14 +106,18 @@ export async function salvarEscalaDia(colaboradorId) {
         observacao: document.getElementById(`escalaObservacao-${colaboradorId}`)?.value ?? currentRecord.observacao ?? null
     };
 
+    salvandoEscalaDia = true;
+
     try {
         await API.salvarEscalaDia(state.dataISO, colaboradorId, payload);
-        await atualizarTudo({ silent: true, source: 'escala' });
+        await recarregarDiaAbertoEscala();
         abrirEditorNaEscala(colaboradorId);
 
         mostrarToast('Escala do dia atualizada com sucesso!', 'success');
     } catch (error) {
         mostrarToast(`Erro ao salvar escala: ${error.message}`, 'error');
+    } finally {
+        salvandoEscalaDia = false;
     }
 }
 
@@ -128,11 +138,11 @@ export async function aplicarAlmocoPeriodoEscala(colaboradorId) {
 
     try {
         await API.aplicarAlmocoPeriodo(payload);
-        await atualizarTudo({ silent: true, source: 'escala' });
-        abrirEditorNaEscala(colaboradorId);
-        // Aplicacao em lote muda varios dias: refaz a previa da semana.
+        // Aplicacao em lote muda varios dias: a previa da semana busca de
+        // novo ao reler o dia.
         estado.escalaWeekCache = null;
-        renderWeekStripEscala(state.dataISO, { force: true });
+        await carregarEscalaSelecionadaEscala(state.dataISO);
+        abrirEditorNaEscala(colaboradorId);
 
         mostrarToast('Almoco aplicado no periodo com sucesso!', 'success');
     } catch (error) {
@@ -149,12 +159,19 @@ export async function renderEscalaDia() {
 
     const todayISO = toISODateEscala(estado.dataEscalaSelecionada || new Date());
 
-    await Promise.allSettled([
+    // Colaboradores (almoco do cadastro), setores (abas) e ausencias (ausencia
+    // parcial) entram nas linhas, mas o cabecalho e o "carregando" nao
+    // dependem deles: a tela monta na hora e a busca do dia corre junto com
+    // eles, em vez de depois. Os plantoes nao entram em nada desta tela.
+    const dadosBase = Promise.allSettled([
         carregarColaboradores(),
         carregarSetores(),
-        carregarAusencias(),
-        carregarPlantoes()
+        carregarAusencias()
     ]);
+
+    // Ao entrar, a faixa da semana busca de novo: algo pode ter mudado em
+    // outra tela desde a ultima visita.
+    estado.escalaWeekCache = null;
 
     appContent.innerHTML = `
             <div class="escala-page">
@@ -356,7 +373,7 @@ export async function renderEscalaDia() {
     });
 
     try {
-        await carregarEscalaSelecionadaEscala(todayISO);
+        await carregarEscalaSelecionadaEscala(todayISO, { aguardar: dadosBase });
     } catch (error) {
         renderScaleHeaderEscala();
         renderScaleEmptyMessageEscala(todayISO);

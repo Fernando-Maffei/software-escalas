@@ -1,5 +1,5 @@
 import { escapeHtml } from '../../../lib/html-seguro.js';
-import { carregarPendenciasPlantao, ligarPendenciasPlantao, renderAbaPendenciasPlantao } from '../../../telas/pendencias-plantao.js';
+import { atualizarPlantoesSemEquipe, carregarPendenciasPlantao, ligarPendenciasPlantao, renderAbaPendenciasPlantao } from '../../../telas/pendencias-plantao.js';
 import { API, buscarFeriadosNacionais } from '../../api.js';
 import { mostrarToast } from '../../app/horas-e-resumo.js';
 import { aguardarUsuarioAutenticado } from '../../auth.js';
@@ -8,7 +8,7 @@ import { atualizarDadosCompartilhados, carregarAusencias, carregarColaboradores,
 import { aplicarDefaultsBancoHorasLancamento } from './banco-horas-lancamento.js';
 import { renderColaboradoresPlantao } from './colaboradores-e-jornada.js';
 import { fecharModalSeguro, formatarDataPtBr, formatarHoraInput, getPlantaoEditorState, isColaboradoresScreenVisible, minutosParaTexto, obterDataISO, setPlantaoEditorState } from './helpers.js';
-import { capturarRascunhoPlantao, carregarBancoHorasResumo, carregarDisponibilidadePlantao, duracaoLancamentoPlantao, lancamentosDoDiaPlantao, ehCoberturaAlmocoPlantao, etiquetaCoberturaAlmocoPlantao, normalizarTipoCreditoPlantao, normalizarTipoLancamentoPlantao, PLANTAO_CREDITO_META, PLANTAO_TIPO_LANCAMENTO_OPCOES, renderListaColaboradores, renderPlantaoEditor } from './plantao-editor.js';
+import { aplicarFormularioLancamentoPlantao, capturarRascunhoPlantao, carregarBancoHorasResumo, carregarDisponibilidadePlantao, duracaoLancamentoPlantao, lancamentosDoDiaPlantao, ehCoberturaAlmocoPlantao, etiquetaCoberturaAlmocoPlantao, normalizarTipoCreditoPlantao, normalizarTipoLancamentoPlantao, PLANTAO_CREDITO_META, PLANTAO_TIPO_LANCAMENTO_OPCOES, renderListaColaboradores, renderPlantaoEditor } from './plantao-editor.js';
 import { atributosAcao } from '../../../lib/atributos-acao.js';
 
 const PLANTAO_DIAS_SEMANA_CURTOS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sab'];
@@ -117,6 +117,20 @@ function resolverTipoPlantaoFront(dataISO, feriadosMap) {
 
 export function ehDataPlantaoValida(dataISO) {
     return resolverTipoPlantaoFront(dataISO) !== null;
+}
+
+// Igual a ehDataPlantaoValida, mas garante antes os feriados nacionais do ano
+// da data (uma busca por ano, com cache): dia util que e feriado num ano que
+// a tela ainda nao carregou nao pode ser recusado.
+export async function dataPlantaoValidaComFeriados(dataISO) {
+    const iso = obterDataISO(dataISO);
+
+    if (!iso) {
+        return false;
+    }
+
+    await garantirFeriadosApiPlantao([Number(iso.slice(0, 4))]);
+    return ehDataPlantaoValida(iso);
 }
 
 export function rotuloTipoPlantao(tipo, feriadoNome) {
@@ -645,11 +659,12 @@ export async function renderLancamentoPlantao() {
 
     const anosJanela = [...new Set([new Date().getFullYear(), Number(obterMesPlantao().slice(0, 4))])];
 
+    // Sem o banco de horas aqui: nada desta tela mostra saldo (ele so serve
+    // aos cards da tela Colaboradores, atualizado a cada gravacao).
     await Promise.allSettled([
         carregarColaboradores(),
         carregarAusencias(),
         carregarPlantoes(),
-        carregarBancoHorasResumo(),
         carregarFeriadosLocais(),
         garantirFeriadosApiPlantao(anosJanela)
     ]);
@@ -835,7 +850,11 @@ async function abrirEditorPlantao(dataISO, dataFormatada) {
     estado.plantaoDataFocoISO = dataISO;
     atualizarSabadoSelecionadoPlantao(dataISO);
 
-    if (!ehDataPlantaoValida(dataISO)) {
+    // O "Editar" da lista de lancados abre dias de qualquer ano. Sem os
+    // feriados nacionais daquele ano, um feriado em dia util era recusado e
+    // um feriado no domingo abria como "Domingo" — o tipo do lancamento nao
+    // batia com o do servidor e o salvar voltava 400.
+    if (!(await dataPlantaoValidaComFeriados(dataISO))) {
         mostrarToast('Plantao so pode ser lancado em sabado, domingo ou feriado.', 'warning');
         return;
     }
@@ -866,6 +885,13 @@ async function abrirEditorPlantao(dataISO, dataFormatada) {
 
     renderPlantaoEditor(state);
     await carregarDisponibilidadePlantao(state);
+
+    // Outro dia aberto (ou a janela fechada) enquanto a disponibilidade
+    // chegava: nao redesenha por cima.
+    if (getPlantaoEditorState() !== state) {
+        return;
+    }
+
     renderPlantaoEditor(state);
     atualizarSabadoSelecionadoPlantao(dataISO);
     document.getElementById('plantaoNovoColaborador')?.focus();
@@ -958,7 +984,61 @@ function fecharPlantaoEditor() {
     }
 }
 
-export async function salvarPlantao(dataISO) {
+// Depois de salvar ou excluir um dia so os plantoes mudaram: rele a lista e
+// redesenha a regua, a aba de lancados e a de pendencias, sem refazer a tela.
+// Antes isto passava por atualizarTudo, que recarregava colaboradores,
+// setores, ausencias e feriados (duas vezes, porque redesenhava a tela
+// inteira, que carrega tudo de novo) e o banco de horas (tambem duas vezes) —
+// 14 requisicoes por gravacao, e a tela voltava ao topo.
+async function recarregarPlantoesNaTela() {
+    await carregarPlantoes();
+
+    // O plantao entra na escala do dia: a faixa da semana da Escala do Dia
+    // busca de novo quando for aberta.
+    estado.escalaWeekCache = null;
+
+    await atualizarReguaPlantao();
+    atualizarResumoPlantaoNaTela();
+    atualizarPlantoesSemEquipe();
+
+    // Plantao em banco de horas muda o saldo mostrado nos cards da tela
+    // Colaboradores; atualiza em segundo plano (trata a propria falha).
+    carregarBancoHorasResumo();
+}
+
+// Um clique repetido em "Salvar" (ou em "Excluir dia") mandava a mesma
+// gravacao duas vezes: dois avisos de sucesso e duas transacoes disputando o
+// mesmo dia no banco.
+let gravacaoPlantaoEmAndamento = false;
+
+function travarBotoesPlantao(travar) {
+    document.querySelectorAll('[data-chamar="salvarPlantao"], [data-chamar="excluirPlantao"]').forEach((botao) => {
+        botao.disabled = travar;
+        botao.setAttribute('aria-busy', travar ? 'true' : 'false');
+    });
+}
+
+async function comGravacaoPlantao(tarefa) {
+    if (gravacaoPlantaoEmAndamento) {
+        return;
+    }
+
+    gravacaoPlantaoEmAndamento = true;
+    travarBotoesPlantao(true);
+
+    try {
+        await tarefa();
+    } finally {
+        gravacaoPlantaoEmAndamento = false;
+        travarBotoesPlantao(false);
+    }
+}
+
+export function salvarPlantao(dataISO) {
+    return comGravacaoPlantao(() => gravarPlantao(dataISO));
+}
+
+async function gravarPlantao(dataISO) {
     const state = getPlantaoEditorState();
 
     if (!state || state.dataISO !== dataISO) {
@@ -978,10 +1058,32 @@ export async function salvarPlantao(dataISO) {
         return;
     }
 
+    // Colaborador escolhido no formulario mas sem clicar em "Adicionar": antes
+    // o dia era salvo sem ele, em silencio. Agora a linha entra (com as mesmas
+    // validacoes do "Adicionar") ou o salvar para com o motivo.
+    if (Number(state.rascunho?.colaboradorId || 0) > 0) {
+        if (!aplicarFormularioLancamentoPlantao(state)) {
+            return;
+        }
+
+        renderPlantaoEditor(state);
+        travarBotoesPlantao(true);
+    }
+
     // Salvar um dia sem nenhuma linha equivale a apagar o dia — mas isso e
     // destrutivo demais para acontecer por engano no botao de salvar.
     if (state.lancamentos.length === 0) {
         mostrarToast('Adicione pelo menos um lancamento. Para limpar o dia, use "Excluir dia".', 'error');
+        return;
+    }
+
+    // Dia ja lancado e nada mudou: nao ha o que mandar ao servidor (regravar
+    // o dia igual so trocaria os ids e refaria a escala e o banco de horas).
+    const jaLancado = (estado.plantoesLancados || []).some((item) => item.dataISO === dataISO);
+
+    if (jaLancado && !plantaoEditorTemAlteracoes(state)) {
+        fecharPlantaoEditor();
+        mostrarToast('Nenhuma alteracao para salvar.', 'info');
         return;
     }
 
@@ -1004,28 +1106,36 @@ export async function salvarPlantao(dataISO) {
         // Salvou: a janela fecha e a regua mostra o dia ja lancado. Com
         // erro, ela fica aberta com tudo o que foi digitado.
         fecharPlantaoEditor();
-        await atualizarTudo({ silent: true, source: 'plantao' });
-
         mostrarToast('Plantao salvo com sucesso!', 'success');
     } catch (error) {
         mostrarToast(`Erro ao salvar plantao: ${error.message}`, 'error');
-    }
-}
-
-export async function excluirPlantao(dataISO) {
-    if (!window.confirm('Tem certeza que deseja excluir este plantao?')) {
         return;
     }
 
-    try {
-        await API.excluirPlantao(dataISO);
-        fecharPlantaoEditor();
-        await atualizarTudo({ silent: true, source: 'plantao' });
+    await recarregarPlantoesNaTela();
+}
 
-        mostrarToast('Plantao excluido com sucesso!', 'success');
-    } catch (error) {
-        mostrarToast(`Erro ao excluir plantao: ${error.message}`, 'error');
+export function excluirPlantao(dataISO) {
+    if (gravacaoPlantaoEmAndamento) {
+        return Promise.resolve();
     }
+
+    if (!window.confirm(`Excluir todos os lancamentos do plantao de ${formatarDataPtBr(dataISO)}?`)) {
+        return Promise.resolve();
+    }
+
+    return comGravacaoPlantao(async () => {
+        try {
+            await API.excluirPlantao(dataISO);
+            fecharPlantaoEditor();
+            mostrarToast('Plantao excluido com sucesso!', 'success');
+        } catch (error) {
+            mostrarToast(`Erro ao excluir plantao: ${error.message}`, 'error');
+            return;
+        }
+
+        await recarregarPlantoesNaTela();
+    });
 }
 
 export async function salvarAusencia(tipo, dataInicio, dataFim) {

@@ -33,6 +33,9 @@ async function refreshEscalaViewEscala() {
         return;
     }
 
+    // Os dados mudaram (gravacao em outra parte ou "Atualizar tudo"): a
+    // faixa da semana tambem busca de novo.
+    estado.escalaWeekCache = null;
     const selectedDate = obterDataSelecionadaEscala();
     await carregarEscalaDiaEscala(selectedDate);
     atualizarAcoesCabecalhoEscala();

@@ -471,8 +471,50 @@ function agruparLancamentosPorHorario(lancamentos) {
     }));
 }
 
+// Conta com teto de setor so ve (e so edita) a parte da equipe que esta nos
+// setores dela: o GET do dia esconde o resto. Como o POST reescreve o dia
+// inteiro e o DELETE apaga o dia inteiro, sem isto salvar ou excluir por essa
+// conta apagava em silencio os turnos de quem ela nao enxerga. Devolve, como
+// lancamentos no formato de buildPlantaoDiaPayload, a parte de cada registro
+// gravado que fica fora do alcance da conta (e que nao veio no payload), para
+// ser regravada como estava. `visiveis` null = conta sem teto: nada a manter.
+function lancamentosForaDoAlcance(registros, visiveis, tipoPlantao, idsNoPayload = []) {
+    if (!visiveis) {
+        return [];
+    }
+
+    const enviados = new Set((idsNoPayload || []).map(Number));
+
+    return (registros || [])
+        .map((registro) => {
+            const colaboradores = (registro.colaboradores || [])
+                .map(Number)
+                .filter((id) => !visiveis.has(id) && !enviados.has(id));
+
+            return {
+                horaInicio: registro.horaInicio,
+                horaFim: registro.horaFim,
+                colaboradores,
+                tipoCredito: resolveLegacyTipoCredito(registro),
+                // O dia pode ter mudado de tipo depois da gravacao (feriado
+                // cadastrado depois): a cobertura continua cobertura, o
+                // resto acompanha o tipo atual do dia.
+                tipoLancamento: registro.tipoLancamento === PLANTAO_TIPO_COBERTURA_ALMOCO
+                    ? PLANTAO_TIPO_COBERTURA_ALMOCO
+                    : tipoPlantao,
+                observacao: registro.observacao ?? null,
+                // Registro antigo pode nao ter horario; ele volta como estava.
+                duracaoMinutos: registro.horaInicio && registro.horaFim
+                    ? calculateIntervalMinutes(registro.horaInicio, registro.horaFim)
+                    : null
+            };
+        })
+        .filter((lancamento) => lancamento.colaboradores.length > 0);
+}
+
 module.exports = {
     agruparLancamentosPorHorario,
+    lancamentosForaDoAlcance,
     buildPlantaoDiaPayload,
     formatDateToISO,
     generateUpcomingSaturdays,

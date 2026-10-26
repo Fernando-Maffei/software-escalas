@@ -1,7 +1,7 @@
 import { API } from '../../core/api.js';
 import { estado } from '../../core/estado.js';
 import { normalizeRuntimeEscalaTipo } from '../../core/runtime/normalizacao.js';
-import { atualizarTudo } from '../../core/runtime/plantao-colaboradores/plantao-regua-e-relatorios.js';
+import { recarregarDiaAbertoEscala } from './acoes-do-dia.js';
 import { abrirEditorNaEscala } from '../escala-dia-editor.js';
 import { ehTipoSemTrabalho, formatMinutesToTimeEscala, formatTimeInputEscala, getTimeMinutesEscala, TIPO_LABELS } from '../escala-dia-shared.js';
 import { getDefaultLunchRangeEscala, getIntervalOverlapMinutesEscala, getPartialAbsenceEscala, isSameLunchAsCadastroEscala } from './calculo-horas.js';
@@ -128,7 +128,7 @@ export async function salvarAjusteDiretoAlmocoEscala(colaboradorId, startMinutes
             observacao: currentRecord.observacao ?? null
         });
         setScaleLunchDraftEscala(colaboradorId, null);
-        await atualizarTudo({ silent: true, source: 'escala' });
+        await recarregarDiaAbertoEscala();
 
         if (estado.escalaEditorColaboradorId && Number(estado.escalaEditorColaboradorId) === Number(colaboradorId)) {
             abrirEditorNaEscala(colaboradorId);

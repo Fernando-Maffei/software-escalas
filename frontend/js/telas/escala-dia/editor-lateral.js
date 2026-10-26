@@ -397,7 +397,10 @@ export function renderScaleEditorEscala(record) {
 // sendo de um dia que o usuario ja abandonou (race condition classica).
 let escalaLoadSeq = 0;
 
-export async function carregarEscalaDiaEscala(dataISO) {
+// `aguardar`: promessa que precisa terminar antes de desenhar as linhas (na
+// entrada da tela, a carga de colaboradores/setores/ausencias, que corre em
+// paralelo com a busca do dia em vez de antes dela).
+export async function carregarEscalaDiaEscala(dataISO, { aguardar = null } = {}) {
     const normalized = toISODateEscala(dataISO) || toISODateEscala(new Date());
     const meuLoad = ++escalaLoadSeq;
 
@@ -415,7 +418,7 @@ export async function carregarEscalaDiaEscala(dataISO) {
     let payload;
 
     try {
-        payload = await API.getEscalaDia(normalized);
+        [payload] = await Promise.all([API.getEscalaDia(normalized), aguardar]);
     } catch (error) {
         if (meuLoad !== escalaLoadSeq) {
             return null;

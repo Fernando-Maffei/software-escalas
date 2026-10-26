@@ -127,6 +127,13 @@ export async function carregarPendenciasPlantao() {
     atualizarSelo();
 }
 
+// Depois de salvar ou excluir um plantao so a lista de plantoes mudou: refaz
+// "Plantoes sem equipe" e o selo sem buscar as folgas de novo.
+export function atualizarPlantoesSemEquipe() {
+    contagem.plantoes = renderPlantoesSemEquipe();
+    atualizarSelo();
+}
+
 // `abrirDia(dataISO)` abre o dia no painel lateral da tela de plantoes.
 export function ligarPendenciasPlantao(abrirDia) {
     ligarPendenciasFolgasDomingo(abrirDia);

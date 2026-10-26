@@ -168,5 +168,45 @@ module.exports = [
                 false
             );
         }
+    },
+    {
+        // O POST reescreve o dia inteiro e o DELETE apaga o dia inteiro. A
+        // conta com teto so ve (e manda) a parte dela da equipe: sem preservar
+        // o resto, salvar ou excluir o dia apagava o turno do outro setor.
+        name: 'conta limitada a um setor salva e exclui o plantao sem apagar o turno de outro setor',
+        async run() {
+            const { leitor, visivel, oculto } = await montarCenario({ isAdmin: true });
+            const admin = criarCliente();
+            await admin.entrar();
+            const turnosDoDia = async () =>
+                esperarSucesso(await admin.get('/api/plantoes/2027-04-10'), 'dia (admin)')
+                    .lancamentos.map((item) => [item.horaInicio, item.horaFim, item.colaboradores])
+                    .sort((a, b) => String(a[0]).localeCompare(String(b[0])));
+
+            const salvo = esperarSucesso(
+                await leitor.post('/api/plantoes', {
+                    dataISO: '2027-04-10',
+                    lancamentos: [{ colaboradorId: visivel.Id, horaInicio: '09:00', horaFim: '12:00' }]
+                }),
+                'salvar como conta limitada'
+            );
+            assert.deepEqual(
+                salvo.data.lancamentos.flatMap((item) => item.colaboradores),
+                [visivel.Id],
+                'a resposta nao revela quem a conta nao ve'
+            );
+            assert.deepEqual(await turnosDoDia(), [
+                ['09:00:00', '12:00:00', [visivel.Id]],
+                ['13:00:00', '17:00:00', [oculto.Id]]
+            ]);
+
+            esperarSucesso(await leitor.delete('/api/plantoes/2027-04-10'), 'excluir como conta limitada');
+            assert.deepEqual(await turnosDoDia(), [['13:00:00', '17:00:00', [oculto.Id]]]);
+            assert.equal((await leitor.get('/api/plantoes/2027-04-10')).status, 404);
+
+            // Dia so com gente de outro setor: para a conta, nao ha o que excluir.
+            assert.equal((await leitor.delete('/api/plantoes/2027-04-17')).status, 404);
+            assert.equal(esperarSucesso(await admin.get('/api/plantoes/2027-04-17'), 'dia 17').lancamentos.length, 1);
+        }
     }
 ];

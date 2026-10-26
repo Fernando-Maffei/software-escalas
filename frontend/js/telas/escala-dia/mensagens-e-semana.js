@@ -356,14 +356,31 @@ export async function renderWeekStripEscala(dataISO, { force = false } = {}) {
     // Render imediato (cache ou placeholder), depois hidrata com o fetch.
     renderWeekStripPillsEscala(iso, cachedByDay);
 
+    // Faixa ja coberta pelo cache nao busca de novo. Antes a busca pedia de
+    // novo a faixa COM a margem, que nunca estava no cache depois de andar um
+    // dia: cada clique em "proximo dia" refazia o relatorio de 12 semanas. O
+    // cache e zerado ao entrar na tela e quando os dados mudam
+    // (refreshEscalaViewEscala, almoco por periodo); o dia aberto usa sempre
+    // o estado ao vivo.
+    if (cachedByDay && !force) {
+        return;
+    }
+
     try {
         // Busca uma margem extra dos dois lados: os proximos cliques perto
         // daqui recentram a faixa sem nova chamada.
         const byDay = await ensureWeekDataEscala(
             shiftIsoDateEscala(start, -FAIXA_DIAS_ANTES),
             shiftIsoDateEscala(end, FAIXA_DIAS_DEPOIS),
-            { force: force || !cachedByDay }
+            { force: true }
         );
+
+        // Cliques rapidos podem disparar duas buscas: a que voltar por
+        // ultimo nao pode redesenhar a faixa de um dia que ja foi deixado.
+        if (toISODateEscala(estado.dataEscalaSelecionada) !== iso) {
+            return;
+        }
+
         renderWeekStripPillsEscala(iso, byDay);
     } catch (error) {
         // A faixa e apoio: se o fetch falhar, a tela do dia continua util.

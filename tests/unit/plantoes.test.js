@@ -5,6 +5,7 @@ const {
     buildPlantaoDiaPayload,
     formatDateToISO,
     generateUpcomingSaturdays,
+    lancamentosForaDoAlcance,
     montarRelatorioHorasExtras,
     normalizeColaboradores,
     normalizePlantaoType,
@@ -378,6 +379,62 @@ module.exports = [
             assert.equal(relatorio.itens.length, 0);
             assert.equal(relatorio.avisos.length, 1);
             assert.match(relatorio.avisos[0], /Plantao 7/);
+        }
+    },
+    {
+        // Conta sem teto de setor: o dia e regravado so com o que ela mandou.
+        name: 'lancamentosForaDoAlcance nao mantem nada para conta sem teto de setor',
+        run() {
+            const registros = [{ horaInicio: '08:00:00', horaFim: '12:00:00', colaboradores: [1, 2] }];
+
+            assert.deepEqual(lancamentosForaDoAlcance(registros, null, 'sabado'), []);
+        }
+    },
+    {
+        // Conta com teto: quem ela nao enxerga volta como estava (horario,
+        // destino e cobertura), e quem ela ve sai — vem do que ela mandou.
+        name: 'lancamentosForaDoAlcance mantem so a parte da equipe fora do alcance da conta',
+        run() {
+            const registros = [
+                { horaInicio: '08:00:00', horaFim: '12:00:00', colaboradores: [1, 7], tipoCredito: 'extra', tipoLancamento: 'domingo', observacao: 'obs' },
+                { horaInicio: '12:00:00', horaFim: '13:00:00', colaboradores: [8], tipoCredito: 'banco', tipoLancamento: 'cobertura_almoco' },
+                { horaInicio: '13:00:00', horaFim: '17:00:00', colaboradores: [2], tipoCredito: 'banco', tipoLancamento: 'domingo' }
+            ];
+            const visiveis = new Set([1, 2]);
+
+            assert.deepEqual(lancamentosForaDoAlcance(registros, visiveis, 'domingo'), [
+                {
+                    horaInicio: '08:00:00',
+                    horaFim: '12:00:00',
+                    colaboradores: [7],
+                    tipoCredito: 'extra',
+                    tipoLancamento: 'domingo',
+                    observacao: 'obs',
+                    duracaoMinutos: 240
+                },
+                {
+                    horaInicio: '12:00:00',
+                    horaFim: '13:00:00',
+                    colaboradores: [8],
+                    tipoCredito: 'banco',
+                    tipoLancamento: 'cobertura_almoco',
+                    observacao: null,
+                    duracaoMinutos: 60
+                }
+            ]);
+        }
+    },
+    {
+        name: 'lancamentosForaDoAlcance segue o tipo atual do dia e nao duplica quem veio no payload',
+        run() {
+            const registros = [{ horaInicio: '08:00:00', horaFim: '12:00:00', colaboradores: [7, 9], tipoLancamento: 'domingo' }];
+            const [mantido] = lancamentosForaDoAlcance(registros, new Set([1]), 'feriado', [9]);
+
+            // Feriado cadastrado depois do lancamento: o regular vira 'feriado'.
+            assert.equal(mantido.tipoLancamento, 'feriado');
+            assert.deepEqual(mantido.colaboradores, [7]);
+            // Registro antigo sem destino das horas credita no banco.
+            assert.equal(mantido.tipoCredito, 'banco');
         }
     }
 ];
