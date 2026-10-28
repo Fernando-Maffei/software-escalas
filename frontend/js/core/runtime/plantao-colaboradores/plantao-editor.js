@@ -133,7 +133,7 @@ function ehPlantaoDeCobertura(registro) {
 }
 
 // Os plantoes de cobertura do dia, uma linha por pessoa, so para leitura.
-export function coberturasDoDiaPlantao(dataISO) {
+function coberturasDoDiaPlantao(dataISO) {
     return (estado.plantoesLancados || [])
         .filter((item) => item.dataISO === dataISO && ehPlantaoDeCobertura(item))
         .flatMap((registro) => (registro.colaboradores || []).map((colaboradorId) => ({

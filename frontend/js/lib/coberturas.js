@@ -22,7 +22,7 @@ export const ROTULOS_ORIGEM = Object.freeze({
 
 const DIAS_CURTOS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sab'];
 
-export function minutosDoHorario(hora) {
+function minutosDoHorario(hora) {
     const [h, m] = String(hora || '').split(':').map(Number);
 
     return Number.isFinite(h) && Number.isFinite(m) ? (h * 60) + m : null;
