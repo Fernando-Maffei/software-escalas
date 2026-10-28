@@ -105,10 +105,10 @@ function aprimorar(select) {
         fechar();
     };
 
-    campo.addEventListener('focus', () => {
-        campo.select();
-        abrir();
-    });
+    // O foco so seleciona o texto: as telas poem o foco no campo ao abrir (ex.:
+    // o editor do plantao), e a lista abrindo sozinha cobria a janela. Ela
+    // abre no clique, ao digitar ou com a seta para baixo.
+    campo.addEventListener('focus', () => campo.select());
     campo.addEventListener('click', abrir);
     campo.addEventListener('input', () => {
         destaque = 0;
