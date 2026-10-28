@@ -9,6 +9,7 @@ const { sql } = require('../db');
 const { AppError } = require('../lib/errors');
 const { extractDateString } = require('../lib/validation');
 const { removerColaboradorDasEquipes } = require('./equipe-plantao');
+const { removerPlantoesDeCoberturaDoColaborador } = require('./cobertura-plantoes');
 
 // Toda tabela com FK para Colaboradores(Id), e a coluna da FK. Uma tabela nova
 // que referencie Colaboradores precisa entrar aqui — o teste de integracao
@@ -65,6 +66,10 @@ async function excluirColaboradorDefinitivamente(tx, colaboradorId, options = {}
         .request()
         .input('id', sql.Int, colaboradorId)
         .query('UPDATE FolgasDomingo SET CobertoPorColaboradorId = NULL WHERE CobertoPorColaboradorId = @id');
+
+    // Plantao gerado por cobertura em que ele e titular ou substituto: sai
+    // antes de os trechos mudarem (FK sem cascata), com o que ele gerou.
+    await removerPlantoesDeCoberturaDoColaborador(tx, colaboradorId);
 
     // As coberturas DESTE colaborador saem com ele (TABELAS_FILHAS), e o
     // credito que deram no banco de quem cobriu sai junto: o movimento aponta

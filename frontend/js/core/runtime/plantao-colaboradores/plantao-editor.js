@@ -125,6 +125,25 @@ function ordenarLancamentosPlantao(linhas) {
     ));
 }
 
+// Plantao gerado por cobertura de plantonista: e editado na cobertura, entao
+// o dia so o mostra e nunca o manda de volta ao salvar (o servidor o preserva).
+function ehPlantaoDeCobertura(registro) {
+    return Boolean(registro?.coberturaTrechoId);
+}
+
+// Os plantoes de cobertura do dia, uma linha por pessoa, so para leitura.
+export function coberturasDoDiaPlantao(dataISO) {
+    return (estado.plantoesLancados || [])
+        .filter((item) => item.dataISO === dataISO && ehPlantaoDeCobertura(item))
+        .flatMap((registro) => (registro.colaboradores || []).map((colaboradorId) => ({
+            colaboradorId: Number(colaboradorId),
+            horaInicio: formatarHoraInput(registro.horaInicio) || '',
+            horaFim: formatarHoraInput(registro.horaFim) || '',
+            tipoCredito: normalizarTipoCreditoPlantao(registro.tipoCredito),
+            observacao: registro.observacao || ''
+        })));
+}
+
 // Monta as linhas da tela a partir do que ja esta gravado. Cada registro do
 // banco pode trazer varios colaboradores no mesmo horario: aqui ele volta a
 // ser uma linha por pessoa, que e como a tela edita.
@@ -132,7 +151,7 @@ export function lancamentosDoDiaPlantao(dataISO) {
     const linhas = [];
 
     (estado.plantoesLancados || [])
-        .filter((item) => item.dataISO === dataISO)
+        .filter((item) => item.dataISO === dataISO && !ehPlantaoDeCobertura(item))
         .forEach((registro) => {
             const horaInicio = formatarHoraInput(registro.horaInicio) || '';
             const horaFim = formatarHoraInput(registro.horaFim) || '';
@@ -384,6 +403,37 @@ function textoResumoLancamentosPlantao(state) {
     return partes.join(' · ');
 }
 
+function renderCoberturasPlantao(dataISO) {
+    const linhas = coberturasDoDiaPlantao(dataISO);
+
+    if (linhas.length === 0) {
+        return '';
+    }
+
+    return `
+            <section class="plantao-secao plantao-coberturas" aria-labelledby="plantaoCoberturasTitulo">
+                <div class="plantao-secao-topo">
+                    <h4 class="plantao-secao-titulo" id="plantaoCoberturasTitulo">Cobertura de plantonista</h4>
+                    <span class="plantao-secao-resumo">Editado na cobertura, nao aqui</span>
+                </div>
+                <ul class="plantao-linhas">
+                    ${linhas.map((linha) => {
+                        const minutos = duracaoLancamentoPlantao(linha);
+                        return `
+                            <li class="plantao-linha is-cobertura">
+                                <span class="plantao-linha-hora">${escapeHtml(linha.horaInicio)}–${escapeHtml(linha.horaFim)}</span>
+                                <span class="plantao-linha-nome">${escapeHtml(nomeColaboradorPlantao(linha.colaboradorId))}</span>
+                                <span class="plantao-linha-meta">${escapeHtml(PLANTAO_CREDITO_META[linha.tipoCredito].label)} · ${escapeHtml(linha.observacao)}</span>
+                                <span class="plantao-linha-duracao">${minutos ? escapeHtml(minutosParaTexto(minutos)) : '--'}</span>
+                                <span class="plantao-linha-acoes"></span>
+                            </li>
+                        `;
+                    }).join('')}
+                </ul>
+            </section>
+        `;
+}
+
 // Uma linha por pessoa, como uma tabela: horario, nome, destino (e a
 // cobertura de almoco, unica marca colorida), duracao e as acoes.
 function renderLancamentosPlantao(state) {
@@ -585,6 +635,8 @@ export function renderPlantaoEditor(state) {
                     </div>
                     ${renderLancamentosPlantao(state)}
                 </section>
+
+                ${renderCoberturasPlantao(state.dataISO)}
 
                 ${mostrarObservacao ? `
                     <label class="plantao-campo plantao-secao">

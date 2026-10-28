@@ -249,7 +249,10 @@ const TABELAS_BACKUP = Object.freeze([
                 max: 30,
                 apelidos: ['tipoLancamento', 'TipoLancamento'],
                 enumeracao: PLANTAO_TIPOS_LANCAMENTO
-            })
+            }),
+            // Plantao gerado por cobertura (desde 2026-10-28); backup antigo
+            // restaura tudo como lancado a mao.
+            col('cobertura_trecho_id', TIPO.ID, { apelidos: ['coberturaTrechoId'] })
         ]
     },
     {

@@ -286,6 +286,145 @@ module.exports = [
         }
     },
     {
+        // Fase 3: sabado, domingo e feriado viram plantao do substituto.
+        name: 'trecho de sabado vira plantao do substituto, preservado pelo editor do dia',
+        async run() {
+            const cliente = criarCliente();
+            await cliente.entrar();
+            const cenario = await montarCenario(cliente);
+            const sabado = '2027-01-09';
+            const cobertura = esperarSucesso(
+                await cliente.post('/api/coberturas', {
+                    titularId: cenario.ana.Id,
+                    dataInicio: sabado,
+                    dataFim: sabado,
+                    trechos: [
+                        {
+                            dataISO: sabado,
+                            horaInicio: '08:00',
+                            horaFim: '12:00',
+                            substitutoId: cenario.bruno.Id,
+                            tipoCredito: 'banco'
+                        }
+                    ]
+                }),
+                'cobertura de sabado'
+            ).data;
+            const url = `/api/coberturas/${cobertura.id}`;
+            const plantoesDoSabado = async () =>
+                esperarSucesso(await cliente.get(`/api/plantoes?from=${sabado}&to=${sabado}`), 'plantoes do sabado');
+            const movimentosDePlantao = async (colaborador) =>
+                esperarSucesso(
+                    await cliente.get(`/api/banco-horas/colaborador/${colaborador.Id}`),
+                    'extrato'
+                ).items.filter((item) => item.origemTipo === 'plantao');
+
+            const [gerado] = await plantoesDoSabado();
+            assert.equal(gerado.coberturaTrechoId, cobertura.trechos[0].id);
+            assert.deepEqual(gerado.colaboradores, [cenario.bruno.Id]);
+            assert.equal(gerado.tipoPlantao, 'sabado');
+            assert.equal(gerado.tipoCredito, 'banco');
+            assert.equal(gerado.observacao, `Cobrindo ${cenario.ana.Nome}`);
+            assert.deepEqual(
+                (await movimentosDePlantao(cenario.bruno)).map((item) => item.minutos),
+                [240]
+            );
+
+            const dia = esperarSucesso(await cliente.get(`/api/escala/dia/${sabado}`), 'escala do sabado');
+            const linhaBruno = dia.items.find((item) => item.colaboradorId === cenario.bruno.Id);
+            assert.equal(linhaBruno.tipo, 'plantao');
+            assert.equal(linhaBruno.horaInicio, '08:00:00');
+            // Fim de semana nao entra pela camada de dia util: nada repetido.
+            assert.deepEqual(linhaBruno.coberturas, []);
+
+            // O editor do dia regrava so o que e dele; o plantao da cobertura fica.
+            esperarSucesso(
+                await cliente.post('/api/plantoes', {
+                    dataISO: sabado,
+                    lancamentos: [
+                        { colaboradorId: cenario.carla.Id, horaInicio: '09:00', horaFim: '13:00', tipoCredito: 'banco' }
+                    ]
+                }),
+                'plantao do sabado'
+            );
+            const doDia = esperarSucesso(await cliente.get(`/api/plantoes/${sabado}`), 'dia de plantao');
+            assert.deepEqual(
+                doDia.lancamentos.map((item) => item.colaboradores),
+                [[cenario.carla.Id]]
+            );
+            assert.deepEqual(
+                doDia.coberturas.map((item) => item.colaboradores),
+                [[cenario.bruno.Id]]
+            );
+            assert.equal(doDia.observacao, null);
+
+            esperarSucesso(await cliente.delete(`/api/plantoes/${sabado}`), 'excluir o dia');
+            assert.deepEqual(
+                (await plantoesDoSabado()).map((item) => item.coberturaTrechoId),
+                [cobertura.trechos[0].id]
+            );
+            assert.equal((await cliente.delete(`/api/plantoes/${sabado}`)).status, 409);
+
+            // Regravar a cobertura sem mudar nada: o plantao dela nao conflita
+            // com o proprio trecho.
+            const lida = esperarSucesso(await cliente.get(url), 'ler cobertura');
+            esperarSucesso(await cliente.put(url, { trechos: lida.trechos }), 'regravar igual');
+
+            // Trocar o substituto troca o plantao, o credito sai do Bruno.
+            esperarSucesso(
+                await cliente.put(url, {
+                    trechos: [{ ...lida.trechos[0], substitutoId: cenario.carla.Id, tipoCredito: 'extra' }]
+                }),
+                'Carla em hora extra'
+            );
+            const [trocado] = await plantoesDoSabado();
+            assert.deepEqual(trocado.colaboradores, [cenario.carla.Id]);
+            assert.equal(trocado.tipoCredito, 'extra');
+            assert.equal((await movimentosDePlantao(cenario.bruno)).length, 0);
+            assert.equal((await movimentosDePlantao(cenario.carla)).length, 0);
+
+            // Excluir a cobertura apaga o plantao.
+            esperarSucesso(await cliente.delete(url), 'excluir cobertura');
+            assert.deepEqual(await plantoesDoSabado(), []);
+        }
+    },
+    {
+        name: 'exclusao definitiva do substituto apaga o plantao de cobertura e deixa o trecho pendente',
+        async run() {
+            const cliente = criarCliente();
+            await cliente.entrar();
+            const cenario = await montarCenario(cliente);
+            const domingo = '2027-01-10';
+            const cobertura = esperarSucesso(
+                await cliente.post('/api/coberturas', {
+                    titularId: cenario.ana.Id,
+                    dataInicio: domingo,
+                    dataFim: domingo,
+                    trechos: [
+                        {
+                            dataISO: domingo,
+                            horaInicio: '08:00',
+                            horaFim: '12:00',
+                            substitutoId: cenario.carla.Id,
+                            tipoCredito: 'banco'
+                        }
+                    ]
+                }),
+                'cobertura de domingo'
+            ).data;
+
+            await desligarColaborador(cliente, cenario.carla.Id);
+            esperarSucesso(await cliente.delete(`/api/colaboradores/${cenario.carla.Id}`), 'excluir Carla');
+
+            assert.deepEqual(
+                esperarSucesso(await cliente.get(`/api/plantoes?from=${domingo}&to=${domingo}`), 'plantoes'),
+                []
+            );
+            const lida = esperarSucesso(await cliente.get(`/api/coberturas/${cobertura.id}`), 'cobertura');
+            assert.equal(lida.resumo.situacao, 'pendente');
+        }
+    },
+    {
         name: 'trechos sobrepostos, credito faltando e titular cobrindo a si mesmo sao recusados',
         async run() {
             const cliente = criarCliente();

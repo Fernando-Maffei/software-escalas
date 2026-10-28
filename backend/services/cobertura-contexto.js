@@ -81,6 +81,9 @@ async function carregarFeriadosCadastrados(poolOrTx, dataInicio, dataFim) {
 //
 // O expediente vem da escala do dia, que e gerada sob demanda — por isso o
 // ensureEscalaDiaForPeriod antes de ler (mesmo caminho da folga de domingo).
+// Os plantoes gerados por cobertura (cobertura_trecho_id) ficam de fora: o
+// trecho que os gerou ja entra pela lista de trechos, e o da propria
+// cobertura em edicao nao pode conflitar consigo mesmo.
 // Da escala ficam de fora as linhas que vieram de plantao (os turnos sao
 // conferidos um a um na tabela plantoes; a linha da escala junta os turnos do
 // dia e inventaria sobreposicao no intervalo entre eles) e as que a propria
@@ -166,6 +169,7 @@ async function carregarAgendaDosSubstitutos(poolOrTx, { dataInicio, dataFim, sub
         INNER JOIN dbo.PlantaoColaborador pc ON pc.PlantaoId = p.id
         WHERE pc.ColaboradorId IN (${parametrosIn(reqPlantoes, 'p', ids)})
           AND p.data_plantao BETWEEN @dataInicio AND @dataFim
+          AND p.cobertura_trecho_id IS NULL
     `);
 
     for (const linha of plantoes.recordset) {

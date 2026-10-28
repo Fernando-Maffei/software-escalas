@@ -859,7 +859,9 @@ async function abrirEditorPlantao(dataISO, dataFormatada) {
         return;
     }
 
-    const registrosDoDia = (estado.plantoesLancados || []).filter((item) => item.dataISO === dataISO);
+    // A observacao do dia e dos lancamentos a mao; a do plantao de cobertura
+    // ("Cobrindo Ana") e dele.
+    const registrosDoDia = (estado.plantoesLancados || []).filter((item) => item.dataISO === dataISO && !item.coberturaTrechoId);
     const lancamentos = lancamentosDoDiaPlantao(dataISO);
     // O ultimo turno gravado vira o padrao do formulario: quase sempre a
     // proxima pessoa lancada entra no mesmo horario.
@@ -915,7 +917,7 @@ function plantaoEditorTemAlteracoes(state) {
         normalizarTipoLancamentoPlantao(linha.tipoLancamento, state.tipoPlantao)
     ].join('|')).sort());
     const observacaoGravada = (estado.plantoesLancados || [])
-        .find((item) => item.dataISO === state.dataISO && item.observacao)?.observacao || '';
+        .find((item) => item.dataISO === state.dataISO && !item.coberturaTrechoId && item.observacao)?.observacao || '';
 
     return chave(state.lancamentos) !== chave(lancamentosDoDiaPlantao(state.dataISO))
         || String(state.observacao || '').trim() !== String(observacaoGravada).trim()

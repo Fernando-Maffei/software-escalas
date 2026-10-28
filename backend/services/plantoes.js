@@ -210,6 +210,9 @@ function serializePlantaoRecord(row) {
         horaInicio: extractTimeString(row.hora_inicio ?? row.HoraInicio ?? row.horaInicio),
         horaFim: extractTimeString(row.hora_fim ?? row.HoraFim ?? row.horaFim),
         observacao: row.observacao ?? row.Observacao ?? null,
+        // Plantao gerado por cobertura de plantonista (cobertura-plantoes.js);
+        // nulo no lancado a mao.
+        coberturaTrechoId: Number(row.cobertura_trecho_id ?? row.coberturaTrechoId) || null,
         duracaoMinutos: Number.isFinite(row.duracaoMinutos) ? row.duracaoMinutos : null,
         duracaoFormatada: Number.isFinite(row.duracaoMinutos) ? minutesToDurationLabel(row.duracaoMinutos) : null,
         criado_em: row.criado_em ?? row.CriadoEm ?? null,

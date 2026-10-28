@@ -5,7 +5,7 @@
 // das ferias e da folga de domingo. Em dia util: a escala do dia le os trechos
 // (cobertura-na-escala.js) e o banco de horas recebe o credito
 // (cobertura-banco.js), refeito a cada gravacao. Sabado, domingo e feriado
-// viram plantao numa fase seguinte.
+// viram plantao (cobertura-plantoes.js), tambem refeito a cada gravacao.
 //
 // As regras estao separadas para serem testadas sem banco:
 //   cobertura-trechos.js    gerar, dividir, validar e resumir os trechos
@@ -14,6 +14,7 @@
 const { sql } = require('../db');
 const { AppError } = require('../lib/errors');
 const { sincronizarMovimentosDaCobertura } = require('./cobertura-banco');
+const { gerarPlantoesDaCobertura, removerPlantoesDaCobertura } = require('./cobertura-plantoes');
 const { detectarConflitoSubstituto, exigirSubstitutoSemConflito } = require('./cobertura-conflitos');
 const {
     carregarAgendaDosSubstitutos,
@@ -438,6 +439,7 @@ async function createCobertura(tx, body = {}, visiveis = null) {
 
     await gravarTrechos(tx, id, trechos, new Map());
     await sincronizarMovimentosDaCobertura(tx, id);
+    await gerarPlantoesDaCobertura(tx, id);
 
     return findCoberturaById(tx, id, visiveis);
 }
@@ -492,8 +494,11 @@ async function updateCobertura(tx, id, body = {}, visiveis = null) {
             WHERE Id = @id
         `);
 
+    // Os plantoes saem antes dos trechos (FK sem cascata) e voltam depois.
+    const datasMexidas = await removerPlantoesDaCobertura(tx, atual.id);
     await gravarTrechos(tx, atual.id, trechos, anteriores);
     await sincronizarMovimentosDaCobertura(tx, atual.id);
+    await gerarPlantoesDaCobertura(tx, atual.id, datasMexidas);
 
     return findCoberturaById(tx, atual.id, visiveis);
 }
@@ -543,10 +548,14 @@ async function deleteCobertura(tx, id, visiveis = null) {
         throw new AppError(404, 'Cobertura nao encontrada.');
     }
 
+    // Os plantoes gerados saem antes (FK sem cascata); sem trechos, gerar so
+    // refaz a escala dos dias que os perderam.
+    const datasMexidas = await removerPlantoesDaCobertura(tx, atual.id);
     // Os trechos saem junto (FK com ON DELETE CASCADE).
     await tx.request().input('id', sql.Int, atual.id).query('DELETE FROM Coberturas WHERE Id = @id');
     // Sem trechos, a sincronizacao so apaga os movimentos que apontavam para eles.
     await sincronizarMovimentosDaCobertura(tx, atual.id);
+    await gerarPlantoesDaCobertura(tx, atual.id, datasMexidas);
 
     return atual;
 }

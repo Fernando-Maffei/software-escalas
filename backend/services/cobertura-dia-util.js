@@ -1,7 +1,8 @@
 // Trechos de cobertura em DIA UTIL que ja tem substituto: o trabalho que a
 // cobertura gera fora da tabela plantoes. Sabado, domingo e feriado viram
-// plantao (Fase 3) e entram na escala, no banco e nas horas extras por la;
-// por isso ficam de fora daqui, senao seriam contados duas vezes.
+// plantao (cobertura-plantoes.js) e entram na escala, no banco e nas horas
+// extras por la; por isso carregarTrechosDeDiaUtil os deixa de fora, senao
+// seriam contados duas vezes.
 //
 // Daqui saem a escala do dia (cobertura-na-escala.js), o banco de horas
 // (cobertura-banco.js), o banco semanal e o relatorio de horas extras.
@@ -29,9 +30,10 @@ function serializarTrechoDiaUtil(linha) {
     };
 }
 
-// Filtros opcionais: periodo, substituto e cobertura. Sem periodo, le tudo
-// (o recalculo do banco de horas).
-async function carregarTrechosDeDiaUtil(poolOrTx, filtros = {}) {
+// Trechos atribuidos com o tipo do dia ('util', 'sabado', 'domingo',
+// 'feriado'). Filtros opcionais: periodo, substituto e cobertura. Sem periodo,
+// le tudo (o recalculo do banco de horas).
+async function carregarTrechosAtribuidos(poolOrTx, filtros = {}) {
     const { dataInicio = null, dataFim = null, substitutoId = null, coberturaId = null } = filtros;
     const request = poolOrTx.request();
     const clausulas = ['t.SubstitutoId IS NOT NULL'];
@@ -76,9 +78,19 @@ async function carregarTrechosDeDiaUtil(poolOrTx, filtros = {}) {
     const feriadosResult = await poolOrTx.request().query('SELECT Data FROM Feriados');
     const feriados = new Set(feriadosResult.recordset.map((linha) => extractDateString(linha.Data)).filter(Boolean));
 
-    return result.recordset
-        .map(serializarTrechoDiaUtil)
-        .filter((trecho) => tipoDoDia(trecho.dataISO, feriados) === 'util');
+    return result.recordset.map((linha) => {
+        const trecho = serializarTrechoDiaUtil(linha);
+        return { ...trecho, tipoDia: tipoDoDia(trecho.dataISO, feriados) };
+    });
+}
+
+async function carregarTrechosDeDiaUtil(poolOrTx, filtros = {}) {
+    return (await carregarTrechosAtribuidos(poolOrTx, filtros)).filter((trecho) => trecho.tipoDia === 'util');
+}
+
+// Os de sabado, domingo e feriado: viram plantao (cobertura-plantoes.js).
+async function carregarTrechosDePlantao(poolOrTx, filtros = {}) {
+    return (await carregarTrechosAtribuidos(poolOrTx, filtros)).filter((trecho) => trecho.tipoDia !== 'util');
 }
 
 function descreverTrecho(trecho) {
@@ -109,6 +121,7 @@ function trechoComoLancamento(trecho) {
 }
 
 module.exports = {
+    carregarTrechosDePlantao,
     carregarTrechosDeDiaUtil,
     descreverTrecho,
     serializarTrechoDiaUtil,
