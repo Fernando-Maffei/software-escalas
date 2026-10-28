@@ -9,6 +9,7 @@ import { abrirEditorColaboradores } from './colaboradores-e-jornada.js';
 import { formatarHoraInput, getPlantaoEditorState, mapBancoHorasResumo, minutosParaTexto, withInFlight } from './helpers.js';
 import { construirMapaFeriadosPlantao, rotuloTipoPlantao } from './plantao-regua-e-relatorios.js';
 import { atributosAcao } from '../../../lib/atributos-acao.js';
+import { aplicarBuscaNosSelects } from '../../select-com-busca.js';
 
 // Aplica "Meus setores" a lista do checklist, mas SEMPRE mantem quem ja
 // esta selecionado (mesmo de outro setor). Sem isso, abrir um plantao com
@@ -587,7 +588,7 @@ export function renderPlantaoEditor(state) {
                     <div class="plantao-novo-campos">
                         <label class="plantao-campo">
                             <span>Colaborador</span>
-                            <select id="plantaoNovoColaborador" class="form-control">
+                            <select id="plantaoNovoColaborador" class="form-control" data-pesquisavel aria-label="Colaborador">
                                 ${renderOpcoesColaboradorPlantao(state)}
                             </select>
                         </label>
@@ -679,6 +680,9 @@ export function renderPlantaoEditor(state) {
             atual.folgaAberta = event.currentTarget.open;
         }
     });
+
+    // Colaborador com busca por nome (core/select-com-busca.js).
+    aplicarBuscaNosSelects(editorContent);
 
     // Depois do innerHTML: o painel de folga liga os proprios eventos e
     // busca a lista dele. Em dia que nao e domingo ele nao renderiza nada

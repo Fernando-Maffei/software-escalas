@@ -16,9 +16,10 @@
 // removida" e quem decide se ela ainda vale e o administrador.
 const { sql } = require('../db');
 const { sincronizarMovimentosDaCobertura } = require('./cobertura-banco');
-const { carregarJornadaDoTitular } = require('./cobertura-contexto');
+const { carregarFeriadosCadastrados, carregarJornadaDoTitular } = require('./cobertura-contexto');
 const { gerarPlantoesDaCobertura, removerPlantoesDaCobertura } = require('./cobertura-plantoes');
 const { gerarTrechosNecessarios, intervalosSeCruzam } = require('./cobertura-trechos');
+const { exigirSemCoberturaSobreposta } = require('./coberturas');
 const { extractDateString, extractTimeString, toSqlTime } = require('../lib/validation');
 
 // Refaz tudo o que a cobertura gera, em volta de uma mudanca nos trechos.
@@ -122,6 +123,7 @@ async function acompanharAusenciaDoTitular(tx, ausencia) {
     const novoInicio = extractDateString(ausencia.DataInicio);
     const novoFim = extractDateString(ausencia.DataFim);
     const ajustadas = [];
+    const feriados = await carregarFeriadosCadastrados(tx, novoInicio, novoFim);
 
     for (const cobertura of coberturas.recordset) {
         if (cobertura.DataInicio === novoInicio && cobertura.DataFim === novoFim) {
@@ -129,9 +131,17 @@ async function acompanharAusenciaDoTitular(tx, ausencia) {
         }
 
         const coberturaId = Number(cobertura.Id);
+        // Mesma trava da tela: estender sobre outra cobertura do titular
+        // cobriria o mesmo horario duas vezes (e creditaria em dobro). O 409
+        // desfaz a edicao da ausencia inteira.
+        await exigirSemCoberturaSobreposta(
+            tx,
+            Number(cobertura.TitularId),
+            { dataInicio: novoInicio, dataFim: novoFim },
+            coberturaId
+        );
+
         const titular = { Id: cobertura.TitularId, TrabalhoInicio: cobertura.TrabalhoInicio, TrabalhoFim: cobertura.TrabalhoFim };
-        const feriadosResult = await tx.request().query('SELECT Data FROM Feriados');
-        const feriados = new Set(feriadosResult.recordset.map((linha) => extractDateString(linha.Data)));
         // So os dias que entraram agora: dia que ja era da cobertura e nao tem
         // trecho foi tirado de proposito.
         const novos = gerarTrechosNecessarios({

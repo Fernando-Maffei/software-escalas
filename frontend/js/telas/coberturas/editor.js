@@ -15,6 +15,7 @@ mostra os outros apagados com o motivo.
 import { API } from '../../core/api.js';
 import { mostrarToast } from '../../core/app/horas-e-resumo.js';
 import { estado } from '../../core/estado.js';
+import { aplicarBuscaNosSelects } from '../../core/select-com-busca.js';
 import { escapeHtml } from '../../lib/html-seguro.js';
 import {
     ROTULOS_SITUACAO,
@@ -93,7 +94,7 @@ function renderTrecho(trecho, indice) {
                     <span aria-hidden="true">–</span>
                     <input type="time" value="${escapeHtml(horaCurta(trecho.horaFim))}" data-campo="horaFim" aria-label="Fim">
                 </span>
-                <select data-campo="substitutoId" aria-label="Quem cobre">${opcoesSubstituto(trecho)}</select>
+                <select data-campo="substitutoId" data-pesquisavel aria-label="Quem cobre">${opcoesSubstituto(trecho)}</select>
                 <select data-campo="tipoCredito" aria-label="Horas vao para"${pendente ? ' disabled' : ''}>
                     <option value=""${credito ? '' : ' selected'}>Escolha o destino</option>
                     <option value="banco"${credito === 'banco' ? ' selected' : ''}>Banco de horas</option>
@@ -156,6 +157,7 @@ function renderCorpo() {
 
     if (corpo) {
         corpo.innerHTML = renderDias();
+        aplicarBuscaNosSelects(corpo);
     }
 
     renderResumo();
@@ -180,7 +182,7 @@ function render() {
 
                 <div class="cobertura-todos">
                     <span>Atribuir os horarios pendentes a</span>
-                    <select id="coberturaTodosSubstituto" aria-label="Quem cobre os pendentes">
+                    <select id="coberturaTodosSubstituto" data-pesquisavel aria-label="Quem cobre os pendentes">
                         <option value="">Escolha o colaborador</option>
                         ${candidatos().map((item) => `<option value="${Number(item.Id)}">${escapeHtml(item.Nome)}</option>`).join('')}
                     </select>
@@ -207,6 +209,7 @@ function render() {
             </div>`;
 
     caixa.hidden = false;
+    aplicarBuscaNosSelects(caixa);
     renderCorpo();
 }
 
@@ -426,13 +429,15 @@ function ligar(caixa) {
             carregarDisponibilidade(Number(evento.target.closest('.cobertura-trecho').dataset.indice));
         }
     });
-
-    document.addEventListener('keydown', (evento) => {
-        if (evento.key === 'Escape' && aberta) {
-            fechar();
-        }
-    });
 }
+
+// Um ouvinte so para o modulo: a caixa e recriada a cada entrada na tela, e um
+// ouvinte por caixa acumulava (o Esc fechava e perguntava N vezes).
+document.addEventListener('keydown', (evento) => {
+    if (evento.key === 'Escape' && aberta) {
+        fechar();
+    }
+});
 
 // `aoMudar`: chamado depois de salvar ou excluir, para a lista se refazer.
 export function abrirEditorCobertura(cobertura, aoMudar = null) {

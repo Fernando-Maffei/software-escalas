@@ -20,6 +20,7 @@ import { appContent } from '../../core/app.js';
 import { mostrarToast } from '../../core/app/horas-e-resumo.js';
 import { estado } from '../../core/estado.js';
 import { carregarAusencias, carregarColaboradores } from '../../core/runtime/dados-e-modais.js';
+import { aplicarBuscaNosSelects } from '../../core/select-com-busca.js';
 import { escapeHtml } from '../../lib/html-seguro.js';
 import { hojeISO } from '../../lib/pendencias-plantao.js';
 import { ROTULOS_ORIGEM, ROTULOS_SITUACAO, ausenciasSemCobertura, dataBr, rotuloOrigem, textoDuracao } from '../../lib/coberturas.js';
@@ -156,7 +157,7 @@ function renderFormAvulsa() {
             <form id="coberturaAvulsaForm" class="coberturas-avulsa" hidden>
                 <label>
                     <span>Titular (de quem e o horario)</span>
-                    <select name="titularId" required><option value="">Escolha</option>${opcoes}</select>
+                    <select name="titularId" required data-pesquisavel aria-label="Titular"><option value="">Escolha</option>${opcoes}</select>
                 </label>
                 <label><span>De</span><input type="date" name="dataInicio" required></label>
                 <label><span>Ate</span><input type="date" name="dataFim" required></label>
@@ -270,6 +271,7 @@ export async function renderCoberturas() {
 
             <div id="coberturaEditor" class="cobertura-modal" role="dialog" aria-modal="true" hidden></div>`;
 
+    aplicarBuscaNosSelects(appContent);
     ligar();
 
     // Vindo das Pendencias de plantao com uma cobertura escolhida.

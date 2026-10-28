@@ -564,6 +564,7 @@ module.exports = {
     MAX_DIAS_COBERTURA,
     createCobertura,
     deleteCobertura,
+    exigirSemCoberturaSobreposta,
     findCoberturaById,
     listCoberturas,
     listarDisponibilidade,

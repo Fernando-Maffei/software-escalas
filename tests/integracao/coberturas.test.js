@@ -835,5 +835,39 @@ module.exports = [
                 [cenario.carla.Id, cenario.carla.Id, null, null, null]
             );
         }
+    },
+    {
+        // Revisao A1: estender as ferias sobre outra cobertura do titular cobriria
+        // o mesmo dia duas vezes; a edicao inteira e recusada.
+        name: 'estender as ferias do titular sobre outra cobertura dele e recusado sem mudar nada',
+        async run() {
+            const cliente = criarCliente();
+            await cliente.entrar();
+            const cenario = await montarCenario(cliente);
+            await carlaCobreTudo(cliente, cenario);
+            esperarSucesso(
+                await cliente.post('/api/coberturas', {
+                    titularId: cenario.ana.Id,
+                    dataInicio: '2027-01-13',
+                    dataFim: '2027-01-13'
+                }),
+                'cobertura avulsa da Ana'
+            );
+
+            const estendida = await cliente.put(`/api/ausencias/${cenario.feriasId}`, {
+                dataInicio: '2027-01-04',
+                dataFim: '2027-01-15'
+            });
+            assert.equal(estendida.status, 409);
+
+            const ferias = esperarSucesso(
+                await cliente.get(`/api/ausencias?colaboradorId=${cenario.ana.Id}`),
+                'ausencias'
+            );
+            assert.equal(
+                String(ferias.find((item) => item.Id === cenario.feriasId).DataFim).slice(0, 10),
+                '2027-01-08'
+            );
+        }
     }
 ];
