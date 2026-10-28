@@ -5,10 +5,14 @@ const {
     atribuirPendentes,
     ausenciasSemCobertura,
     dividirAoMeio,
+    indiceCoberturaPorDia,
+    montarRelatorioCoberturas,
     resumirTrechos,
     rotuloDia,
     rotuloOrigem,
+    textoCoberturaDoDia,
     textoDuracao,
+    textoSegundoTurno,
     trechosParaEnvio
 } = require('../../frontend/js/lib/coberturas');
 
@@ -120,6 +124,69 @@ module.exports = [
             const lista = ausenciasSemCobertura(ausencias, colaboradores, [{ ausenciaId: 15 }], '2027-01-01');
 
             assert.deepEqual(lista.map((item) => [item.id, item.colaboradorNome, item.dataInicio]), [[10, 'Ana', '2027-01-04']]);
+        }
+    },
+    {
+        name: 'calendario: situacao e quem cobre por dia do titular',
+        run() {
+            const indice = indiceCoberturaPorDia([
+                {
+                    titularId: 1,
+                    trechos: [
+                        trecho({ dataISO: '2027-01-04', substitutoNome: 'Carla' }),
+                        trecho({ dataISO: '2027-01-04', substitutoNome: 'Bruno' }),
+                        trecho({ dataISO: '2027-01-05', substitutoId: null, substitutoNome: null })
+                    ],
+                    resumo: {
+                        dias: [
+                            { dataISO: '2027-01-04', situacao: 'coberto' },
+                            { dataISO: '2027-01-05', situacao: 'pendente' }
+                        ]
+                    }
+                }
+            ]);
+
+            assert.equal(textoCoberturaDoDia(indice.get('1|2027-01-04')), 'Coberto por Carla, Bruno');
+            assert.equal(textoCoberturaDoDia(indice.get('1|2027-01-05')), 'Sem cobertura');
+            assert.equal(indice.get('2|2027-01-04'), undefined);
+        }
+    },
+    {
+        name: 'segundo turno em texto para o relatorio de escala',
+        run() {
+            assert.equal(
+                textoSegundoTurno([{ titularNome: 'Ana', horaInicio: '19:00:00', horaFim: '22:00:00', tipoCredito: 'extra' }]),
+                'Cobrindo Ana 19:00-22:00 (hora extra)'
+            );
+            assert.equal(textoSegundoTurno(undefined), '');
+        }
+    },
+    {
+        name: 'relatorio de coberturas soma banco e extra por pessoa e separa o que ficou sem ninguem',
+        run() {
+            const coberturas = [
+                {
+                    titularNome: 'Ana',
+                    trechos: [
+                        trecho({ horaInicio: '11:00', horaFim: '16:00', substitutoId: 30, substitutoNome: 'Carla', tipoCredito: 'extra' }),
+                        trecho({ horaInicio: '16:00', horaFim: '22:00' }),
+                        trecho({ dataISO: '2027-01-05', horaInicio: '11:00', horaFim: '22:00', substitutoId: null, substitutoNome: null, tipoCredito: null }),
+                        trecho({ dataISO: '2027-02-01', horaInicio: '11:00', horaFim: '22:00' })
+                    ]
+                }
+            ];
+
+            const relatorio = montarRelatorioCoberturas(coberturas, { inicioISO: '2027-01-01', fimISO: '2027-01-31' });
+            assert.deepEqual(
+                relatorio.pessoas.map((pessoa) => [pessoa.nome, pessoa.minutosBanco, pessoa.minutosExtra, pessoa.trechos.length]),
+                [['Bruno', 360, 0, 1], ['Carla', 0, 300, 1]]
+            );
+            assert.deepEqual(relatorio.totais, { banco: 360, extra: 300, pendente: 660 });
+            assert.equal(relatorio.pendentes[0].titularNome, 'Ana');
+
+            const soCarla = montarRelatorioCoberturas(coberturas, { inicioISO: '2027-01-01', fimISO: '2027-01-31', colaboradorId: '30' });
+            assert.deepEqual(soCarla.pessoas.map((pessoa) => pessoa.nome), ['Carla']);
+            assert.deepEqual(soCarla.pendentes, []);
         }
     }
 ];

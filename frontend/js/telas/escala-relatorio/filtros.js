@@ -1,5 +1,6 @@
 import { estado } from '../../core/estado.js';
 import { escapeHtml } from '../../lib/html-seguro.js';
+import { textoSegundoTurno } from '../../lib/coberturas.js';
 import { formatDatePtBrEscala, getDayLabelEscala, TIPO_LABELS } from '../escala-dia-shared.js';
 
 export function buildColaboradorOptionsEscala(selectedId = '') {
@@ -103,7 +104,9 @@ export const COLUNAS_ESCALA_DETALHADA = [
     { titulo: 'Saida', valor: (i) => i.horaFim || '--' },
     { titulo: 'Almoco', valor: (i) => i.almoco || '--' },
     { titulo: 'Tipo', html: true, valor: (i) => `<span class="evento-tipo badge-${escapeHtml(i.tipo)}">${escapeHtml(TIPO_LABELS[i.tipo] || i.tipo || '--')}</span>` },
-    { titulo: 'Observacoes', valor: (i) => i.observacao || '--' }
+    // O segundo turno de cobertura (ver backend/services/cobertura-na-escala.js)
+    // vai junto da observacao do dia.
+    { titulo: 'Observacoes', valor: (i) => [i.observacao, textoSegundoTurno(i.coberturas)].filter(Boolean).join(' | ') || '--' }
 ];
 
 // Helper genérico de tabela de relatório: header, `scope="col"` e body

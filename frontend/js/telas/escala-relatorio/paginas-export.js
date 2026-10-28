@@ -1,4 +1,5 @@
 import { escapeHtml } from '../../lib/html-seguro.js';
+import { textoSegundoTurno } from '../../lib/coberturas.js';
 import { ESCALA_QUADRO_WEEKDAY_HEADERS, formatDatePtBrEscala, getDayLabelEscala, TIPO_LABELS } from '../escala-dia-shared.js';
 import { groupEscalaItemsBySetor } from './agrupamento-setor.js';
 import { renderEscalaExportStats, renderEscalaHolidayList } from './feriados-export.js';
@@ -182,7 +183,7 @@ export function renderDetailedEscalaExportPages(snapshot) {
                                 <td>${escapeHtml(item.horaFim || '--')}</td>
                                 <td>${escapeHtml(item.almoco || '--')}</td>
                                 <td>${escapeHtml(TIPO_LABELS[item.tipo] || item.tipo || '--')}</td>
-                                <td>${escapeHtml(item.observacao || '--')}</td>
+                                <td>${escapeHtml([item.observacao, textoSegundoTurno(item.coberturas)].filter(Boolean).join(' | ') || '--')}</td>
                             </tr>
                         `).join('')}
                     </tbody>

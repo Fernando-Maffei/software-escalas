@@ -329,3 +329,20 @@
         grid-column: 1 / -1;
     }
 }
+
+/* Calendario: marca de cobertura na ferias/folga do plantonista. */
+.ausencia-tag .cobertura-marca {
+    margin-left: auto;
+    padding-left: 4px;
+    flex-shrink: 0;
+    font-size: 10px;
+}
+
+.ausencia-tag .cobertura-marca.is-coberto {
+    color: var(--success);
+}
+
+.ausencia-tag .cobertura-marca.is-parcial,
+.ausencia-tag .cobertura-marca.is-pendente {
+    color: var(--warning);
+}

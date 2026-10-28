@@ -20,6 +20,7 @@ import { isColaboradoresScreenVisible } from './plantao-colaboradores/helpers.js
 import { ehCoberturaAlmocoPlantao, normalizarTipoLancamentoPlantao, PLANTAO_TIPO_LANCAMENTO_OPCOES, renderListaColaboradores, rotuloTipoLancamentoPlantao } from './plantao-colaboradores/plantao-editor.js';
 import { ehDataPlantaoValida, renderLancamentoPlantao } from './plantao-colaboradores/plantao-regua-e-relatorios.js';
 import { gerarRelatorioAssinaturas, renderPainelRelatorioAssinaturas } from './relatorio-assinaturas.js';
+import { renderPainelRelatorioCoberturas } from './relatorio-coberturas.js';
 import { gerarRelatorioDomingos, renderPainelRelatorioDomingos } from './relatorio-domingos.js';
 import { gerarRelatorioCompleto } from './relatorio-mensal.js';
 import { atributosAcao } from '../../lib/atributos-acao.js';
@@ -701,6 +702,9 @@ export async function renderRelatorios() {
                 <button type="button" class="relatorios-aba" data-relatorio-aba="domingos" role="tab" aria-selected="false">
                     <i class="fas fa-calendar-week"></i> Domingos e feriados
                 </button>
+                <button type="button" class="relatorios-aba" data-relatorio-aba="coberturas" role="tab" aria-selected="false">
+                    <i class="fas fa-people-arrows"></i> Coberturas
+                </button>
                 <button type="button" class="relatorios-aba" data-relatorio-aba="assinaturas" role="tab" aria-selected="false">
                     <i class="fas fa-file-signature"></i> Assinaturas
                 </button>
@@ -860,6 +864,8 @@ export async function renderRelatorios() {
                 </div>
 
                 ${renderPainelRelatorioDomingos(buildPlantaoColaboradorOptions())}
+
+                ${renderPainelRelatorioCoberturas(buildPlantaoColaboradorOptions())}
 
                 ${renderPainelRelatorioAssinaturas()}
             </div>

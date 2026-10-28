@@ -193,3 +193,130 @@ export function ausenciasSemCobertura(ausencias, colaboradores, coberturas, hoje
         .map((item) => ({ ...item, colaboradorNome: plantonistas.get(item.colaboradorId).Nome }))
         .sort((a, b) => a.dataInicio.localeCompare(b.dataInicio) || a.colaboradorNome.localeCompare(b.colaboradorNome));
 }
+
+// Calendario: "titularId|dataISO" -> { situacao, substitutos } de cada dia
+// que tem horario a cobrir, para marcar a ferias/folga do titular.
+export function indiceCoberturaPorDia(coberturas) {
+    const indice = new Map();
+
+    for (const cobertura of coberturas || []) {
+        const nomesPorDia = new Map();
+
+        for (const trecho of cobertura.trechos || []) {
+            if (!nomesPorDia.has(trecho.dataISO)) {
+                nomesPorDia.set(trecho.dataISO, new Set());
+            }
+
+            if (trecho.substitutoNome) {
+                nomesPorDia.get(trecho.dataISO).add(trecho.substitutoNome);
+            }
+        }
+
+        for (const dia of cobertura.resumo?.dias || []) {
+            indice.set(`${Number(cobertura.titularId)}|${dia.dataISO}`, {
+                situacao: dia.situacao,
+                substitutos: [...(nomesPorDia.get(dia.dataISO) || [])]
+            });
+        }
+    }
+
+    return indice;
+}
+
+export function textoCoberturaDoDia(info) {
+    if (!info) {
+        return '';
+    }
+
+    if (info.situacao === 'coberto') {
+        return `Coberto por ${info.substitutos.join(', ')}`;
+    }
+
+    if (info.situacao === 'parcial') {
+        return `Cobertura parcial: ${info.substitutos.join(', ')}`;
+    }
+
+    return 'Sem cobertura';
+}
+
+// Escala (relatorio detalhado): o segundo turno que a pessoa fez cobrindo
+// alguem, em texto. `coberturas` e o campo de mesmo nome de cada item.
+export function textoSegundoTurno(coberturas) {
+    return (coberturas || [])
+        .map((item) => {
+            const destino = item.tipoCredito === 'extra' ? 'hora extra' : 'banco';
+            return `Cobrindo ${item.titularNome || 'colega'} ${horaCurta(item.horaInicio)}-${horaCurta(item.horaFim)} (${destino})`;
+        })
+        .join(' | ');
+}
+
+// Relatorio de coberturas: por substituto, cada horario que ele cobriu no
+// periodo (com o destino das horas) e os totais; e, a parte, o que ficou sem
+// ninguem. `colaboradorId` filtra o substituto (os pendentes somem: nao sao
+// de ninguem).
+export function montarRelatorioCoberturas(coberturas, filtros = {}) {
+    const { inicioISO = '', fimISO = '9999-12-31' } = filtros;
+    const filtroId = filtros.colaboradorId ? Number(filtros.colaboradorId) : null;
+    const pessoas = new Map();
+    const pendentes = [];
+    const totais = { banco: 0, extra: 0, pendente: 0 };
+
+    for (const cobertura of coberturas || []) {
+        for (const trecho of cobertura.trechos || []) {
+            if (trecho.dataISO < inicioISO || trecho.dataISO > fimISO) {
+                continue;
+            }
+
+            const minutos = duracaoTrecho(trecho);
+            const linha = {
+                dataISO: trecho.dataISO,
+                horaInicio: horaCurta(trecho.horaInicio),
+                horaFim: horaCurta(trecho.horaFim),
+                titularNome: cobertura.titularNome || 'Colaborador',
+                tipoCredito: trecho.tipoCredito,
+                minutos
+            };
+
+            if (trecho.substitutoId === null || trecho.substitutoId === undefined) {
+                if (filtroId === null) {
+                    pendentes.push(linha);
+                    totais.pendente += minutos;
+                }
+
+                continue;
+            }
+
+            const id = Number(trecho.substitutoId);
+
+            if (filtroId !== null && id !== filtroId) {
+                continue;
+            }
+
+            if (!pessoas.has(id)) {
+                pessoas.set(id, {
+                    substitutoId: id,
+                    nome: trecho.substitutoNome || 'Colaborador de outro setor',
+                    minutosBanco: 0,
+                    minutosExtra: 0,
+                    trechos: []
+                });
+            }
+
+            const pessoa = pessoas.get(id);
+            const chave = trecho.tipoCredito === 'extra' ? 'extra' : 'banco';
+            pessoa[chave === 'extra' ? 'minutosExtra' : 'minutosBanco'] += minutos;
+            totais[chave] += minutos;
+            pessoa.trechos.push(linha);
+        }
+    }
+
+    const porData = (a, b) => a.dataISO.localeCompare(b.dataISO) || a.horaInicio.localeCompare(b.horaInicio);
+
+    return {
+        pessoas: [...pessoas.values()]
+            .map((pessoa) => ({ ...pessoa, trechos: pessoa.trechos.sort(porData) }))
+            .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')),
+        pendentes: pendentes.sort(porData),
+        totais
+    };
+}
