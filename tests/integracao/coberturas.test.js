@@ -156,6 +156,136 @@ module.exports = [
         }
     },
     {
+        // Fase 2: o trecho de dia util vira trabalho do substituto na escala
+        // do dia, credito no banco (destino banco) ou hora extra (destino extra).
+        name: 'trecho de dia util aparece na escala do substituto e credita banco ou hora extra',
+        async run() {
+            const cliente = criarCliente();
+            await cliente.entrar();
+            const cenario = await montarCenario(cliente);
+            const cobertura = await abrirCobertura(cliente, cenario);
+            const [segunda, terca, ...resto] = cobertura.trechos;
+            const url = `/api/coberturas/${cobertura.id}`;
+
+            esperarSucesso(
+                await cliente.put(url, {
+                    trechos: [
+                        { ...segunda, horaFim: '17:00', substitutoId: cenario.carla.Id, tipoCredito: 'extra' },
+                        {
+                            dataISO: segunda.dataISO,
+                            horaInicio: '17:00',
+                            horaFim: '22:00',
+                            substitutoId: cenario.bruno.Id,
+                            tipoCredito: 'banco'
+                        },
+                        { ...terca, substitutoId: cenario.carla.Id, tipoCredito: 'banco' },
+                        ...resto
+                    ]
+                }),
+                'revezamento'
+            );
+
+            // Escala do dia: cada um continua com o proprio expediente e o
+            // trecho entra como segundo turno.
+            const dia = esperarSucesso(await cliente.get(`/api/escala/dia/${segunda.dataISO}`), 'escala do dia');
+            const linha = (colaborador) => dia.items.find((item) => item.colaboradorId === colaborador.Id);
+            assert.equal(linha(cenario.bruno).horaInicio, '08:00:00');
+            assert.deepEqual(
+                linha(cenario.bruno).coberturas.map((item) => [
+                    item.horaInicio,
+                    item.horaFim,
+                    item.tipoCredito,
+                    item.titularNome
+                ]),
+                [['17:00:00', '22:00:00', 'banco', cenario.ana.Nome]]
+            );
+            assert.deepEqual(
+                linha(cenario.carla).coberturas.map((item) => [item.horaInicio, item.horaFim, item.tipoCredito]),
+                [['11:00:00', '17:00:00', 'extra']]
+            );
+            assert.deepEqual(linha(cenario.ana).coberturas, []);
+
+            // O relatorio da escala traz o mesmo segundo turno.
+            const relatorio = esperarSucesso(
+                await cliente.get(
+                    `/api/escala/relatorio?dataInicio=${segunda.dataISO}&dataFim=${segunda.dataISO}&colaboradorId=${cenario.bruno.Id}`
+                ),
+                'relatorio'
+            );
+            assert.equal(relatorio.items[0].coberturas.length, 1);
+
+            // Banco: Bruno ganha 5h na segunda, Carla 11h na terca. As 6h da
+            // Carla na segunda sao hora extra e ficam fora do saldo.
+            const extratoBruno = esperarSucesso(
+                await cliente.get(`/api/banco-horas/colaborador/${cenario.bruno.Id}`),
+                'extrato Bruno'
+            );
+            assert.deepEqual(
+                extratoBruno.items.filter((item) => item.origemTipo === 'cobertura').map((item) => item.minutos),
+                [300]
+            );
+            const extratoCarla = esperarSucesso(
+                await cliente.get(`/api/banco-horas/colaborador/${cenario.carla.Id}`),
+                'extrato Carla'
+            );
+            assert.deepEqual(
+                extratoCarla.items.filter((item) => item.origemTipo === 'cobertura').map((item) => item.minutos),
+                [660]
+            );
+            assert.deepEqual(
+                extratoCarla.horasExtras.map((item) => [item.origem, item.dataReferencia, item.minutos]),
+                [['cobertura', segunda.dataISO, 360]]
+            );
+
+            const extras = esperarSucesso(
+                await cliente.get(
+                    `/api/banco-horas-semanal/horas-extras?inicio=${FERIAS.dataInicio}&fim=${FERIAS.dataFim}&colaboradorId=${cenario.carla.Id}`
+                ),
+                'relatorio de horas extras'
+            );
+            assert.equal(extras.totalMinutos, 360);
+            assert.equal(extras.itens[0].plantoes[0].origem, 'cobertura');
+
+            // Recalcular o banco do zero refaz o credito da cobertura.
+            esperarSucesso(await cliente.post('/api/banco-horas/recalcular', {}), 'recalcular');
+            const recalculado = esperarSucesso(
+                await cliente.get(`/api/banco-horas/colaborador/${cenario.carla.Id}`),
+                'extrato depois do recalculo'
+            );
+            assert.deepEqual(
+                recalculado.items.filter((item) => item.origemTipo === 'cobertura').map((item) => item.minutos),
+                [660]
+            );
+
+            // Trocar o destino do Bruno para hora extra tira o credito dele.
+            const atual = esperarSucesso(await cliente.get(url), 'ler cobertura');
+            esperarSucesso(
+                await cliente.put(url, {
+                    trechos: atual.trechos.map((trecho) =>
+                        trecho.substitutoId === cenario.bruno.Id ? { ...trecho, tipoCredito: 'extra' } : trecho
+                    )
+                }),
+                'Bruno em hora extra'
+            );
+            const semCredito = esperarSucesso(
+                await cliente.get(`/api/banco-horas/colaborador/${cenario.bruno.Id}`),
+                'extrato Bruno depois'
+            );
+            assert.equal(semCredito.items.filter((item) => item.origemTipo === 'cobertura').length, 0);
+
+            // Excluir a cobertura apaga o resto e tira o segundo turno da escala.
+            esperarSucesso(await cliente.delete(url), 'excluir cobertura');
+            const depois = esperarSucesso(
+                await cliente.get(`/api/banco-horas/colaborador/${cenario.carla.Id}`),
+                'extrato Carla depois'
+            );
+            assert.equal(depois.items.filter((item) => item.origemTipo === 'cobertura').length, 0);
+            assert.equal(depois.horasExtras.length, 0);
+            const diaDepois = esperarSucesso(await cliente.get(`/api/escala/dia/${segunda.dataISO}`), 'escala depois');
+            assert.deepEqual(diaDepois.items.find((item) => item.colaboradorId === cenario.bruno.Id).coberturas, []);
+        }
+    },
+    {
         name: 'trechos sobrepostos, credito faltando e titular cobrindo a si mesmo sao recusados',
         async run() {
             const cliente = criarCliente();

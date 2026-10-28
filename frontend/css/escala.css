@@ -4206,6 +4206,9 @@
 }
 
 .escala-page .escala-bar-plantao { background: #0ea5a4; }
+/* Cobertura de plantonista: a linha propria e o segundo turno ao lado do
+   expediente (o trecho que a pessoa assume de quem esta fora). */
+.escala-page .escala-bar-cobertura { background: #7c3aed; }
 
 /* O rotulo da barra ("08:00–18:00") e alinhado a esquerda, entao uma ausencia
    que comece junto com a jornada o cobria e ele virava "8:00" pela metade.

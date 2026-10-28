@@ -1,9 +1,11 @@
 // Coberturas de plantonista: grava e le o caso (Coberturas) e a divisao do
 // horario em trechos (CoberturaTrechos).
 //
-// Este servico so registra. Ainda nao gera escala do dia, plantao nem banco de
-// horas — isso vem nas fases seguintes, sempre derivado destas tabelas, no
-// mesmo padrao das ferias e da folga de domingo.
+// O que a cobertura gera e sempre derivado destas tabelas, no mesmo padrao
+// das ferias e da folga de domingo. Em dia util: a escala do dia le os trechos
+// (cobertura-na-escala.js) e o banco de horas recebe o credito
+// (cobertura-banco.js), refeito a cada gravacao. Sabado, domingo e feriado
+// viram plantao numa fase seguinte.
 //
 // As regras estao separadas para serem testadas sem banco:
 //   cobertura-trechos.js    gerar, dividir, validar e resumir os trechos
@@ -11,6 +13,7 @@
 //   cobertura-contexto.js   o que essas regras precisam ler do banco
 const { sql } = require('../db');
 const { AppError } = require('../lib/errors');
+const { sincronizarMovimentosDaCobertura } = require('./cobertura-banco');
 const { detectarConflitoSubstituto, exigirSubstitutoSemConflito } = require('./cobertura-conflitos');
 const {
     carregarAgendaDosSubstitutos,
@@ -434,6 +437,7 @@ async function createCobertura(tx, body = {}, visiveis = null) {
     const id = Number(inserida.recordset[0].Id);
 
     await gravarTrechos(tx, id, trechos, new Map());
+    await sincronizarMovimentosDaCobertura(tx, id);
 
     return findCoberturaById(tx, id, visiveis);
 }
@@ -489,6 +493,7 @@ async function updateCobertura(tx, id, body = {}, visiveis = null) {
         `);
 
     await gravarTrechos(tx, atual.id, trechos, anteriores);
+    await sincronizarMovimentosDaCobertura(tx, atual.id);
 
     return findCoberturaById(tx, atual.id, visiveis);
 }
@@ -540,6 +545,8 @@ async function deleteCobertura(tx, id, visiveis = null) {
 
     // Os trechos saem junto (FK com ON DELETE CASCADE).
     await tx.request().input('id', sql.Int, atual.id).query('DELETE FROM Coberturas WHERE Id = @id');
+    // Sem trechos, a sincronizacao so apaga os movimentos que apontavam para eles.
+    await sincronizarMovimentosDaCobertura(tx, atual.id);
 
     return atual;
 }

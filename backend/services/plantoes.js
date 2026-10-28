@@ -405,6 +405,9 @@ function montarRelatorioHorasExtras(plantoes, colaboradores, filtros = {}) {
             item.totalMinutos += minutos;
             item.plantoes.push({
                 plantaoId: plantao.id,
+                // 'cobertura' quando veio de um trecho de dia util: ai o id e
+                // do trecho, nao de plantoes.
+                origem: plantao.origem || 'plantao',
                 dataISO: plantao.dataISO,
                 tipoPlantao: plantao.tipoPlantao,
                 tipoLancamento: plantao.tipoLancamento,

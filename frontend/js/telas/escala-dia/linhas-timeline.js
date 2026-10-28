@@ -6,7 +6,7 @@ import { abrirEditorNaEscala } from '../escala-dia-editor.js';
 import { ehTipoSemTrabalho, formatDurationEscala, formatMinutesToTimeEscala, formatTimeInputEscala, getTimeMinutesEscala, TIPO_LABELS } from '../escala-dia-shared.js';
 import { atualizarBotaoRestaurarAlmocosEscala } from './acoes-do-dia.js';
 import { computeCoverageEscala, renderScaleHeaderEscala, renderTotalRowEscala } from './cabecalho-e-cobertura.js';
-import { calculateWorkedMinutesEscala, compareScaleRecordsEscala, getClampedIntervalEscala, getPartialAbsenceEscala, isFullDayOffEscala } from './calculo-horas.js';
+import { calculateWorkedMinutesEscala, compareScaleRecordsEscala, getClampedIntervalEscala, getCoberturasEscala, getPartialAbsenceEscala, isFullDayOffEscala } from './calculo-horas.js';
 import { getCellStateEscala, salvarAjusteDiretoAlmocoEscala } from './celulas-e-almoco.js';
 import { ajustarFonteHorasEscala, ajustarLarguraColunaNomeEscala, applyScaleHourBoundsCssEscala, getCurrentScaleState, observarLarguraTimelineEscala, SLOT_MINUTES } from './estado-e-layout.js';
 import { filterScaleItemsBySectorEscala, getScaleSectorSelectionEscala } from './filtros-setor.js';
@@ -126,15 +126,29 @@ function buildRowOverlayEscala(record, bounds) {
 
     const start = getTimeMinutesEscala(record.horaInicio);
     const end = getTimeMinutesEscala(record.horaFim);
+    // Segundo turno: cada trecho de cobertura vira uma barra propria, ao lado
+    // da do expediente, com quem esta sendo coberto no title.
+    const coberturas = getCoberturasEscala(record).map((item) => {
+        const label = `${formatTimeInputEscala(item.horaInicio)}–${formatTimeInputEscala(item.horaFim)}`;
+        const destino = item.tipoCredito === 'extra' ? 'hora extra' : 'banco de horas';
+        const titulo = `Cobrindo ${item.titularNome || 'colega'} ${label} (${destino})`;
+        const itemLeft = Math.max(0, pct(item.start));
+        const itemRight = Math.min(100, pct(item.end));
+
+        return `<div class="escala-bar escala-bar-cobertura" style="left:${itemLeft}%;width:${Math.max(0, itemRight - itemLeft)}%" title="${escapeHtml(titulo)}">
+                <span class="escala-bar-label">${escapeHtml(label)}</span>
+            </div>`;
+    }).join('');
 
     if (start === null || end === null || end <= start) {
-        return '<div class="escala-overlay"></div>';
+        return `<div class="escala-overlay">${coberturas}</div>`;
     }
 
     const left = Math.max(0, pct(start));
     const right = Math.min(100, pct(end));
     const barLabel = `${formatTimeInputEscala(record.horaInicio)}–${formatTimeInputEscala(record.horaFim)}`;
     const isPlantao = type === 'plantao';
+    const barClass = isPlantao ? ' escala-bar-plantao' : (type === 'cobertura' ? ' escala-bar-cobertura' : '');
 
     const lunchStart = getTimeMinutesEscala(record.almocoInicio);
     const lunchEnd = getTimeMinutesEscala(record.almocoFim);
@@ -174,9 +188,10 @@ function buildRowOverlayEscala(record, bounds) {
     }
 
     return `<div class="escala-overlay">
-            <div class="escala-bar${isPlantao ? ' escala-bar-plantao' : ''}" style="left:${left}%;width:${Math.max(0, right - left)}%">
+            <div class="escala-bar${barClass}" style="left:${left}%;width:${Math.max(0, right - left)}%">
                 <span class="escala-bar-label">${escapeHtml(barLabel)}</span>
             </div>
+            ${coberturas}
             ${lunch}
             ${absence}
         </div>`;
@@ -358,6 +373,7 @@ export function renderScaleRowsEscala(state) {
                             ${record.setorNome ? `<small class="escala-sector-chip">${escapeHtml(record.setorNome)}</small>` : ''}
                             ${type === 'plantao' ? '<span class="plantao-badge">Plantao</span>' : ''}
                             ${type !== 'normal' && type !== 'plantao' ? `<small class="escala-dia-tipo">${escapeHtml(typeLabel)}</small>` : ''}
+                            ${type !== 'cobertura' && getCoberturasEscala(record).length > 0 ? '<small class="escala-dia-tipo">+ Cobertura</small>' : ''}
                         </span>
                     </span>
                     <span class="timeline-name-action" aria-hidden="true">

@@ -14,6 +14,7 @@ const {
     resolveDefaultDescontaBancoHoras
 } = require('./bancoHoras');
 const { serializePlantaoRecord } = require('./plantoes');
+const { carregarTrechosDeDiaUtil, trechoComoLancamento } = require('./cobertura-dia-util');
 const { SQL_EQUIPE_PLANTAO } = require('./equipe-plantao');
 const { extractDateString, extractTimeString } = require('../lib/validation');
 
@@ -184,7 +185,9 @@ function calcularCreditoPlantaoNaJanela(plantoes, colaboradorId, inicioISO, fimI
             itens.push({
                 dataInicio: dataISO,
                 dataFim: dataISO,
-                descricao: `Plantao ${hhmm(plantao.horaInicio)}-${hhmm(plantao.horaFim)}`,
+                // A cobertura de dia util chega no formato de plantao, com
+                // a descricao propria (trechoComoLancamento).
+                descricao: plantao.descricao || `Plantao ${hhmm(plantao.horaInicio)}-${hhmm(plantao.horaFim)}`,
                 minutos: duracao,
                 formatado: minutosParaRelogio(duracao)
             });
@@ -233,7 +236,8 @@ async function carregarBases(pool, dataISO, { ateInclusive }) {
 }
 
 // Ausencias e plantoes entre a base mais antiga e a data. Sem nenhuma base, nao
-// ha o que calcular e nada e lido.
+// ha o que calcular e nada e lido. A cobertura de dia util vai junto com os
+// plantoes: credita o substituto pela mesma regra (banco sim, extra nao).
 async function carregarMovimentacao(pool, bases, fimISO) {
     const ausenciasPorColaborador = new Map();
 
@@ -272,9 +276,14 @@ async function carregarMovimentacao(pool, bases, fimISO) {
             WHERE data_plantao <= @fim AND data_plantao >= @piso
         `);
 
+    const coberturas = await carregarTrechosDeDiaUtil(pool, { dataInicio: pisoISO, dataFim: fimISO });
+
     return {
         ausenciasPorColaborador,
-        plantoes: plantoesResult.recordset.map((row) => serializePlantaoRecord(row))
+        plantoes: [
+            ...plantoesResult.recordset.map((row) => serializePlantaoRecord(row)),
+            ...coberturas.map(trechoComoLancamento)
+        ]
     };
 }
 

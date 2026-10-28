@@ -66,6 +66,23 @@ async function excluirColaboradorDefinitivamente(tx, colaboradorId, options = {}
         .input('id', sql.Int, colaboradorId)
         .query('UPDATE FolgasDomingo SET CobertoPorColaboradorId = NULL WHERE CobertoPorColaboradorId = @id');
 
+    // As coberturas DESTE colaborador saem com ele (TABELAS_FILHAS), e o
+    // credito que deram no banco de quem cobriu sai junto: o movimento aponta
+    // para um trecho que deixa de existir.
+    await tx
+        .request()
+        .input('id', sql.Int, colaboradorId)
+        .query(`
+            DELETE FROM BancoHorasMovimentos
+            WHERE OrigemTipo = 'cobertura'
+              AND OrigemId IN (
+                  SELECT t.Id
+                  FROM CoberturaTrechos t
+                  INNER JOIN Coberturas c ON c.Id = t.CoberturaId
+                  WHERE c.TitularId = @id
+              )
+        `);
+
     // Trecho que este colaborador cobriu na cobertura de OUTRA pessoa volta a
     // ficar sem substituto: a cobertura do titular continua existindo.
     await tx

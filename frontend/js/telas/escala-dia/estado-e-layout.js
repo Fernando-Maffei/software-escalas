@@ -42,6 +42,13 @@ export function getScaleHourBoundsEscala(items = getCurrentScaleState().items ||
             includeCandidate(getTimeMinutesEscala(item?.almocoInicio));
             includeCandidate(getTimeMinutesEscala(item?.almocoFim));
         }
+
+        // O segundo turno de cobertura (ex.: 19:00-22:00 depois do proprio
+        // expediente) tambem precisa caber na grade.
+        (Array.isArray(item?.coberturas) ? item.coberturas : []).forEach((cobertura) => {
+            includeCandidate(getTimeMinutesEscala(cobertura.horaInicio));
+            includeCandidate(getTimeMinutesEscala(cobertura.horaFim));
+        });
     });
 
     if (earliestMinutes === null || latestMinutes === null) {
