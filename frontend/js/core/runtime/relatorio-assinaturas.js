@@ -8,9 +8,10 @@
 // teto de setor vale): o Nome/Apelido vai nas
 // linhas de data e o nome completo do cadastro na lista de assinaturas.
 //
-// O plantonista na jornada habitual (sem lancamento naquele dia) tambem entra,
-// marcado "(jornada)" e sem linha de assinatura: le a jornada semanal, as
-// ausencias, as folgas de domingo e os feriados do mes, no mesmo escopo.
+// Nos sabados, o plantonista na jornada habitual (sem lancamento naquele dia)
+// tambem entra, marcado "(jornada)" e sem linha de assinatura: le a jornada
+// semanal, as ausencias e os feriados do mes, no mesmo escopo. Domingo e
+// feriado ficam so com os lancamentos (plantao e cobertura de almoco).
 import { atributosAcao } from '../../lib/atributos-acao.js';
 import { escapeHtml } from '../../lib/html-seguro.js';
 import { dataPorExtenso, jornadasHabituais, montarFolhasAssinatura, periodoDoMes, TIPOS_FOLHA_ASSINATURA } from '../../lib/lancamentos-assinatura.js';
@@ -53,7 +54,7 @@ export function renderPainelRelatorioAssinaturas() {
                 </div>
                 <div class="relatorio-card-body">
                     <p class="relatorio-descricao">
-                        Folhas de escala de plantão do mês para assinatura: uma de sábados e uma de domingos e feriados, com as datas e os colaboradores, o local e a data, e o nome completo de cada um para assinar.
+                        Folhas de escala de plantão do mês para assinatura: uma de sábados e uma de domingos e feriados, com as datas e os colaboradores, o local e a data, e o nome completo de cada um para assinar. Aos sábados entra também o plantonista na jornada habitual, sem assinatura.
                     </p>
                     <div class="relatorio-filtros">
                         <div class="filtro-group">
@@ -146,11 +147,10 @@ async function feriadosDoMes(filtros) {
 
 async function carregarJornadasHabituais(filtros) {
     const periodo = { dataInicio: filtros.inicioISO, dataFim: filtros.fimISO };
-    const [colaboradores, jornada, ausencias, folgas, feriados] = await Promise.all([
+    const [colaboradores, jornada, ausencias, feriados] = await Promise.all([
         API.getColaboradores({ incluirInativos: 1 }),
         API.getJornadaSemanal(),
         API.getAusencias(periodo),
-        API.getFolgasDomingo(periodo),
         feriadosDoMes(filtros)
     ]);
 
@@ -160,7 +160,6 @@ async function carregarJornadasHabituais(filtros) {
         colaboradores: lista(colaboradores),
         jornadaSemanal: lista(jornada),
         ausencias: lista(ausencias),
-        folgasDomingo: lista(folgas),
         feriados
     });
 }

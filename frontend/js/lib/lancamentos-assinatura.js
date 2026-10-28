@@ -13,14 +13,15 @@
 //
 // e a de domingos e feriados, igual. Nas linhas de data vai o Nome/Apelido; na
 // lista de assinaturas, o nome completo (ou o Nome, quando ele nao foi
-// preenchido). So plantao entra: folga, ferias, ausencia e cobertura de almoco
+// preenchido). Entram os lancamentos da tela de plantao — o plantao do dia e,
+// no domingo e no feriado, a cobertura de almoco. Folga, ferias e ausencia
 // ficam de fora.
 //
-// Alem dos lancamentos, entra o plantonista na JORNADA HABITUAL dele (ver
-// jornadasHabituais): quem tem jornada naquele sabado, domingo ou feriado
-// aparece na linha da data, marcado "(jornada)", mas nao assina — esta so
-// cumprindo o proprio horario. Lancamento ganha da jornada: o plantonista
-// lancado num plantao naquele dia assina como hoje.
+// So no SABADO entra tambem o plantonista na JORNADA HABITUAL dele (ver
+// jornadasHabituais): aparece na linha da data, marcado "(jornada)", mas nao
+// assina — esta so cumprindo o proprio horario. Lancamento ganha da jornada: o
+// plantonista lancado num plantao naquele sabado assina como hoje. Domingo e
+// feriado ficam so com os lancamentos.
 //
 // Cada pessoa aparece uma vez por data: dois turnos no mesmo dia nao repetem o
 // nome.
@@ -29,7 +30,7 @@
 /** @type {Readonly<Record<string, {rotulo: string, titulo: string, tipos: string[]}>>} */
 const FOLHAS = Object.freeze({
     sabados: { rotulo: 'Sábados', titulo: 'Escala de Sábados', tipos: ['sabado'] },
-    domingos_feriados: { rotulo: 'Domingos e feriados', titulo: 'Escala de Domingos e Feriados', tipos: ['domingo', 'feriado'] }
+    domingos_feriados: { rotulo: 'Domingos e feriados', titulo: 'Escala de Domingos e Feriados', tipos: ['domingo', 'feriado', 'cobertura_almoco'] }
 });
 
 // Para o filtro "Folha" da tela: [chave, rotulo].
@@ -91,8 +92,6 @@ function folhaDoTipo(tipoLancamento) {
     return Object.keys(FOLHAS).find((chave) => FOLHAS[chave].tipos.includes(tipoLancamento)) || null;
 }
 
-const DIAS_SEMANA_UTEIS = [1, 2, 3, 4, 5];
-
 function diaDaSemana(dataISO) {
     const [ano, mes, dia] = dataISO.split('-').map(Number);
     return new Date(Date.UTC(ano, mes - 1, dia, 12)).getUTCDay();
@@ -105,36 +104,33 @@ function proximoDia(dataISO) {
 
 const isoDe = (valor) => String(valor || '').slice(0, 10);
 const horaDe = (valor) => (String(valor || '').match(/(\d{2}:\d{2})/) || [])[1] || '';
+const SABADO = 6;
 
 /**
- * Plantonista na jornada habitual em cada sabado, domingo e feriado do
- * periodo, no formato de plantao que montarFolhasAssinatura le. A jornada e a
- * do cadastro: a jornada semanal do dia (ColaboradorJornadaSemanal) ou, para
- * quem nao tem jornada semanal, o horario da ficha de segunda a sexta — a
- * mesma regra da escala do dia. Fica de fora quem nao estava trabalhando:
- * desligado, de ferias/folga/ausencia o dia inteiro ou de folga de domingo.
+ * Plantonista na jornada habitual em cada SABADO do periodo, no formato de
+ * plantao que montarFolhasAssinatura le. Sabado que e feriado fica de fora:
+ * feriado, como domingo, so tem os lancamentos. A jornada e a do cadastro
+ * (jornada semanal do sabado). Fica de fora quem nao estava trabalhando:
+ * desligado ou de ferias/folga/ausencia o dia inteiro.
  *
  * @param {object} dados
  * @param {string} dados.inicioISO
  * @param {string} dados.fimISO
- * @param {Array<object>} dados.colaboradores  Id, IsPlantonista, Ativo, DataDesligamento, TrabalhoInicio, TrabalhoFim
+ * @param {Array<object>} dados.colaboradores  Id, IsPlantonista, Ativo, DataDesligamento
  * @param {Array<object>} [dados.jornadaSemanal]  linhas ATIVAS: colaboradorId, diaSemana, trabalhoInicio, trabalhoFim
  * @param {Array<object>} [dados.ausencias]  ColaboradorId, PeriodoTipo, DataInicio, DataFim
- * @param {Array<object>} [dados.folgasDomingo]  colaboradorId, dataDomingo
  * @param {Iterable<string>} [dados.feriados]  datas ISO
  */
 export function jornadasHabituais(dados) {
     const feriados = new Set(dados.feriados || []);
-    const jornadaPorColaborador = new Map();
+    const jornadaDoSabado = new Map();
 
     (dados.jornadaSemanal || []).forEach((linha) => {
-        const id = Number(linha.colaboradorId ?? linha.ColaboradorId);
-
-        if (!jornadaPorColaborador.has(id)) {
-            jornadaPorColaborador.set(id, new Map());
+        if (Number(linha.diaSemana ?? linha.DiaSemana) !== SABADO) {
+            return;
         }
 
-        jornadaPorColaborador.get(id).set(Number(linha.diaSemana ?? linha.DiaSemana), {
+        jornadaDoSabado.set(Number(linha.colaboradorId ?? linha.ColaboradorId), {
             inicio: horaDe(linha.trabalhoInicio ?? linha.TrabalhoInicio),
             fim: horaDe(linha.trabalhoFim ?? linha.TrabalhoFim)
         });
@@ -153,26 +149,12 @@ export function jornadasHabituais(dados) {
             fora.add(`${id}|${dataISO}`);
         }
     });
-    (dados.folgasDomingo || []).forEach((folga) => {
-        fora.add(`${Number(folga.colaboradorId ?? folga.ColaboradorId)}|${isoDe(folga.dataDomingo ?? folga.DataDomingo)}`);
-    });
 
     const plantonistas = (dados.colaboradores || []).filter((item) => item.IsPlantonista || item.isPlantonista);
     const jornadas = [];
 
     for (let dataISO = dados.inicioISO; dataISO <= dados.fimISO; dataISO = proximoDia(dataISO)) {
-        const semana = diaDaSemana(dataISO);
-        let tipoLancamento = null;
-
-        if (feriados.has(dataISO)) {
-            tipoLancamento = 'feriado';
-        } else if (semana === 6) {
-            tipoLancamento = 'sabado';
-        } else if (semana === 0) {
-            tipoLancamento = 'domingo';
-        }
-
-        if (!tipoLancamento) {
+        if (diaDaSemana(dataISO) !== SABADO || feriados.has(dataISO)) {
             continue;
         }
 
@@ -180,23 +162,15 @@ export function jornadasHabituais(dados) {
             const id = Number(colaborador.Id ?? colaborador.id);
             const ativo = colaborador.Ativo !== false && colaborador.Ativo !== 0;
             const desligamento = isoDe(colaborador.DataDesligamento ?? colaborador.dataDesligamento);
+            const jornada = jornadaDoSabado.get(id);
 
             if ((!ativo && (!desligamento || dataISO >= desligamento)) || fora.has(`${id}|${dataISO}`)) {
                 continue;
             }
 
-            const porDia = jornadaPorColaborador.get(id);
-            const jornada = porDia
-                ? porDia.get(semana)
-                : (DIAS_SEMANA_UTEIS.includes(semana)
-                    ? { inicio: horaDe(colaborador.TrabalhoInicio), fim: horaDe(colaborador.TrabalhoFim) }
-                    : null);
-
-            if (!jornada?.inicio || !jornada?.fim) {
-                continue;
+            if (jornada?.inicio && jornada?.fim) {
+                jornadas.push({ dataISO, tipoLancamento: 'sabado', colaboradores: [id], horario: `${jornada.inicio}-${jornada.fim}` });
             }
-
-            jornadas.push({ dataISO, tipoLancamento, colaboradores: [id], horario: `${jornada.inicio}-${jornada.fim}` });
         }
     }
 
@@ -259,7 +233,7 @@ function coletarEscalas(dados) {
  *        tipoLancamento ja normalizado: sabado / domingo / feriado / cobertura_almoco;
  *        horario "HH:MM-HH:MM"
  * @param {Array<{dataISO:string, tipoLancamento:string, colaboradores:number[], horario?:string}>} [dados.jornadas]
- *        plantonista na jornada habitual (jornadasHabituais): aparece, nao assina
+ *        plantonista na jornada habitual do sabado (jornadasHabituais): aparece, nao assina
  * @param {(id:number) => {apelido:string, nomeCompleto?:string}} dados.nomeDe
  */
 export function montarFolhasAssinatura(dados) {
