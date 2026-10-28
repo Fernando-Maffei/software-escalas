@@ -10,6 +10,7 @@ const suites = [
     ...require('./coberturaTrechos.test.js'),
     ...require('./coberturaConflitos.test.js'),
     ...require('./coberturaNaEscala.test.js'),
+    ...require('./coberturasTela.test.js'),
     ...require('./plantonista.test.js'),
     ...require('./pendenciasPlantao.test.js'),
     ...require('./rodizioDomingos.test.js'),

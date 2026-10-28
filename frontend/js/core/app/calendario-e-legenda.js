@@ -277,7 +277,7 @@ export function getPaginaFromURL() {
     const hash = window.location.hash.substring(1); // Remove o #
 
     // Se não tiver hash ou for inválido, retorna dashboard
-    const paginasValidas = ['dashboard', 'calendario', 'colaboradores', 'escala', 'lancamentoPlantao', 'bancoHoras', 'relatorios', 'configuracoes', 'usuarios'];
+    const paginasValidas = ['dashboard', 'calendario', 'colaboradores', 'escala', 'lancamentoPlantao', 'coberturas', 'bancoHoras', 'relatorios', 'configuracoes', 'usuarios'];
 
     if (hash && paginasValidas.includes(hash)) {
         return hash;

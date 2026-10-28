@@ -145,6 +145,12 @@ export const API = {
     getSetores: (params = {}) => API.get('/setores', params),
     getTiposEscala: (params = {}) => API.get('/tipos-escala', params),
     getFolgasDomingo: (params = {}) => API.get('/folgas-domingo', params),
+    getCoberturas: (params = {}) => API.get('/coberturas', params),
+    getCobertura: (id) => API.get(`/coberturas/${id}`),
+    criarCobertura: (data) => API.post('/coberturas', data),
+    salvarCobertura: (id, data) => API.put(`/coberturas/${id}`, data),
+    excluirCobertura: (id) => API.delete(`/coberturas/${id}`),
+    getDisponibilidadeCobertura: (params = {}) => API.get('/coberturas/disponibilidade', params),
     salvarSetor: (data) => API.post('/setores', data),
     salvarColaborador: (data) => data.id
         ? API.put(`/colaboradores/${data.id}`, data)

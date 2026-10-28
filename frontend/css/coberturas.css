@@ -1,0 +1,331 @@
+/* ===========================================================
+   COBERTURAS DE PLANTONISTA (telas/coberturas/)
+   -----------------------------------------------------------
+   Lista, formulario de cobertura avulsa e a janela de uma
+   cobertura. Cores so por tokens do tema: o tema escuro vem junto.
+   =========================================================== */
+
+.coberturas-secao {
+    margin-bottom: 24px;
+    padding: 18px 20px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    background: var(--card);
+}
+
+.coberturas-secao-topo {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.coberturas-secao-topo h3 {
+    margin: 0;
+    font-size: var(--text-md);
+    color: var(--text);
+}
+
+.coberturas-sub {
+    margin: 4px 0 0;
+    font-size: var(--text-sm);
+    color: var(--text-light);
+}
+
+.coberturas-contagem {
+    min-width: 24px;
+    padding: 2px 8px;
+    border-radius: var(--radius-pill);
+    background: var(--warning-soft);
+    color: var(--warning-text);
+    font-size: var(--text-xs);
+    font-weight: var(--weight-semibold);
+    text-align: center;
+}
+
+.coberturas-lista {
+    display: grid;
+    gap: 8px;
+    margin-top: 12px;
+}
+
+.coberturas-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 14px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    background: var(--surface-raised);
+}
+
+.coberturas-item strong {
+    margin-right: 6px;
+    color: var(--text);
+}
+
+.coberturas-item p {
+    margin: 4px 0 0;
+    font-size: var(--text-sm);
+    color: var(--text-light);
+}
+
+.coberturas-item .btn-secondary {
+    flex-shrink: 0;
+    padding: 8px 14px;
+    font-size: var(--text-sm);
+}
+
+.coberturas-vazio {
+    margin: 12px 0 0;
+    padding: 12px;
+    border: 1px dashed var(--border);
+    border-radius: var(--radius-md);
+    color: var(--text-light);
+    font-size: var(--text-sm);
+    text-align: center;
+}
+
+.coberturas-filtros,
+.coberturas-avulsa {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 10px;
+}
+
+.coberturas-avulsa {
+    margin-bottom: 24px;
+    padding: 16px 20px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    background: var(--card);
+}
+
+.coberturas-avulsa[hidden] {
+    display: none;
+}
+
+.coberturas-filtros label,
+.coberturas-avulsa label {
+    display: grid;
+    gap: 4px;
+    font-size: var(--text-xs);
+    color: var(--text-light);
+}
+
+.coberturas-filtros .coberturas-check {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: var(--text-sm);
+}
+
+.coberturas-page input,
+.coberturas-page select,
+.cobertura-modal input,
+.cobertura-modal select,
+.cobertura-modal textarea {
+    padding: 7px 9px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--card);
+    color: var(--text);
+    font: inherit;
+    font-size: var(--text-sm);
+}
+
+/* Situacao: as mesmas tres cores em lista e janela. */
+.cobertura-chip {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: var(--radius-pill);
+    font-size: var(--text-xs);
+    font-weight: var(--weight-semibold);
+    background: var(--neutral-fill);
+    color: var(--text-secondary);
+}
+
+.cobertura-chip.is-coberto {
+    background: var(--success-soft);
+    color: var(--success-text);
+}
+
+.cobertura-chip.is-parcial,
+.cobertura-chip.is-pendente {
+    background: var(--warning-soft);
+    color: var(--warning-text);
+}
+
+/* Janela de uma cobertura, no mesmo molde da janela do dia de plantao. */
+.cobertura-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    padding: 6vh 16px 0;
+    overflow-y: auto;
+    background: rgba(15, 23, 42, 0.55);
+}
+
+.cobertura-modal[hidden] {
+    display: none;
+}
+
+.cobertura-modal-caixa {
+    width: min(860px, 100%);
+    margin: 0 auto 6vh;
+    padding: 24px 24px 0;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-xl);
+}
+
+.cobertura-modal-topo {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.cobertura-modal-topo h3 {
+    margin: 0;
+    color: var(--text);
+}
+
+.cobertura-modal-topo p {
+    margin: 4px 0 0;
+    font-size: var(--text-sm);
+    color: var(--text-light);
+}
+
+.cobertura-todos {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    margin: 16px 0;
+    padding: 10px 12px;
+    border-radius: var(--radius-md);
+    background: var(--surface-sunken, var(--bg-soft));
+    font-size: var(--text-sm);
+    color: var(--text-light);
+}
+
+.cobertura-todos .btn-secondary {
+    padding: 7px 14px;
+    font-size: var(--text-sm);
+}
+
+.cobertura-dia {
+    margin-bottom: 14px;
+}
+
+.cobertura-dia h4 {
+    margin: 0 0 6px;
+    font-size: var(--text-sm);
+    color: var(--text);
+}
+
+.cobertura-dia h4 small {
+    margin-left: 6px;
+    font-weight: var(--weight-regular);
+    color: var(--text-light);
+}
+
+.cobertura-dia ul {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+}
+
+.cobertura-trecho {
+    display: grid;
+    grid-template-columns: auto minmax(160px, 1fr) 150px 52px auto;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 10px;
+}
+
+.cobertura-trecho select {
+    min-width: 0;
+    width: 100%;
+}
+
+.cobertura-trecho + .cobertura-trecho {
+    border-top: 1px solid var(--border);
+}
+
+.cobertura-trecho.is-pendente {
+    background: var(--warning-soft);
+}
+
+.cobertura-trecho-hora {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.cobertura-trecho-duracao {
+    font-size: var(--text-sm);
+    color: var(--text-light);
+    text-align: right;
+}
+
+.cobertura-trecho-acoes {
+    display: flex;
+    gap: 4px;
+}
+
+.cobertura-observacao {
+    display: grid;
+    gap: 4px;
+    margin-top: 6px;
+    font-size: var(--text-xs);
+    color: var(--text-light);
+}
+
+.cobertura-modal-rodape {
+    position: sticky;
+    bottom: 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 18px;
+    padding: 14px 0 18px;
+    border-top: 1px solid var(--border);
+    background: var(--card);
+}
+
+.cobertura-modal-rodape-espaco {
+    flex: 1;
+}
+
+@media (max-width: 720px) {
+    .coberturas-item {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .cobertura-modal {
+        padding: 0;
+    }
+
+    .cobertura-modal-caixa {
+        min-height: 100dvh;
+        margin: 0;
+        border-radius: 0;
+    }
+
+    .cobertura-trecho {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .cobertura-trecho-hora {
+        grid-column: 1 / -1;
+    }
+}
