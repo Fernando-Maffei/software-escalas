@@ -20,6 +20,7 @@ const { excluirColaboradorDefinitivamente } = require('../services/exclusao-cola
 const { aplicarHorarioPadrao, normalizarPlantonista, temFolgaDeDomingo } = require('../services/plantonista');
 const { ensureSetorExists, normalizeNullableSetorId } = require('../services/setores');
 const { withTransaction } = require('../db/transactions');
+const { avisoDeTrechosLiberados, liberarTrechosPorDesligamento } = require('../services/cobertura-reacoes');
 const {
     ensurePositiveInt,
     extractDateString,
@@ -414,15 +415,21 @@ router.put('/:id/desligar', async (req, res) => {
         ? normalizeIsoDate(req.body.dataDesligamento, 'Data de desligamento')
         : extractDateString(new Date());
 
-    await pool.request()
-        .input('id', sql.Int, id)
-        .input('data', sql.Date, dataDesligamento)
-        .query('UPDATE Colaboradores SET Ativo = 0, DataDesligamento = @data WHERE Id = @id');
+    // Cobertura que ele faria dali em diante volta a pendente.
+    const coberturasAfetadas = await withTransaction(sql, pool, async (tx) => {
+        await tx.request()
+            .input('id', sql.Int, id)
+            .input('data', sql.Date, dataDesligamento)
+            .query('UPDATE Colaboradores SET Ativo = 0, DataDesligamento = @data WHERE Id = @id');
+
+        return liberarTrechosPorDesligamento(tx, id, dataDesligamento);
+    });
 
     res.json({
         success: true,
-        message: 'Colaborador desligado. O historico foi preservado.',
-        data: { id, ativo: false, dataDesligamento }
+        message: `Colaborador desligado. O historico foi preservado.${avisoDeTrechosLiberados(coberturasAfetadas)}`,
+        data: { id, ativo: false, dataDesligamento },
+        coberturasAfetadas
     });
 });
 

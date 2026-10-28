@@ -1,7 +1,14 @@
 const assert = require('node:assert/strict');
 
 const { consultar, criarCliente, esperarSucesso, nomeUnico } = require('./apoio');
-const { criarColaborador, criarSetor, desligarColaborador, lancarAusencia, tornarPlantonista } = require('./fabrica');
+const {
+    cadastrarFeriado,
+    criarColaborador,
+    criarSetor,
+    desligarColaborador,
+    lancarAusencia,
+    tornarPlantonista
+} = require('./fabrica');
 
 // Ferias de segunda a sexta, longe de "hoje" (01/01/2027 e feriado, fica fora).
 const FERIAS = Object.freeze({ dataInicio: '2027-01-04', dataFim: '2027-01-08' });
@@ -40,6 +47,25 @@ async function abrirCobertura(cliente, cenario) {
 
 function atribuir(trechos, substitutoId, tipoCredito = 'banco') {
     return trechos.map((trecho) => ({ ...trecho, substitutoId, tipoCredito }));
+}
+
+// Carla cobre a semana inteira da Ana, em banco.
+async function carlaCobreTudo(cliente, cenario) {
+    const cobertura = await abrirCobertura(cliente, cenario);
+    return esperarSucesso(
+        await cliente.put(`/api/coberturas/${cobertura.id}`, {
+            trechos: atribuir(cobertura.trechos, cenario.carla.Id)
+        }),
+        'Carla cobre tudo'
+    ).data;
+}
+
+async function creditosDeCobertura(cliente, colaborador) {
+    const extrato = esperarSucesso(await cliente.get(`/api/banco-horas/colaborador/${colaborador.Id}`), 'extrato');
+    return extrato.items
+        .filter((item) => item.origemTipo === 'cobertura')
+        .map((item) => String(item.dataReferencia).slice(0, 10))
+        .sort();
 }
 
 module.exports = [
@@ -654,6 +680,160 @@ module.exports = [
             assert.equal(daAna.trechos[0].substitutoId, null);
             assert.equal(daAna.trechos[0].tipoCredito, null);
             assert.equal(daAna.resumo.situacao, 'pendente');
+        }
+    },
+    {
+        // Fase 6: a ausencia de quem cobre entra, e o horario dele volta a pendente.
+        name: 'ausencia lancada para o substituto devolve a pendente so os horarios atingidos',
+        async run() {
+            const cliente = criarCliente();
+            await cliente.entrar();
+            const cenario = await montarCenario(cliente);
+            const cobertura = await carlaCobreTudo(cliente, cenario);
+            const url = `/api/coberturas/${cobertura.id}`;
+
+            const atestado = await cliente.post('/api/ausencias', {
+                colaboradorId: cenario.carla.Id,
+                tipo: 'ausencia',
+                subtipo: 'medico',
+                dataInicio: '2027-01-05',
+                dataFim: '2027-01-05',
+                periodoTipo: 'dia_inteiro',
+                descontaBancoHoras: false
+            });
+            assert.equal(atestado.status, 201);
+            assert.deepEqual(
+                atestado.body.coberturasAfetadas.map((item) => item.dataISO),
+                ['2027-01-05']
+            );
+            assert.match(atestado.body.message, /voltaram a pendente/);
+
+            // Ausencia por horas so pega o horario que cruza.
+            const consulta = await cliente.post('/api/ausencias', {
+                colaboradorId: cenario.carla.Id,
+                tipo: 'ausencia',
+                subtipo: 'medico',
+                dataInicio: '2027-01-06',
+                dataFim: '2027-01-06',
+                periodoTipo: 'horas',
+                horaInicio: '08:00',
+                horaFim: '09:00',
+                descontaBancoHoras: false
+            });
+            assert.equal(consulta.status, 201);
+            assert.deepEqual(consulta.body.coberturasAfetadas, []);
+
+            const lida = esperarSucesso(await cliente.get(url), 'ler cobertura');
+            assert.deepEqual(
+                lida.trechos.map((trecho) => [trecho.dataISO, trecho.substitutoId]),
+                [
+                    ['2027-01-04', cenario.carla.Id],
+                    ['2027-01-05', null],
+                    ['2027-01-06', cenario.carla.Id],
+                    ['2027-01-07', cenario.carla.Id],
+                    ['2027-01-08', cenario.carla.Id]
+                ]
+            );
+            assert.deepEqual(await creditosDeCobertura(cliente, cenario.carla), [
+                '2027-01-04',
+                '2027-01-06',
+                '2027-01-07',
+                '2027-01-08'
+            ]);
+        }
+    },
+    {
+        name: 'ferias do titular encurtadas e estendidas: a cobertura acompanha o periodo',
+        async run() {
+            const cliente = criarCliente();
+            await cliente.entrar();
+            const cenario = await montarCenario(cliente);
+            const cobertura = await carlaCobreTudo(cliente, cenario);
+            const url = `/api/coberturas/${cobertura.id}`;
+            const ferias = `/api/ausencias/${cenario.feriasId}`;
+
+            const encurtada = await cliente.put(ferias, { dataInicio: '2027-01-04', dataFim: '2027-01-06' });
+            assert.equal(encurtada.status, 200);
+            assert.equal(encurtada.body.coberturasAjustadas.length, 1);
+
+            let lida = esperarSucesso(await cliente.get(url), 'ler cobertura');
+            assert.equal(lida.dataFim, '2027-01-06');
+            assert.deepEqual(
+                lida.trechos.map((trecho) => trecho.dataISO),
+                ['2027-01-04', '2027-01-05', '2027-01-06']
+            );
+            assert.deepEqual(await creditosDeCobertura(cliente, cenario.carla), [
+                '2027-01-04',
+                '2027-01-05',
+                '2027-01-06'
+            ]);
+
+            // Estender ate a segunda seguinte: quinta, sexta e a segunda entram
+            // pendentes; sabado e domingo nao sao da jornada da Ana.
+            esperarSucesso(
+                await cliente.put(ferias, { dataInicio: '2027-01-04', dataFim: '2027-01-11' }),
+                'estender ferias'
+            );
+            lida = esperarSucesso(await cliente.get(url), 'ler cobertura');
+            assert.equal(lida.dataFim, '2027-01-11');
+            assert.deepEqual(
+                lida.trechos.map((trecho) => [trecho.dataISO, trecho.substitutoId]),
+                [
+                    ['2027-01-04', cenario.carla.Id],
+                    ['2027-01-05', cenario.carla.Id],
+                    ['2027-01-06', cenario.carla.Id],
+                    ['2027-01-07', null],
+                    ['2027-01-08', null],
+                    ['2027-01-11', null]
+                ]
+            );
+        }
+    },
+    {
+        name: 'feriado cadastrado depois troca o credito de dia util pelo plantao, e volta ao apagar',
+        async run() {
+            const cliente = criarCliente();
+            await cliente.entrar();
+            const cenario = await montarCenario(cliente);
+            await carlaCobreTudo(cliente, cenario);
+            const dia = '2027-01-07';
+            const plantoesDoDia = async () =>
+                esperarSucesso(await cliente.get(`/api/plantoes?from=${dia}&to=${dia}`), 'plantoes').filter((item) =>
+                    item.colaboradores.includes(cenario.carla.Id)
+                );
+
+            const feriado = await cadastrarFeriado(cliente, dia);
+            assert.ok(!(await creditosDeCobertura(cliente, cenario.carla)).includes(dia));
+            const [plantao] = await plantoesDoDia();
+            assert.equal(plantao.tipoPlantao, 'feriado');
+            assert.ok(plantao.coberturaTrechoId);
+
+            esperarSucesso(await cliente.delete(`/api/feriados/${feriado.Id ?? feriado.id}`), 'apagar feriado');
+            assert.ok((await creditosDeCobertura(cliente, cenario.carla)).includes(dia));
+            assert.deepEqual(await plantoesDoDia(), []);
+        }
+    },
+    {
+        name: 'desligar o substituto devolve a pendente o que ele cobriria dali em diante',
+        async run() {
+            const cliente = criarCliente();
+            await cliente.entrar();
+            const cenario = await montarCenario(cliente);
+            const cobertura = await carlaCobreTudo(cliente, cenario);
+
+            const desligado = esperarSucesso(
+                await cliente.put(`/api/colaboradores/${cenario.carla.Id}/desligar`, {
+                    dataDesligamento: '2027-01-06'
+                }),
+                'desligar Carla'
+            );
+            assert.equal(desligado.coberturasAfetadas.length, 3);
+
+            const lida = esperarSucesso(await cliente.get(`/api/coberturas/${cobertura.id}`), 'ler cobertura');
+            assert.deepEqual(
+                lida.trechos.map((trecho) => trecho.substitutoId),
+                [cenario.carla.Id, cenario.carla.Id, null, null, null]
+            );
         }
     }
 ];

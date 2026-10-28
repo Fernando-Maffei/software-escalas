@@ -674,10 +674,15 @@ export function abrirDesligarColaborador(id, nome) {
     overlay.querySelector('#btnConfirmarDesligamento').addEventListener('click', async () => {
         const dataDesligamento = document.getElementById('inputDataDesligamento')?.value || hojeISO;
         try {
-            await API.desligarColaborador(id, { dataDesligamento });
+            const resposta = await API.desligarColaborador(id, { dataDesligamento });
             fecharModalColab();
             fecharColaboradorEditor();
-            mostrarToast('Colaborador desligado. Historico preservado.', 'success');
+            // Coberturas que ele faria dali em diante voltaram a pendente.
+            if (resposta?.coberturasAfetadas?.length) {
+                mostrarToast(resposta.message, 'warning');
+            } else {
+                mostrarToast('Colaborador desligado. Historico preservado.', 'success');
+            }
             await Promise.allSettled([
                 carregarColaboradores(),
                 carregarBancoHorasResumo()

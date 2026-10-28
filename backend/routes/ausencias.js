@@ -15,6 +15,11 @@ const {
     syncAusenciaToEscalaDia
 } = require('../services/escala');
 const { withTransaction } = require('../db/transactions');
+const {
+    acompanharAusenciaDoTitular,
+    avisoDeTrechosLiberados,
+    liberarTrechosPorAusencia
+} = require('../services/cobertura-reacoes');
 const { colaboradoresVisiveis, escopoLancamentos, exigirColaboradorVisivel } = require('../auth/acesso-setores');
 const {
     buildDateRange,
@@ -315,13 +320,15 @@ router.post('/', async (req, res) => {
         await syncAusenciaMovement(tx, saved, colaborador);
         await syncAusenciaToEscalaDia(tx, saved, colaborador);
 
-        return saved;
+        // Quem estava cobrindo plantonista nesses dias deixa de cobrir.
+        return { saved, coberturasAfetadas: await liberarTrechosPorAusencia(tx, saved) };
     });
 
     res.status(201).json({
-        message: 'Lancamento salvo com sucesso!',
+        message: `Lancamento salvo com sucesso!${avisoDeTrechosLiberados(result.coberturasAfetadas)}`,
         success: true,
-        data: result
+        data: result.saved,
+        coberturasAfetadas: result.coberturasAfetadas
     });
 });
 
@@ -378,13 +385,20 @@ router.put('/:id', async (req, res) => {
         );
         await syncAusenciaToEscalaDia(tx, saved, colaborador);
 
-        return saved;
+        // Ferias do titular mudaram: a cobertura dele acompanha. E, se quem
+        // saiu estava cobrindo alguem, esses horarios voltam a pendente.
+        const coberturasAjustadas = await acompanharAusenciaDoTitular(tx, saved);
+        const coberturasAfetadas = await liberarTrechosPorAusencia(tx, saved);
+
+        return { saved, coberturasAjustadas, coberturasAfetadas };
     });
 
     res.json({
-        message: 'Lancamento atualizado com sucesso!',
+        message: `Lancamento atualizado com sucesso!${avisoDeTrechosLiberados(result.coberturasAfetadas)}`,
         success: true,
-        data: result
+        data: result.saved,
+        coberturasAjustadas: result.coberturasAjustadas,
+        coberturasAfetadas: result.coberturasAfetadas
     });
 });
 

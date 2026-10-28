@@ -4,6 +4,8 @@ const router = express.Router();
 const { sql, conectar } = require('../db');
 const { AppError } = require('../lib/errors');
 const { feriadosNacionaisDoAno, nomeFeriadoNacional } = require('../services/feriados-nacionais');
+const { refazerCoberturasNasDatas } = require('../services/cobertura-reacoes');
+const { withTransaction } = require('../db/transactions');
 const {
     ensurePositiveInt,
     extractDateString,
@@ -153,15 +155,21 @@ router.post('/', async (req, res) => {
         throw new AppError(400, 'Já existe um feriado cadastrado nesta data.');
     }
 
-    const result = await pool.request()
-        .input('nome', sql.NVarChar(200), payload.nome)
-        .input('data', sql.Date, payload.data)
-        .input('tipo', sql.NVarChar(50), payload.tipo)
-        .query(`
-            INSERT INTO Feriados (Nome, Data, Tipo)
-            OUTPUT INSERTED.*
-            VALUES (@nome, @data, @tipo)
-        `);
+    // O dia deixa de ser util: a cobertura que caia nele vira plantao.
+    const result = await withTransaction(sql, pool, async (tx) => {
+        const inserido = await tx.request()
+            .input('nome', sql.NVarChar(200), payload.nome)
+            .input('data', sql.Date, payload.data)
+            .input('tipo', sql.NVarChar(50), payload.tipo)
+            .query(`
+                INSERT INTO Feriados (Nome, Data, Tipo)
+                OUTPUT INSERTED.*
+                VALUES (@nome, @data, @tipo)
+            `);
+
+        await refazerCoberturasNasDatas(tx, [payload.data]);
+        return inserido;
+    });
 
     res.status(201).json({
         message: 'Feriado adicionado com sucesso!',
@@ -191,20 +199,26 @@ router.put('/:id', async (req, res) => {
         throw new AppError(400, 'Já existe outro feriado nesta data.');
     }
 
-    const result = await pool.request()
-        .input('id', sql.Int, id)
-        .input('nome', sql.NVarChar(200), payload.nome)
-        .input('data', sql.Date, payload.data)
-        .input('tipo', sql.NVarChar(50), payload.tipo)
-        .query(`
-            UPDATE Feriados
-            SET
-                Nome = @nome,
-                Data = @data,
-                Tipo = @tipo
-            OUTPUT INSERTED.*
-            WHERE Id = @id
-        `);
+    const result = await withTransaction(sql, pool, async (tx) => {
+        const atualizado = await tx.request()
+            .input('id', sql.Int, id)
+            .input('nome', sql.NVarChar(200), payload.nome)
+            .input('data', sql.Date, payload.data)
+            .input('tipo', sql.NVarChar(50), payload.tipo)
+            .query(`
+                UPDATE Feriados
+                SET
+                    Nome = @nome,
+                    Data = @data,
+                    Tipo = @tipo
+                OUTPUT INSERTED.*
+                WHERE Id = @id
+            `);
+
+        // Data antiga volta a ser dia util; a nova passa a ser feriado.
+        await refazerCoberturasNasDatas(tx, [extractDateString(existing.Data), payload.data]);
+        return atualizado;
+    });
 
     res.json({
         message: 'Feriado atualizado com sucesso!',
@@ -222,9 +236,13 @@ router.delete('/:id', async (req, res) => {
         throw new AppError(404, 'Feriado não encontrado.');
     }
 
-    await pool.request()
-        .input('id', sql.Int, id)
-        .query('DELETE FROM Feriados WHERE Id = @id');
+    await withTransaction(sql, pool, async (tx) => {
+        await tx.request()
+            .input('id', sql.Int, id)
+            .query('DELETE FROM Feriados WHERE Id = @id');
+
+        await refazerCoberturasNasDatas(tx, [extractDateString(feriado.Data)]);
+    });
 
     res.json({
         message: 'Feriado excluído com sucesso!',
