@@ -4,14 +4,19 @@ ABA "PENDENCIAS" DA TELA DE PLANTOES
 Reune o que exige uma acao e que, antes, so aparecia abrindo cada dia:
 
 - folgas de domingo aguardando reposicao  (lista em folgas-domingo.js);
-- plantoes dos proximos 30 dias sem ninguem da equipe lancado.
+- plantoes dos proximos 30 dias sem ninguem da equipe lancado;
+- coberturas de plantonista com horario descoberto e plantonista fora
+  (ferias, folga, ausencia) sem cobertura — resolvidas na tela Coberturas.
 
 Cada linha leva ao dia ou abre o que resolve a pendencia, no mesmo painel
 lateral da tela. O selo da aba soma as duas listas. "Colaboradores sem jornada"
 fica so no Dashboard (nao e assunto de plantao).
 ===================================================================== */
 
+import { API } from '../core/api.js';
+import { carregarPagina } from '../core/app/modais-e-navegacao.js';
 import { estado } from '../core/estado.js';
+import { ROTULOS_ORIGEM, ausenciasSemCobertura, dataBr, textoDuracao } from '../lib/coberturas.js';
 import { formatarHoraInput } from '../core/runtime/plantao-colaboradores/helpers.js';
 import { PLANTAO_CREDITO_META, normalizarTipoCreditoPlantao } from '../core/runtime/plantao-colaboradores/plantao-editor.js';
 import { escapeHtml } from '../lib/html-seguro.js';
@@ -27,7 +32,7 @@ const DIAS_SEMANA = ['Domingo', 'Segunda', 'Terca', 'Quarta', 'Quinta', 'Sexta',
 // Plantao ate esta distancia ganha destaque ambar; alem dela a etiqueta e neutra.
 const PROXIMO_EM_DIAS = 7;
 
-const contagem = { folgas: 0, plantoes: 0 };
+const contagem = { folgas: 0, plantoes: 0, coberturas: 0 };
 let ouvindoAtualizacoes = false;
 
 function nomeDoDia(dataISO) {
@@ -38,7 +43,7 @@ function nomeDoDia(dataISO) {
 
 function atualizarSelo() {
     const selo = document.getElementById('plantaoAbaPendenciasContagem');
-    const total = contagem.folgas + contagem.plantoes;
+    const total = contagem.folgas + contagem.plantoes + contagem.coberturas;
 
     if (selo) {
         selo.textContent = String(total);
@@ -92,6 +97,71 @@ function renderPlantoesSemEquipe() {
     return dias.length;
 }
 
+function renderLinhaCobertura(item) {
+    return `
+                <div class="pendencias-item">
+                    <div>
+                        <strong>${escapeHtml(item.titularNome || 'Colaborador')}</strong>
+                        <span class="pendencias-tag pendencias-tag--espera">${escapeHtml(textoDuracao(item.resumo.minutosPendentes))} sem ninguem</span>
+                        <p>${escapeHtml(dataBr(item.dataInicio))} a ${escapeHtml(dataBr(item.dataFim))}</p>
+                    </div>
+                    <button type="button" class="btn-secondary folga-domingo-btn" data-abrir-cobertura="${Number(item.id)}">
+                        <i class="fas fa-people-arrows"></i> Abrir cobertura
+                    </button>
+                </div>`;
+}
+
+function renderLinhaSemCobertura(item) {
+    return `
+                <div class="pendencias-item">
+                    <div>
+                        <strong>${escapeHtml(item.colaboradorNome)}</strong>
+                        <span class="pendencias-tag pendencias-tag--neutra">${escapeHtml(ROTULOS_ORIGEM[item.tipo] || 'Ausencia')} sem cobertura</span>
+                        <p>${escapeHtml(dataBr(item.dataInicio))} a ${escapeHtml(dataBr(item.dataFim))}</p>
+                    </div>
+                    <button type="button" class="btn-secondary folga-domingo-btn" data-abrir-cobertura="">
+                        <i class="fas fa-people-arrows"></i> Ir para Coberturas
+                    </button>
+                </div>`;
+}
+
+// Coberturas de hoje em diante: as com horario descoberto e as ausencias de
+// plantonista que ainda nao tem cobertura nenhuma.
+async function carregarPendenciasCoberturas() {
+    const lista = document.getElementById('coberturasPendentesLista');
+    const selo = document.getElementById('coberturasPendentesContagem');
+
+    if (!lista) {
+        return 0;
+    }
+
+    const hoje = hojeISO();
+    let futuras = [];
+
+    try {
+        const resposta = await API.getCoberturas({ dataInicio: hoje, dataFim: `${Number(hoje.slice(0, 4)) + 1}${hoje.slice(4)}` });
+        futuras = resposta?.items || [];
+    } catch (error) {
+        lista.innerHTML = '<p class="pendencias-vazio">Nao foi possivel carregar as coberturas.</p>';
+        return 0;
+    }
+
+    const descobertas = futuras.filter((item) => item.resumo.minutosPendentes > 0);
+    const semCobertura = ausenciasSemCobertura(estado.ausencias, estado.colaboradores, futuras, hoje);
+    const total = descobertas.length + semCobertura.length;
+
+    lista.innerHTML = total
+        ? [...descobertas.map(renderLinhaCobertura), ...semCobertura.map(renderLinhaSemCobertura)].join('')
+        : '<p class="pendencias-vazio">Nada pendente aqui.</p>';
+
+    if (selo) {
+        selo.textContent = String(total);
+        selo.classList.toggle('is-zero', total === 0);
+    }
+
+    return total;
+}
+
 export function renderAbaPendenciasPlantao() {
     return `
                 ${renderPendenciasFolgasDomingo()}
@@ -103,6 +173,17 @@ export function renderAbaPendenciasPlantao() {
                     </div>
                     <p class="pendencias-sub">Proximos ${JANELA_PLANTOES_DIAS} dias, do mais proximo para o mais distante.</p>
                     <div class="pendencias-lista" id="plantoesSemEquipeLista">
+                        <p class="pendencias-vazio">Carregando...</p>
+                    </div>
+                </section>
+
+                <section class="pendencias-secao" id="coberturasPendentes">
+                    <div class="pendencias-titulo">
+                        <h4><i class="fas fa-people-arrows"></i> Coberturas de plantonista</h4>
+                        <span class="pendencias-contagem" id="coberturasPendentesContagem">0</span>
+                    </div>
+                    <p class="pendencias-sub">Horario de plantonista sem ninguem cobrindo, de hoje em diante.</p>
+                    <div class="pendencias-lista" id="coberturasPendentesLista">
                         <p class="pendencias-vazio">Carregando...</p>
                     </div>
                 </section>`;
@@ -123,7 +204,12 @@ export async function carregarPendenciasPlantao() {
 
     contagem.plantoes = renderPlantoesSemEquipe();
     atualizarSelo();
-    contagem.folgas = await carregarPendenciasFolgasDomingo();
+    const [folgas, coberturas] = await Promise.all([
+        carregarPendenciasFolgasDomingo(),
+        carregarPendenciasCoberturas()
+    ]);
+    contagem.folgas = folgas;
+    contagem.coberturas = coberturas;
     atualizarSelo();
 }
 
@@ -137,6 +223,16 @@ export function atualizarPlantoesSemEquipe() {
 // `abrirDia(dataISO)` abre o dia no painel lateral da tela de plantoes.
 export function ligarPendenciasPlantao(abrirDia) {
     ligarPendenciasFolgasDomingo(abrirDia);
+
+    // A cobertura e resolvida na tela Coberturas, que abre a escolhida.
+    document.getElementById('coberturasPendentes')?.addEventListener('click', (evento) => {
+        const botao = evento.target.closest('[data-abrir-cobertura]');
+
+        if (botao) {
+            estado.coberturaAbrirId = Number(botao.getAttribute('data-abrir-cobertura')) || undefined;
+            carregarPagina('coberturas');
+        }
+    });
 
     document.getElementById('plantoesSemEquipe')?.addEventListener('click', async (evento) => {
         const botao = evento.target.closest('[data-abrir-plantao-dia]');

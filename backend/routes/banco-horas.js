@@ -17,6 +17,8 @@ const { colaboradoresVisiveis, exigirColaboradorVisivel } = require('../auth/ace
 const { ensurePositiveInt, extractDateString, normalizeOptionalText } = require('../lib/validation');
 const { serializePlantaoRecord } = require('../services/plantoes');
 const { SQL_EQUIPE_PLANTAO, SQL_PLANTAO_COM_COLABORADOR } = require('../services/equipe-plantao');
+const { gravarMovimentosDosTrechos } = require('../services/cobertura-banco');
+const { carregarTrechosDeDiaUtil } = require('../services/cobertura-dia-util');
 
 function mapResumoRow(row) {
     return {
@@ -179,8 +181,8 @@ router.get('/resumo', async (req, res) => {
     });
 });
 
-// Plantoes do colaborador marcados como hora extra, do mais novo para o mais
-// velho.
+// Plantoes e coberturas de dia util do colaborador marcados como hora extra,
+// do mais novo para o mais velho.
 async function listarHorasExtrasDoColaborador(pool, colaboradorId, limit) {
     const result = await pool.request()
         .input('colaboradorId', sql.Int, colaboradorId)
@@ -193,7 +195,7 @@ async function listarHorasExtrasDoColaborador(pool, colaboradorId, limit) {
             ORDER BY data_plantao DESC, id DESC
         `);
 
-    return result.recordset
+    const plantoes = result.recordset
         .map((row) => serializePlantaoRecord(row))
         .map((plantao) => {
             const minutos = plantao.horaInicio && plantao.horaFim
@@ -202,6 +204,7 @@ async function listarHorasExtrasDoColaborador(pool, colaboradorId, limit) {
 
             return {
                 plantaoId: plantao.id,
+                origem: 'plantao',
                 dataReferencia: plantao.dataISO,
                 horaInicio: plantao.horaInicio,
                 horaFim: plantao.horaFim,
@@ -211,6 +214,25 @@ async function listarHorasExtrasDoColaborador(pool, colaboradorId, limit) {
                 observacao: plantao.observacao
             };
         });
+    const coberturas = (await carregarTrechosDeDiaUtil(pool, { substitutoId: colaboradorId }))
+        .filter((trecho) => trecho.tipoCredito === 'extra')
+        .map((trecho) => ({
+            trechoId: trecho.id,
+            origem: 'cobertura',
+            dataReferencia: trecho.dataISO,
+            horaInicio: trecho.horaInicio,
+            horaFim: trecho.horaFim,
+            minutos: trecho.minutos,
+            minutosFormatado: minutesToDurationLabel(trecho.minutos),
+            tipoPlantao: 'cobertura',
+            observacao: [trecho.titularNome ? `Cobrindo ${trecho.titularNome}` : null, trecho.observacao]
+                .filter(Boolean).join(' | ') || null
+        }));
+
+    return [...plantoes, ...coberturas]
+        .sort((a, b) => String(b.dataReferencia).localeCompare(String(a.dataReferencia))
+            || String(b.horaInicio).localeCompare(String(a.horaInicio)))
+        .slice(0, limit);
 }
 
 router.get('/colaborador/:id', async (req, res) => {
@@ -447,6 +469,9 @@ router.post('/recalcular', async (req, res) => {
                 movimentosGerados += 1;
             }
         }
+
+        // Cobertura em dia util com destino 'banco' (cobertura-banco.js).
+        movimentosGerados += await gravarMovimentosDosTrechos(tx, await carregarTrechosDeDiaUtil(tx));
 
         return {
             movimentosGerados,

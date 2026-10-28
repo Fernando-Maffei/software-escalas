@@ -9,6 +9,7 @@ const { sql } = require('../db');
 const { AppError } = require('../lib/errors');
 const { extractDateString } = require('../lib/validation');
 const { removerColaboradorDasEquipes } = require('./equipe-plantao');
+const { removerPlantoesDeCoberturaDoColaborador } = require('./cobertura-plantoes');
 
 // Toda tabela com FK para Colaboradores(Id), e a coluna da FK. Uma tabela nova
 // que referencie Colaboradores precisa entrar aqui — o teste de integracao
@@ -21,6 +22,8 @@ const TABELAS_FILHAS = Object.freeze([
     ['ColaboradorJornadaSemanal', 'ColaboradorId'],
     ['AlmocosPersonalizados', 'ColaboradorId'],
     ['FolgasDomingo', 'ColaboradorId'],
+    // Os trechos da cobertura saem junto (ON DELETE CASCADE).
+    ['Coberturas', 'TitularId'],
     ['Ausencias', 'ColaboradorId']
 ]);
 
@@ -63,6 +66,34 @@ async function excluirColaboradorDefinitivamente(tx, colaboradorId, options = {}
         .request()
         .input('id', sql.Int, colaboradorId)
         .query('UPDATE FolgasDomingo SET CobertoPorColaboradorId = NULL WHERE CobertoPorColaboradorId = @id');
+
+    // Plantao gerado por cobertura em que ele e titular ou substituto: sai
+    // antes de os trechos mudarem (FK sem cascata), com o que ele gerou.
+    await removerPlantoesDeCoberturaDoColaborador(tx, colaboradorId);
+
+    // As coberturas DESTE colaborador saem com ele (TABELAS_FILHAS), e o
+    // credito que deram no banco de quem cobriu sai junto: o movimento aponta
+    // para um trecho que deixa de existir.
+    await tx
+        .request()
+        .input('id', sql.Int, colaboradorId)
+        .query(`
+            DELETE FROM BancoHorasMovimentos
+            WHERE OrigemTipo = 'cobertura'
+              AND OrigemId IN (
+                  SELECT t.Id
+                  FROM CoberturaTrechos t
+                  INNER JOIN Coberturas c ON c.Id = t.CoberturaId
+                  WHERE c.TitularId = @id
+              )
+        `);
+
+    // Trecho que este colaborador cobriu na cobertura de OUTRA pessoa volta a
+    // ficar sem substituto: a cobertura do titular continua existindo.
+    await tx
+        .request()
+        .input('id', sql.Int, colaboradorId)
+        .query('UPDATE CoberturaTrechos SET SubstitutoId = NULL, TipoCredito = NULL WHERE SubstitutoId = @id');
 
     for (const [tabela, coluna] of TABELAS_FILHAS) {
         await tx.request().input('id', sql.Int, colaboradorId).query(`DELETE FROM dbo.[${tabela}] WHERE [${coluna}] = @id`);

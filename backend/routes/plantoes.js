@@ -7,9 +7,9 @@ const { PLANTAO_TIPOS, PLANTAO_TIPOS_LANCAMENTO } = require('../lib/dominio');
 const {
     buildDisponibilidadeColaborador,
     calculateIntervalMinutes,
-    describePlantaoMovement,
     minutesToDurationLabel
 } = require('../services/bancoHoras');
+const { deletePlantaoMovements, syncPlantaoMovements } = require('../services/plantao-movimentos');
 const {
     deleteEscalaDiaByOrigin,
     restoreEscalaDefaultsForPeriod,
@@ -46,10 +46,12 @@ const PLANTAO_COLUNAS = `
             observacao,
             tipo_plantao,
             tipo_credito,
-            tipo_lancamento`;
+            tipo_lancamento,
+            cobertura_trecho_id`;
 
 // O dia pode ter MAIS DE UM lancamento (turnos com horarios, pessoas e destinos
-// diferentes), entao a busca por data devolve lista.
+// diferentes), entao a busca por data devolve lista. Inclui os plantoes gerados
+// por cobertura (cobertura_trecho_id); quem edita o dia separa os dois.
 async function findPlantoesByDate(poolOrTx, dataISO) {
     const result = await poolOrTx.request()
         .input('data_plantao', sql.Date, dataISO)
@@ -159,74 +161,6 @@ function hydratePlantaoDuration(serialized) {
     return serialized;
 }
 
-async function deletePlantaoMovements(poolOrTx, plantaoId) {
-    await poolOrTx.request()
-        .input('origemTipo', sql.NVarChar(30), 'plantao')
-        .input('origemId', sql.Int, plantaoId)
-        .query(`
-            DELETE FROM BancoHorasMovimentos
-            WHERE OrigemTipo = @origemTipo
-              AND OrigemId = @origemId
-        `);
-}
-
-async function syncPlantaoMovements(poolOrTx, row) {
-    const plantao = serializePlantaoRecord(row);
-    await deletePlantaoMovements(poolOrTx, plantao.id);
-
-    // Hora extra e paga em folha: o plantao fica registrado e entra na escala do
-    // dia, mas nao vira credito no banco de horas. O DELETE acima roda antes
-    // deste corte de proposito — se o lancamento era 'banco' e virou 'extra',
-    // o movimento antigo precisa sumir.
-    if (plantao.tipoCredito === 'extra') {
-        return { synced: false, skippedReason: 'hora_extra' };
-    }
-
-    if (!plantao.horaInicio || !plantao.horaFim || plantao.colaboradores.length === 0) {
-        return { synced: false, skippedReason: 'missing_required_data' };
-    }
-
-    const minutos = calculateIntervalMinutes(plantao.horaInicio, plantao.horaFim, {
-        startLabel: 'Hora inicial do plantao',
-        endLabel: 'Hora final do plantao'
-    });
-
-    for (const colaboradorId of plantao.colaboradores) {
-        await poolOrTx.request()
-            .input('colaboradorId', sql.Int, colaboradorId)
-            .input('dataReferencia', sql.Date, plantao.dataISO)
-            .input('minutos', sql.Int, minutos)
-            .input('origemTipo', sql.NVarChar(30), 'plantao')
-            .input('origemId', sql.Int, plantao.id)
-            .input('descricao', sql.NVarChar(255), describePlantaoMovement(plantao))
-            .input('observacao', sql.NVarChar(500), plantao.observacao || null)
-            .query(`
-                INSERT INTO BancoHorasMovimentos (
-                    ColaboradorId,
-                    DataReferencia,
-                    Minutos,
-                    OrigemTipo,
-                    OrigemId,
-                    Descricao,
-                    Observacao
-                ) VALUES (
-                    @colaboradorId,
-                    @dataReferencia,
-                    @minutos,
-                    @origemTipo,
-                    @origemId,
-                    @descricao,
-                    @observacao
-                )
-            `);
-    }
-
-    return {
-        synced: true,
-        minutos
-    };
-}
-
 router.get('/', async (req, res) => {
     const pool = await conectar();
     const request = pool.request();
@@ -304,32 +238,41 @@ router.get('/:dataISO', async (req, res) => {
     const dataISO = normalizeIsoDate(req.params.dataISO, 'Data do plantao');
     const tipoPlantao = resolvePlantaoTypeByDate(dataISO, await loadFeriadosSet(pool));
     const rows = await findPlantoesByDate(pool, dataISO);
-
-    if (rows.length === 0) {
-        throw new AppError(404, 'Plantao nao encontrado.');
-    }
-
-    const lancamentos = filtrarEquipesVisiveis(
+    const visiveis = await colaboradoresVisiveis(pool, req);
+    const todos = filtrarEquipesVisiveis(
         rows.map((row) => hydratePlantaoDuration(serializePlantaoRecord(row))),
-        await colaboradoresVisiveis(pool, req)
+        visiveis
     );
 
-    if (lancamentos.length === 0) {
+    if (todos.length === 0) {
         throw new AppError(404, 'Plantao nao encontrado.');
     }
+
+    // O plantao gerado por cobertura vem a parte: ele e editado na
+    // cobertura, nao no dia de plantao.
+    const lancamentos = todos.filter((item) => !item.coberturaTrechoId);
 
     res.json({
         dataISO,
         tipoPlantao,
         // A observacao e do dia: todas as linhas gravam o mesmo texto.
         observacao: lancamentos.find((item) => item.observacao)?.observacao || null,
-        lancamentos
+        lancamentos,
+        coberturas: todos.filter((item) => item.coberturaTrechoId)
     });
 });
+
+// Plantoes do dia lancados a mao, sem os gerados por cobertura: so esses o
+// editor do dia regrava e exclui.
+function semCobertura(rows) {
+    return rows.filter((row) => !row.cobertura_trecho_id);
+}
 
 // O dia e reescrito inteiro a cada gravacao: casar linha por linha com o que
 // ja existia daria o mesmo resultado por muito mais codigo, e a tela sempre
 // manda o dia completo. `dia` = { dataISO, tipoPlantao, observacao }.
+// `anteriores` sao so os lancados a mao; o plantao de cobertura do dia fica
+// como esta (ver cobertura-plantoes.js) e entra junto na escala.
 async function regravarDiaPlantao(tx, dia, anteriores, grupos) {
     for (const anterior of anteriores) {
         await deletePlantaoMovements(tx, anterior.id);
@@ -338,7 +281,7 @@ async function regravarDiaPlantao(tx, dia, anteriores, grupos) {
 
     await tx.request()
         .input('data_plantao', sql.Date, dia.dataISO)
-        .query('DELETE FROM plantoes WHERE data_plantao = @data_plantao');
+        .query('DELETE FROM plantoes WHERE data_plantao = @data_plantao AND cobertura_trecho_id IS NULL');
 
     const salvos = [];
 
@@ -372,7 +315,8 @@ async function regravarDiaPlantao(tx, dia, anteriores, grupos) {
     }
 
     const colaboradoresResult = await tx.request().query('SELECT * FROM Colaboradores');
-    await syncPlantaoDiaToEscalaDia(tx, dia.dataISO, salvos, colaboradoresResult.recordset);
+    const daCobertura = (await findPlantoesByDate(tx, dia.dataISO)).filter((row) => row.cobertura_trecho_id);
+    await syncPlantaoDiaToEscalaDia(tx, dia.dataISO, [...salvos, ...daCobertura], colaboradoresResult.recordset);
 
     return salvos;
 }
@@ -397,7 +341,7 @@ router.post('/', async (req, res) => {
             });
         }
 
-        const anteriores = await findPlantoesByDate(tx, payload.dataISO);
+        const anteriores = semCobertura(await findPlantoesByDate(tx, payload.dataISO));
         const action = anteriores.length > 0 ? 'updated' : 'created';
 
         // Conta com teto de setor: quem ela nao enxerga continua no dia como
@@ -446,12 +390,18 @@ router.delete('/:dataISO', async (req, res) => {
     const visiveis = await colaboradoresVisiveis(pool, req);
 
     await withTransaction(sql, pool, async (tx) => {
-        const existentes = await findPlantoesByDate(tx, dataISO);
+        const doDia = await findPlantoesByDate(tx, dataISO);
+        const existentes = semCobertura(doDia);
+        const daCobertura = doDia.filter((row) => row.cobertura_trecho_id);
         const registros = existentes.map((row) => serializePlantaoRecord(row));
 
         // Dia em que a conta nao enxerga ninguem e, para ela, um dia sem
         // plantao (o GET tambem responde 404).
         if (existentes.length === 0 || filtrarEquipesVisiveis(registros, visiveis).length === 0) {
+            if (daCobertura.length > 0 && existentes.length === 0) {
+                throw new AppError(409, 'Este dia so tem plantao de cobertura de plantonista. Ele sai pela cobertura, nao pelo dia de plantao.');
+            }
+
             throw new AppError(404, 'Plantao nao encontrado.');
         }
 
@@ -469,7 +419,7 @@ router.delete('/:dataISO', async (req, res) => {
             return;
         }
 
-        // Excluir o dia derruba TODOS os turnos daquela data.
+        // Excluir o dia derruba todos os turnos lancados a mao naquela data.
         for (const existente of existentes) {
             await deletePlantaoMovements(tx, existente.id);
             await deleteEscalaDiaByOrigin(tx, 'plantao', existente.id);
@@ -477,7 +427,14 @@ router.delete('/:dataISO', async (req, res) => {
 
         await tx.request()
             .input('data_plantao', sql.Date, dataISO)
-            .query('DELETE FROM plantoes WHERE data_plantao = @data_plantao');
+            .query('DELETE FROM plantoes WHERE data_plantao = @data_plantao AND cobertura_trecho_id IS NULL');
+
+        // O plantao de cobertura do dia continua e volta para a escala.
+        if (daCobertura.length > 0) {
+            const colaboradoresResult = await tx.request().query('SELECT * FROM Colaboradores');
+            await syncPlantaoDiaToEscalaDia(tx, dataISO, daCobertura, colaboradoresResult.recordset);
+            return;
+        }
 
         await restoreEscalaDefaultsForPeriod(tx, dataISO, dataISO);
     });

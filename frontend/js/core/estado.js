@@ -32,6 +32,8 @@ export const estado = {
     plantaoDataFocoISO: undefined,
     plantaoMesISO: undefined,
     plantaoAbrirDataISO: undefined,
+    // Cobertura que a tela Coberturas abre ao entrar (vindo das Pendencias).
+    coberturaAbrirId: undefined,
     escalaEditorColaboradorId: undefined,
     escalaWeekCache: undefined,
     escalaLunchDrafts: undefined

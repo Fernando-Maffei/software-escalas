@@ -7,11 +7,15 @@
 // Le os plantoes pela mesma rota da tela de plantoes, no escopo da conta (o
 // teto de setor vale): o Nome/Apelido vai nas
 // linhas de data e o nome completo do cadastro na lista de assinaturas.
+//
+// O plantonista na jornada habitual (sem lancamento naquele dia) tambem entra,
+// marcado "(jornada)" e sem linha de assinatura: le a jornada semanal, as
+// ausencias, as folgas de domingo e os feriados do mes, no mesmo escopo.
 import { atributosAcao } from '../../lib/atributos-acao.js';
 import { escapeHtml } from '../../lib/html-seguro.js';
-import { dataPorExtenso, montarFolhasAssinatura, periodoDoMes, TIPOS_FOLHA_ASSINATURA } from '../../lib/lancamentos-assinatura.js';
+import { dataPorExtenso, jornadasHabituais, montarFolhasAssinatura, periodoDoMes, TIPOS_FOLHA_ASSINATURA } from '../../lib/lancamentos-assinatura.js';
 import { carregarDiretorioColaboradores, resolverColaborador } from '../../telas/lancamentos.js';
-import { API } from '../api.js';
+import { API, buscarFeriadosNacionais } from '../api.js';
 import { mostrarToast } from '../app/horas-e-resumo.js';
 import { gerarOptionsMeses } from '../app/relatorios-export.js';
 import { normalizarTipoLancamentoPlantao } from './plantao-colaboradores/plantao-editor.js';
@@ -125,15 +129,53 @@ function faixaHorario(inicio, fim) {
     return horaInicio && horaFim ? `${horaInicio}-${horaFim}` : '';
 }
 
+const lista = (resposta) => (Array.isArray(resposta) ? resposta : resposta?.items || []);
+
+// Feriados do mes, nacionais e cadastrados, como datas ISO.
+async function feriadosDoMes(filtros) {
+    const [nacionais, cadastrados] = await Promise.all([
+        buscarFeriadosNacionais(filtros.ano),
+        API.get(`/feriados/mes/${filtros.ano}/${filtros.mes + 1}`)
+    ]);
+
+    return [
+        ...lista(nacionais).map((item) => dataIso(item.date || item.data)),
+        ...lista(cadastrados).map((item) => dataIso(item.Data || item.data))
+    ].filter(Boolean);
+}
+
+async function carregarJornadasHabituais(filtros) {
+    const periodo = { dataInicio: filtros.inicioISO, dataFim: filtros.fimISO };
+    const [colaboradores, jornada, ausencias, folgas, feriados] = await Promise.all([
+        API.getColaboradores({ incluirInativos: 1 }),
+        API.getJornadaSemanal(),
+        API.getAusencias(periodo),
+        API.getFolgasDomingo(periodo),
+        feriadosDoMes(filtros)
+    ]);
+
+    return jornadasHabituais({
+        inicioISO: filtros.inicioISO,
+        fimISO: filtros.fimISO,
+        colaboradores: lista(colaboradores),
+        jornadaSemanal: lista(jornada),
+        ausencias: lista(ausencias),
+        folgasDomingo: lista(folgas),
+        feriados
+    });
+}
+
 async function montarDadosRelatorioAssinaturas(filtros) {
     // Diretorio recarregado: inclui desligados (plantao antigo de quem ja
     // saiu continua com nome) e pega o nome completo recem-editado.
-    const [plantoes] = await Promise.all([
+    const [plantoes, , jornadas] = await Promise.all([
         API.getPlantoes({ from: filtros.inicioISO, to: filtros.fimISO }),
-        carregarDiretorioColaboradores(true)
+        carregarDiretorioColaboradores(true),
+        carregarJornadasHabituais(filtros)
     ]);
 
     return montarFolhasAssinatura({
+        jornadas,
         inicioISO: filtros.inicioISO,
         fimISO: filtros.fimISO,
         rotuloMes: filtros.rotulo,
@@ -172,13 +214,17 @@ function renderFolhas(relatorio, filtros) {
                 <ul class="folha-assinaturas">
                     ${folha.assinaturas.map((nome) => `<li>${escapeHtml(nome)}</li>`).join('')}
                 </ul>
+                ${folha.emJornada.length ? `
+                    <p class="folha-jornada">Em jornada habitual (sem assinatura): ${escapeHtml(folha.emJornada.join(', '))}.</p>
+                ` : ''}
             </section>
         `).join('');
 }
 
 function textoTotais(relatorio) {
-    const { folhas, escalas, colaboradores } = relatorio.totais;
-    return `${folhas} folha(s) · ${escalas} escala(s) de ${colaboradores} colaborador(es)`;
+    const { folhas, escalas, colaboradores, jornadas } = relatorio.totais;
+    const emJornada = jornadas ? ` · ${jornadas} em jornada habitual (sem assinatura)` : '';
+    return `${folhas} folha(s) · ${escalas} escala(s) de ${colaboradores} colaborador(es)${emJornada}`;
 }
 
 function renderRelatorioAssinaturas(relatorio, filtros) {
@@ -240,6 +286,7 @@ function gerarHtmlImpressaoAssinaturas(relatorio, filtros) {
         .folha-datas li { font-size: 12pt; font-weight: 700; line-height: 25pt; }
         .folha-local { margin: 24pt 0 0; font-size: 11pt; }
         .folha-assinaturas { margin: 20pt 0 0; padding: 0; list-style: none; }
+        .folha-jornada { margin: 24pt 0 0; font-size: 10pt; font-style: italic; }
         .folha-assinaturas li { width: max-content; min-width: 9cm; max-width: 100%; margin-top: 34pt; padding-top: 3pt; border-top: 1px solid #000000; font-size: 11pt; line-height: 15pt; break-inside: avoid; page-break-inside: avoid; }
     </style>
 </head>

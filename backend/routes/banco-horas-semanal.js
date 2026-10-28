@@ -18,6 +18,7 @@ const {
 } = require('../lib/validation');
 const { montarRelatorioHorasExtras, serializePlantaoRecord } = require('../services/plantoes');
 const { withTransaction } = require('../db/transactions');
+const { carregarTrechosDeDiaUtil, trechoComoLancamento } = require('../services/cobertura-dia-util');
 const {
     PLANTAO_COLUNAS_CREDITO,
     calcularSaldo,
@@ -621,8 +622,8 @@ router.delete('/semana/:semana', async (req, res) => {
 });
 
 // GET /api/banco-horas-semanal/horas-extras?inicio=&fim=&colaboradorId=
-// Relatorio de horas extras do periodo: os plantoes lancados com destino
-// 'extra' agrupados por colaborador. Essas horas sao pagas em folha e por isso
+// Relatorio de horas extras do periodo: os plantoes (e as coberturas de dia
+// util) lancados com destino 'extra' agrupados por colaborador. Essas horas sao pagas em folha e por isso
 // nao entram na grade semanal nem no saldo — sem este relatorio nao existia
 // nenhum lugar que somasse quanto cada um fez de hora extra no mes.
 router.get('/horas-extras', async (req, res) => {
@@ -668,8 +669,13 @@ router.get('/horas-extras', async (req, res) => {
             ORDER BY data_plantao DESC, id DESC
         `);
 
+    // Cobertura de dia util paga como hora extra entra no mesmo relatorio.
+    const coberturas = await carregarTrechosDeDiaUtil(pool, { dataInicio: inicioISO, dataFim: fimISO });
     const relatorio = montarRelatorioHorasExtras(
-        plantoesResult.recordset.map((row) => serializePlantaoRecord(row)),
+        [
+            ...plantoesResult.recordset.map((row) => serializePlantaoRecord(row)),
+            ...coberturas.map(trechoComoLancamento)
+        ],
         colaboradores,
         { inicioISO, fimISO, colaboradorId }
     );

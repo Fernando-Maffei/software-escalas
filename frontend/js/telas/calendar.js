@@ -1,11 +1,44 @@
-import { buscarFeriadosNacionais } from '../core/api.js';
+import { API, buscarFeriadosNacionais } from '../core/api.js';
 import { estado } from '../core/estado.js';
 import { usuarioEhAdmin } from '../core/permissoes.js';
+import { indiceCoberturaPorDia, textoCoberturaDoDia } from '../lib/coberturas.js';
 import { escapeHtml } from '../lib/html-seguro.js';
 import { iconeTipoLancamento } from '../lib/tipos-lancamento.js';
 import { abrirModalLancamento, carregarDiretorioColaboradores, carregarListagens, carregarListagensComFiltro, resolverColaborador as resolverColaboradorLancamento } from './lancamentos.js';
 
 const cacheFeriadosPorAno = new Map();
+// Coberturas de plantonista por mes ("2026-11" -> indice de cobertura por dia
+// do titular). Some ao entrar na tela, para refletir o que foi editado em
+// Coberturas.
+const coberturasPorMes = new Map();
+
+// O calendario desenha na hora com o que ja tem; as coberturas do mes chegam
+// depois e redesenham, se o mes ainda for o mesmo.
+function coberturasDoMes(mes, ano) {
+    const chave = `${ano}-${String(mes + 1).padStart(2, '0')}`;
+
+    if (coberturasPorMes.has(chave)) {
+        return coberturasPorMes.get(chave);
+    }
+
+    coberturasPorMes.set(chave, new Map());
+    const fim = new Date(ano, mes + 1, 0).getDate();
+
+    API.getCoberturas({ dataInicio: `${chave}-01`, dataFim: `${chave}-${String(fim).padStart(2, '0')}` })
+        .then((resposta) => {
+            coberturasPorMes.set(chave, indiceCoberturaPorDia(resposta?.items || []));
+
+            if (estado.mesAtual === mes && estado.anoAtual === ano && document.getElementById('calendar')) {
+                gerarCalendario(mes, ano);
+            }
+        })
+        .catch((error) => {
+            // Sem as coberturas o calendario continua certo, so sem a marca.
+            console.error('[calendario] falha ao carregar coberturas:', error);
+        });
+
+    return coberturasPorMes.get(chave);
+}
 const dataAtual = new Date();
 
 estado.mesAtual = dataAtual.getMonth();
@@ -179,6 +212,7 @@ export function gerarCalendario(mes, ano) {
 
     calendar.innerHTML = '';
 
+    const coberturas = coberturasDoMes(mes, ano);
     const primeiroDia = new Date(ano, mes, 1);
     const ultimoDia = new Date(ano, mes + 1, 0);
     const diasNoMes = ultimoDia.getDate();
@@ -263,18 +297,24 @@ export function gerarCalendario(mes, ano) {
             const tipo = String(ausencia.tipo || ausencia.Tipo || '').toLowerCase();
 
             if (!colaboradoresUnicos.has(nome)) {
-                colaboradoresUnicos.set(nome, { nome, tipo, ativo });
+                colaboradoresUnicos.set(nome, { nome, tipo, ativo, cobertura: coberturas.get(`${Number(colaboradorId)}|${dataISO}`) || null });
             }
         });
 
         colaboradoresUnicos.forEach((info) => {
             const tag = document.createElement('div');
             tag.className = `ausencia-tag ${info.tipo}${info.ativo ? '' : ' inativo'}`;
-            tag.innerHTML = `${iconeTipoLancamento(info.tipo)}<span>${escapeHtml(info.nome)}</span>`;
+            // Plantonista fora com horario a cobrir: icone de cobertura com a
+            // cor da situacao do dia (verde coberto, ambar parcial/pendente).
+            const marcaCobertura = info.cobertura
+                ? `<i class="fas fa-people-arrows cobertura-marca is-${escapeHtml(info.cobertura.situacao)}" aria-hidden="true"></i>`
+                : '';
+            tag.innerHTML = `${iconeTipoLancamento(info.tipo)}<span>${escapeHtml(info.nome)}</span>${marcaCobertura}`;
 
             // Em coluna estreita o nome sai cortado com reticencias: o title
             // mostra inteiro.
-            tag.title = info.ativo ? info.nome : `${info.nome} — colaborador desligado`;
+            const titulo = info.ativo ? info.nome : `${info.nome} — colaborador desligado`;
+            tag.title = info.cobertura ? `${titulo} · ${textoCoberturaDoDia(info.cobertura)}` : titulo;
 
             cell.appendChild(tag);
         });
@@ -353,6 +393,8 @@ function configurarNavegacaoCalendario() {
 }
 
 export async function inicializarCalendario() {
+    coberturasPorMes.clear();
+
     // O diretorio com desligados precisa estar em memoria antes do primeiro
     // render, senao as ausencias de quem saiu voltam a virar "Desconhecido".
     const diretorio = carregarDiretorioColaboradores();

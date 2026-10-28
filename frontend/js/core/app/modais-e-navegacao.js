@@ -1,6 +1,7 @@
 import { render as renderBancoHoras } from '../../telas/banco-horas.js';
 import { pararAtualizacaoAutomatica, renderDashboard } from '../../telas/dashboard/render.js';
 import { renderEscalaDia } from '../../telas/escala-dia-editor.js';
+import { renderCoberturas } from '../../telas/coberturas/index.js';
 import { appContent } from '../app.js';
 import { setActiveButton } from '../layout-pagina.js';
 import { paginaDestinoPermitida } from '../permissoes.js';
@@ -56,6 +57,9 @@ export function carregarPagina(paginaSolicitada) {
             break;
         case "lancamentoPlantao":
             entrarTelaPlantao();
+            break;
+        case "coberturas":
+            renderCoberturas();
             break;
         case "configuracoes":
             renderConfiguracoes();

@@ -472,6 +472,11 @@
     outline-offset: 2px;
 }
 
+/* Plantao gerado por cobertura de plantonista: so leitura no editor do dia. */
+.plantao-linha.is-cobertura {
+    color: var(--text-secondary, inherit);
+}
+
 .plantao-vazio {
     margin: 0;
     padding: 16px;

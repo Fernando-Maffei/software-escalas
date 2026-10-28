@@ -6,6 +6,8 @@ const { serializePlantaoRecord } = require('./plantoes');
 const { SQL_EQUIPE_PLANTAO } = require('./equipe-plantao');
 const { temFolgaDeDomingo } = require('./plantonista');
 const { mergeEscalaDiaEmLote } = require('./escala-gravacao-em-lote');
+const { carregarTrechosDeDiaUtil } = require('./cobertura-dia-util');
+const { anexarCoberturasNaEscala } = require('./cobertura-na-escala');
 const {
     buildDateRange,
     compareTimes,
@@ -1775,12 +1777,36 @@ async function resetEscalaLunchesToCadastro(poolOrTx, dataISO, options = {}) {
     return result;
 }
 
+// As linhas de escala_dia do periodo com os trechos de cobertura de dia util
+// por cima (ver cobertura-na-escala.js).
+async function listarComCoberturas(poolOrTx, startISO, endISO, options = {}) {
+    const { colaboradorId = null, setorId = null } = options;
+    const rows = await listEscalaDiaRows(poolOrTx, startISO, endISO, { colaboradorId, setorId });
+    const trechos = await carregarTrechosDeDiaUtil(poolOrTx, {
+        dataInicio: startISO,
+        dataFim: endISO,
+        substitutoId: colaboradorId
+    });
+
+    if (trechos.length === 0) {
+        return rows.map((row) => ({ ...row, coberturas: [] }));
+    }
+
+    const colaboradores = (await listColaboradores(poolOrTx)).filter(colaboradorAtivo);
+
+    return anexarCoberturasNaEscala(rows, trechos, {
+        colaboradores: new Map(colaboradores.map((item) => [Number(item.Id), item])),
+        colaboradorId,
+        setorId
+    });
+}
+
 async function listEscalaDiaByDate(poolOrTx, dataISO, options = {}) {
     const normalized = normalizeIsoDate(dataISO, 'Data');
     await ensureEscalaDiaForPeriod(poolOrTx, normalized, normalized, {
         setorId: options.setorId || null
     });
-    const rows = await listEscalaDiaRows(poolOrTx, normalized, normalized, {
+    const rows = await listarComCoberturas(poolOrTx, normalized, normalized, {
         setorId: options.setorId || null
     });
 
@@ -1798,11 +1824,14 @@ async function listEscalaReport(poolOrTx, filters) {
         colaboradorId: filters.colaboradorId || null
     });
 
-    const rows = await listEscalaDiaRows(poolOrTx, dataInicio, dataFim, {
+    // O filtro de tipo vem DEPOIS das coberturas: a linha de cobertura nasce
+    // na leitura, e so com todas as linhas do dia da para saber se o
+    // substituto ja tinha uma (filtrar antes criaria linha repetida).
+    const tipo = filters.tipo ? normalizeEscalaTipo(filters.tipo) : null;
+    const rows = (await listarComCoberturas(poolOrTx, dataInicio, dataFim, {
         colaboradorId: filters.colaboradorId || null,
-        setorId: filters.setorId || null,
-        tipo: filters.tipo || null
-    });
+        setorId: filters.setorId || null
+    })).filter((row) => !tipo || row.tipo === tipo);
     const colaboradores = await listColaboradores(poolOrTx, {
         colaboradorId: filters.colaboradorId || null
     });
@@ -1834,7 +1863,8 @@ async function listEscalaReport(poolOrTx, filters) {
             jornadaSemanalIndex.get(Number(row.colaboradorId)) || null
         ),
         tipo: row.tipo,
-        observacao: row.observacao || null
+        observacao: row.observacao || null,
+        coberturas: row.coberturas
     }));
 }
 

@@ -4,7 +4,7 @@ import { normalizeRuntimeEscalaTipo } from '../../core/runtime/normalizacao.js';
 import { recarregarDiaAbertoEscala } from './acoes-do-dia.js';
 import { abrirEditorNaEscala } from '../escala-dia-editor.js';
 import { ehTipoSemTrabalho, formatMinutesToTimeEscala, formatTimeInputEscala, getTimeMinutesEscala, TIPO_LABELS } from '../escala-dia-shared.js';
-import { getDefaultLunchRangeEscala, getIntervalOverlapMinutesEscala, getPartialAbsenceEscala, isSameLunchAsCadastroEscala } from './calculo-horas.js';
+import { getCoberturasEscala, getDefaultLunchRangeEscala, getIntervalOverlapMinutesEscala, getPartialAbsenceEscala, isSameLunchAsCadastroEscala } from './calculo-horas.js';
 import { getCurrentScaleState, SLOT_MINUTES } from './estado-e-layout.js';
 import { renderScaleRowsEscala } from './linhas-timeline.js';
 
@@ -44,7 +44,14 @@ export function getCellStateEscala(record, slot) {
     const workOverlap = getIntervalOverlapMinutesEscala(currentHourStart, currentHourEnd, start, end);
 
     if (start === null || end === null || end <= start || workOverlap <= 0) {
-        return { className: 'fora-expediente', status: 'Fora do expediente' };
+        // Fora do proprio expediente, mas cobrindo outra pessoa: conta como
+        // trabalhando (entra na linha TRABALHANDO e no total).
+        const cobrindo = getCoberturasEscala(record)
+            .some((item) => getIntervalOverlapMinutesEscala(currentHourStart, currentHourEnd, item.start, item.end) > 0);
+
+        return cobrindo
+            ? { className: 'trabalhando', status: 'Cobertura' }
+            : { className: 'fora-expediente', status: 'Fora do expediente' };
     }
 
     if (absenceStart !== null && absenceEnd !== null && absenceEnd > absenceStart) {

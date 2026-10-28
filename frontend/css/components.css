@@ -574,3 +574,76 @@ select.form-control option:hover {
 .badge.danger  { background: var(--danger-soft);  color: var(--danger); }
 .badge.neutral { background: var(--bg-soft); color: var(--text-light); border: 1px solid var(--border); }
 
+
+/* ================= SELETOR COM BUSCA (core/select-com-busca.js) ================= */
+/* O <select> original continua no DOM (valor, opcoes, change) e focavel, so
+   escondido da vista; quem aparece e a caixa de busca com a lista. */
+.select-busca {
+  position: relative;
+  min-width: 0;
+}
+
+.select-busca-original {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0 0 0 0) !important;
+  border: 0 !important;
+}
+
+.select-busca-campo {
+  width: 100%;
+  min-width: 0;
+}
+
+.select-busca-lista {
+  position: absolute;
+  z-index: var(--z-dropdown, 1100);
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  max-height: 260px;
+  margin: 0;
+  padding: 4px;
+  overflow-y: auto;
+  list-style: none;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+}
+
+.select-busca-lista[hidden] {
+  display: none;
+}
+
+.select-busca-lista li {
+  padding: 7px 10px;
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.select-busca-lista li.is-destaque,
+.select-busca-lista li:hover {
+  background: var(--accent-soft, var(--bg-soft));
+}
+
+.select-busca-lista li.is-selecionada {
+  font-weight: var(--font-weight-semibold);
+}
+
+.select-busca-lista li.is-desabilitada {
+  color: var(--text-light);
+  cursor: not-allowed;
+  background: transparent;
+}
+
+.select-busca-lista .select-busca-vazio {
+  color: var(--text-light);
+  cursor: default;
+}

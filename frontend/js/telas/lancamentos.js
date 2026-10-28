@@ -1008,15 +1008,23 @@ async function salvarLancamento() {
     }
 
     try {
+        let resposta = null;
+
         if (ehFeriado) {
             await salvarFeriadoDoFormulario(dataInicio);
         } else {
             // salvarAusencia vem de core/runtime/ e ja monta o payload de
             // banco de horas a partir dos campos do formulario.
-            await salvarAusencia(tipo, dataInicio, dataFim);
+            resposta = await salvarAusencia(tipo, dataInicio, dataFim);
         }
 
-        toast('Salvo com sucesso!', 'success');
+        // Quem saiu estava cobrindo plantonista: os horarios voltaram a
+        // pendente e alguem precisa assumir (a mensagem do servidor diz quais).
+        if (resposta?.coberturasAfetadas?.length) {
+            toast(resposta.message, 'warning');
+        } else {
+            toast('Salvo com sucesso!', 'success');
+        }
         setEdicao(null);
 
         // atualizarTudo (core/runtime/) recarrega os dados e ja

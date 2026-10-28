@@ -380,6 +380,14 @@
 }
 
 .folha-assinatura .folha-datas,
+/* Plantonista em jornada habitual: aparece, mas nao assina. */
+.folha-assinatura .folha-jornada {
+    margin: 18px 0 0;
+    font-size: 13px;
+    font-style: italic;
+    color: var(--text-light);
+}
+
 .folha-assinatura .folha-assinaturas {
     margin: 0;
     padding: 0;

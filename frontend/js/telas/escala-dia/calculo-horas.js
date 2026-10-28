@@ -63,6 +63,18 @@ export function getPartialAbsenceEscala(colaboradorId, dataISO) {
     }) || null;
 }
 
+// Trechos de cobertura de dia util que a pessoa assume alem da propria linha
+// (o "segundo turno"; ver backend/services/cobertura-na-escala.js), em minutos.
+export function getCoberturasEscala(record) {
+    return (Array.isArray(record?.coberturas) ? record.coberturas : [])
+        .map((item) => ({
+            ...item,
+            start: getTimeMinutesEscala(item.horaInicio),
+            end: getTimeMinutesEscala(item.horaFim)
+        }))
+        .filter((item) => item.start !== null && item.end !== null && item.end > item.start);
+}
+
 export function getIntervalOverlapMinutesEscala(start, end, targetStart, targetEnd) {
     if (![start, end, targetStart, targetEnd].every(Number.isFinite) || end <= start || targetEnd <= targetStart) {
         return 0;
@@ -114,6 +126,13 @@ export function hasCellClassEscala(className, expectedClass) {
 }
 
 export function calculateWorkedMinutesEscala(record) {
+    const coberturaMinutes = getCoberturasEscala(record)
+        .reduce((sum, item) => sum + (item.end - item.start), 0);
+
+    return calculateOwnShiftMinutesEscala(record) + coberturaMinutes;
+}
+
+function calculateOwnShiftMinutesEscala(record) {
     const start = getTimeMinutesEscala(record.horaInicio);
     const end = getTimeMinutesEscala(record.horaFim);
 
