@@ -15,7 +15,13 @@
 const { AppError } = require('../lib/errors');
 const { PLANTAO_TIPOS_CREDITO } = require('../lib/dominio');
 const { isFeriadoNacional } = require('./feriados-nacionais');
-const { normalizeEnum, normalizeIsoDate, normalizeTime } = require('../lib/validation');
+const {
+    ensurePositiveInt,
+    normalizeEnum,
+    normalizeIsoDate,
+    normalizeOptionalText,
+    normalizeTime
+} = require('../lib/validation');
 
 function minutosDoHorario(hora) {
     const [h, m] = String(hora).split(':').map(Number);
@@ -248,14 +254,20 @@ function validarTrechosDaCobertura({ titularId, dataInicio, dataFim, trechos, fe
             throw new AppError(400, `O ${rotulo}: escolha se as horas vao para o banco de horas ou para hora extra.`);
         }
 
+        // id presente = trecho ja gravado sendo editado; sem id = trecho novo.
+        const id = bruto.id === undefined || bruto.id === null || bruto.id === ''
+            ? null
+            : ensurePositiveInt(bruto.id, `Id do ${rotulo}`);
+
         return {
-            ...(bruto.id !== undefined && bruto.id !== null ? { id: bruto.id } : {}),
+            ...(id === null ? {} : { id }),
             dataISO,
             tipoDia: tipoDoDia(dataISO, feriados),
             horaInicio,
             horaFim,
             substitutoId,
-            tipoCredito
+            tipoCredito,
+            observacao: normalizeOptionalText(bruto.observacao, `Observacao do ${rotulo}`, { maxLength: 500 })
         };
     });
 

@@ -21,6 +21,8 @@ const TABELAS_FILHAS = Object.freeze([
     ['ColaboradorJornadaSemanal', 'ColaboradorId'],
     ['AlmocosPersonalizados', 'ColaboradorId'],
     ['FolgasDomingo', 'ColaboradorId'],
+    // Os trechos da cobertura saem junto (ON DELETE CASCADE).
+    ['Coberturas', 'TitularId'],
     ['Ausencias', 'ColaboradorId']
 ]);
 
@@ -63,6 +65,13 @@ async function excluirColaboradorDefinitivamente(tx, colaboradorId, options = {}
         .request()
         .input('id', sql.Int, colaboradorId)
         .query('UPDATE FolgasDomingo SET CobertoPorColaboradorId = NULL WHERE CobertoPorColaboradorId = @id');
+
+    // Trecho que este colaborador cobriu na cobertura de OUTRA pessoa volta a
+    // ficar sem substituto: a cobertura do titular continua existindo.
+    await tx
+        .request()
+        .input('id', sql.Int, colaboradorId)
+        .query('UPDATE CoberturaTrechos SET SubstitutoId = NULL, TipoCredito = NULL WHERE SubstitutoId = @id');
 
     for (const [tabela, coluna] of TABELAS_FILHAS) {
         await tx.request().input('id', sql.Int, colaboradorId).query(`DELETE FROM dbo.[${tabela}] WHERE [${coluna}] = @id`);

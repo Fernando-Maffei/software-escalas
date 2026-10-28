@@ -189,6 +189,38 @@ const TABELAS_BACKUP = Object.freeze([
         ]
     },
     {
+        // AusenciaId sem FK de proposito (ver a migration): pode apontar para
+        // uma ausencia que ja foi apagada, e a restauracao aceita assim.
+        tabela: 'Coberturas',
+        identidade: 'Id',
+        colunas: [
+            col('Id', TIPO.ID, { apelidos: ['id'] }),
+            col('TitularId', TIPO.ID, { obrigatorio: true, apelidos: ['titularId'] }),
+            col('DataInicio', TIPO.DATA, { obrigatorio: true, apelidos: ['dataInicio'] }),
+            col('DataFim', TIPO.DATA, { obrigatorio: true, apelidos: ['dataFim'] }),
+            col('AusenciaId', TIPO.ID, { apelidos: ['ausenciaId'] }),
+            col('Observacao', TIPO.TEXTO, { max: 500, apelidos: ['observacao'] }),
+            col('CriadoEm', TIPO.DATA_HORA, { apelidos: ['criadoEm'] }),
+            col('AtualizadoEm', TIPO.DATA_HORA, { apelidos: ['atualizadoEm'] })
+        ]
+    },
+    {
+        tabela: 'CoberturaTrechos',
+        identidade: 'Id',
+        colunas: [
+            col('Id', TIPO.ID, { apelidos: ['id'] }),
+            col('CoberturaId', TIPO.ID, { obrigatorio: true, apelidos: ['coberturaId'] }),
+            col('Data', TIPO.DATA, { obrigatorio: true, apelidos: ['data', 'dataISO'] }),
+            col('HoraInicio', TIPO.HORA, { obrigatorio: true, apelidos: ['horaInicio'] }),
+            col('HoraFim', TIPO.HORA, { obrigatorio: true, apelidos: ['horaFim'] }),
+            col('SubstitutoId', TIPO.ID, { apelidos: ['substitutoId'] }),
+            col('TipoCredito', TIPO.TEXTO, { max: 20, apelidos: ['tipoCredito'], enumeracao: PLANTAO_CREDITOS }),
+            col('Observacao', TIPO.TEXTO, { max: 500, apelidos: ['observacao'] }),
+            col('CriadoEm', TIPO.DATA_HORA, { apelidos: ['criadoEm'] }),
+            col('AtualizadoEm', TIPO.DATA_HORA, { apelidos: ['atualizadoEm'] })
+        ]
+    },
+    {
         tabela: 'plantoes',
         identidade: 'id',
         legado: ['plantoes', 'Plantoes'],

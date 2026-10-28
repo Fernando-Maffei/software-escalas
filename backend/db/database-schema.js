@@ -10,6 +10,8 @@ const REQUIRED_TABLES = Object.freeze([
     'TiposEscala',
     'TipoEscalaDia',
     'FolgasDomingo',
+    'Coberturas',
+    'CoberturaTrechos',
     'Setores',
     'Ausencias',
     'Feriados',
@@ -44,7 +46,8 @@ const SCHEMA_SCRIPT_PATHS = Object.freeze([
     path.join(__dirname, '..', '..', 'database', 'migrations', '2026-09-28-plantao-colaborador.sql'),
     path.join(__dirname, '..', '..', 'database', 'migrations', '2026-09-30-plantonista-colaborador.sql'),
     path.join(__dirname, '..', '..', 'database', 'migrations', '2026-10-21-plantao-tipo-lancamento.sql'),
-    path.join(__dirname, '..', '..', 'database', 'migrations', '2026-10-26-colaborador-nome-completo.sql')
+    path.join(__dirname, '..', '..', 'database', 'migrations', '2026-10-26-colaborador-nome-completo.sql'),
+    path.join(__dirname, '..', '..', 'database', 'migrations', '2026-10-28-coberturas.sql')
 ]);
 
 const EXAMPLE_SEED_SCRIPT_PATH = path.join(__dirname, '..', '..', 'database', 'seeds', 'dados-exemplo.sql');

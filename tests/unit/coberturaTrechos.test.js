@@ -182,6 +182,27 @@ module.exports = [
         }
     },
     {
+        name: 'cobertura: validacao guarda id numerico e observacao do trecho',
+        run() {
+            const [editado, novo] = validarTrechosDaCobertura({
+                ...cobertura,
+                trechos: [
+                    { id: '12', ...trecho('2026-11-03', '11:00', '16:00'), observacao: '  troca combinada  ' },
+                    trecho('2026-11-03', '16:00', '22:00')
+                ]
+            });
+
+            assert.equal(editado.id, 12);
+            assert.equal(editado.observacao, 'troca combinada');
+            assert.equal('id' in novo, false);
+            assert.equal(novo.observacao, null);
+            assert.throws(
+                () => validarTrechosDaCobertura({ ...cobertura, trechos: [{ id: 'x', ...trecho('2026-11-03', '11:00', '22:00') }] }),
+                /Id do trecho 1 invalido/
+            );
+        }
+    },
+    {
         name: 'cobertura: titular nao cobre a si mesmo',
         run() {
             assert.throws(
