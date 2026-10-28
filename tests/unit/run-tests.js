@@ -7,6 +7,8 @@ const suites = [
     ...require('./tiposEscala.test.js'),
     ...require('./folgasDomingo.test.js'),
     ...require('./folgasDomingoConflitos.test.js'),
+    ...require('./coberturaTrechos.test.js'),
+    ...require('./coberturaConflitos.test.js'),
     ...require('./plantonista.test.js'),
     ...require('./pendenciasPlantao.test.js'),
     ...require('./rodizioDomingos.test.js'),
