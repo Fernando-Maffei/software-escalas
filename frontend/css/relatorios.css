@@ -380,6 +380,12 @@
 }
 
 .folha-assinatura .folha-datas,
+.folha-assinatura .folha-assinaturas {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
 /* Plantonista em jornada habitual: aparece, mas nao assina. */
 .folha-assinatura .folha-jornada {
     margin: 18px 0 0;
@@ -388,16 +394,15 @@
     color: var(--text-light);
 }
 
-.folha-assinatura .folha-assinaturas {
-    margin: 0;
-    padding: 0;
-    list-style: none;
-}
-
+/* A data em negrito, os nomes em peso normal: a data e o que o olho procura. */
 .folha-assinatura .folha-datas li {
     font-size: 12pt;
-    font-weight: 700;
+    font-weight: 400;
     line-height: 25pt;
+}
+
+.folha-assinatura .folha-data {
+    font-weight: 700;
 }
 
 .folha-assinatura .folha-local {
