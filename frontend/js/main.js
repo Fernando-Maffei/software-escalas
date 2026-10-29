@@ -40,7 +40,7 @@ import './telas/escala-dia/celulas-e-almoco.js';
 import './telas/escala-dia/cabecalho-e-cobertura.js';
 import './telas/escala-dia/mensagens-e-semana.js';
 import './telas/escala-dia/linhas-timeline.js';
-import './telas/escala-dia/editor-lateral.js';
+import './telas/escala-dia/editor-ajustes.js';
 import './telas/escala-dia/acoes-do-dia.js';
 import './telas/escala-dia-editor.js';
 import './telas/escala-relatorio/quadro-mensal.js';

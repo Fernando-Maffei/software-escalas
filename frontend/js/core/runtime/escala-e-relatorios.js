@@ -5,7 +5,7 @@ import { renderDashboard } from '../../telas/dashboard/render.js';
 import { abrirEditorNaEscala } from '../../telas/escala-dia-editor.js';
 import { buildEscalaMonthOptions, formatDatePtBrEscala, formatDurationEscala, formatTimeRangeEscala, getMonthBoundsEscala, getTimeMinutesEscala, RELATORIO_ESCALA_MODOS, toISODateEscala } from '../../telas/escala-dia-shared.js';
 import { atualizarAcoesCabecalhoEscala, obterDataSelecionadaEscala } from '../../telas/escala-dia/acoes-do-dia.js';
-import { carregarEscalaDiaEscala } from '../../telas/escala-dia/editor-lateral.js';
+import { carregarEscalaDiaEscala } from '../../telas/escala-dia/editor-ajustes.js';
 import { gerarRelatorioEscala } from '../../telas/escala-relatorio.js';
 import { buildColaboradorOptionsEscala, buildSetorOptionsRelatorioEscala, buildTipoOptionsEscala } from '../../telas/escala-relatorio/filtros.js';
 import { toggleEscalaReportModeFilters } from '../../telas/escala-relatorio/quadro-mensal.js';

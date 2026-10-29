@@ -3,7 +3,7 @@ import { API } from '../api.js';
 import { appContent } from '../app.js';
 import { estado } from '../estado.js';
 import { carregarSetores } from '../runtime/dados-e-modais.js';
-import { abrirDesligadosColaboradores, abrirEditorColaborador } from '../runtime/plantao-colaboradores/colaboradores-e-jornada.js';
+import { abrirDesligadosColaboradores, abrirEditorColaborador, colaboradorEditorTemAlteracoes } from '../runtime/plantao-colaboradores/colaboradores-e-jornada.js';
 import { renderListaColaboradores } from '../runtime/plantao-colaboradores/plantao-editor.js';
 import { mostrarToast } from './horas-e-resumo.js';
 import { atributosAcao } from '../../lib/atributos-acao.js';
@@ -41,22 +41,31 @@ export function renderColaboradores() {
                 <div id="listaColaboradores" class="colaboradores-grid"></div>
             </div>
 
-            <!-- PAINEL LATERAL DE EDIÇÃO (sempre visível quando aberto) -->
-            <div id="colaboradorEditor" class="editor-sidebar" style="display: none;">
-                <div class="editor-content" style="opacity: 1; visibility: visible;">
-                    <div class="editor-header">
-                        <h3><i class="fas fa-user-edit"></i> <span id="editorTitle">Novo Colaborador</span></h3>
-                        <button ${atributosAcao('fecharColaboradorEditor')} class="btn-close-editor">
-                            <i class="fas fa-times"></i>
-                        </button>
-                    </div>
-                    <div id="colaboradorEditorContent" class="editor-form"></div>
+        </div>
+
+        <!-- Janela do cadastro, no mesmo molde da janela do dia de plantao:
+             a lista fica com a largura toda e o editor abre por cima. -->
+        <div id="colaboradorEditor" class="colaborador-modal" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="editorTitle">
+            <div class="colaborador-modal-caixa">
+                <div class="editor-header">
+                    <h3><i class="fas fa-user-edit"></i> <span id="editorTitle">Novo Colaborador</span></h3>
+                    <button ${atributosAcao('fecharColaboradorEditor')} class="btn-close-editor" aria-label="Fechar" title="Fechar (Esc)">
+                        <i class="fas fa-times"></i>
+                    </button>
                 </div>
+                <div id="colaboradorEditorContent" class="editor-form"></div>
             </div>
         </div>
     `;
 
     renderListaColaboradores();
+
+    // Clique no fundo escurecido fecha como o X (com o aviso de alteracoes).
+    document.getElementById('colaboradorEditor')?.addEventListener('mousedown', (event) => {
+        if (event.target === event.currentTarget) {
+            fecharColaboradorEditor();
+        }
+    });
 
     // Evento do botão novo colaborador
     document.getElementById('btnNovoColaborador').addEventListener('click', function() {
@@ -129,12 +138,38 @@ function ajustarOffsetCabecalhoColaboradores() {
     }
 }
 
+// X, Cancelar, Esc e clique fora: fecham a janela, mas perguntam antes se
+// houver alteracao ainda nao salva.
 export function fecharColaboradorEditor() {
+    if (colaboradorEditorTemAlteracoes()
+        && !window.confirm('Ha alteracoes neste colaborador que ainda nao foram salvas. Fechar e descartar?')) {
+        return;
+    }
+
+    esconderColaboradorEditor();
+}
+
+// Fecha sem perguntar: depois de salvar ou de desligar.
+export function esconderColaboradorEditor() {
     const editorPanel = document.getElementById('colaboradorEditor');
     if (editorPanel) {
         editorPanel.style.display = 'none';
     }
 }
+
+function colaboradorEditorAberto() {
+    const editorPanel = document.getElementById('colaboradorEditor');
+    return Boolean(editorPanel && editorPanel.style.display !== 'none');
+}
+
+// Um ouvinte so para o modulo: a janela e recriada a cada entrada na tela.
+// Com a janela de desligar aberta por cima, o Esc e dela.
+document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && colaboradorEditorAberto() && !document.getElementById('modalColabGeral')) {
+        event.preventDefault();
+        fecharColaboradorEditor();
+    }
+});
 
 function filtrarColaboradores(termo) {
     if (!termo) {

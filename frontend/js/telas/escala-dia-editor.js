@@ -6,49 +6,36 @@ import { escapeHtml } from '../lib/html-seguro.js';
 import { toISODateEscala } from './escala-dia-shared.js';
 import { abrirLancamentoPessoalEscala, abrirPlantaoDaEscala, atualizarAcoesCabecalhoEscala, carregarEscalaSelecionadaEscala, obterDataSelecionadaEscala, recarregarDiaAbertoEscala, reporDomingoDaEscala, restaurarAlmocosCadastroDiaEscala, shiftIsoDateEscala } from './escala-dia/acoes-do-dia.js';
 import { bindScrollHeightAutoEscala, renderScaleHeaderEscala } from './escala-dia/cabecalho-e-cobertura.js';
-import { renderScaleEditorEscala } from './escala-dia/editor-lateral.js';
+import { ajustesEscalaTemAlteracoes, esconderAjustesEscala, renderScaleEditorEscala } from './escala-dia/editor-ajustes.js';
 import { aplicarDensidadeEscala, getCurrentScaleState, getScaleSortModeEscala, lerDensidadeEscalaSalva, setScaleSortModeEscala } from './escala-dia/estado-e-layout.js';
 import { getScaleSectorSelectionEscala, renderScaleSectorTabsEscala } from './escala-dia/filtros-setor.js';
 import { renderScaleRowsEscala } from './escala-dia/linhas-timeline.js';
 import { renderScaleEmptyMessageEscala } from './escala-dia/mensagens-e-semana.js';
 
-function ensureScaleSidebarToggleEscala() {
-    const sidebar = document.getElementById('sidebarEditor');
-    const toggle = document.getElementById('toggleEditor');
-    const icon = document.getElementById('toggleIcon');
-
-    if (!sidebar || !toggle || toggle.dataset.bound === 'true') {
+// X, Cancelar, Esc e clique fora: fecham a janela de ajustes, mas perguntam
+// antes se algum campo foi mexido e nao salvo.
+export function fecharEditor() {
+    if (ajustesEscalaTemAlteracoes()
+        && !window.confirm('Ha alteracoes neste dia que ainda nao foram salvas. Fechar e descartar?')) {
         return;
     }
 
-    toggle.dataset.bound = 'true';
-    toggle.addEventListener('click', () => {
-        sidebar.classList.toggle('collapsed');
-        if (icon) {
-            icon.className = sidebar.classList.contains('collapsed')
-                ? 'fas fa-chevron-left'
-                : 'fas fa-chevron-right';
-        }
-    });
-}
-
-export function fecharEditor() {
-    const content = document.getElementById('editorContent');
-
+    esconderAjustesEscala();
     estado.escalaEditorColaboradorId = null;
     renderScaleRowsEscala(getCurrentScaleState());
-
-    if (!content) {
-        return;
-    }
-
-    content.innerHTML = `
-            <div class="editor-empty">
-                <i class="fas fa-arrow-left"></i>
-                <p>Clique no nome de um colaborador para editar o dia ou aplicar almoco por periodo.</p>
-            </div>
-        `;
 }
+
+function ajustesEscalaAberto() {
+    return Boolean(estado.escalaEditorColaboradorId && document.getElementById('escalaAjustesModal')?.hidden === false);
+}
+
+// Um ouvinte so para o modulo: a tela (e a janela) e recriada a cada entrada.
+document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && ajustesEscalaAberto()) {
+        event.preventDefault();
+        fecharEditor();
+    }
+});
 
 export function abrirEditorNaEscala(colaboradorId) {
     const state = getCurrentScaleState();
@@ -64,27 +51,12 @@ export function abrirEditorNaEscala(colaboradorId) {
     renderScaleEditorEscala(record);
 }
 
-function bindScaleOutsideSelectionEscala() {
-    const escalaPage = document.querySelector('.escala-page');
-
-    if (!escalaPage || escalaPage.dataset.selectionBound === 'true') {
-        return;
-    }
-
-    escalaPage.dataset.selectionBound = 'true';
-    escalaPage.addEventListener('click', (event) => {
-        if (!estado.escalaEditorColaboradorId) {
-            return;
+// Clique no fundo escurecido fecha como o X (com o aviso de alteracoes).
+function bindAjustesEscalaFundo() {
+    document.getElementById('escalaAjustesModal')?.addEventListener('mousedown', (event) => {
+        if (event.target === event.currentTarget) {
+            fecharEditor();
         }
-
-        const clickedInsideTimeline = event.target.closest('.timeline-container');
-        const clickedInsideSidebar = event.target.closest('#sidebarEditor');
-
-        if (clickedInsideTimeline || clickedInsideSidebar) {
-            return;
-        }
-
-        fecharEditor();
     });
 }
 
@@ -276,27 +248,23 @@ export async function renderEscalaDia() {
                         </div>
                     </div>
 
-                    <div id="sidebarEditor" class="editor-sidebar collapsed">
-                        <div class="editor-toggle" id="toggleEditor">
-                            <i class="fas fa-chevron-left" id="toggleIcon"></i>
-                        </div>
-                        <div class="editor-content">
-                            <h3><i class="fas fa-clock"></i> Ajustes da escala</h3>
-                            <div id="editorContent" class="editor-form">
-                                <div class="editor-empty">
-                                    <i class="fas fa-arrow-left"></i>
-                                    <p>Clique no nome de um colaborador para editar o dia ou aplicar almoco por periodo.</p>
-                                </div>
-                            </div>
-                        </div>
+                </div>
+
+                <!-- Ajustes do dia de um colaborador: abre por cima da grade ao
+                     clicar no nome, no mesmo molde da janela do dia de plantao. -->
+                <div id="escalaAjustesModal" class="escala-ajustes-modal" hidden role="dialog" aria-modal="true" aria-labelledby="escalaAjustesTitulo">
+                    <div class="escala-ajustes-caixa">
+                        <div id="editorContent" class="editor-form"></div>
                     </div>
                 </div>
 
             </div>
         `;
 
-    ensureScaleSidebarToggleEscala();
-    bindScaleOutsideSelectionEscala();
+    // Tela nova, janela fechada: sem isto, um "Atualizar tudo" depois de
+    // sair com a janela aberta a reabria sozinha.
+    estado.escalaEditorColaboradorId = null;
+    bindAjustesEscalaFundo();
     atualizarAcoesCabecalhoEscala();
     bindScrollHeightAutoEscala();
 

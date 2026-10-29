@@ -1,6 +1,6 @@
 import { escapeHtml } from '../../../lib/html-seguro.js';
 import { API } from '../../api.js';
-import { fecharColaboradorEditor, solicitarSenhaModal } from '../../app/colaboradores.js';
+import { esconderColaboradorEditor, solicitarSenhaModal } from '../../app/colaboradores.js';
 import { formatarHora, mostrarToast } from '../../app/horas-e-resumo.js';
 import { estado } from '../../estado.js';
 import { carregarColaboradores, carregarSetores } from '../dados-e-modais.js';
@@ -407,6 +407,31 @@ async function hydrateJornadaSemanalEditor(colaboradorId) {
     }
 }
 
+// Alteracao nao salva: algo digitado ou escolhido na janela, ou a jornada
+// semanal mexida pelos botoes dela. So eventos do usuario contam: os valores
+// que o proprio editor preenche ao abrir nao disparam input/change.
+let colaboradorEditorAlterado = false;
+
+function ligarAlteracoesColaboradorEditor(editorPanel) {
+    if (editorPanel.dataset.ligado === 'sim') {
+        return;
+    }
+
+    editorPanel.dataset.ligado = 'sim';
+    const marcar = (event) => {
+        if (event.isTrusted) {
+            colaboradorEditorAlterado = true;
+        }
+    };
+
+    editorPanel.addEventListener('input', marcar);
+    editorPanel.addEventListener('change', marcar);
+}
+
+export function colaboradorEditorTemAlteracoes() {
+    return colaboradorEditorAlterado || Boolean(getJornadaSemanalEditorMeta().touched);
+}
+
 export async function abrirEditorColaboradores(id) {
     if (
         !Array.isArray(estado.setores) || estado.setores.length === 0
@@ -424,6 +449,8 @@ export async function abrirEditorColaboradores(id) {
     }
 
     editorPanel.style.display = 'block';
+    colaboradorEditorAlterado = false;
+    ligarAlteracoesColaboradorEditor(editorPanel);
     editorTitle.innerText = colaborador ? 'Editar Colaborador' : 'Novo Colaborador';
 
     const jornadaMeta = getJornadaSemanalEditorMeta();
@@ -480,23 +507,22 @@ export async function abrirEditorColaboradores(id) {
 
                 ${buildJornadaSemanalEditorMarkup(buildJornadaSemanalDefaultRows(), { showSuggestion: false })}
 
+                <!-- Rodape grudado na borda de baixo da janela. Desligar fica a
+                     esquerda, longe do Salvar. -->
                 <div class="editor-actions">
-                    <button ${atributosAcao('salvarColaboradorEditor', colaborador ? colaborador.Id : null)} class="btn-primary">
-                        <i class="fas fa-save"></i> ${colaborador ? 'Atualizar' : 'Salvar'}
-                    </button>
+                    ${colaborador ? `
+                        <button ${atributosAcao('abrirDesligarColaborador', colaborador.Id, String(colaborador.Nome || ''))} class="btn-danger" title="O historico e preservado. A exclusao definitiva so acontece depois, na tela de desligados.">
+                            <i class="fas fa-user-slash"></i> Desligar colaborador
+                        </button>
+                    ` : ''}
+                    <span class="editor-actions-espaco"></span>
                     <button ${atributosAcao('fecharColaboradorEditor')} class="btn-secondary">
                         <i class="fas fa-times"></i> Cancelar
                     </button>
+                    <button ${atributosAcao('salvarColaboradorEditor', colaborador ? colaborador.Id : null)} class="btn-primary">
+                        <i class="fas fa-save"></i> ${colaborador ? 'Atualizar' : 'Salvar'}
+                    </button>
                 </div>
-
-                ${colaborador ? `
-                    <div class="editor-footer">
-                        <button ${atributosAcao('abrirDesligarColaborador', colaborador.Id, String(colaborador.Nome || ''))} class="btn-danger" style="width: 100%;">
-                            <i class="fas fa-user-slash"></i> Desligar colaborador
-                        </button>
-                        <small class="helper-text">O historico e preservado. A exclusao definitiva so acontece depois, na tela de desligados.</small>
-                    </div>
-                ` : ''}
             </div>
         `;
 
@@ -610,7 +636,7 @@ export async function salvarColaboradorEditor(id) {
 
         renderListaColaboradores();
 
-        fecharColaboradorEditor();
+        esconderColaboradorEditor();
 
         mostrarToast(
             id ? 'Colaborador atualizado!' : 'Colaborador salvo com sucesso!',
@@ -676,7 +702,7 @@ export function abrirDesligarColaborador(id, nome) {
         try {
             const resposta = await API.desligarColaborador(id, { dataDesligamento });
             fecharModalColab();
-            fecharColaboradorEditor();
+            esconderColaboradorEditor();
             // Coberturas que ele faria dali em diante voltaram a pendente.
             if (resposta?.coberturasAfetadas?.length) {
                 mostrarToast(resposta.message, 'warning');
