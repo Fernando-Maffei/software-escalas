@@ -165,6 +165,8 @@ function setJornadaSemanalEditorTouched(value = true) {
     meta.touched = Boolean(value);
 }
 
+// Uma linha por dia (dia | jornada | almoco), com os titulos das colunas uma
+// vez so no cabecalho. Dia desmarcado mostra so "Nao trabalha".
 function renderJornadaSemanalRows(rows = []) {
     return rows.map((row) => `
             <div class="jornada-semanal-row${row.checked ? ' is-selected' : ''}" data-jornada-row="${row.diaSemana}">
@@ -173,23 +175,18 @@ function renderJornadaSemanalRows(rows = []) {
                     <span>${escapeHtml(row.label)}</span>
                 </label>
                 <div class="jornada-semanal-times${row.checked ? '' : ' is-hidden'}" data-jornada-times="${row.diaSemana}">
-                    <div class="jornada-time-group">
-                        <small>Jornada</small>
-                        <div class="jornada-time-pair">
-                            <input type="time" data-jornada-entrada="${row.diaSemana}" value="${escapeHtml(row.trabalhoInicio || '')}" class="form-control" title="Entrada">
-                            <span>ate</span>
-                            <input type="time" data-jornada-saida="${row.diaSemana}" value="${escapeHtml(row.trabalhoFim || '')}" class="form-control" title="Saida">
-                        </div>
+                    <div class="jornada-time-pair" data-rotulo="Jornada" role="group" aria-label="Jornada de ${escapeHtml(row.label)}">
+                        <input type="time" data-jornada-entrada="${row.diaSemana}" value="${escapeHtml(row.trabalhoInicio || '')}" class="form-control" title="Entrada">
+                        <span aria-hidden="true">–</span>
+                        <input type="time" data-jornada-saida="${row.diaSemana}" value="${escapeHtml(row.trabalhoFim || '')}" class="form-control" title="Saida">
                     </div>
-                    <div class="jornada-time-group">
-                        <small>Almoco</small>
-                        <div class="jornada-time-pair">
-                            <input type="time" data-jornada-almoco-inicio="${row.diaSemana}" value="${escapeHtml(row.almocoInicio || '')}" class="form-control" title="Almoco inicio">
-                            <span>ate</span>
-                            <input type="time" data-jornada-almoco-fim="${row.diaSemana}" value="${escapeHtml(row.almocoFim || '')}" class="form-control" title="Almoco fim">
-                        </div>
+                    <div class="jornada-time-pair" data-rotulo="Almoco" role="group" aria-label="Almoco de ${escapeHtml(row.label)}">
+                        <input type="time" data-jornada-almoco-inicio="${row.diaSemana}" value="${escapeHtml(row.almocoInicio || '')}" class="form-control" title="Almoco inicio">
+                        <span aria-hidden="true">–</span>
+                        <input type="time" data-jornada-almoco-fim="${row.diaSemana}" value="${escapeHtml(row.almocoFim || '')}" class="form-control" title="Almoco fim">
                     </div>
                 </div>
+                <span class="jornada-semanal-folga">Nao trabalha</span>
             </div>
         `).join('');
 }
@@ -202,15 +199,17 @@ function buildJornadaSemanalEditorMarkup(rows = [], options = {}) {
                 <label><i class="fas fa-calendar-week"></i> Jornada semanal</label>
                 <div id="jornadaSemanalSection" class="jornada-semanal-shell">
                     <div class="jornada-semanal-actions">
-                        <button type="button" class="btn-secondary btn-jornada-action" id="btnJornadaSegSex">
-                            <i class="fas fa-business-time"></i> Selecionar segunda a sexta
+                        <span class="jornada-semanal-actions-rotulo">Marcar:</span>
+                        <button type="button" class="btn-jornada-action" id="btnJornadaSegSex">Seg a sex</button>
+                        <button type="button" class="btn-jornada-action" id="btnJornadaTodos">Todos os dias</button>
+                        <button type="button" class="btn-jornada-action btn-jornada-copiar" id="btnJornadaCopiarPadrao" title="Copia o horario de entrada, saida e almoco de cima para os dias marcados">
+                            <i class="fas fa-copy" aria-hidden="true"></i> Copiar horario padrao
                         </button>
-                        <button type="button" class="btn-secondary btn-jornada-action" id="btnJornadaTodos">
-                            <i class="fas fa-layer-group"></i> Selecionar todos
-                        </button>
-                        <button type="button" class="btn-secondary btn-jornada-action" id="btnJornadaCopiarPadrao">
-                            <i class="fas fa-copy"></i> Copiar horario padrao para dias selecionados
-                        </button>
+                    </div>
+                    <div class="jornada-semanal-cabecalho" aria-hidden="true">
+                        <span>Dia</span>
+                        <span>Jornada</span>
+                        <span>Almoco</span>
                     </div>
                     <div class="jornada-semanal-grid" id="jornadaSemanalGrid">
                         ${renderJornadaSemanalRows(rows)}

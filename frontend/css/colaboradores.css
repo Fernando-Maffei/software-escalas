@@ -423,102 +423,145 @@
     font-weight: 500;
 }
 
+/* Jornada semanal como tabela enxuta: uma linha por dia (dia | jornada |
+   almoco), titulos das colunas uma vez so e nenhum cartao por dia. Dia
+   desmarcado fica numa linha apagada com "Nao trabalha". */
 #colaboradorEditor .jornada-semanal-shell {
     display: grid;
-    gap: 12px;
-    padding: 14px;
-    border-radius: 16px;
-    background: var(--card-dark);
+    border-radius: 12px;
     border: 1px solid var(--border);
+    background: var(--card);
+    overflow: hidden;
 }
 
 #colaboradorEditor .jornada-semanal-actions {
     display: flex;
     flex-wrap: wrap;
-    gap: 8px;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border);
+    background: var(--card-dark);
+}
+
+#colaboradorEditor .jornada-semanal-actions-rotulo {
+    font-size: 12px;
+    color: var(--text-light);
 }
 
 #colaboradorEditor .btn-jornada-action {
+    padding: 4px 10px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-pill, 999px);
+    background: var(--card);
+    color: var(--text);
+    font: inherit;
     font-size: 12px;
-    padding: 8px 10px;
+    font-weight: 600;
+    cursor: pointer;
 }
 
-#colaboradorEditor .jornada-semanal-grid {
+#colaboradorEditor .btn-jornada-action:hover {
+    border-color: var(--primary);
+    color: var(--primary);
+}
+
+#colaboradorEditor .btn-jornada-copiar {
+    margin-left: auto;
+}
+
+#colaboradorEditor .jornada-semanal-cabecalho,
+#colaboradorEditor .jornada-semanal-row {
     display: grid;
-    gap: 8px;
+    grid-template-columns: 112px minmax(0, 1fr) minmax(0, 1fr);
+    align-items: center;
+    gap: 12px;
+    padding: 0 12px;
+}
+
+#colaboradorEditor .jornada-semanal-cabecalho {
+    padding-top: 8px;
+    padding-bottom: 4px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--text-light);
 }
 
 #colaboradorEditor .jornada-semanal-row {
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    background: white;
-    padding: 10px;
-    display: grid;
-    gap: 8px;
+    min-height: 46px;
+    border-top: 1px solid var(--border);
 }
 
-#colaboradorEditor .jornada-semanal-row.is-selected {
-    border-color: rgba(29, 99, 237, 0.35);
-    background: rgba(29, 99, 237, 0.08);
+#colaboradorEditor .jornada-semanal-cabecalho + .jornada-semanal-grid .jornada-semanal-row:first-child {
+    border-top: none;
 }
 
-#colaboradorEditor .jornada-semanal-day-toggle {
+/* "label." para vencer o rotulo em maiusculas de .editor-form-group label. */
+#colaboradorEditor label.jornada-semanal-day-toggle {
     display: inline-flex;
     align-items: center;
     gap: 8px;
+    margin: 0;
     font-size: 13px;
     font-weight: 600;
-    color: var(--text);
-    margin-bottom: 0;
-}
-
-#colaboradorEditor .jornada-semanal-times {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr);
-    gap: 10px;
-}
-
-#colaboradorEditor .jornada-time-group {
-    display: grid;
-    gap: 6px;
-}
-
-#colaboradorEditor .jornada-time-group small {
-    color: var(--text-light);
-    font-size: 10px;
-    font-weight: 800;
     letter-spacing: 0;
-    text-transform: uppercase;
+    text-transform: none;
+    color: var(--text);
+    cursor: pointer;
 }
 
-#colaboradorEditor .jornada-time-pair {
-    display: grid;
-    grid-template-columns: minmax(96px, 1fr) 28px minmax(96px, 1fr);
-    gap: 8px;
-    align-items: center;
-}
-
-#colaboradorEditor .jornada-time-pair input {
-    width: 100%;
-    min-width: 0;
-    height: 38px;
-    padding: 8px 10px;
-    text-align: center;
-}
-
-#colaboradorEditor .jornada-time-pair span {
+#colaboradorEditor .jornada-semanal-row:not(.is-selected) label.jornada-semanal-day-toggle {
     color: var(--text-light);
-    font-size: 12px;
-    font-weight: 700;
-    text-align: center;
+    font-weight: 500;
+}
+
+/* Os dois pares de horario viram as colunas 2 e 3 da propria linha. */
+#colaboradorEditor .jornada-semanal-times {
+    display: contents;
 }
 
 #colaboradorEditor .jornada-semanal-times.is-hidden {
     display: none;
 }
 
+#colaboradorEditor .jornada-time-pair {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+}
+
+#colaboradorEditor .jornada-time-pair input {
+    flex: 1 1 0;
+    width: 100%;
+    min-width: 0;
+    height: 34px;
+    padding: 4px 8px;
+    font-size: 13px;
+    text-align: center;
+}
+
+#colaboradorEditor .jornada-time-pair span {
+    color: var(--text-light);
+    font-size: 12px;
+}
+
+#colaboradorEditor .jornada-semanal-folga {
+    display: none;
+    grid-column: 2 / -1;
+    font-size: 12px;
+    color: var(--text-lighter, var(--text-light));
+}
+
+#colaboradorEditor .jornada-semanal-row:not(.is-selected) .jornada-semanal-folga {
+    display: block;
+}
+
 #colaboradorEditor .jornada-semanal-hint {
     margin: 0;
+    padding: 10px 12px 0;
 }
 
 #colaboradorEditor .jornada-semanal-hint.is-hidden,
@@ -528,6 +571,7 @@
 
 #colaboradorEditor .jornada-semanal-suggestion-actions {
     display: flex;
+    padding: 8px 12px 12px;
 }
 
 #colaboradorEditor .banco-horas-input {
@@ -691,9 +735,6 @@
         align-items: flex-start;
     }
 
-    #colaboradorEditor .jornada-time-pair {
-        grid-template-columns: minmax(86px, 1fr) 28px minmax(86px, 1fr);
-    }
 }
 
 /* No celular a janela ocupa a tela inteira. */
@@ -727,6 +768,34 @@
 
     #colaboradorEditor .editor-actions-espaco {
         display: none;
+    }
+
+    /* Dia numa linha e, embaixo, jornada e almoco com o rotulo na frente. */
+    #colaboradorEditor .jornada-semanal-cabecalho {
+        display: none;
+    }
+
+    #colaboradorEditor .jornada-semanal-row {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 6px;
+        padding: 8px 12px;
+    }
+
+    #colaboradorEditor .jornada-time-pair::before {
+        content: attr(data-rotulo);
+        flex: 0 0 56px;
+        font-size: 11px;
+        font-weight: 700;
+        text-transform: uppercase;
+        color: var(--text-light);
+    }
+
+    #colaboradorEditor .jornada-semanal-folga {
+        grid-column: auto;
+    }
+
+    #colaboradorEditor .btn-jornada-copiar {
+        margin-left: 0;
     }
 }
 
@@ -848,22 +917,20 @@
 }
 
 [data-theme="dark"] #colaboradorEditor .jornada-semanal-shell {
-    background: rgba(12, 20, 32, 0.7);
-    border-color: var(--border);
-}
-
-[data-theme="dark"] #colaboradorEditor .jornada-semanal-row {
     background: var(--card);
     border-color: var(--border);
 }
 
-[data-theme="dark"] #colaboradorEditor .jornada-semanal-row.is-selected {
-    background: rgba(29, 99, 237, 0.2);
-    border-color: rgba(74, 158, 255, 0.4);
+[data-theme="dark"] #colaboradorEditor .jornada-semanal-actions {
+    background: rgba(12, 20, 32, 0.5);
 }
 
-[data-theme="dark"] #colaboradorEditor .jornada-semanal-day-toggle {
+[data-theme="dark"] #colaboradorEditor label.jornada-semanal-day-toggle {
     color: var(--text);
+}
+
+[data-theme="dark"] #colaboradorEditor .jornada-semanal-row:not(.is-selected) label.jornada-semanal-day-toggle {
+    color: var(--text-light);
 }
 
 [data-theme="dark"] #colaboradorEditor .banco-horas-editor-shell {
