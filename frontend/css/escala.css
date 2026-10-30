@@ -290,60 +290,6 @@
     opacity: 0.5;
 }
 
-/* ================= BARRA LATERAL EDITOR ================= */
-.editor-sidebar {
-    width: 400px;
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-xl);
-    box-shadow: var(--shadow-md);
-    position: relative;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    overflow: visible; /* Mudado de hidden para visible */
-}
-
-.editor-sidebar.collapsed {
-    width: 60px;
-    min-width: 60px;
-}
-
-.editor-sidebar.collapsed .editor-content {
-    opacity: 0;
-    visibility: hidden;
-    transform: translateX(20px);
-}
-
-/* Botão de toggle (seta) */
-.editor-toggle {
-    position: absolute;
-    left: -12px;
-    top: 50%;
-    transform: translateY(-50%);
-    width: 28px;
-    height: 48px;
-    /* Abaixo do cabecalho fixo (70) e acima da grade (ate 12). Hoje o
-       contexto de empilhamento ja mantem a alca atras do cabecalho mesmo
-       com o valor antigo (100), entao isto nao muda o que se ve — deixa
-       explicita a ordem pretendida para nao virar bug se o contexto mudar.
-       A colisao visual foi resolvida pela reserva de espaco no cabecalho. */
-    z-index: 60;
-    background: var(--primary);
-    border-radius: var(--radius-md) 0 0 var(--radius-md);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    color: white;
-    box-shadow: var(--shadow-sm);
-    transition: all 0.3s ease;
-    border: 2px solid var(--card);
-}
-
-.editor-toggle:hover {
-    background: var(--primary-dark);
-    width: 32px;
-}
-
 /* Aviso de almoco fora do cadastro, na barra lateral do editor. */
 .editor-aviso-almoco {
     display: flex;
@@ -374,39 +320,6 @@
     font-size: 11px;
     line-height: 1.4;
     color: var(--text-secondary);
-}
-
-.editor-toggle i {
-    font-size: 16px;
-}
-
-.editor-sidebar.collapsed .editor-toggle {
-    left: 0;
-    border-radius: 0 var(--radius-md) var(--radius-md) 0;
-}
-
-.editor-content {
-    height: 100%;
-    padding: 24px;
-    transition: all 0.3s ease;
-    overflow-y: auto;
-    max-height: 600px;
-}
-
-.editor-content h3 {
-    font-size: 18px;
-    font-weight: 700;
-    color: var(--text);
-    margin-bottom: 20px;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding-bottom: 16px;
-    border-bottom: 2px solid var(--border);
-}
-
-.editor-content h3 i {
-    color: var(--primary);
 }
 
 /* Botão de fechar (X) */
@@ -669,49 +582,6 @@
     padding: 10px 12px;
 }
 
-/* Estado vazio */
-.editor-empty {
-    height: 100%;
-    min-height: 400px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    text-align: center;
-    color: var(--text-lighter);
-    background: var(--card-dark);
-    border-radius: 16px;
-    padding: 40px 20px;
-}
-
-.editor-empty i {
-    font-size: 48px;
-    margin-bottom: 16px;
-    color: var(--primary);
-    opacity: 0.5;
-}
-
-.editor-empty p {
-    font-size: 14px;
-    max-width: 200px;
-    line-height: 1.5;
-}
-
-/* Tema escuro */
-[data-theme="dark"] .editor-sidebar {
-    background: var(--card);
-    border-color: var(--border);
-}
-
-[data-theme="dark"] .editor-content h3 {
-    color: var(--text);
-    border-bottom-color: var(--border);
-}
-
-[data-theme="dark"] .editor-content h3 i {
-    color: var(--primary);
-}
-
 [data-theme="dark"] .btn-close-editor {
     background: var(--danger-soft);
     color: var(--danger);
@@ -720,16 +590,6 @@
 [data-theme="dark"] .btn-close-editor:hover {
     background: var(--danger);
     color: white;
-}
-
-[data-theme="dark"] .editor-empty {
-    background: var(--card-dark);
-    color: var(--text-lighter);
-}
-
-[data-theme="dark"] .editor-empty i {
-    color: var(--primary);
-    opacity: 0.5;
 }
 
 [data-theme="dark"] .editor-header {
@@ -1128,18 +988,6 @@
         flex-direction: column;
     }
     
-    .editor-sidebar {
-        width: 100%;
-    }
-    
-    .editor-sidebar.collapsed {
-        width: 60px;
-    }
-    
-    .editor-sidebar.collapsed .editor-toggle {
-        left: 0;
-    }
-    
     .escala-footer {
         grid-template-columns: 1fr;
     }
@@ -1213,31 +1061,6 @@
 
 [data-theme="dark"] .timeline-cell:hover {
     background: var(--primary-soft);
-}
-
-/* Editor sidebar no tema escuro */
-[data-theme="dark"] .editor-sidebar {
-    background: var(--card);
-    border-color: var(--border);
-}
-
-[data-theme="dark"] .editor-content h3 {
-    color: var(--text);
-    border-bottom-color: var(--border);
-}
-
-[data-theme="dark"] .editor-content h3 i {
-    color: var(--primary);
-}
-
-[data-theme="dark"] .editor-empty {
-    background: var(--card-dark);
-    color: var(--text-lighter);
-}
-
-[data-theme="dark"] .editor-empty i {
-    color: var(--primary);
-    opacity: 0.5;
 }
 
 [data-theme="dark"] .editor-header {
@@ -2134,12 +1957,8 @@
     top: 0;
     z-index: 70;
     margin: 0 0 12px;
-    /* Reserva a direita a coluna ocupada pela alca de abrir/fechar o editor
-       (.editor-toggle, ~44px na barra recolhida). Sem isso o botao "Novo
-       lancamento", que fica no fim da faixa, divide a mesma coluna que a
-       alca e os dois colidem dependendo do tamanho da janela e da rolagem.
-       O padding-top (24px) e o respiro do topo, que antes vinha do #appContent. */
-    padding: 24px 52px 10px 0;
+    /* O padding-top (24px) e o respiro do topo, que antes vinha do #appContent. */
+    padding: 24px 0 10px 0;
     background: var(--bg-soft);
     border-bottom: 1px solid rgba(148, 163, 184, 0.14);
     box-shadow: 0 16px 24px -24px rgba(12, 20, 32, 0.45);
@@ -2548,17 +2367,6 @@
     gap: 16px;
     align-items: flex-start;
     position: relative; /* ancora o painel recolhido, que vira overlay */
-}
-
-/* Recolhido, o painel nao deve deixar um vao vazio: some com o gap de 16px.
-   A tabela (coluna 1fr) ocupa tudo, menos a aba fina de 34px do painel — que
-   fica colada na borda direita do card (ver a regra .collapsed abaixo). */
-.escala-page .escala-layout:has(.editor-sidebar.collapsed) {
-    gap: 0;
-    /* Recolhido nao ha painel de conteudo que precise dos 600px de altura
-       minima da .escala-layout; libera-la faz a area encolher ate a tabela, e
-       assim a aba (que estica junto) centraliza na altura do card. */
-    min-height: 0;
 }
 
 .escala-page .escala-scroll {
@@ -3233,60 +3041,6 @@
     background: rgba(12, 20, 32, 0.48);
 }
 
-.escala-page .sidebarEditor,
-.escala-page .editor-sidebar {
-    align-self: flex-start;
-}
-
-.escala-page .editor-sidebar {
-    width: clamp(312px, 22vw, 352px);
-    border: 1px solid rgba(148, 163, 184, 0.18);
-    background:
-        linear-gradient(180deg, rgba(26, 42, 62, 0.96) 0%, rgba(18, 30, 46, 0.98) 100%);
-    box-shadow: 0 22px 50px rgba(8, 13, 20, 0.34);
-}
-
-.escala-page .editor-sidebar.collapsed {
-    width: 34px;
-    min-width: 34px;
-    /* align-self: stretch iguala a altura do painel a da tabela; junto com o
-       display:none do conteudo (abaixo), a aba centraliza verticalmente e cola
-       na borda do card. Sem o display:none, o conteudo escondido ainda ocupava
-       ~600px e empurrava a aba para baixo. */
-    align-self: stretch;
-}
-
-.escala-page .editor-sidebar.collapsed .editor-content {
-    display: none;
-}
-
-/* Recolhido, a alca deixava de ser um "tab colado no painel" e virava um
-   retangulo flutuando no vao de 16px, com a borda esquerda reta encostada em
-   nada — parecia cortado/quebrado. Aqui ela vira um botao-alca auto-contido:
-   centralizado na tira, com todos os cantos arredondados e sombra propria,
-   entao le como um controle intencional de "abrir o painel". */
-.escala-page .editor-sidebar.collapsed .editor-toggle {
-    left: 0;
-    transform: translateY(-50%);
-    width: 34px;
-    height: 46px;
-    border: none;
-    border-radius: 0 12px 12px 0; /* reto a esquerda (colado no card), arredondado a direita */
-    box-shadow: 0 10px 24px rgba(8, 13, 20, 0.28);
-}
-
-.escala-page .editor-content {
-    max-height: 720px;
-    padding: 18px 16px 20px;
-}
-
-.escala-page .editor-content h3 {
-    margin-bottom: 16px;
-    padding-bottom: 14px;
-    font-size: 17px;
-    border-bottom: 1px solid rgba(148, 163, 184, 0.18);
-}
-
 .escala-page .editor-colaborador {
     display: grid;
     gap: 16px;
@@ -3333,7 +3087,7 @@
     color: #8ea3c8;
 }
 
-.escala-page .editor-sidebar .form-control,
+.escala-ajustes-modal .form-control,
 .escala-page .time-inputs input {
     min-height: 48px;
     border: 1px solid rgba(148, 163, 184, 0.2);
@@ -3341,16 +3095,16 @@
     color: #f8fafc;
 }
 
-.escala-page .editor-sidebar textarea.form-control {
+.escala-ajustes-modal textarea.form-control {
     min-height: 104px;
     resize: vertical;
 }
 
-.escala-page .editor-sidebar .form-control::placeholder {
+.escala-ajustes-modal .form-control::placeholder {
     color: #7f8da8;
 }
 
-.escala-page .editor-sidebar .form-control:focus,
+.escala-ajustes-modal .form-control:focus,
 .escala-page .time-inputs input:focus {
     border-color: rgba(74, 158, 255, 0.62);
     box-shadow: 0 0 0 4px rgba(74, 158, 255, 0.14);
@@ -3441,10 +3195,82 @@
     margin-top: 0;
 }
 
-.escala-page .editor-empty {
-    min-height: 320px;
-    border: 1px dashed rgba(148, 163, 184, 0.18);
-    background: rgba(12, 20, 32, 0.42);
+/* ---- Janela de ajustes do dia ----
+   Abre ao clicar no nome do colaborador, no mesmo molde da janela do dia de
+   plantao: fundo escurecido que rola inteiro (sem rolagem aninhada), caixa
+   centralizada e rodape grudado embaixo. Sem padding embaixo no fundo, para
+   o rodape parar na borda da tela. */
+.escala-ajustes-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    padding: 6vh 16px 0;
+    overflow-y: auto;
+    background: rgba(15, 23, 42, 0.55);
+}
+
+.escala-ajustes-modal[hidden] {
+    display: none;
+}
+
+.escala-ajustes-caixa {
+    width: min(560px, 100%);
+    margin: 0 auto 6vh;
+    padding: 24px 24px 0;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-xl);
+    animation: fadeIn 0.2s ease;
+}
+
+.escala-ajustes-rotulo {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 4px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--primary);
+}
+
+.escala-page .escala-ajustes-rodape {
+    position: sticky;
+    bottom: 0;
+    z-index: 1;
+    padding: 14px 0 18px;
+    border-top: 1px solid var(--border);
+    background: var(--card);
+}
+
+.escala-page .escala-ajustes-rodape .btn-primary,
+.escala-page .escala-ajustes-rodape .btn-secondary {
+    min-height: 44px;
+}
+
+/* No celular a janela ocupa a tela inteira. */
+@media (max-width: 720px) {
+    .escala-ajustes-modal {
+        padding: 0;
+    }
+
+    .escala-ajustes-caixa {
+        min-height: 100%;
+        min-height: 100dvh;
+        margin: 0;
+        padding: 16px 16px 0;
+        border: none;
+        border-radius: 0;
+    }
+
+    /* Mais especifico que o ".editor-actions" de uma coluna do bloco de 768px. */
+    .escala-page .editor-actions.escala-ajustes-rodape {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        margin: 0 -16px;
+        padding: 12px 16px;
+    }
 }
 
 @media (max-width: 1500px) {
@@ -3490,26 +3316,6 @@
         flex-direction: column;
     }
 
-    .escala-page .editor-sidebar {
-        width: 100%;
-    }
-
-    .escala-page .editor-sidebar.collapsed {
-        width: 100%;
-        min-width: 100%;
-        max-height: 56px;
-        overflow: hidden;
-    }
-
-    .escala-page .editor-sidebar.collapsed .editor-toggle {
-        left: auto;
-        right: 0;
-        border-radius: 12px 0 0 12px;
-    }
-
-    .escala-page .editor-content {
-        max-height: none;
-    }
 }
 
 @media (max-width: 768px) {
@@ -3754,19 +3560,8 @@
     color: var(--primary-dark);
 }
 
-:root:not([data-theme="dark"]) .escala-page .editor-sidebar {
-    border-color: var(--border);
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.99), rgba(248, 250, 252, 0.98));
-    box-shadow: 0 22px 50px rgba(12, 20, 32, 0.12);
-}
-
-:root:not([data-theme="dark"]) .escala-page .editor-content h3,
 :root:not([data-theme="dark"]) .escala-page .editor-header h4 {
     color: var(--text);
-}
-
-:root:not([data-theme="dark"]) .escala-page .editor-content h3 {
-    border-bottom-color: var(--border);
 }
 
 :root:not([data-theme="dark"]) .escala-page .editor-header {
@@ -3783,20 +3578,19 @@
     color: var(--text-light);
 }
 
-:root:not([data-theme="dark"]) .escala-page .editor-sidebar .form-control,
+:root:not([data-theme="dark"]) .escala-ajustes-modal .form-control,
 :root:not([data-theme="dark"]) .escala-page .time-inputs input {
     background: rgba(255, 255, 255, 0.98);
     color: var(--text);
     border-color: var(--border);
 }
 
-:root:not([data-theme="dark"]) .escala-page .editor-sidebar .form-control::placeholder {
+:root:not([data-theme="dark"]) .escala-ajustes-modal .form-control::placeholder {
     color: var(--text-lighter);
 }
 
 :root:not([data-theme="dark"]) .escala-page .time-inputs,
-:root:not([data-theme="dark"]) .escala-page .editor-period-panel,
-:root:not([data-theme="dark"]) .escala-page .editor-empty {
+:root:not([data-theme="dark"]) .escala-page .editor-period-panel {
     background: rgba(248, 250, 252, 0.92);
     border-color: var(--border);
 }
@@ -3808,7 +3602,7 @@
 
 .escala-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr);
   gap: 16px;
   align-items: start;
   width: 100%;
@@ -3888,39 +3682,6 @@
 .timeline-name-header {
   min-width: 0;
   box-sizing: border-box;
-}
-
-/* Sidebar de edição da escala não deve esmagar a timeline */
-#sidebarEditor {
-  width: 340px;
-  max-width: 340px;
-  transition: width 0.25s ease, opacity 0.25s ease;
-}
-
-#sidebarEditor.collapsed {
-  width: 44px;
-  min-width: 44px;
-}
-
-#sidebarEditor.collapsed .editor-content {
-  display: none;
-}
-
-/* Em telas menores, a sidebar de edição vira painel abaixo */
-@media (max-width: 1100px) {
-  .escala-layout {
-    grid-template-columns: 1fr;
-  }
-
-  #sidebarEditor,
-  #sidebarEditor.collapsed {
-    width: 100%;
-    max-width: 100%;
-  }
-
-  #sidebarEditor.collapsed .editor-content {
-    display: none;
-  }
 }
 
 /* Em notebook ou tela pequena, sidebar principal começa mais compacta */

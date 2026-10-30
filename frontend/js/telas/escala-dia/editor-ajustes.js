@@ -281,12 +281,39 @@ function syncScaleDragEditorEscala(colaboradorId) {
     renderScaleDragTrackEscala(lunchShell, buildScaleDragTrackConfigEscala(colaboradorId, 'lunch'));
 }
 
-export function renderScaleEditorEscala(record) {
-    const sidebar = document.getElementById('sidebarEditor');
-    const content = document.getElementById('editorContent');
-    const toggleIcon = document.getElementById('toggleIcon');
+// Valores dos campos da janela de ajustes logo depois de desenhada: fechar
+// compara com eles para saber se ha algo digitado e nao salvo.
+let ajustesEscalaIniciais = null;
 
-    if (!sidebar || !content) {
+function lerCamposAjustesEscala() {
+    const campos = document.querySelectorAll('#escalaAjustesModal input, #escalaAjustesModal textarea');
+    return JSON.stringify(Array.from(campos, (campo) => [campo.id, campo.value]));
+}
+
+export function ajustesEscalaTemAlteracoes() {
+    return ajustesEscalaIniciais !== null && lerCamposAjustesEscala() !== ajustesEscalaIniciais;
+}
+
+export function esconderAjustesEscala() {
+    const modal = document.getElementById('escalaAjustesModal');
+    const content = document.getElementById('editorContent');
+
+    ajustesEscalaIniciais = null;
+
+    if (modal) {
+        modal.hidden = true;
+    }
+
+    if (content) {
+        content.innerHTML = '';
+    }
+}
+
+export function renderScaleEditorEscala(record) {
+    const modal = document.getElementById('escalaAjustesModal');
+    const content = document.getElementById('editorContent');
+
+    if (!modal || !content) {
         return;
     }
 
@@ -309,19 +336,15 @@ export function renderScaleEditorEscala(record) {
             `
         : '';
 
-    sidebar.classList.remove('collapsed');
-    if (toggleIcon) {
-        toggleIcon.className = 'fas fa-chevron-right';
-    }
-
     content.innerHTML = `
             <div class="editor-colaborador">
                 <div class="editor-header">
                     <div>
-                        <h4>${escapeHtml(record.colaboradorNome || 'Colaborador')}</h4>
+                        <span class="escala-ajustes-rotulo"><i class="fas fa-clock"></i> Ajustes da escala</span>
+                        <h4 id="escalaAjustesTitulo">${escapeHtml(record.colaboradorNome || 'Colaborador')}</h4>
                         <small>${escapeHtml(formatDatePtBrEscala(record.dataISO))} • ${escapeHtml(getDayLabelEscala(record.dataISO))} • ${escapeHtml(TIPO_LABELS[record.tipo] || 'Escala')}</small>
                     </div>
-                    <button ${atributosAcao('fecharEditor')} class="btn-close-editor">
+                    <button ${atributosAcao('fecharEditor')} class="btn-close-editor" aria-label="Fechar" title="Fechar (Esc)">
                         <i class="fas fa-times"></i>
                     </button>
                 </div>
@@ -351,15 +374,6 @@ export function renderScaleEditorEscala(record) {
                     <textarea id="escalaObservacao-${record.colaboradorId}" class="form-control" rows="3" placeholder="Detalhes deste dia">${escapeHtml(record.observacao || '')}</textarea>
                 </div>
 
-                <div class="editor-actions editor-actions-main">
-                    <button ${atributosAcao('salvarEscalaDia', record.colaboradorId)} class="btn-primary">
-                        <i class="fas fa-save"></i> Salvar dia
-                    </button>
-                    <button ${atributosAcao('fecharEditor')} class="btn-secondary">
-                        <i class="fas fa-times"></i> Cancelar
-                    </button>
-                </div>
-
                 <div class="editor-period-panel">
                     <div class="editor-period-header">
                         <label><i class="fas fa-calendar-alt"></i> Almoco por periodo</label>
@@ -386,9 +400,27 @@ export function renderScaleEditorEscala(record) {
                         </button>
                     </div>
                 </div>
+
+                <!-- Rodape grudado na borda de baixo da janela. -->
+                <div class="editor-actions editor-actions-main escala-ajustes-rodape">
+                    <button ${atributosAcao('fecharEditor')} class="btn-secondary">
+                        <i class="fas fa-times"></i> Cancelar
+                    </button>
+                    <button ${atributosAcao('salvarEscalaDia', record.colaboradorId)} class="btn-primary">
+                        <i class="fas fa-save"></i> Salvar dia
+                    </button>
+                </div>
             </div>
         `;
 
+    // Reaberta depois de salvar ou recarregar o dia, a janela ja estava
+    // visivel: mantem a rolagem; so a primeira abertura volta ao topo.
+    if (modal.hidden) {
+        modal.hidden = false;
+        modal.scrollTop = 0;
+    }
+
+    ajustesEscalaIniciais = lerCamposAjustesEscala();
 }
 
 // Sequencia da requisicao do dia. Cada carregamento recebe um numero e so

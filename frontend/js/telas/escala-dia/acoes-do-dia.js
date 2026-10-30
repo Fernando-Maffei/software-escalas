@@ -6,7 +6,7 @@ import { dataPlantaoValidaComFeriados, ehDataPlantaoValida } from '../../core/ru
 import { abrirEditorNaEscala } from '../escala-dia-editor.js';
 import { formatDatePtBrEscala, toISODateEscala } from '../escala-dia-shared.js';
 import { abrirModalLancamento } from '../lancamentos.js';
-import { carregarEscalaDiaEscala, getScaleEditorRecordEscala } from './editor-lateral.js';
+import { carregarEscalaDiaEscala, getScaleEditorRecordEscala } from './editor-ajustes.js';
 import { getCurrentScaleState } from './estado-e-layout.js';
 import { buildScaleSectorFiltersEscala, filterScaleItemsBySectorEscala, getScaleSectorSelectionEscala } from './filtros-setor.js';
 import { abrirReporDomingoEscala, atualizarBotaoReporDomingoEscala } from './repor-domingo.js';
