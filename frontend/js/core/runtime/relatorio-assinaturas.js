@@ -206,7 +206,7 @@ function renderFolhas(relatorio, filtros) {
                 <h1 class="folha-titulo">${escapeHtml(folha.titulo)}</h1>
                 <ul class="folha-datas">
                     ${folha.datas.map((linha) => `
-                        <li>${escapeHtml(linha.data)} &rarr; ${escapeHtml(linha.nomes.join(', '))}</li>
+                        <li><strong class="folha-data">${escapeHtml(linha.data)}</strong> &rarr; ${escapeHtml(linha.nomes.join(', '))}</li>
                     `).join('')}
                 </ul>
                 <p class="folha-local">${escapeHtml(localEData)}</p>
@@ -282,7 +282,8 @@ function gerarHtmlImpressaoAssinaturas(relatorio, filtros) {
         .folha-assinatura:last-child { break-after: auto; page-break-after: auto; }
         .folha-titulo { margin: 0 0 25pt; font-size: 14pt; font-weight: 700; line-height: 1.2; text-align: center; }
         .folha-datas { margin: 0; padding: 0; list-style: none; }
-        .folha-datas li { font-size: 12pt; font-weight: 700; line-height: 25pt; }
+        .folha-datas li { font-size: 12pt; font-weight: 400; line-height: 25pt; }
+        .folha-data { font-weight: 700; }
         .folha-local { margin: 24pt 0 0; font-size: 11pt; }
         .folha-assinaturas { margin: 20pt 0 0; padding: 0; list-style: none; }
         .folha-jornada { margin: 24pt 0 0; font-size: 10pt; font-style: italic; }
