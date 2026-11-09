@@ -138,7 +138,6 @@ export const API = {
         });
     },
 
-    health: () => API.get('/health'),
     getNetworkStatus: () => API.get('/network/status'),
 
     getColaboradores: (params = {}) => API.get('/colaboradores', params),
@@ -152,13 +151,7 @@ export const API = {
     excluirCobertura: (id) => API.delete(`/coberturas/${id}`),
     getDisponibilidadeCobertura: (params = {}) => API.get('/coberturas/disponibilidade', params),
     salvarSetor: (data) => API.post('/setores', data),
-    salvarColaborador: (data) => data.id
-        ? API.put(`/colaboradores/${data.id}`, data)
-        : API.post('/colaboradores', data),
     getColaboradorJornadaSemanal: (colaboradorId) => API.get(`/colaboradores/${colaboradorId}/jornada-semanal`),
-    salvarColaboradorJornadaSemanal: (colaboradorId, jornadaSemanal) => API.put(`/colaboradores/${colaboradorId}/jornada-semanal`, {
-        jornadaSemanal
-    }),
     getJornadaSemanal: (params = {}) => API.get('/jornada-semanal', params),
     excluirColaborador: (id) => API.delete(`/colaboradores/${id}`),
     desligarColaborador: (id, data) => API.put(`/colaboradores/${id}/desligar`, data),
@@ -189,13 +182,9 @@ export const API = {
     salvarEscalaDia: (dataISO, colaboradorId, data) => API.put(`/escala/dia/${dataISO}/colaborador/${colaboradorId}`, data),
     aplicarAlmocoPeriodo: (data) => API.put('/escala/almoco-periodo', data),
     restaurarAlmocosCadastroEscala: (dataISO, data = {}) => API.put(`/escala/dia/${dataISO}/almocos/cadastro`, data),
-    sincronizarEscala: (data) => API.post('/escala/rebuild', data),
 
-    getBancoHorasStatus: () => API.get('/banco-horas/status'),
     getBancoHorasResumo: (params = {}) => API.get('/banco-horas/resumo', params),
     getBancoHorasExtrato: (colaboradorId, params = {}) => API.get(`/banco-horas/colaborador/${colaboradorId}`, params),
-    atualizarBancoHorasSaldo: (colaboradorId, data) => API.put(`/banco-horas/colaborador/${colaboradorId}/saldo`, data),
-    recalcularBancoHoras: () => API.post('/banco-horas/recalcular', {}),
 
     getBancoHorasSemanal: (params = {}) => API.get('/banco-horas-semanal', params),
     salvarBancoHorasSemanalCelula: (data) => API.put('/banco-horas-semanal/celula', data),
