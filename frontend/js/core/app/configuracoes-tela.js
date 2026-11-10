@@ -93,58 +93,6 @@ export function renderConfiguracoes() {
                 </div>
             </div>
 
-            <div class="config-card" data-config-section="operacao">
-                <div class="config-card-header">
-                    <i class="fas fa-sliders-h"></i>
-                    <h2>Preferências</h2>
-                </div>
-                
-                <div class="config-card-body">
-                    <div class="config-item">
-                        <div class="config-item-info">
-                            <i class="fas fa-calendar-week"></i>
-                            <div>
-                                <strong>Semana começa em:</strong>
-                                <p>Defina o primeiro dia da semana</p>
-                            </div>
-                        </div>
-                        <select id="primeiroDiaSemana" class="config-select">
-                            <option value="0">Domingo</option>
-                            <option value="1" selected>Segunda-feira</option>
-                            <option value="6">Sábado</option>
-                        </select>
-                    </div>
-
-                    <div class="config-item">
-                        <div class="config-item-info">
-                            <i class="fas fa-clock"></i>
-                            <div>
-                                <strong>Formato de hora:</strong>
-                                <p>Escolha como as horas são exibidas</p>
-                            </div>
-                        </div>
-                        <select id="formatoHora" class="config-select">
-                            <option value="24" selected>24 horas (14:30)</option>
-                            <option value="12">12 horas (2:30 PM)</option>
-                        </select>
-                    </div>
-
-                    <div class="config-item">
-                        <div class="config-item-info">
-                            <i class="fas fa-bell"></i>
-                            <div>
-                                <strong>Notificações:</strong>
-                                <p>Receber alertas do sistema</p>
-                            </div>
-                        </div>
-                        <label class="switch">
-                            <input type="checkbox" id="notificacoes" checked>
-                            <span class="slider"></span>
-                        </label>
-                    </div>
-                </div>
-            </div>
-
             <!-- CARD SOBRE O SISTEMA -->
             <div class="config-card config-card-wide" data-config-section="escalas">
                 <div class="config-card-header">
@@ -562,15 +510,8 @@ export function renderConfiguracoes() {
         });
     });
 
-    // Carrega preferências salvas
-    carregarPreferencias();
     inicializarSecoesConfiguracoes();
     inicializarPersonalizacaoEscala();
-
-    // Eventos para salvar preferências
-    document.getElementById('primeiroDiaSemana').addEventListener('change', salvarPreferencias);
-    document.getElementById('formatoHora').addEventListener('change', salvarPreferencias);
-    document.getElementById('notificacoes').addEventListener('change', salvarPreferencias);
 
     inicializarConfiguracaoBancoTela();
 
@@ -592,31 +533,6 @@ function mudarTema(tema) {
     mostrarToast(`Tema ${tema === 'dark' ? 'escuro' : 'claro'} ativado!`, 'success');
 }
 
-// Função para carregar preferências salvas
-function carregarPreferencias() {
-    const primeiroDia = localStorage.getItem('primeiroDiaSemana');
-    const formatoHora = localStorage.getItem('formatoHora');
-    const notificacoes = localStorage.getItem('notificacoes');
-
-    if (primeiroDia) {
-        document.getElementById('primeiroDiaSemana').value = primeiroDia;
-    }
-    if (formatoHora) {
-        document.getElementById('formatoHora').value = formatoHora;
-    }
-    if (notificacoes) {
-        document.getElementById('notificacoes').checked = notificacoes === 'true';
-    }
-}
-
-// Função para salvar preferências
-function salvarPreferencias() {
-    localStorage.setItem('primeiroDiaSemana', document.getElementById('primeiroDiaSemana').value);
-    localStorage.setItem('formatoHora', document.getElementById('formatoHora').value);
-    localStorage.setItem('notificacoes', document.getElementById('notificacoes').checked);
-    mostrarToast('Preferências salvas!', 'success');
-}
-
 // Funções de ferramentas (exemplo)
 // Baixa o backup COMPLETO do servidor (todas as tabelas de dados), mais as
 // preferencias deste navegador. "Importar Dados" com este arquivo devolve o
@@ -626,10 +542,7 @@ export async function exportarDados() {
     try {
         const backup = await API.baixarBackup();
         backup.preferencias = {
-            tema: localStorage.getItem('tema') || 'light',
-            primeiroDiaSemana: localStorage.getItem('primeiroDiaSemana') || '1',
-            formatoHora: localStorage.getItem('formatoHora') || '24',
-            notificacoes: localStorage.getItem('notificacoes') === 'true'
+            tema: localStorage.getItem('tema') || 'light'
         };
 
         const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
@@ -655,17 +568,5 @@ export function aplicarPreferenciasImportadas(preferencias = {}) {
     if (preferencias.tema) {
         localStorage.setItem('tema', preferencias.tema);
         document.documentElement.setAttribute('data-theme', preferencias.tema);
-    }
-
-    if (preferencias.primeiroDiaSemana !== undefined) {
-        localStorage.setItem('primeiroDiaSemana', String(preferencias.primeiroDiaSemana));
-    }
-
-    if (preferencias.formatoHora !== undefined) {
-        localStorage.setItem('formatoHora', String(preferencias.formatoHora));
-    }
-
-    if (preferencias.notificacoes !== undefined) {
-        localStorage.setItem('notificacoes', String(preferencias.notificacoes));
     }
 }

@@ -10,12 +10,6 @@ const CONFIGURACOES_SECOES = [
         description: 'Tema e cores'
     },
     {
-        id: 'operacao',
-        label: 'Operacao',
-        icon: 'sliders-h',
-        description: 'Preferencias gerais'
-    },
-    {
         id: 'escalas',
         label: 'Escalas',
         icon: 'calendar-check',
